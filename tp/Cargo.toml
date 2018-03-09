@@ -1,0 +1,16 @@
+[package]
+name = "sawtooth-sabre"
+version = "0.1.0"
+authors = ["Cargill Incorporated"]
+build = "build.rs"
+
+[dependencies]
+sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
+log = "0.3.8"
+simple_logger = "0.4.0"
+clap = "2"
+protobuf = "1.4"
+rust-crypto = "0.2.36"
+
+[build-dependencies]
+protoc-rust = "1.4"
