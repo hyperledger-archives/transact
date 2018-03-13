@@ -17,7 +17,7 @@ syntax = "proto3";
 // A namespace registry is stored using the namespace, prefixed with zero
 // padding:
 //
-//   00ec00 + 00 padding + substr(namespace, 0, 6)
+//   00ec00 + hash(namespace)
 //
 // The stored contents are a serialized NamespaceRegistryList message to handle
 // hash collisions.
