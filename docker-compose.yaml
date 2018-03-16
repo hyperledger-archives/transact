@@ -54,3 +54,29 @@ services:
     image: hyperledger/sawtooth-settings-tp:1.0
     container_name: sabre-settings-tp
     entrypoint: settings-tp -vv --connect tcp://validator:9704
+
+  sabre-tp:
+    image: sabre-tp
+    container_name: sabre-tp
+    entrypoint: "bash -c \"\
+        cd /project/tp/ && \
+        cargo build && \
+        sawtooth-sabre -vv -C tcp://validator:9704 \
+        \""
+    volumes:
+      - .:/project
+    build:
+      context: tp
+
+  sabre-cli:
+    image: sabre-cli
+    container_name: sabre-cli
+    entrypoint: "bash -c \"\
+      sawtooth keygen && \
+      cargo build && \
+      tail -f /dev/null \
+      \""
+    volumes:
+      - .:/project
+    build:
+      context: cli
