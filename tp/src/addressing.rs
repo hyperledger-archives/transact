@@ -24,12 +24,6 @@ const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &'static str = "00ec02";
 
-pub fn get_namspace_prefix(namespace: &str) -> String {
-    let mut sha = Sha512::new();
-    sha.input_str(namespace);
-    sha.result_str()[..6].to_string()
-}
-
 pub fn hash(to_hash: &str, num: usize) -> String {
     let mut sha = Sha512::new();
     sha.input_str(to_hash);
@@ -42,13 +36,13 @@ pub fn hash(to_hash: &str, num: usize) -> String {
 }
 
 pub fn make_contract_address(name: &str, version: &str) -> String {
-    get_namspace_prefix(&CONTRACT_PREFIX) + &hash(&(name.to_string() + "," + version), 64)
+    CONTRACT_PREFIX.to_string() + &hash(&(name.to_string() + "," + version), 64)
 }
 
 pub fn make_contract_registry_address(name: &str) -> String {
-    get_namspace_prefix(&CONTRACT_REGISTRY_PREFIX) + &hash(name, 64)
+    CONTRACT_REGISTRY_PREFIX.to_string() + &hash(name, 64)
 }
 
 pub fn make_namespace_registry_address(namespace: &str) -> String {
-    get_namspace_prefix(&NAMESPACE_REGISTRY_PREFIX) + &hash(namespace, 64)
+    NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(namespace, 64)
 }
