@@ -12,8 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use protobuf;
-use protobuf::Message;
-use protobuf::MessageStatic;
 use protobuf::RepeatedField;
 
 use crypto::digest::Digest;
@@ -748,7 +746,6 @@ impl TransactionHandler for SabreTransactionHandler {
                 signer,
                 &mut state,
             ),
-            _ => Err(ApplyError::InvalidTransaction("Invalid action".into())),
         }
     }
 }
