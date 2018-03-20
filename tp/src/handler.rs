@@ -28,7 +28,7 @@ use addressing::{make_contract_address, make_contract_registry_address,
                  make_namespace_registry_address};
 
 use protos::contract::{Contract, ContractList};
-use protos::contract_registry::{ContractRegistry, ContractRegistryList};
+use protos::contract_registry::{ContractRegistry, ContractRegistryList, ContractRegistry_Version};
 use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList};
 use protos::payload::{CreateContractAction, CreateContractRegistryAction,
                       CreateNamespaceRegistryAction, CreateNamespaceRegistryPermissionAction,
@@ -344,7 +344,7 @@ impl<'a> SabreState<'a> {
             },
             None => ContractList::new(),
         };
-        // remove old agent if it exists and sort the contracts by name
+        // remove old contract if it exists and sort the contracts by name
         let contracts = contract_list.get_contracts().to_vec();
         let mut index = None;
         let mut count = 0;
@@ -377,6 +377,26 @@ impl<'a> SabreState<'a> {
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
+
+    pub fn delete_contract(&mut self, name: &str, version: &str) -> Result<(), ApplyError> {
+        let address = make_contract_address(name, version);
+        let d = self.context.delete_state(vec![address.clone()])?;
+        let deleted: Vec<String> = match d {
+            Some(deleted) => deleted.to_vec(),
+            None => {
+                return Err(ApplyError::InternalError(String::from(
+                    "Cannot delete contract",
+                )))
+            }
+        };
+        if !deleted.contains(&address) {
+            return Err(ApplyError::InternalError(String::from(
+                "Cannot delete contract",
+            )));
+        };
+        Ok(())
+    }
+
 
     pub fn get_contract_registry(
         &mut self,
@@ -676,9 +696,51 @@ fn create_contract(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Create Contract not yet implemented.",
-    )));
+    let name = payload.get_name();
+    let version = payload.get_version();
+    match state.get_contract(name, version) {
+        Ok(None) => (),
+        Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
+            "Contract already exists: {}, {}", name, version,
+        ))),
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    let mut contract = Contract::new();
+    contract.set_name(name.to_string());
+    contract.set_version(version.to_string());
+    contract.set_inputs(RepeatedField::from_vec(payload.get_inputs().to_vec()));
+    contract.set_outputs(RepeatedField::from_vec(payload.get_outputs().to_vec()));
+    contract.set_creator(signer.to_string());
+    contract.set_contract(payload.get_contract().to_vec());
+
+    state.set_contract(name, version, contract)?;
+
+    // update or create the contract registry for the contract
+    let mut contract_registry = match state.get_contract_registry(name) {
+        Ok(None) => {
+            let mut contract_registry = ContractRegistry::new();
+            contract_registry.set_name(name.to_string());
+            contract_registry
+        }
+        Ok(Some(contract_registry)) => contract_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    let mut sha = Sha512::new();
+    sha.input(payload.get_contract());
+
+    let mut contract_registry_version = ContractRegistry_Version::new();
+    contract_registry_version.set_version(version.to_string());
+    contract_registry_version.set_contract_sha512(sha.result_str().to_string());
+    contract_registry_version.set_creator(signer.to_string());
+    contract_registry.versions.push(contract_registry_version);
+
+    state.set_contract_registry(name, contract_registry)
 }
 
 fn delete_contract(
@@ -686,9 +748,45 @@ fn delete_contract(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Delete Contract not yet implemented.",
-    )));
+
+    let name = payload.get_name();
+    let version = payload.get_version();
+
+     match state.get_contract(name, version) {
+        Ok(Some(_)) => (),
+        Ok(_) => return Err(ApplyError::InvalidTransaction(format!(
+            "Contract does not exist: {}, {}", name, version,
+        ))),
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    // update the contract registry for the contract
+    let mut contract_registry = match state.get_contract_registry(name) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "ContractRegistry does not exist {}.", name,
+        ))),
+        Ok(Some(contract_registry)) => contract_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    if !(contract_registry.owners.contains(&signer.to_string())) {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Signer is not an owner of this contract: {}.", signer,
+        )))
+    }
+    let versions = contract_registry.versions.clone();
+    for (index, contract_registry_version) in versions.iter().enumerate() {
+        if contract_registry_version.version == version {
+            contract_registry.versions.remove(index);
+            break;
+        }
+    }
+    state.set_contract_registry(name, contract_registry)?;
+    state.delete_contract(name, version)
 }
 
 fn execute_contract(
