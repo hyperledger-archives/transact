@@ -23,13 +23,15 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
 use sawtooth_sdk::messages::processor::TpProcessRequest;
+use sawtooth_sdk::messages::setting::Setting;
 
 use addressing::{make_contract_address, make_contract_registry_address,
-                 make_namespace_registry_address};
+                 make_namespace_registry_address, get_sawtooth_admins_address};
 
 use protos::contract::{Contract, ContractList};
 use protos::contract_registry::{ContractRegistry, ContractRegistryList, ContractRegistry_Version};
-use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList};
+use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList,
+                                 NamespaceRegistry_Permission};
 use protos::payload::{CreateContractAction, CreateContractRegistryAction,
                       CreateNamespaceRegistryAction, CreateNamespaceRegistryPermissionAction,
                       DeleteContractAction, DeleteContractRegistryAction,
@@ -191,7 +193,7 @@ impl SabreRequestPayload {
                 let create_namespace_registry = payload.get_create_namespace_registry();
                 if create_namespace_registry.get_namespace().is_empty() {
                     return Err(ApplyError::InvalidTransaction(String::from(
-                        "Namespace Registry namesapce cannot be an empty string",
+                        "Namespace Registry namespace cannot be an empty string",
                     )));
                 }
                 if create_namespace_registry.get_owners().is_empty() {
@@ -292,6 +294,28 @@ pub struct SabreState<'a> {
 impl<'a> SabreState<'a> {
     pub fn new(context: &'a mut TransactionContext) -> SabreState {
         SabreState { context: context }
+    }
+
+    pub fn get_admin_setting(
+        &mut self,
+    ) -> Result<Option<Setting>, ApplyError> {
+        let address = get_sawtooth_admins_address();
+        let d = self.context.get_state(&address)?;
+        match d {
+            Some(packed) => {
+                let setting: Setting = match protobuf::parse_from_bytes(packed.as_slice()) {
+                    Ok(setting) => setting,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize setting: {:?}",
+                            err,
+                        )))
+                    }
+                };
+                Ok(Some(setting))
+            }
+            None => Ok(None),
+        }
     }
 
     pub fn get_contract(
@@ -588,6 +612,25 @@ impl<'a> SabreState<'a> {
         self.context
             .set_state(&address, serialized.as_ref())
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+        Ok(())
+    }
+
+    pub fn delete_namespace_registry(&mut self, namespace: &str) -> Result<(), ApplyError> {
+        let address = make_namespace_registry_address(namespace);
+        let d = self.context.delete_state(vec![address.clone()])?;
+        let deleted: Vec<String> = match d {
+            Some(deleted) => deleted.to_vec(),
+            None => {
+                return Err(ApplyError::InternalError(String::from(
+                    "Cannot delete namespace registry",
+                )))
+            }
+        };
+        if !deleted.contains(&address) {
+            return Err(ApplyError::InternalError(String::from(
+                "Cannot delete namespace registry",
+            )));
+        };
         Ok(())
     }
 }
@@ -908,9 +951,46 @@ fn create_namespace_registry(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Create Namespace Registry not implemented.",
-    )));
+
+    let namespace = payload.get_namespace();
+
+    match state.get_namespace_registry(namespace) {
+        Ok(None) => (),
+        Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry already exists: {}.", namespace,
+        ))),
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    }
+
+    let setting = match state.get_admin_setting(){
+        Ok(Some(setting)) => setting,
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "Only owners or admins can update or delete a namespace registry: {}.", signer,
+        ))),
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    for entry in setting.get_entries() {
+        if entry.key == "sawtooth.swa.administrators" {
+            let values = entry.value.split(",");
+            let value_vec: Vec<&str> = values.collect();
+            if !value_vec.contains(&signer){
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Only admins can create a namespace registry: {}.", signer,
+                )))
+            }
+        }
+    }
+
+    let mut namespace_registry = NamespaceRegistry::new();
+    namespace_registry.set_namespace(namespace.to_string());
+    namespace_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
+
+    state.set_namespace_registry(namespace, namespace_registry)
 }
 
 fn delete_namespace_registry(
@@ -929,8 +1009,13 @@ fn delete_namespace_registry(
             "Unable to check state: {}.", err,
         )))
     };
-    // Check if signer is an owner or an admin
     can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+
+    if namespace_registry.permissions.len() != 0 {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry can only be deleted if there are no permissions: {}.", namespace,
+        )))
+    }
     state.delete_namespace_registry(namespace)
 }
 
