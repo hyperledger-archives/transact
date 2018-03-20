@@ -1002,7 +1002,7 @@ fn delete_namespace_registry(
 
     let namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exists: {}.", namespace,
+            "NamespaceRegistry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1029,7 +1029,7 @@ fn update_namespace_registry_owners(
 
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exists: {}.", namespace,
+            "NamespaceRegistry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1044,7 +1044,99 @@ fn update_namespace_registry_owners(
     state.set_namespace_registry(namespace, namespace_registry)
 }
 
+fn create_namespace_registry_permission(
+    payload: CreateNamespaceRegistryPermissionAction,
+    signer: &str,
+    state: &mut SabreState,
+) -> Result<(), ApplyError> {
 
+    let namespace = payload.get_namespace();
+    let contract_name = payload.get_contract_name();
+    let mut namespace_registry = match state.get_namespace_registry(namespace) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry does not exist: {}.", namespace,
+        ))),
+        Ok(Some(namespace_registry)) => namespace_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+    // Check if signer is an owner or an admin
+    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+
+    let mut new_permission = NamespaceRegistry_Permission::new();
+    new_permission.set_contract_name(contract_name.to_string());
+    new_permission.set_read(payload.get_read());
+    new_permission.set_write(payload.get_write());
+
+    // remove old permission for contract if one exists and replace with the new permission
+    let permissions = namespace_registry.get_permissions().to_vec();
+    let mut index = None;
+    let mut count = 0;
+    for permission in permissions.clone() {
+        if permission.contract_name == contract_name {
+            index = Some(count);
+            break;
+        }
+        count = count + 1;
+    }
+
+    match index {
+        Some(x) => {
+            namespace_registry.permissions.remove(x);
+        }
+        None => (),
+    };
+    namespace_registry.permissions.push(new_permission);
+    state.set_namespace_registry(namespace, namespace_registry)
+
+}
+
+fn delete_namespace_registry_permission(
+    payload: DeleteNamespaceRegistryPermissionAction,
+    signer: &str,
+    state: &mut SabreState,
+) -> Result<(), ApplyError> {
+
+    let namespace = payload.get_namespace();
+    let contract_name = payload.get_contract_name();
+
+    let mut namespace_registry = match state.get_namespace_registry(namespace) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry does not exist: {}.", namespace,
+        ))),
+        Ok(Some(namespace_registry)) => namespace_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+    // Check if signer is an owner or an admin
+    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+
+    // remove old permission for contract
+    let permissions = namespace_registry.get_permissions().to_vec();
+    let mut index = None;
+    let mut count = 0;
+    for permission in permissions.clone() {
+        if permission.contract_name == contract_name {
+            index = Some(count);
+            break;
+        }
+        count = count + 1;
+    }
+
+    match index {
+        Some(x) => {
+            namespace_registry.permissions.remove(x);
+        }
+        None => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry does not have a permission for : {}.", contract_name,
+        ))),
+    };
+    state.set_namespace_registry(namespace, namespace_registry)
+}
+
+// helper function to check if the signer is allowed to update a namespace_registry
 fn can_update_namespace_registry(namespace_registry: NamespaceRegistry, signer: &str, state: &mut SabreState) -> Result<(), ApplyError> {
     if !namespace_registry.owners.contains(&signer.to_string()) {
         let setting = match state.get_admin_setting(){
@@ -1070,24 +1162,4 @@ fn can_update_namespace_registry(namespace_registry: NamespaceRegistry, signer: 
         }
     }
     Ok(())
-}
-
-fn create_namespace_registry_permission(
-    payload: CreateNamespaceRegistryPermissionAction,
-    signer: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Create Namespace Registry Permissions not implemented.",
-    )));
-}
-
-fn delete_namespace_registry_permission(
-    payload: DeleteNamespaceRegistryPermissionAction,
-    signer: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Delete Namespace Registry Permissions not implemented.",
-    )));
 }
