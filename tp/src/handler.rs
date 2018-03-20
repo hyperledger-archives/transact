@@ -485,6 +485,25 @@ impl<'a> SabreState<'a> {
         Ok(())
     }
 
+    pub fn delete_contract_registry(&mut self, name: &str) -> Result<(), ApplyError> {
+        let address = make_contract_registry_address(name);
+        let d = self.context.delete_state(vec![address.clone()])?;
+        let deleted: Vec<String> = match d {
+            Some(deleted) => deleted.to_vec(),
+            None => {
+                return Err(ApplyError::InternalError(String::from(
+                    "Cannot delete contract registry",
+                )))
+            }
+        };
+        if !deleted.contains(&address) {
+            return Err(ApplyError::InternalError(String::from(
+                "Cannot delete contract registry",
+            )));
+        };
+        Ok(())
+    }
+
     pub fn get_namespace_registry(
         &mut self,
         namespace: &str,
@@ -804,9 +823,24 @@ fn create_contract_registry(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Create Contract Registry not yet implemented.",
-    )));
+
+    let name = payload.get_name();
+
+    match state.get_contract_registry(name) {
+        Ok(None) => (),
+        Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
+            "ContractRegistry already exists: {}.", name,
+        ))),
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    let mut contract_registry = ContractRegistry::new();
+    contract_registry.set_name(name.to_string());
+    contract_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
+
+    state.set_contract_registry(name, contract_registry)
 }
 
 fn delete_contract_registry(
@@ -814,9 +848,32 @@ fn delete_contract_registry(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Delete Contract Registry not implemented.",
-    )));
+
+    let name = payload.get_name();
+    let contract_registry = match state.get_contract_registry(name) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "ContractRegistry does not exist: {}.", name,
+        ))),
+        Ok(Some(contract_registry)) => contract_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    if !(contract_registry.owners.contains(&signer.to_string())) {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Signer must be an owner to delete a contract registry: {}.", signer,
+        )))
+    }
+
+    if contract_registry.versions.len() != 0 {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "ContractRegistry can only be deleted if there are no versions: {}.", name,
+        )))
+    }
+
+    state.delete_contract_registry(name)
+
 }
 
 fn update_contract_registry_owners(
@@ -824,9 +881,26 @@ fn update_contract_registry_owners(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Update Contract Registry Owners not implemented.",
-    )));
+
+    let name = payload.get_name();
+    let mut contract_registry = match state.get_contract_registry(name) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "ContractRegistry does not exist: {}.", name,
+        ))),
+        Ok(Some(contract_registry)) => contract_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    if !(contract_registry.owners.contains(&signer.to_string())) {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Signer must be an owner to update the owners of the contract: {}.", signer,
+        )))
+    }
+
+    contract_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
+    state.set_contract_registry(name, contract_registry)
 }
 
 fn create_namespace_registry(
@@ -844,9 +918,20 @@ fn delete_namespace_registry(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Delete Namespace Registry not implemented.",
-    )));
+    let namespace = payload.get_namespace();
+
+    let namespace_registry = match state.get_namespace_registry(namespace) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry does not exists: {}.", namespace,
+        ))),
+        Ok(Some(namespace_registry)) => namespace_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+    // Check if signer is an owner or an admin
+    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+    state.delete_namespace_registry(namespace)
 }
 
 fn update_namespace_registry_owners(
@@ -854,9 +939,52 @@ fn update_namespace_registry_owners(
     signer: &str,
     state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Update Namespace Registry Owners not implemented.",
-    )));
+
+    let namespace = payload.get_namespace();
+
+    let mut namespace_registry = match state.get_namespace_registry(namespace) {
+        Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+            "NamespaceRegistry does not exists: {}.", namespace,
+        ))),
+        Ok(Some(namespace_registry)) => namespace_registry,
+        Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+            "Unable to check state: {}.", err,
+        )))
+    };
+
+    // Check if signer is an owner or an admin
+    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+
+    namespace_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
+    state.set_namespace_registry(namespace, namespace_registry)
+}
+
+
+fn can_update_namespace_registry(namespace_registry: NamespaceRegistry, signer: &str, state: &mut SabreState) -> Result<(), ApplyError> {
+    if !namespace_registry.owners.contains(&signer.to_string()) {
+        let setting = match state.get_admin_setting(){
+            Ok(Some(setting)) => setting,
+            Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+                "Only owners or admins can update or delete a namespace registry: {}.", signer,
+            ))),
+            Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+                "Unable to check state: {}.", err,
+            )))
+        };
+
+        for entry in setting.get_entries() {
+            if entry.key == "sawtooth.swa.administrators" {
+                let values = entry.value.split(",");
+                let value_vec: Vec<&str> = values.collect();
+                if !value_vec.contains(&signer){
+                    return Err(ApplyError::InvalidTransaction(format!(
+                        "Only owners or admins can update or delete a namespace registry: {}.", signer,
+                    )))
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 fn create_namespace_registry_permission(
