@@ -14,6 +14,7 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
+use crypto::sha2::Sha256;
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
@@ -24,8 +25,21 @@ const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &'static str = "00ec02";
 
+const SETTING_PREFIX: &'static str = "000000";
+
 pub fn hash(to_hash: &str, num: usize) -> String {
     let mut sha = Sha512::new();
+    sha.input_str(to_hash);
+    let temp = sha.result_str().to_string();
+    let hash = match temp.get(..num) {
+        Some(x) => x,
+        None => "",
+    };
+    hash.to_string()
+}
+
+pub fn hash_256(to_hash: &str, num: usize) -> String {
+    let mut sha = Sha256::new();
     sha.input_str(to_hash);
     let temp = sha.result_str().to_string();
     let hash = match temp.get(..num) {
@@ -45,4 +59,9 @@ pub fn make_contract_registry_address(name: &str) -> String {
 
 pub fn make_namespace_registry_address(namespace: &str) -> String {
     NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(namespace, 64)
+}
+
+pub fn get_sawtooth_admins_address() -> String {
+    SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16) + &hash_256("swa", 16)
+        + &hash_256("administrators", 16) + &hash_256("", 16)
 }
