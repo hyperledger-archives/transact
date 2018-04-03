@@ -1,3 +1,7 @@
 /cli/Cargo.lock
 /cli/src/protos/
 /cli/target/
+
+/tp/Cargo.lock
+/tp/src/protos/
+/tp/target/
