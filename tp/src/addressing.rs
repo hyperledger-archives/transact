@@ -58,7 +58,11 @@ pub fn make_contract_registry_address(name: &str) -> String {
 }
 
 pub fn make_namespace_registry_address(namespace: &str) -> String {
-    NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(namespace, 64)
+    let prefix = match namespace.get(..6) {
+        Some(x) => x,
+        None => "",
+    };
+    NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)
 }
 
 pub fn get_sawtooth_admins_address() -> String {

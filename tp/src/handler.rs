@@ -951,6 +951,12 @@ fn create_namespace_registry(
 
     let namespace = payload.get_namespace();
 
+    if namespace.len() < 6 {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Namespace must be at least 6 characters: {}.", namespace,
+        )))
+    }
+
     match state.get_namespace_registry(namespace) {
         Ok(None) => (),
         Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
