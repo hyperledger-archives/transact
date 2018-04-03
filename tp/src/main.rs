@@ -21,6 +21,7 @@ extern crate protobuf;
 extern crate sawtooth_sdk;
 extern crate simple_logger;
 
+mod wasm_executor;
 mod addressing;
 mod handler;
 mod protos;

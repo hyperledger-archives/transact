@@ -17,6 +17,8 @@ use protobuf::RepeatedField;
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 
+use wasm_executor::wasm_module::WasmModule;
+
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
@@ -556,6 +558,30 @@ impl<'a> SabreState<'a> {
         }
     }
 
+    pub fn get_namespace_registries(
+        &mut self,
+        namespace: &str,
+    ) -> Result<Option<NamespaceRegistryList>, ApplyError> {
+        let address = make_namespace_registry_address(namespace);
+        let d = self.context.get_state(&address)?;
+        match d {
+            Some(packed) => {
+                let namespace_registries: NamespaceRegistryList =
+                    match protobuf::parse_from_bytes(packed.as_slice()) {
+                        Ok(namespace_registries) => namespace_registries,
+                        Err(err) => {
+                            return Err(ApplyError::InternalError(format!(
+                                "Cannot deserialize namespace registry list: {:?}",
+                                err,
+                            )))
+                        }
+                    };
+                Ok(Some(namespace_registries))
+            }
+            None => Ok(None),
+        }
+    }
+
     pub fn set_namespace_registry(
         &mut self,
         namespace: &str,
@@ -687,6 +713,7 @@ impl TransactionHandler for SabreTransactionHandler {
         };
 
         let signer = request.get_header().get_signer_public_key();
+        let context_clone = context.clone();
         let mut state = SabreState::new(context);
 
         info!(
@@ -704,7 +731,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 delete_contract(delete_contract_payload, signer, &mut state)
             }
             Action::ExecuteContract(execute_contract_payload) => {
-                execute_contract(execute_contract_payload, signer, &mut state)
+                execute_contract(execute_contract_payload, signer, &mut state, context_clone)
             }
             Action::CreateContractRegistry(create_contract_registry_payload) => {
                 create_contract_registry(create_contract_registry_payload, signer, &mut state)
@@ -852,10 +879,137 @@ fn execute_contract(
     payload: ExecuteContractAction,
     signer: &str,
     state: &mut SabreState,
+    context: TransactionContext,
 ) -> Result<(), ApplyError> {
-    return Err(ApplyError::InvalidTransaction(String::from(
-        "Execute Contract not yet implemented.",
-    )));
+    let name = payload.get_name();
+    let version = payload.get_version();
+
+    let contract = match state.get_contract(name, version) {
+       Ok(Some(contract)) => contract,
+       Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+           "Contract does not exist: {}, {}", name, version,
+       ))),
+       Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+           "Unable to check state: {}", err,
+       )))
+    };
+
+    for input in payload.get_inputs() {
+        let namespace = match input.get(..6){
+            Some(namespace) => namespace,
+            None =>  return Err(ApplyError::InvalidTransaction(format!(
+                "Input must have at least 6 characters: {}", input,
+            )))
+        };
+        let registries = match state.get_namespace_registries(namespace) {
+            Ok(Some(registries)) => registries,
+            Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+                "Namespace Registry does not exist: {}", namespace,
+            ))),
+            Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+                "Unable to check state: {}", err,
+            )))
+        };
+
+        let mut namespace_registry = None;
+        for registry in registries.get_registries() {
+            if input.starts_with(&registry.namespace) {
+                namespace_registry = Some(registry)
+            }
+        }
+
+        let mut permissioned = false;
+        match namespace_registry {
+            Some(registry) => {
+                for permission in registry.get_permissions() {
+                    if name == permission.contract_name && permission.read{
+                        permissioned = true;
+                        break
+                    }
+                }
+                if !permissioned {
+                    return Err(ApplyError::InvalidTransaction(format!(
+                        "Contract does not have permission to read from state : {} {}",
+                        name, input
+                    )))
+                }
+
+            },
+            None => return Err(ApplyError::InvalidTransaction(format!(
+                "No namespace registry exists for namespace: {} input: {} ", namespace, input
+            )))
+        }
+
+    }
+
+    for output in payload.get_outputs() {
+        let namespace = match output.get(..6){
+            Some(namespace) => namespace,
+            None =>  return Err(ApplyError::InvalidTransaction(format!(
+                "Output must have at least 6 characters: {}", output,
+            )))
+        };
+        let registries = match state.get_namespace_registries(namespace) {
+            Ok(Some(registries)) => registries,
+            Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
+                "Namespace Registry does not exist: {}", namespace,
+            ))),
+            Err(err) => return Err(ApplyError::InvalidTransaction(format!(
+                "Unable to check state: {}", err,
+            )))
+        };
+
+        let mut namespace_registry = None;
+        for registry in registries.get_registries() {
+            if output.starts_with(&registry.namespace) {
+                namespace_registry = Some(registry)
+            }
+        }
+        let mut permissioned = false;
+        match namespace_registry {
+            Some(registry) => {
+                for permission in registry.get_permissions() {
+                    if name == permission.contract_name && permission.write {
+                        permissioned = true;
+                        break
+                    }
+                }
+                if !permissioned {
+                    return Err(ApplyError::InvalidTransaction(format!(
+                        "Contract does not have permission to write to state: {}, {}",
+                        name, output
+                    )))
+                }
+
+            },
+            None => return Err(ApplyError::InvalidTransaction(format!(
+                "No namespace registry exists for namespace: {} output: {}", namespace, output
+            )))
+        }
+
+    }
+
+    let module = WasmModule::new(contract.get_contract(), context)
+        .expect("Failed to create can_add module");
+
+    let result = module
+        .entrypoint(payload.get_payload().to_vec(), signer.into())
+        .map_err(|e| ApplyError::InvalidTransaction(format!("{:?}", e)))?;
+
+    match result {
+        None => return Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract did not return a result: {}, {}", name, version,
+        ))),
+        Some(1) => Ok(()),
+        Some(-3) => return Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract returned invalid transaction: {}, {}", name, version,
+        ))),
+        Some(num) => return Err(ApplyError::InternalError(format!(
+            "Wasm contract returned internal error: {}", num
+        ))),
+
+    }
+
 }
 
 fn create_contract_registry(
