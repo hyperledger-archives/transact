@@ -35,10 +35,12 @@ pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
     let temp = sha.result_str().to_string();
     let hash = match temp.get(..num) {
         Some(x) => x,
-        None => return Err(ApplyError::InvalidTransaction(format!(
-            "Cannot hash {} to Sha512 and return String with len {}",
-            to_hash, num
-        )))
+        None => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Cannot hash {} to Sha512 and return String with len {}",
+                to_hash, num
+            )))
+        }
     };
     Ok(hash.into())
 }
@@ -81,6 +83,8 @@ pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyE
 }
 
 pub fn get_sawtooth_admins_address() -> Result<String, ApplyError> {
-    Ok(SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16)? + &hash_256("swa", 16)?
-        + &hash_256("administrators", 16)? + &hash_256("", 16)?)
+    Ok(
+        SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16)? + &hash_256("swa", 16)?
+            + &hash_256("administrators", 16)? + &hash_256("", 16)?,
+    )
 }

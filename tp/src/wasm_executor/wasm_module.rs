@@ -13,18 +13,13 @@
 // limitations under the License.
 extern crate wasmi;
 
-use wasm_executor::wasmi::{
-    Module,
-    ModuleInstance,
-    ImportsBuilder,
-    RuntimeValue
-};
-use wasm_executor::wasm_externals::{WasmExternals, ExternalsError};
-use sawtooth_sdk::processor::handler::{TransactionContext};
+use wasm_executor::wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
+use wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
+use sawtooth_sdk::processor::handler::TransactionContext;
 
 pub struct WasmModule {
     context: TransactionContext,
-    module: Module
+    module: Module,
 }
 
 impl WasmModule {
@@ -36,12 +31,14 @@ impl WasmModule {
     pub fn entrypoint(
         &self,
         payload: Vec<u8>,
-        signer: String
+        signer: String,
     ) -> Result<Option<i32>, ExternalsError> {
-        let mut env =  WasmExternals::new(None, self.context.clone())?;
+        let mut env = WasmExternals::new(None, self.context.clone())?;
 
-        let instance = ModuleInstance::new(&self.module, &ImportsBuilder::new().with_resolver("env", &env))?
-            .assert_no_start();
+        let instance = ModuleInstance::new(
+            &self.module,
+            &ImportsBuilder::new().with_resolver("env", &env),
+        )?.assert_no_start();
 
         let payload_ptr = env.write_data(payload)? as i32;
         info!("Payload written to memory");
@@ -49,15 +46,14 @@ impl WasmModule {
         let signer_ptr = env.write_data(signer.into_bytes())? as i32;
         info!("Signer written to memory");
 
-        let result = instance
-            .invoke_export(
-                "entrypoint",
-                &vec![
-                    RuntimeValue::I32(payload_ptr),
-                    RuntimeValue::I32(signer_ptr)
-                ],
-                &mut env
-            )?;
+        let result = instance.invoke_export(
+            "entrypoint",
+            &vec![
+                RuntimeValue::I32(payload_ptr),
+                RuntimeValue::I32(signer_ptr),
+            ],
+            &mut env,
+        )?;
 
         if let Some(RuntimeValue::I32(i)) = result {
             Ok(Some(i))

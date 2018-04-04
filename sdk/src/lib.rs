@@ -20,25 +20,22 @@ use std::string::FromUtf8Error;
 pub use externs::{WasmPtr, WasmPtrList};
 
 pub struct Header {
-    signer: String
+    signer: String,
 }
 
 impl Header {
-    pub fn new(signer: String) -> Header{
-        Header {
-            signer
-        }
+    pub fn new(signer: String) -> Header {
+        Header { signer }
     }
 
     pub fn get_signer_public_key(&self) -> &str {
         &self.signer
     }
-
 }
 
 pub struct TpProcessRequest<'a> {
     payload: Vec<u8>,
-    header:  &'a mut Header,
+    header: &'a mut Header,
 }
 
 impl<'a> TpProcessRequest<'a> {
@@ -47,11 +44,11 @@ impl<'a> TpProcessRequest<'a> {
     }
 
     pub fn get_payload(&self) -> &[u8] {
-        return &self.payload
+        return &self.payload;
     }
 
-    pub fn get_header(&self) ->  &Header {
-        return self.header
+    pub fn get_header(&self) -> &Header {
+        return self.header;
     }
 }
 
@@ -72,8 +69,10 @@ impl TransactionContext {
         unsafe {
             let wasm_address_buffer = WasmBuffer::new(address.to_string().as_bytes())?;
             let wasm_state_buffer = WasmBuffer::new(state)?;
-            ptr_to_vec(externs::set_state(wasm_address_buffer.into_raw(),
-                                          wasm_state_buffer.into_raw()))?;
+            ptr_to_vec(externs::set_state(
+                wasm_address_buffer.into_raw(),
+                wasm_state_buffer.into_raw(),
+            ))?;
             Ok(())
         }
     }
@@ -84,7 +83,11 @@ pub trait TransactionHandler {
     fn family_name(&self) -> String;
     fn family_versions(&self) -> Vec<String>;
     fn namespaces(&self) -> Vec<String>;
-    fn apply(&self, request: &TpProcessRequest, context: &mut TransactionContext) -> Result<(), ApplyError>;
+    fn apply(
+        &self,
+        request: &TpProcessRequest,
+        context: &mut TransactionContext,
+    ) -> Result<(), ApplyError>;
 }
 
 /// -1: Failed to deserialize payload
@@ -104,14 +107,17 @@ where
     let signer = if let Ok(i) = WasmBuffer::from_raw(signer_ptr) {
         match i.into_string() {
             Ok(s) => s,
-            Err(_) => return -2
+            Err(_) => return -2,
         }
     } else {
         return -1;
     };
 
     let mut header = Header::new(signer);
-    match apply(&TpProcessRequest::new(payload, &mut header), &mut TransactionContext::new()) {
+    match apply(
+        &TpProcessRequest::new(payload, &mut header),
+        &mut TransactionContext::new(),
+    ) {
         Ok(r) => if r {
             1
         } else {
@@ -132,7 +138,7 @@ where
 ///
 pub struct WasmBuffer {
     raw: WasmPtr,
-    data: Vec<u8>
+    data: Vec<u8>,
 }
 
 impl WasmBuffer {
@@ -140,18 +146,22 @@ impl WasmBuffer {
         let raw = externs::alloc(buffer.len());
 
         if raw < 0 {
-            return Err(WasmSdkError::AllocError("Failed to allocate host memory".into()));
+            return Err(WasmSdkError::AllocError(
+                "Failed to allocate host memory".into(),
+            ));
         }
 
         for i in 0..buffer.len() {
             if externs::write_byte(raw, i as u32, buffer[i]) < 0 {
-                return Err(WasmSdkError::MemoryWriteError("Failed to write data to host memory".into()));
+                return Err(WasmSdkError::MemoryWriteError(
+                    "Failed to write data to host memory".into(),
+                ));
             }
         }
 
         Ok(WasmBuffer {
             raw,
-            data: buffer.clone().to_vec()
+            data: buffer.clone().to_vec(),
         })
     }
 
@@ -168,7 +178,9 @@ impl WasmBuffer {
                 let ptr = externs::get_ptr_from_collection(ptr, i as u32);
 
                 if ptr < 0 {
-                    return Err(WasmSdkError::MemoryRetrievalError("pointer not found".into()));
+                    return Err(WasmSdkError::MemoryRetrievalError(
+                        "pointer not found".into(),
+                    ));
                 }
                 wasm_buffers.push(WasmBuffer::from_raw(ptr)?);
             }
@@ -186,8 +198,7 @@ impl WasmBuffer {
     }
 
     pub fn into_string(&self) -> Result<String, WasmSdkError> {
-        String::from_utf8(self.data.clone())
-            .map_err(WasmSdkError::from)
+        String::from_utf8(self.data.clone()).map_err(WasmSdkError::from)
     }
 }
 
@@ -200,28 +211,24 @@ pub enum WasmSdkError {
     MemoryWriteError(String),
     MemoryRetrievalError(String),
     Utf8EncodeError(FromUtf8Error),
-    ProtobufError(protobuf::ProtobufError)
+    ProtobufError(protobuf::ProtobufError),
 }
 
 impl std::fmt::Display for WasmSdkError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            WasmSdkError::InvalidTransaction(ref s) =>
-                write!(f, "InvalidTransactio: {}", s),
-            WasmSdkError::InternalError(ref s) =>
-                write!(f, "InternalError: {}", s),
-            WasmSdkError::StateSetError(ref s) =>
-                write!(f, "StateSetError: {}", s),
-            WasmSdkError::AllocError(ref s) =>
-                write!(f, "AllocError: {}", s),
-            WasmSdkError::MemoryWriteError(ref s) =>
-                write!(f, "MemoryWriteError: {}", s),
-            WasmSdkError::MemoryRetrievalError(ref s) =>
-                write!(f, "MemoryRetrievalError: {}", s),
-            WasmSdkError::Utf8EncodeError(ref err) =>
-                write!(f, "Utf8EncodeError: {}", err.description()),
-            WasmSdkError::ProtobufError(ref err) =>
-                write!(f, "ProtobufError: {}", err.description()),
+            WasmSdkError::InvalidTransaction(ref s) => write!(f, "InvalidTransactio: {}", s),
+            WasmSdkError::InternalError(ref s) => write!(f, "InternalError: {}", s),
+            WasmSdkError::StateSetError(ref s) => write!(f, "StateSetError: {}", s),
+            WasmSdkError::AllocError(ref s) => write!(f, "AllocError: {}", s),
+            WasmSdkError::MemoryWriteError(ref s) => write!(f, "MemoryWriteError: {}", s),
+            WasmSdkError::MemoryRetrievalError(ref s) => write!(f, "MemoryRetrievalError: {}", s),
+            WasmSdkError::Utf8EncodeError(ref err) => {
+                write!(f, "Utf8EncodeError: {}", err.description())
+            }
+            WasmSdkError::ProtobufError(ref err) => {
+                write!(f, "ProtobufError: {}", err.description())
+            }
         }
     }
 }
@@ -256,18 +263,17 @@ impl std::fmt::Display for ApplyError {
 impl From<WasmSdkError> for ApplyError {
     fn from(e: WasmSdkError) -> Self {
         match e {
-            WasmSdkError::InvalidTransaction(..) =>
-                ApplyError::InvalidTransaction(format!("{}", e)),
-            _ => ApplyError::InternalError(format!("{}", e))
+            WasmSdkError::InvalidTransaction(..) => {
+                ApplyError::InvalidTransaction(format!("{}", e))
+            }
+            _ => ApplyError::InternalError(format!("{}", e)),
         }
     }
 }
 
 unsafe fn set_state(address: String, state: &[u8]) -> Result<(), WasmSdkError> {
-    let addr_ptr = WasmBuffer::new(address.as_bytes())?
-        .into_raw();
-    let state_ptr = WasmBuffer::new(state)?
-        .into_raw();
+    let addr_ptr = WasmBuffer::new(address.as_bytes())?.into_raw();
+    let state_ptr = WasmBuffer::new(state)?.into_raw();
 
     let result = externs::set_state(addr_ptr, state_ptr);
 
@@ -285,8 +291,8 @@ unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
         vec.push(externs::read_byte(ptr as isize + i));
     }
 
-    if vec.len() == 0{
-        return Ok(None)
+    if vec.len() == 0 {
+        return Ok(None);
     }
     Ok(Some(vec))
 }

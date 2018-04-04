@@ -16,7 +16,7 @@ pub type WasmPtr = i32;
 pub type WasmPtrList = i32;
 
 #[no_mangle]
-extern {
+extern "C" {
     pub fn get_state(addr: WasmPtr) -> WasmPtr;
     pub fn set_state(addr: WasmPtr, state: WasmPtr) -> i32;
     pub fn get_ptr_len(ptr: WasmPtr) -> isize;

@@ -18,23 +18,9 @@ use std::error::Error as StdError;
 use std::fmt;
 
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
-use wasm_executor::wasmi::{
-    MemoryRef,
-    FuncRef,
-    FuncInstance,
-    Externals,
-    HostError,
-    Error,
-    MemoryDescriptor,
-    MemoryInstance,
-    ModuleImportResolver,
-    RuntimeArgs,
-    RuntimeValue,
-    Signature,
-    ValueType,
-    Trap,
-    TrapKind
-};
+use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor,
+                           MemoryInstance, MemoryRef, ModuleImportResolver, RuntimeArgs,
+                           RuntimeValue, Signature, Trap, TrapKind, ValueType};
 use wasm_executor::wasmi::memory_units::Pages;
 
 // External function indices
@@ -119,13 +105,13 @@ pub struct WasmExternals {
     context: TransactionContext,
     ptrs: HashMap<u32, Pointer>,
     ptr_collections: HashMap<u32, Vec<u32>>,
-    memory_write_offset: u32
+    memory_write_offset: u32,
 }
 
 impl WasmExternals {
     pub fn new(
         memory_ref: Option<MemoryRef>,
-        context: TransactionContext
+        context: TransactionContext,
     ) -> Result<WasmExternals, ExternalsError> {
         let m_ref = if let Some(m) = memory_ref {
             m
@@ -138,20 +124,20 @@ impl WasmExternals {
             context,
             ptrs: HashMap::new(),
             ptr_collections: HashMap::new(),
-            memory_write_offset: 0
+            memory_write_offset: 0,
         })
     }
 
     fn ptr_to_string(&mut self, raw_ptr: u32) -> Result<String, ExternalsError> {
         if let Some(p) = self.ptrs.get(&raw_ptr) {
-            let bytes = self
-                .get_memory_ref()
-                .get(p.raw, p.length)?;
+            let bytes = self.get_memory_ref().get(p.raw, p.length)?;
 
-            String::from_utf8(bytes)
-                .map_err(ExternalsError::from)
+            String::from_utf8(bytes).map_err(ExternalsError::from)
         } else {
-            Err(ExternalsError::from(format!("ptr referencing {} not found", raw_ptr)))
+            Err(ExternalsError::from(format!(
+                "ptr referencing {} not found",
+                raw_ptr
+            )))
         }
     }
 
@@ -161,7 +147,10 @@ impl WasmExternals {
                 .get(p.raw, p.length)
                 .map_err(ExternalsError::from)
         } else {
-            Err(ExternalsError::from(format!("ptr referencing {} not found", raw_ptr)))
+            Err(ExternalsError::from(format!(
+                "ptr referencing {} not found",
+                raw_ptr
+            )))
         }
     }
 
@@ -169,15 +158,13 @@ impl WasmExternals {
         self.memory_ref.clone()
     }
 
-    pub fn write_data(&mut self, data: Vec<u8>) -> Result<u32, ExternalsError>{
-
-        self.get_memory_ref()
-            .set(self.memory_write_offset, &data)?;
+    pub fn write_data(&mut self, data: Vec<u8>) -> Result<u32, ExternalsError> {
+        self.get_memory_ref().set(self.memory_write_offset, &data)?;
 
         let ptr = Pointer {
             raw: self.memory_write_offset,
             length: data.len(),
-            capacity: data.capacity()
+            capacity: data.capacity(),
         };
 
         let raw_ptr = ptr.raw;
@@ -193,7 +180,7 @@ impl Externals for WasmExternals {
     fn invoke_index(
         &mut self,
         index: usize,
-        args: RuntimeArgs
+        args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
             GET_STATE_IDX => {
@@ -211,8 +198,7 @@ impl Externals for WasmExternals {
                 let raw_ptr = self.write_data(state)?;
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
-
-            },
+            }
             SET_STATE_IDX => {
                 let addr_ptr: i32 = args.nth(0);
                 let state_ptr: i32 = args.nth(1);
@@ -227,7 +213,7 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(0)))
                 }
-            },
+            }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
                 info!("Getting pointer length\nraw {}", addr);
@@ -238,7 +224,7 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
-            },
+            }
             GET_PTR_CAP_IDX => {
                 let addr = args.nth(0);
 
@@ -247,7 +233,7 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
-            },
+            }
             ALLOC_IDX => {
                 let len: i32 = args.nth(0);
 
@@ -256,14 +242,14 @@ impl Externals for WasmExternals {
                 info!("Block successfully allocated ptr: {}", raw_ptr as i32);
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
-            },
+            }
             READ_BYTE_IDX => {
                 let offset: i32 = args.nth(0);
                 let byte = self.get_memory_ref()
                     .get(offset as u32, 1)
                     .map_err(ExternalsError::from)?[0];
                 Ok(Some(RuntimeValue::I32(byte as i32)))
-            },
+            }
             WRITE_BYTE_IDX => {
                 let ptr: u32 = args.nth(0);
                 let offset: u32 = args.nth(1);
@@ -278,7 +264,7 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
-            },
+            }
             GET_COLLECTION_LEN_IDX => {
                 let head_ptr: u32 = args.nth(0);
 
@@ -290,7 +276,7 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
-            },
+            }
             GET_PTR_FROM_COLLECTION_IDX => {
                 let head_ptr: u32 = args.nth(0);
                 let index: u32 = args.nth(1);
@@ -308,49 +294,59 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
-            },
-            _ => Err(ExternalsError::to_trap("Function does not exist".into()))
+            }
+            _ => Err(ExternalsError::to_trap("Function does not exist".into())),
         }
     }
 }
 
 impl ModuleImportResolver for WasmExternals {
-    fn resolve_func(
-        &self,
-        field_name: &str,
-        _signature: &Signature
-    ) -> Result<FuncRef, Error> {
+    fn resolve_func(&self, field_name: &str, _signature: &Signature) -> Result<FuncRef, Error> {
         match field_name {
             "get_state" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                GET_STATE_IDX)),
+                GET_STATE_IDX,
+            )),
             "set_state" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
-                SET_STATE_IDX)),
+                SET_STATE_IDX,
+            )),
             "get_ptr_len" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                GET_PTR_LEN_IDX)),
+                GET_PTR_LEN_IDX,
+            )),
             "get_ptr_capacity" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                GET_PTR_CAP_IDX)),
+                GET_PTR_CAP_IDX,
+            )),
             "alloc" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                ALLOC_IDX)),
+                ALLOC_IDX,
+            )),
             "read_byte" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                READ_BYTE_IDX)),
+                READ_BYTE_IDX,
+            )),
             "write_byte" => Ok(FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32, ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
-                WRITE_BYTE_IDX)),
+                Signature::new(
+                    &[ValueType::I32, ValueType::I32, ValueType::I32][..],
+                    Some(ValueType::I32),
+                ),
+                WRITE_BYTE_IDX,
+            )),
             "get_ptr_collection_len" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
-                GET_COLLECTION_LEN_IDX)),
+                GET_COLLECTION_LEN_IDX,
+            )),
             "get_ptr_from_collection" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
-                GET_PTR_FROM_COLLECTION_IDX)),
+                GET_PTR_FROM_COLLECTION_IDX,
+            )),
 
-            _ => Err(
-                Error::Instantiation(format!("Export {} not found", field_name)))
+            _ => Err(Error::Instantiation(format!(
+                "Export {} not found",
+                field_name
+            ))),
         }
     }
 
@@ -361,7 +357,10 @@ impl ModuleImportResolver for WasmExternals {
     ) -> Result<MemoryRef, Error> {
         match field_name {
             "memory" => Ok(self.get_memory_ref()),
-            _ => Err(Error::Instantiation(format!("env module doesn't provide memory '{}'",field_name)))
+            _ => Err(Error::Instantiation(format!(
+                "env module doesn't provide memory '{}'",
+                field_name
+            ))),
         }
     }
 }
@@ -370,12 +369,16 @@ impl ModuleImportResolver for WasmExternals {
 struct Pointer {
     raw: u32,
     length: usize,
-    capacity: usize
+    capacity: usize,
 }
 
 impl fmt::Debug for Pointer {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Pointer {{ raw: {}, length: {}, capacity {} }}", self.raw, self.length, self.capacity)
+        write!(
+            f,
+            "Pointer {{ raw: {}, length: {}, capacity {} }}",
+            self.raw, self.length, self.capacity
+        )
     }
 }
 
@@ -398,11 +401,10 @@ impl fmt::Display for ExternalsError {
 
 impl HostError for ExternalsError {}
 
-
-impl <'a> From<&'a str> for ExternalsError {
+impl<'a> From<&'a str> for ExternalsError {
     fn from(s: &'a str) -> Self {
         ExternalsError {
-            message: String::from(s)
+            message: String::from(s),
         }
     }
 }
@@ -410,24 +412,21 @@ impl <'a> From<&'a str> for ExternalsError {
 impl From<Error> for ExternalsError {
     fn from(e: Error) -> Self {
         ExternalsError {
-            message: format!("{:?}", e)
+            message: format!("{:?}", e),
         }
     }
 }
 
-
 impl From<String> for ExternalsError {
     fn from(s: String) -> Self {
-        ExternalsError {
-            message: s
-        }
+        ExternalsError { message: s }
     }
 }
 
 impl From<FromUtf8Error> for ExternalsError {
     fn from(e: FromUtf8Error) -> Self {
         ExternalsError {
-            message: e.description().to_string()
+            message: e.description().to_string(),
         }
     }
 }
@@ -435,7 +434,7 @@ impl From<FromUtf8Error> for ExternalsError {
 impl From<ContextError> for ExternalsError {
     fn from(e: ContextError) -> Self {
         ExternalsError {
-            message: format!("{:?}", e)
+            message: format!("{:?}", e),
         }
     }
 }
