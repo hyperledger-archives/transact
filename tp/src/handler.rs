@@ -851,7 +851,7 @@ fn delete_contract(
     // update the contract registry for the contract
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "ContractRegistry does not exist {}.", name,
+            "Contract Registry does not exist {}.", name,
         ))),
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1023,7 +1023,7 @@ fn create_contract_registry(
     match state.get_contract_registry(name) {
         Ok(None) => (),
         Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
-            "ContractRegistry already exists: {}.", name,
+            "Contract Registry already exists: {}.", name,
         ))),
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
             "Unable to check state: {}.", err,
@@ -1046,7 +1046,7 @@ fn delete_contract_registry(
     let name = payload.get_name();
     let contract_registry = match state.get_contract_registry(name) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "ContractRegistry does not exist: {}.", name,
+            "Contract Registry does not exist: {}.", name,
         ))),
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1062,7 +1062,7 @@ fn delete_contract_registry(
 
     if contract_registry.versions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "ContractRegistry can only be deleted if there are no versions: {}.", name,
+            "Contract Registry can only be deleted if there are no versions: {}.", name,
         )))
     }
 
@@ -1079,7 +1079,7 @@ fn update_contract_registry_owners(
     let name = payload.get_name();
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "ContractRegistry does not exist: {}.", name,
+            "Contract Registry does not exist: {}.", name,
         ))),
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1114,7 +1114,7 @@ fn create_namespace_registry(
     match state.get_namespace_registry(namespace) {
         Ok(None) => (),
         Ok(Some(_)) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry already exists: {}.", namespace,
+            "Namespace Registry already exists: {}.", namespace,
         ))),
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
             "Unable to check state: {}.", err,
@@ -1159,7 +1159,7 @@ fn delete_namespace_registry(
 
     let namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exist: {}.", namespace,
+            "Namespace Registry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1170,7 +1170,7 @@ fn delete_namespace_registry(
 
     if namespace_registry.permissions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry can only be deleted if there are no permissions: {}.", namespace,
+            "Namespace Registry can only be deleted if there are no permissions: {}.", namespace,
         )))
     }
     state.delete_namespace_registry(namespace)
@@ -1186,7 +1186,7 @@ fn update_namespace_registry_owners(
 
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exist: {}.", namespace,
+            "Namespace Registry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1211,7 +1211,7 @@ fn create_namespace_registry_permission(
     let contract_name = payload.get_contract_name();
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exist: {}.", namespace,
+            "Namespace Registry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1260,7 +1260,7 @@ fn delete_namespace_registry_permission(
 
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not exist: {}.", namespace,
+            "Namespace Registry does not exist: {}.", namespace,
         ))),
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => return Err(ApplyError::InvalidTransaction(format!(
@@ -1287,7 +1287,7 @@ fn delete_namespace_registry_permission(
             namespace_registry.permissions.remove(x);
         }
         None => return Err(ApplyError::InvalidTransaction(format!(
-            "NamespaceRegistry does not have a permission for : {}.", contract_name,
+            "Namespace Registry does not have a permission for : {}.", contract_name,
         ))),
     };
     state.set_namespace_registry(namespace, namespace_registry)
