@@ -16,6 +16,8 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 use crypto::sha2::Sha256;
 
+use sawtooth_sdk::processor::handler::ApplyError;
+
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
 
@@ -27,45 +29,58 @@ const CONTRACT_PREFIX: &'static str = "00ec02";
 
 const SETTING_PREFIX: &'static str = "000000";
 
-pub fn hash(to_hash: &str, num: usize) -> String {
+pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
     let mut sha = Sha512::new();
     sha.input_str(to_hash);
     let temp = sha.result_str().to_string();
     let hash = match temp.get(..num) {
         Some(x) => x,
-        None => "",
+        None => return Err(ApplyError::InvalidTransaction(format!(
+            "Cannot hash {} to Sha512 and return String with len {}",
+            to_hash, num
+        )))
     };
-    hash.to_string()
+    Ok(hash.to_string())
 }
 
-pub fn hash_256(to_hash: &str, num: usize) -> String {
+pub fn hash_256(to_hash: &str, num: usize) -> Result<String, ApplyError> {
     let mut sha = Sha256::new();
     sha.input_str(to_hash);
     let temp = sha.result_str().to_string();
     let hash = match temp.get(..num) {
         Some(x) => x,
-        None => "",
+        None => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Cannot hash {} to Sha256 and return String with len {}",
+                to_hash, num
+            )))
+        }
     };
-    hash.to_string()
+    Ok(hash.to_string())
 }
 
-pub fn make_contract_address(name: &str, version: &str) -> String {
-    CONTRACT_PREFIX.to_string() + &hash(&(name.to_string() + "," + version), 64)
+pub fn make_contract_address(name: &str, version: &str) -> Result<String, ApplyError> {
+    Ok(CONTRACT_PREFIX.to_string() + &hash(&(name.to_string() + "," + version), 64)?)
 }
 
-pub fn make_contract_registry_address(name: &str) -> String {
-    CONTRACT_REGISTRY_PREFIX.to_string() + &hash(name, 64)
+pub fn make_contract_registry_address(name: &str) -> Result<String, ApplyError> {
+    Ok(CONTRACT_REGISTRY_PREFIX.to_string() + &hash(name, 64)?)
 }
 
-pub fn make_namespace_registry_address(namespace: &str) -> String {
+pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyError> {
     let prefix = match namespace.get(..6) {
         Some(x) => x,
-        None => "",
+        None => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Namespace must be at least 6 characters long: {}",
+                namespace
+            )))
+        }
     };
-    NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)
+    Ok(NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)?)
 }
 
-pub fn get_sawtooth_admins_address() -> String {
-    SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16) + &hash_256("swa", 16)
-        + &hash_256("administrators", 16) + &hash_256("", 16)
+pub fn get_sawtooth_admins_address() -> Result<String, ApplyError> {
+    Ok(SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16)? + &hash_256("swa", 16)?
+        + &hash_256("administrators", 16)? + &hash_256("", 16)?)
 }

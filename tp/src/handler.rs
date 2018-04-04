@@ -299,7 +299,7 @@ impl<'a> SabreState<'a> {
     pub fn get_admin_setting(
         &mut self,
     ) -> Result<Option<Setting>, ApplyError> {
-        let address = get_sawtooth_admins_address();
+        let address = get_sawtooth_admins_address()?;
         let d = self.context.get_state(&address)?;
         match d {
             Some(packed) => {
@@ -323,7 +323,7 @@ impl<'a> SabreState<'a> {
         name: &str,
         version: &str,
     ) -> Result<Option<Contract>, ApplyError> {
-        let address = make_contract_address(name, version);
+        let address = make_contract_address(name, version)?;
         let d = self.context.get_state(&address)?;
         match d {
             Some(packed) => {
@@ -354,7 +354,7 @@ impl<'a> SabreState<'a> {
         version: &str,
         new_contract: Contract,
     ) -> Result<(), ApplyError> {
-        let address = make_contract_address(name, version);
+        let address = make_contract_address(name, version)?;
         let d = self.context.get_state(&address)?;
         let mut contract_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -403,7 +403,7 @@ impl<'a> SabreState<'a> {
     }
 
     pub fn delete_contract(&mut self, name: &str, version: &str) -> Result<(), ApplyError> {
-        let address = make_contract_address(name, version);
+        let address = make_contract_address(name, version)?;
         let d = self.context.delete_state(vec![address.clone()])?;
         let deleted: Vec<String> = match d {
             Some(deleted) => deleted.to_vec(),
@@ -426,7 +426,7 @@ impl<'a> SabreState<'a> {
         &mut self,
         name: &str,
     ) -> Result<Option<ContractRegistry>, ApplyError> {
-        let address = make_contract_registry_address(name);
+        let address = make_contract_registry_address(name)?;
         let d = self.context.get_state(&address)?;
         match d {
             Some(packed) => {
@@ -457,7 +457,7 @@ impl<'a> SabreState<'a> {
         name: &str,
         new_contract_registry: ContractRegistry,
     ) -> Result<(), ApplyError> {
-        let address = make_contract_registry_address(name);
+        let address = make_contract_registry_address(name)?;
         let d = self.context.get_state(&address)?;
         let mut contract_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -510,7 +510,7 @@ impl<'a> SabreState<'a> {
     }
 
     pub fn delete_contract_registry(&mut self, name: &str) -> Result<(), ApplyError> {
-        let address = make_contract_registry_address(name);
+        let address = make_contract_registry_address(name)?;
         let d = self.context.delete_state(vec![address.clone()])?;
         let deleted: Vec<String> = match d {
             Some(deleted) => deleted.to_vec(),
@@ -532,7 +532,7 @@ impl<'a> SabreState<'a> {
         &mut self,
         namespace: &str,
     ) -> Result<Option<NamespaceRegistry>, ApplyError> {
-        let address = make_namespace_registry_address(namespace);
+        let address = make_namespace_registry_address(namespace)?;
         let d = self.context.get_state(&address)?;
         match d {
             Some(packed) => {
@@ -562,7 +562,7 @@ impl<'a> SabreState<'a> {
         &mut self,
         namespace: &str,
     ) -> Result<Option<NamespaceRegistryList>, ApplyError> {
-        let address = make_namespace_registry_address(namespace);
+        let address = make_namespace_registry_address(namespace)?;
         let d = self.context.get_state(&address)?;
         match d {
             Some(packed) => {
@@ -587,7 +587,7 @@ impl<'a> SabreState<'a> {
         namespace: &str,
         new_namespace_registry: NamespaceRegistry,
     ) -> Result<(), ApplyError> {
-        let address = make_namespace_registry_address(namespace);
+        let address = make_namespace_registry_address(namespace)?;
         let d = self.context.get_state(&address)?;
         let mut namespace_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -640,7 +640,7 @@ impl<'a> SabreState<'a> {
     }
 
     pub fn delete_namespace_registry(&mut self, namespace: &str) -> Result<(), ApplyError> {
-        let address = make_namespace_registry_address(namespace);
+        let address = make_namespace_registry_address(namespace)?;
         let d = self.context.delete_state(vec![address.clone()])?;
         let deleted: Vec<String> = match d {
             Some(deleted) => deleted.to_vec(),
