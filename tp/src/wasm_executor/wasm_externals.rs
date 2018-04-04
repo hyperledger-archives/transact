@@ -309,7 +309,7 @@ impl Externals for WasmExternals {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
             },
-            _ => Err(ExternalsError::to_trap("Function does not exist".to_string()))
+            _ => Err(ExternalsError::to_trap("Function does not exist".into()))
         }
     }
 }

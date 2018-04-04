@@ -668,12 +668,12 @@ pub struct SabreTransactionHandler {
 impl SabreTransactionHandler {
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
-            family_name: "sabre".to_string(),
-            family_versions: vec!["0.0".to_string()],
+            family_name: "sabre".into(),
+            family_versions: vec!["0.0".into()],
             namespaces: vec![
-                NAMESPACE_REGISTRY_PREFIX.to_string(),
-                CONTRACT_REGISTRY_PREFIX.to_string(),
-                CONTRACT_PREFIX.to_string(),
+                NAMESPACE_REGISTRY_PREFIX.into(),
+                CONTRACT_REGISTRY_PREFIX.into(),
+                CONTRACT_PREFIX.into(),
             ],
         }
     }
@@ -795,11 +795,11 @@ fn create_contract(
     };
 
     let mut contract = Contract::new();
-    contract.set_name(name.to_string());
-    contract.set_version(version.to_string());
+    contract.set_name(name.into());
+    contract.set_version(version.into());
     contract.set_inputs(RepeatedField::from_vec(payload.get_inputs().to_vec()));
     contract.set_outputs(RepeatedField::from_vec(payload.get_outputs().to_vec()));
-    contract.set_creator(signer.to_string());
+    contract.set_creator(signer.into());
     contract.set_contract(payload.get_contract().to_vec());
 
     state.set_contract(name, version, contract)?;
@@ -808,7 +808,7 @@ fn create_contract(
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => {
             let mut contract_registry = ContractRegistry::new();
-            contract_registry.set_name(name.to_string());
+            contract_registry.set_name(name.into());
             contract_registry
         }
         Ok(Some(contract_registry)) => contract_registry,
@@ -821,9 +821,9 @@ fn create_contract(
     sha.input(payload.get_contract());
 
     let mut contract_registry_version = ContractRegistry_Version::new();
-    contract_registry_version.set_version(version.to_string());
-    contract_registry_version.set_contract_sha512(sha.result_str().to_string());
-    contract_registry_version.set_creator(signer.to_string());
+    contract_registry_version.set_version(version.into());
+    contract_registry_version.set_contract_sha512(sha.result_str().into());
+    contract_registry_version.set_creator(signer.into());
     contract_registry.versions.push(contract_registry_version);
 
     state.set_contract_registry(name, contract_registry)
@@ -859,7 +859,7 @@ fn delete_contract(
         )))
     };
 
-    if !(contract_registry.owners.contains(&signer.to_string())) {
+    if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
             "Signer is not an owner of this contract: {}.", signer,
         )))
@@ -1031,7 +1031,7 @@ fn create_contract_registry(
     };
 
     let mut contract_registry = ContractRegistry::new();
-    contract_registry.set_name(name.to_string());
+    contract_registry.set_name(name.into());
     contract_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
 
     state.set_contract_registry(name, contract_registry)
@@ -1054,7 +1054,7 @@ fn delete_contract_registry(
         )))
     };
 
-    if !(contract_registry.owners.contains(&signer.to_string())) {
+    if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
             "Signer must be an owner to delete a contract registry: {}.", signer,
         )))
@@ -1087,7 +1087,7 @@ fn update_contract_registry_owners(
         )))
     };
 
-    if !(contract_registry.owners.contains(&signer.to_string())) {
+    if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
             "Signer must be an owner to update the owners of the contract: {}.", signer,
         )))
@@ -1144,7 +1144,7 @@ fn create_namespace_registry(
     }
 
     let mut namespace_registry = NamespaceRegistry::new();
-    namespace_registry.set_namespace(namespace.to_string());
+    namespace_registry.set_namespace(namespace.into());
     namespace_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
 
     state.set_namespace_registry(namespace, namespace_registry)
@@ -1222,7 +1222,7 @@ fn create_namespace_registry_permission(
     can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
 
     let mut new_permission = NamespaceRegistry_Permission::new();
-    new_permission.set_contract_name(contract_name.to_string());
+    new_permission.set_contract_name(contract_name.into());
     new_permission.set_read(payload.get_read());
     new_permission.set_write(payload.get_write());
 
@@ -1295,7 +1295,7 @@ fn delete_namespace_registry_permission(
 
 // helper function to check if the signer is allowed to update a namespace_registry
 fn can_update_namespace_registry(namespace_registry: NamespaceRegistry, signer: &str, state: &mut SabreState) -> Result<(), ApplyError> {
-    if !namespace_registry.owners.contains(&signer.to_string()) {
+    if !namespace_registry.owners.contains(&signer.into()) {
         let setting = match state.get_admin_setting(){
             Ok(Some(setting)) => setting,
             Ok(None) => return Err(ApplyError::InvalidTransaction(format!(

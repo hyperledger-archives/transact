@@ -40,7 +40,7 @@ pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
             to_hash, num
         )))
     };
-    Ok(hash.to_string())
+    Ok(hash.into())
 }
 
 pub fn hash_256(to_hash: &str, num: usize) -> Result<String, ApplyError> {
@@ -56,7 +56,7 @@ pub fn hash_256(to_hash: &str, num: usize) -> Result<String, ApplyError> {
             )))
         }
     };
-    Ok(hash.to_string())
+    Ok(hash.into())
 }
 
 pub fn make_contract_address(name: &str, version: &str) -> Result<String, ApplyError> {
