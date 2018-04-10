@@ -275,7 +275,7 @@ impl SabreRequestPayload {
             }
             SabrePayload_Action::ACTION_UNSET => {
                 return Err(ApplyError::InvalidTransaction(String::from(
-                    "Action is not set.",
+                    "Action is not set",
                 )));
             }
         };
@@ -791,7 +791,7 @@ fn create_contract(
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -817,7 +817,7 @@ fn create_contract(
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -853,7 +853,7 @@ fn delete_contract(
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -863,14 +863,14 @@ fn delete_contract(
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Contract Registry does not exist {}.",
+                "Contract Registry does not exist {}",
                 name,
             )))
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -878,7 +878,7 @@ fn delete_contract(
 
     if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Signer is not an owner of this contract: {}.",
+            "Signer is not an owner of this contract: {}",
             signer,
         )));
     }
@@ -969,7 +969,7 @@ fn execute_contract(
             }
             None => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "No namespace registry exists for namespace: {} input: {} ",
+                    "No namespace registry exists for namespace: {} input: {}",
                     namespace, input
                 )))
             }
@@ -1074,13 +1074,13 @@ fn create_contract_registry(
         Ok(None) => (),
         Ok(Some(_)) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Contract Registry already exists: {}.",
+                "Contract Registry already exists: {}",
                 name,
             )))
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1102,14 +1102,14 @@ fn delete_contract_registry(
     let contract_registry = match state.get_contract_registry(name) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Contract Registry does not exist: {}.",
+                "Contract Registry does not exist: {}",
                 name,
             )))
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1117,14 +1117,14 @@ fn delete_contract_registry(
 
     if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Signer must be an owner to delete a contract registry: {}.",
+            "Signer must be an owner to delete a contract registry: {}",
             signer,
         )));
     }
 
     if contract_registry.versions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Contract Registry can only be deleted if there are no versions: {}.",
+            "Contract Registry can only be deleted if there are no versions: {}",
             name,
         )));
     }
@@ -1141,14 +1141,14 @@ fn update_contract_registry_owners(
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Contract Registry does not exist: {}.",
+                "Contract Registry does not exist: {}",
                 name,
             )))
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1156,7 +1156,7 @@ fn update_contract_registry_owners(
 
     if !(contract_registry.owners.contains(&signer.into())) {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Signer must be an owner to update the owners of the contract: {}.",
+            "Signer must be an owner to update the owners of the contract: {}",
             signer,
         )));
     }
@@ -1174,7 +1174,7 @@ fn create_namespace_registry(
 
     if namespace.len() < 6 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Namespace must be at least 6 characters: {}.",
+            "Namespace must be at least 6 characters: {}",
             namespace,
         )));
     }
@@ -1183,13 +1183,13 @@ fn create_namespace_registry(
         Ok(None) => (),
         Ok(Some(_)) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry already exists: {}.",
+                "Namespace Registry already exists: {}",
                 namespace,
             )))
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1199,13 +1199,13 @@ fn create_namespace_registry(
         Ok(Some(setting)) => setting,
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Only owners or admins can update or delete a namespace registry: {}.",
+                "Only owners or admins can update or delete a namespace registry: {}",
                 signer,
             )))
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1217,7 +1217,7 @@ fn create_namespace_registry(
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "Only admins can create a namespace registry: {}.",
+                    "Only admins can create a namespace registry: {}",
                     signer,
                 )));
             }
@@ -1241,14 +1241,14 @@ fn delete_namespace_registry(
     let namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry does not exist: {}.",
+                "Namespace Registry does not exist: {}",
                 namespace,
             )))
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1257,7 +1257,7 @@ fn delete_namespace_registry(
 
     if namespace_registry.permissions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Namespace Registry can only be deleted if there are no permissions: {}.",
+            "Namespace Registry can only be deleted if there are no permissions: {}",
             namespace,
         )));
     }
@@ -1274,14 +1274,14 @@ fn update_namespace_registry_owners(
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry does not exist: {}.",
+                "Namespace Registry does not exist: {}",
                 namespace,
             )))
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1304,14 +1304,14 @@ fn create_namespace_registry_permission(
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry does not exist: {}.",
+                "Namespace Registry does not exist: {}",
                 namespace,
             )))
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1357,14 +1357,14 @@ fn delete_namespace_registry_permission(
     let mut namespace_registry = match state.get_namespace_registry(namespace) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry does not exist: {}.",
+                "Namespace Registry does not exist: {}",
                 namespace,
             )))
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}.",
+                "Unable to check state: {}",
                 err,
             )))
         }
@@ -1390,7 +1390,7 @@ fn delete_namespace_registry_permission(
         }
         None => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Namespace Registry does not have a permission for : {}.",
+                "Namespace Registry does not have a permission for : {}",
                 contract_name,
             )))
         }
@@ -1409,13 +1409,13 @@ fn can_update_namespace_registry(
             Ok(Some(setting)) => setting,
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "Only owners or admins can update or delete a namespace registry: {}.",
+                    "Only owners or admins can update or delete a namespace registry: {}",
                     signer,
                 )))
             }
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "Unable to check state: {}.",
+                    "Unable to check state: {}",
                     err,
                 )))
             }
@@ -1427,7 +1427,7 @@ fn can_update_namespace_registry(
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(
-                        "Only owners or admins can update or delete a namespace registry: {}.",
+                        "Only owners or admins can update or delete a namespace registry: {}",
                         signer,
                     )));
                 }
