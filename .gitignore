@@ -10,3 +10,6 @@
 /example/intkey_multiply/cli/Cargo.lock
 /example/intkey_multiply/processor/target/
 /example/intkey_multiply/processor/Cargo.lock
+
+/sdk/Cargo.lock
+/sdk/target/
