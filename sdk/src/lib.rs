@@ -263,10 +263,9 @@ impl std::fmt::Display for ApplyError {
 impl From<WasmSdkError> for ApplyError {
     fn from(e: WasmSdkError) -> Self {
         match e {
-            WasmSdkError::InvalidTransaction(..) => {
-                ApplyError::InvalidTransaction(format!("{}", e))
-            }
-            _ => ApplyError::InternalError(format!("{}", e)),
+            WasmSdkError::InternalError(..) =>
+                ApplyError::InternalError(format!("{}", e)),
+            _ => ApplyError::InvalidTransaction(format!("{}", e)),
         }
     }
 }
