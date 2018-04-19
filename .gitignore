@@ -5,3 +5,8 @@
 /tp/Cargo.lock
 /tp/src/protos/
 /tp/target/
+
+/example/intkey_multiply/cli/target/
+/example/intkey_multiply/cli/Cargo.lock
+/example/intkey_multiply/processor/target/
+/example/intkey_multiply/processor/Cargo.lock
