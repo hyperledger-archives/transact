@@ -31,3 +31,11 @@ pub mod database;
 #[macro_use]
 extern crate log;
 extern crate python3_sys as py_ffi;
+extern crate cbor;
+extern crate cpython;
+extern crate crypto;
+extern crate libc;
+extern crate lmdb_zero;
+
+#[cfg(test)]
+extern crate rand;
