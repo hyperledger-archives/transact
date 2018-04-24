@@ -36,6 +36,8 @@ extern crate cpython;
 extern crate crypto;
 extern crate libc;
 extern crate lmdb_zero;
+#[macro_use]
+extern crate log;
 
 #[cfg(test)]
 extern crate rand;
