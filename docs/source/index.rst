@@ -8,3 +8,4 @@ Welcome to Sabre's documentation!
 
 .. toctree::
     sabre_transaction_family.rst
+    application_developer_guide.rst
