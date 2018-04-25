@@ -14,7 +14,7 @@
 
 name: intkey_multiply
 version: '1.0'
-wasm: processor/target/wasm32-unknown-unknown/release/intkey_multiply.wasm
+wasm: processor/target/wasm32-unknown-unknown/release/intkey-multiply.wasm
 inputs:
   - '1cf126'
 outputs:
