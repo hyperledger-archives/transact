@@ -13,3 +13,5 @@
 
 /sdk/Cargo.lock
 /sdk/target/
+
+/keys

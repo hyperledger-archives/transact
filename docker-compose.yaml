@@ -18,6 +18,8 @@ services:
   validator:
     image: hyperledger/sawtooth-validator:1.0
     container_name: sabre-validator
+    volumes:
+      - .:/project
     expose:
       - 9704
     ports:
@@ -25,8 +27,14 @@ services:
     entrypoint: "bash -c \"\
         sawadm keygen && \
         sawtooth keygen && \
-        sawset genesis && \
-        sawadm genesis config-genesis.batch && \
+        mkdir -p /project/keys && \
+        cp /root/.sawtooth/keys/* /project/keys &&
+        sawset genesis  -k /etc/sawtooth/keys/validator.priv && \
+        sawset proposal create \
+          -k /etc/sawtooth/keys/validator.priv \
+          sawtooth.swa.administrators=$$(cat project/keys/root.pub) \
+          -o config.batch && \
+        sawadm genesis config-genesis.batch config.batch && \
         sawtooth-validator -vv \
           --endpoint tcp://validator:9705 \
           --bind component:tcp://eth0:9704 \
@@ -71,12 +79,12 @@ services:
   sabre-cli:
     image: sabre-cli
     container_name: sabre-cli
+    volumes:
+      - .:/project
+      - ./keys:/root/.sawtooth/keys
     entrypoint: "bash -c \"\
-      sawtooth keygen && \
       cargo build && \
       tail -f /dev/null \
       \""
-    volumes:
-      - .:/project
     build:
       context: cli
