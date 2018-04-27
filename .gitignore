@@ -15,3 +15,6 @@
 /sdk/target/
 
 /keys
+
+/docs/build
+/docs/source/cli/output
