@@ -34,6 +34,7 @@ extern crate python3_sys as py_ffi;
 extern crate cbor;
 extern crate cpython;
 extern crate crypto;
+extern crate hex;
 extern crate libc;
 extern crate lmdb_zero;
 #[macro_use]
