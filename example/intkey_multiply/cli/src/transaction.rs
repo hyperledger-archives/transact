@@ -35,8 +35,8 @@ use error::CliError;
 /// The Intkey Multiply transaction family name (intkey_multiply)
 const INTKEY_MULITPLY_FAMILY_NAME: &'static str = "intkey_multiply";
 
-/// The Intkey Multiply transaction familyversion (0.0)
-const INTKEY_MULITPLY_VERSION: &'static str = "0.0";
+/// The Intkey Multiply transaction family version (1.0)
+const INTKEY_MULITPLY_VERSION: &'static str = "1.0";
 
 /// The namespace registry prefix for intkey (1cf126)
 const INTKEY_PREFIX: &'static str = "1cf126";
