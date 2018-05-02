@@ -186,8 +186,12 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
         let encoded_key = encode_upper(key.clone());
         let raw_value = map.get(&key)
             .ok_or_else(|| ApplyError::InvalidTransaction("Value from map".into()))?;
-        if raw_value > &(23 as u32 ){
-            let value = &format!("{:02X}", raw_value);
+        if raw_value > &(23 as u32 ) {
+            let mut value = format!("{:02X}", raw_value);
+            if value.len() % 2 == 1 {
+                value = "0".to_string() + &value.clone();
+            }
+
             let value_length = match value.len() {
                 2 => "18",
                 4 => "19",
@@ -197,7 +201,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
                 )))
             };
             hex_string = hex_string + &format!("{:X}", length) + &encoded_key +
-                &value_length + value;
+                &value_length + &value;
         } else {
             hex_string = hex_string + &format!("{:X}", length) + &encoded_key+ &format!("{:02X}", raw_value);
         }
