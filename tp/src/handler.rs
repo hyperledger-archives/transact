@@ -805,21 +805,12 @@ fn create_contract(
         }
     };
 
-    let mut contract = Contract::new();
-    contract.set_name(name.into());
-    contract.set_version(version.into());
-    contract.set_inputs(RepeatedField::from_vec(payload.get_inputs().to_vec()));
-    contract.set_outputs(RepeatedField::from_vec(payload.get_outputs().to_vec()));
-    contract.set_creator(signer.into());
-    contract.set_contract(payload.get_contract().to_vec());
-
-    state.set_contract(name, version, contract)?;
-
     // update or create the contract registry for the contract
     let mut contract_registry = match state.get_contract_registry(name) {
         Ok(None) => {
             let mut contract_registry = ContractRegistry::new();
             contract_registry.set_name(name.into());
+            contract_registry.set_owners(RepeatedField::from_vec(vec!(signer.into())));
             contract_registry
         }
         Ok(Some(contract_registry)) => contract_registry,
@@ -830,6 +821,23 @@ fn create_contract(
             )))
         }
     };
+
+    if !contract_registry.owners.contains(&signer.into()) {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Only owners can submit new versions of contracts {}",
+            signer,
+        )))
+    }
+
+    let mut contract = Contract::new();
+    contract.set_name(name.into());
+    contract.set_version(version.into());
+    contract.set_inputs(RepeatedField::from_vec(payload.get_inputs().to_vec()));
+    contract.set_outputs(RepeatedField::from_vec(payload.get_outputs().to_vec()));
+    contract.set_creator(signer.into());
+    contract.set_contract(payload.get_contract().to_vec());
+
+    state.set_contract(name, version, contract)?;
 
     let mut sha = Sha512::new();
     sha.input(payload.get_contract());
