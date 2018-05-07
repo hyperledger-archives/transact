@@ -807,12 +807,11 @@ fn create_contract(
 
     // update or create the contract registry for the contract
     let mut contract_registry = match state.get_contract_registry(name) {
-        Ok(None) => {
-            let mut contract_registry = ContractRegistry::new();
-            contract_registry.set_name(name.into());
-            contract_registry.set_owners(RepeatedField::from_vec(vec!(signer.into())));
-            contract_registry
-        }
+        Ok(None) =>
+            return Err(ApplyError::InvalidTransaction(format!(
+                "The Contract Registry does not exist: {}",
+                name,
+            ))),
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
@@ -1103,6 +1102,35 @@ fn create_contract_registry(
         }
     };
 
+    let setting = match state.get_admin_setting() {
+        Ok(Some(setting)) => setting,
+        Ok(None) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Only admins can create a contract registry: {}",
+                signer,
+            )))
+        }
+        Err(err) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Unable to check state: {}",
+                err,
+            )))
+        }
+    };
+
+    for entry in setting.get_entries() {
+        if entry.key == "sawtooth.swa.administrators" {
+            let values = entry.value.split(",");
+            let value_vec: Vec<&str> = values.collect();
+            if !value_vec.contains(&signer) {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Only admins can create a contract registry: {}",
+                    signer,
+                )));
+            }
+        }
+    }
+
     let mut contract_registry = ContractRegistry::new();
     contract_registry.set_name(name.into());
     contract_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
@@ -1132,19 +1160,14 @@ fn delete_contract_registry(
         }
     };
 
-    if !(contract_registry.owners.contains(&signer.into())) {
-        return Err(ApplyError::InvalidTransaction(format!(
-            "Signer must be an owner to delete a contract registry: {}",
-            signer,
-        )));
-    }
-
     if contract_registry.versions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Contract Registry can only be deleted if there are no versions: {}",
-            name,
-        )));
-    }
+             "Contract Registry can only be deleted if there are no versions: {}",
+             name,
+         )));
+     }
+    // Check if signer is an owner or an admin
+    can_update_contract_registry(contract_registry.clone(), signer, state)?;
 
     state.delete_contract_registry(name)
 }
@@ -1171,12 +1194,8 @@ fn update_contract_registry_owners(
         }
     };
 
-    if !(contract_registry.owners.contains(&signer.into())) {
-        return Err(ApplyError::InvalidTransaction(format!(
-            "Signer must be an owner to update the owners of the contract: {}",
-            signer,
-        )));
-    }
+    // Check if signer is an owner or an admin
+    can_update_contract_registry(contract_registry.clone(), signer, state)?;
 
     contract_registry.set_owners(RepeatedField::from_vec(payload.get_owners().to_vec()));
     state.set_contract_registry(name, contract_registry)
@@ -1445,6 +1464,45 @@ fn can_update_namespace_registry(
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(
                         "Only owners or admins can update or delete a namespace registry: {}",
+                        signer,
+                    )));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+// helper function to check if the signer is allowed to update a contract_registry
+fn can_update_contract_registry(
+    contract_registry: ContractRegistry,
+    signer: &str,
+    state: &mut SabreState,
+) -> Result<(), ApplyError> {
+    if !contract_registry.owners.contains(&signer.into()) {
+        let setting = match state.get_admin_setting() {
+            Ok(Some(setting)) => setting,
+            Ok(None) => {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Only owners or admins can update or delete a contract registry: {}",
+                    signer,
+                )))
+            }
+            Err(err) => {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Unable to check state: {}",
+                    err,
+                )))
+            }
+        };
+
+        for entry in setting.get_entries() {
+            if entry.key == "sawtooth.swa.administrators" {
+                let values = entry.value.split(",");
+                let value_vec: Vec<&str> = values.collect();
+                if !value_vec.contains(&signer) {
+                    return Err(ApplyError::InvalidTransaction(format!(
+                        "Only owners or admins can update or delete a contract registry: {}",
                         signer,
                     )));
                 }

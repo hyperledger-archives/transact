@@ -23,10 +23,12 @@
 extern crate subprocess;
 extern crate serde_json;
 
-use serde_json::{Value, Error};
+use serde_json::Value;
 use subprocess::Exec;
 use std::io::{BufReader, BufRead};
 use std::error::Error as StdError;
+use std::fs::File;
+use std::io::Read;
 
 const INTKEY_MULTIPLY_DEF: &str =
     "/project/example/intkey_multiply/intkey_multiply.yaml";
@@ -35,6 +37,7 @@ const INTKEY_MULTIPLY_DEF: &str =
 const GOOD_PAYLOAD: &str = "/project/integration/payloads/A_B_C_payload";
 // Path to a payload to multiply intkey value C and nonexisties and store in A.
 const BAD_PAYLOAD: &str = "/project/integration/payloads/A_Bad_C_payload";
+const SIGNER: &str = "/root/.sawtooth/keys/root.pub";
 
 #[derive(Debug)]
 pub enum TestError {
@@ -91,6 +94,15 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
 /// checks that they are correctly either committed or invalid.
 #[test]
 fn test_sabre() {
+    let mut f = File::open(SIGNER).expect("file not found");
+
+    let mut signer = String::new();
+    f.read_to_string(&mut signer)
+        .expect("something went wrong reading the file");
+
+    // remove newline character
+    signer.pop();
+
     // Test that Sabre will return an invalid transaction when the Contract does not
     // exist
     //
@@ -112,7 +124,7 @@ fn test_sabre() {
     println!("{}", message);
     assert!(message.contains("Contract does not exist"));
 
-    // Test that Sabre will set a Contract and create a Contract Registry for the contract name.
+    // Test that Sabre will return an invalid transaction if the ContractRegistry does not exist
     //
     // Send CreateContractAction with the following:
     //      Name: intkey_multiply
@@ -120,6 +132,39 @@ fn test_sabre() {
     //      Inputs: 1cf126
     //      Outputs: 1cf126
     //      contract: The compiled intkey_multiply wasm contract.
+    //
+    // Result: Invalid Transaction, The Contract Registry does not exist
+    let response = match sabre_cli("upload -f".to_string() + &INTKEY_MULTIPLY_DEF){
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err))
+    };
+    assert!(response["data"][0]["status"]=="INVALID");
+    let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
+    println!("{}", message);
+    assert!(message.contains("The Contract Registry does not exist"));
+
+    // Test that Sabre will set a ContractRegistry.
+    //
+    // Send CreateContractRegistryAction with the following:
+    //      Name: intkey_multiply
+    //      Owners: signing key
+    //
+    // Result: Committed.
+    let response = match sabre_cli("cr --create intkey_multiply --owner ".to_string() +
+        &signer) {
+            Ok(x) => x,
+            Err(err) => panic!(format!("No Response {}", err))
+    };
+    assert!(response["data"][0]["status"]=="COMMITTED");
+
+    // Test that Sabre will set a Contract.
+    //
+    // Send CreateContractAction with the following:
+    //      Name: intkey_multiply
+    //      Version: 1.0
+    //      Inputs: 1cf126
+    //      Outputs: 1cf126
+    //      Contract: The compiled intkey_multiply wasm contract.
     //
     // Result: Committed.
     let response = match sabre_cli("upload -f".to_string() + &INTKEY_MULTIPLY_DEF){
@@ -153,10 +198,10 @@ fn test_sabre() {
     //
     // Send CreateNamespaceRegistryAction with the following:
     //      Namespace: 1cf126
-    //      Owner: test_owner
+    //      Owner: signing key
     //
     // Result: Committed
-    let response = match sabre_cli("ns --create 1cf126 --owner test_owner".to_string()){
+    let response = match sabre_cli("ns --create 1cf126 --owner ".to_string() + &signer) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err))
     };
@@ -226,7 +271,7 @@ fn test_sabre() {
     //      Outputs: 1cf126
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
-    // Result: Invalid Transaction, CWasm contract returned invalid transaction
+    // Result: Invalid Transaction, Wasm contract returned invalid transaction
     let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
         &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
             Ok(x) => x,
