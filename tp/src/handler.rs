@@ -1235,7 +1235,7 @@ fn create_namespace_registry(
         Ok(Some(setting)) => setting,
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Only owners or admins can update or delete a namespace registry: {}",
+                "Only admins can create a namespace registry: {}",
                 signer,
             )))
         }
