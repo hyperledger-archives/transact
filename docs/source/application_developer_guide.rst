@@ -255,9 +255,9 @@ Sabre Transactions.
 Starting the network
 --------------------
 Only an administrator, whose public key is stored in
-``sawtooth.swa.administrators`` are allowed to add namespace registries to the
-Sabre network. As such this key, is shared between the Sawtooth Validator
-container and the Sabre Cli container.
+``sawtooth.swa.administrators`` are allowed to add namespace and contract
+registries to the Sabre network. As such this key, is shared between the
+Sawtooth Validator container and the Sabre CLI container.
 
 To start up the network run the following command from the top level
 sawtooth-sabre directory:
@@ -343,13 +343,57 @@ instead of sending the transaction to the REST-API.
 
 Logout out of the container.
 
-Uploading Contract
-------------------
+Create Contract Registry
+------------------------
+Contract Registries can only be created by a sawtooth administrator, as
+mentioned above. Once the contract registry is created, any owner is allowed to
+add and delete versions of the contract, as well as delete the contract
+registry if there are no versions.
+
 Enter the sabre-cli docker container:
 
 .. code-block:: console
 
   $ docker exec -it sabre-cli bash
+
+To create a contract registry, you can use the following command
+
+.. code-block:: console
+
+  $ sabre cr -h
+
+  sabre-cr
+  create, update, or delete a Sabre contract registry
+
+  USAGE:
+      sabre cr [FLAGS] [OPTIONS] <name>
+
+  FLAGS:
+      -c, --create     Create the contract registry
+      -d, --delete     Delete the contract registry
+      -h, --help       Prints help information
+      -u, --update     Update the contract registry
+      -V, --version    Prints version information
+
+  OPTIONS:
+      -k, --key <key>           Signing key name
+      -O, --owner <owner>...    Owner of this contract registry
+      -U, --url <url>           URL to the Sawtooth REST API
+          --wait <wait>         A time in seconds to wait for batches to be committed
+
+  ARGS:
+      <name>    Name of the contracts in the registry
+
+Run the following to create the intkey_multiply contract registry:
+
+.. code-block:: console
+
+  sabre cr --create intkey_multiply --owner <owner-key> --url http://rest-api:9708
+
+Uploading Contract
+------------------
+A new contract version can only be uploaded by an admin or an owner of the
+associated contract registry.
 
 To upload a Sabre contract, you can use the following command
 
