@@ -432,7 +432,6 @@ The inputs for CreateNamespaceRegistryAction must include:
 The outputs for CreateNamespaceRegistryAction must include:
 
 * the address for the namespace registry
-* the settings address for ``sawtooth.swa.administrators``
 
 DeleteNamespaceRegistryAction
 -----------------------------
@@ -460,7 +459,6 @@ The inputs for DeleteNamespaceRegistryAction must include:
 The outputs for DeleteNamespaceRegistryAction must include:
 
 * the address for the namespace registry
-* the settings address for ``sawtooth.swa.administrators``
 
 UpdateNamespaceRegistryOwnersAction
 -----------------------------------
@@ -490,7 +488,6 @@ The inputs for UpdateNamespaceRegistryOwnersAction must include:
 The outputs for UpdateNamespaceRegistryOwnersAction must include:
 
 * the address for the namespace registry
-* the settings address for ``sawtooth.swa.administrators``
 
 CreateNamespaceRegistryPermissionAction
 ---------------------------------------
@@ -526,7 +523,6 @@ The inputs for CreateNamespaceRegistryPermissionAction must include:
 The outputs for CreateNamespaceRegistryPermissionAction must include:
 
 * the address for the namespace registry
-* the settings address for ``sawtooth.swa.administrators``
 
 DeleteNamespaceRegistryPermissionAction
 ---------------------------------------
@@ -554,7 +550,6 @@ The inputs for DeleteNamespaceRegistryPermissionAction must include:
 The outputs for DeleteNamespaceRegistryPermissionAction must include:
 
 * the address for the namespace registry
-* the settings address for ``sawtooth.swa.administrators``
 
 Transaction Header
 ==================
