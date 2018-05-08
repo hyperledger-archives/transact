@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends \
 RUN apt-get update && apt-get install -y -q \
     dvipng \
     make \
+    pkg-config \
     sudo \
     texlive-fonts-recommended \
     texlive-latex-base \
