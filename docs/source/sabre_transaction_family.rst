@@ -219,8 +219,8 @@ The contract registry is fetched from state and the transaction signer is
 checked against the owners. If the signer is not an owner, the transaction is
 considered invalid.
 
-If the contract registry for the contract name does not exist, a new contract
-registry is created and the transaction signer is added as an owner.
+If the contract registry for the contract name does not exist, the transaction
+is invalid.
 
 Both the new contract and the updated contract registry are set in state.
 
@@ -326,8 +326,13 @@ Create a contract registry with no version.
     repeated string owners = 2;
   }
 
-If the contract registry for the provided contact name already exists, then
+If the contract registry for the provided contract name already exists, the
 the transaction is invalid.
+
+Only those whose public keys are stored in ``sawtooth.swa.administrators`` are
+allowed to create new contract registries. If the transaction signer is an
+administrator, the new contract registry is set in state. Otherwise, the
+transaction is invalid.
 
 The new contract registry is created for the name and provided owners. The
 owners should be a list of public keys of users that are allowed to add new
@@ -338,6 +343,7 @@ The new contract registry is set in state.
 The inputs for CreateContractRegistryAction must include:
 
 * the address for the contract registry
+* the settings address for ``sawtooth.swa.administrators``
 
 The outputs for CreateContractRegistryAction must include:
 
@@ -355,7 +361,8 @@ Deletes a contract registry if there are no versions.
   }
 
 If the contract registry does not exist, the transaction is invalid. If the
-transaction signer is not an owner or the contract registry has any number of
+transaction signer is not an owner or does not have their public key in
+``sawtooth.swa.administrators`` or the contract registry has any number of
 versions, the transaction is invalid.
 
 The contract registry is deleted.
@@ -367,7 +374,7 @@ The inputs for DeleteContractRegistryAction must include:
 The outputs for DeleteContractRegistryAction must include:
 
 * the address for the contract registry
-
+* the settings address for ``sawtooth.swa.administrators``
 
 UpdateContractRegistryOwnersAction
 ----------------------------------
@@ -382,7 +389,8 @@ Update the contract registry's owners list.
   }
 
 If the contract registry does not exist or the transaction signer is not an
-owner, the transaction is invalid.
+owner or does not have their public key in ``sawtooth.swa.administrators``, the
+transaction is invalid.
 
 The new owner list will replace the current owner list and the updated contract
 registry is set in state.
@@ -390,11 +398,11 @@ registry is set in state.
 The inputs for UpdateContractRegistryOwnersAction must include:
 
 * the address for the contract registry
+* the settings address for ``sawtooth.swa.administrators``
 
 The outputs for UpdateContractRegistryOwnersAction must include:
 
 * the address for the contract registry
-
 
 CreateNamespaceRegistryAction
 -----------------------------
