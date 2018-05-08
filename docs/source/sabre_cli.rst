@@ -17,6 +17,26 @@ REST API.
 .. literalinclude:: cli/output/sabre_usage.out
    :language: console
 
+
+sabre cr
+========
+
+The ``sabre cr`` subcommand submits a Sabre transaction that can create, update
+or delete a contract registry.
+
+.. literalinclude:: cli/output/sabre_cr_usage.out
+  :language: console
+
+A contract registry can only be created by an administrator. An administrator
+has their public key stored in the setting ``sawtooth.swa.administrators``. At
+least one ``--owner`` is required. An owner is identified by their public key
+and is allowed to update and delete contract registries and stored contract
+versions.
+
+Only an owner or an administrator is allowed to update owners of a contract
+registry or delete a contract registry.
+
+
 sabre upload
 ============
 
@@ -39,6 +59,9 @@ following information:
     - <input addresses>
   outputs:
     - <output addresses>
+
+Note only an owner of the associated contract registry is allowed to upload
+a new version of a contract.
 
 sabre ns
 ========

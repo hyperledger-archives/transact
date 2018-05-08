@@ -36,6 +36,8 @@ mkdir -p source/cli/output
 
 save_usage sabre
 
+save_usage sabre cr
+
 save_usage sabre exec
 
 save_usage sabre ns
