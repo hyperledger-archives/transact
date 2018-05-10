@@ -87,3 +87,6 @@ The ``--contract`` should be <contract_name:version_number>. The ``--inputs``
 and ``--outputs`` should include any namespaces or addresses that the contract
 needs to have access to. Finally the ``--payload`` should be a path to
 the file that contains the Sabre contract bytes.
+
+.. Licensed under Creative Commons Attribution 4.0 International License
+.. https://creativecommons.org/licenses/by/4.0/

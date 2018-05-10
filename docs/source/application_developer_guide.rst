@@ -532,3 +532,6 @@ Run the following command to list intkey state
   C 5
 
 You should see A set to 50.
+
+.. Licensed under Creative Commons Attribution 4.0 International License
+.. https://creativecommons.org/licenses/by/4.0/
