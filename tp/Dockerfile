@@ -1,4 +1,4 @@
-FROM rust:1.22.1
+FROM rust:latest
 
 RUN apt-get update && apt-get install -y unzip libzmq3-dev
 

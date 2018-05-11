@@ -15,4 +15,4 @@ wasmi = { git = "https://github.com/pepyakin/wasmi.git" }
 
 
 [build-dependencies]
-protoc-rust = "1.4"
+protoc-rust = "1.6"
