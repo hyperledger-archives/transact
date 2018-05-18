@@ -9,10 +9,10 @@ sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
 log = "0.3.8"
 simple_logger = "0.4.0"
 clap = "2"
-protobuf = "1.4"
+protobuf = "2"
 rust-crypto = "0.2.36"
 wasmi = { git = "https://github.com/pepyakin/wasmi.git" }
 
 
 [build-dependencies]
-protoc-rust = "1.6"
+protoc-rust = "2"
