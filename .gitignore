@@ -13,6 +13,9 @@
 /example/intkey_multiply/processor/target/
 /example/intkey_multiply/processor/Cargo.lock
 
+/integration/target/
+/integration/Cargo.lock
+
 /sdk/Cargo.lock
 /sdk/target/
 
