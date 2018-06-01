@@ -76,6 +76,33 @@ impl TransactionContext {
             Ok(())
         }
     }
+
+    pub fn delete_state(&self, addresses: Vec<String>) -> Result<Option<Vec<String>>, WasmSdkError> {
+        unsafe {
+            if addresses.is_empty(){
+                return Err(WasmSdkError::InvalidTransaction(
+                    "No address to delte".into(),
+                ));
+            }
+            let head = &addresses[0];
+            let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
+            externs::create_collection(header_address_buffer.into_raw());
+
+            for addr in addresses[1..].iter() {
+                let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
+                externs::add_to_collection(
+                    header_address_buffer.into_raw(), wasm_buffer.into_raw());
+            };
+            let result = WasmBuffer::from_list(
+                    externs::delete_state(header_address_buffer.into_raw()))?;
+            let mut result_vec = Vec::new();
+            for i in result {
+                let addr = String::from_utf8(i.data)?;
+                result_vec.push(addr);
+            }
+            Ok(Some(result_vec))
+        }
+    }
 }
 
 // Mimics the sawtooth sdk TransactionHandler

@@ -100,6 +100,33 @@ const GET_COLLECTION_LEN_IDX: usize = 7;
 ///
 const GET_PTR_FROM_COLLECTION_IDX: usize = 8;
 
+/// Args
+///
+/// 1) Pointer offset in memory for address string
+/// 2) Length of address string
+///
+const DELETE_STATE_IDX: usize = 9;
+
+/// Args
+///
+/// 1) First pointer in pointer collection
+///
+/// Returns - returns the raw head pointer if the collection is
+/// valid, and -1 otherwise
+///
+const CREATE_COLLECTION: usize = 10;
+
+/// Args
+///
+/// 1) First pointer in pointer collection
+///
+/// 2) New pointer that should be added to the collection
+///
+/// Returns - returns the raw head pointer if adding new pointer to the collection was
+/// valid, and -1 otherwise
+///
+const ADD_TO_COLLECTION: usize = 11;
+
 pub struct WasmExternals {
     pub memory_ref: MemoryRef,
     context: TransactionContext,
@@ -174,6 +201,36 @@ impl WasmExternals {
 
         Ok(raw_ptr)
     }
+
+    /// Takes a list of pointers and associates them,
+    /// effectively creating a list
+    ///
+    /// Returns a result either containing the raw value
+    /// of the first pointer in the list or an externals
+    /// error
+    pub fn collect_ptrs(&mut self, raw_ptrs: Vec<u32>) -> Result<u32, ExternalsError> {
+        info!("associating pointers: {:?}", raw_ptrs);
+        if raw_ptrs.iter().all(|x| self.ptrs.contains_key(&x)) {
+            self.ptr_collections.insert(raw_ptrs[0], raw_ptrs.clone());
+            Ok(raw_ptrs[0])
+        } else {
+            Err(ExternalsError::from("Attempting to create a ptr collection with nonexistant pointers"))
+        }
+    }
+
+    pub fn add_to_collection(&mut self, head: u32, raw_ptr: u32) -> Result<u32, ExternalsError> {
+        if let Some(x) = self.ptr_collections.get_mut(&head) {
+            x.push(raw_ptr);
+            Ok(head)
+        } else {
+            Err(ExternalsError::from("Attempting to add a ptr to nonexistant collecttion"))
+        }
+    }
+
+    pub fn create_collection(&mut self, head: u32) -> Result<u32, ExternalsError> {
+        self.ptr_collections.insert(head, vec![head]);
+        Ok(head)
+    }
 }
 
 impl Externals for WasmExternals {
@@ -213,6 +270,35 @@ impl Externals for WasmExternals {
                 } else {
                     Ok(Some(RuntimeValue::I32(0)))
                 }
+            }
+            DELETE_STATE_IDX => {
+                let head_ptr: u32 = args.nth(0);
+
+                let addresses = match self.ptr_collections.get(&head_ptr) {
+                    Some(addresses) => addresses.clone(),
+                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                };
+                let mut addr_vec = Vec::new();
+                for addr in addresses {
+                    let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
+                    addr_vec.push(address);
+                }
+                info!("Attempting to delete state, addresses: {:?}", addr_vec);
+                let result = self.context
+                    .delete_state(addr_vec)
+                    .map_err(ExternalsError::from)?
+                    .unwrap_or(Vec::new());
+
+                let mut ptr_vec = Vec::new();
+                for addr in result{
+                    let raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
+                    ptr_vec.push(raw_ptr);
+                }
+
+                let raw_ptr = self.collect_ptrs(ptr_vec)?;
+
+                Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
+
             }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
@@ -295,6 +381,18 @@ impl Externals for WasmExternals {
                     Ok(Some(RuntimeValue::I32(-1)))
                 }
             }
+            CREATE_COLLECTION => {
+                let head_ptr: u32 = args.nth(0);
+                self.create_collection(head_ptr)?;
+                Ok(Some(RuntimeValue::I32(head_ptr as i32)))
+            }
+            ADD_TO_COLLECTION => {
+                let head_ptr: u32 = args.nth(0);
+                let raw_ptr: u32 = args.nth(1);
+
+                self.add_to_collection(head_ptr, raw_ptr)?;
+                Ok(Some(RuntimeValue::I32(head_ptr as i32)))
+            }
             _ => Err(ExternalsError::to_trap("Function does not exist".into())),
         }
     }
@@ -310,6 +408,10 @@ impl ModuleImportResolver for WasmExternals {
             "set_state" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
                 SET_STATE_IDX,
+            )),
+            "delete_state" => Ok(FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
+                DELETE_STATE_IDX,
             )),
             "get_ptr_len" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
@@ -341,6 +443,14 @@ impl ModuleImportResolver for WasmExternals {
             "get_ptr_from_collection" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
                 GET_PTR_FROM_COLLECTION_IDX,
+            )),
+            "create_collection" => Ok(FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
+                CREATE_COLLECTION,
+            )),
+            "add_to_collection" => Ok(FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
+                ADD_TO_COLLECTION,
             )),
 
             _ => Err(Error::Instantiation(format!(

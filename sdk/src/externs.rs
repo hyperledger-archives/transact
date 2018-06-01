@@ -19,6 +19,7 @@ pub type WasmPtrList = i32;
 extern "C" {
     pub fn get_state(addr: WasmPtr) -> WasmPtr;
     pub fn set_state(addr: WasmPtr, state: WasmPtr) -> i32;
+    pub fn delete_state(addresses: WasmPtrList) -> WasmPtrList;
     pub fn get_ptr_len(ptr: WasmPtr) -> isize;
     pub fn get_capacity_len(ptr: WasmPtr) -> isize;
     pub fn alloc(len: usize) -> WasmPtr;
@@ -26,4 +27,6 @@ extern "C" {
     pub fn write_byte(ptr: WasmPtr, offset: u32, byte: u8) -> i32;
     pub fn get_ptr_collection_len(ptr: WasmPtrList) -> isize;
     pub fn get_ptr_from_collection(ptr: WasmPtrList, index: u32) -> WasmPtr;
+    pub fn add_to_collection(head: WasmPtr, ptr: WasmPtr) -> WasmPtr;
+    pub fn create_collection(head: WasmPtr)-> WasmPtr;
 }
