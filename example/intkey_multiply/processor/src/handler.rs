@@ -311,8 +311,8 @@ impl<'a> IntkeyState<'a> {
     }
 
     pub fn get(&mut self, name: &str) -> Result<Option<u32>, ApplyError> {
-        let address = &IntkeyState::calculate_address(name);
-        let d = self.context.get_state(address)?;
+        let address = IntkeyState::calculate_address(name);
+        let d = self.context.get_state(vec![address.to_string()])?;
         match d {
             Some(packed) => {
                 let hex_vec: Vec<String> = packed.iter().map(|b| format!("{:02X}", b)).collect();
@@ -339,10 +339,13 @@ impl<'a> IntkeyState<'a> {
         map.insert(name.into(), value);
 
         let encoded = encode_intkey(map)?;
-        let packed = &decode(encoded)
+        let packed = decode(encoded)
             .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
+
+        let mut sets = HashMap::new();
+        sets.insert(IntkeyState::calculate_address(name), packed);
         self.context
-            .set_state(&IntkeyState::calculate_address(name), packed)
+            .set_state(sets)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
 
         Ok(())
