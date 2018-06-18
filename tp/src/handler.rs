@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std::collections::HashMap;
+
 use protobuf;
 use protobuf::RepeatedField;
 
@@ -298,7 +300,7 @@ impl<'a> SabreState<'a> {
 
     pub fn get_admin_setting(&mut self) -> Result<Option<Setting>, ApplyError> {
         let address = get_sawtooth_admins_address()?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address])?;
         match d {
             Some(packed) => {
                 let setting: Setting = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -322,7 +324,7 @@ impl<'a> SabreState<'a> {
         version: &str,
     ) -> Result<Option<Contract>, ApplyError> {
         let address = make_contract_address(name, version)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address])?;
         match d {
             Some(packed) => {
                 let contracts: ContractList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -353,7 +355,7 @@ impl<'a> SabreState<'a> {
         new_contract: Contract,
     ) -> Result<(), ApplyError> {
         let address = make_contract_address(name, version)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address.to_string()])?;
         let mut contract_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(contracts) => contracts,
@@ -394,8 +396,10 @@ impl<'a> SabreState<'a> {
                 )))
             }
         };
+        let mut sets = HashMap::new();
+        sets.insert(address, serialized);
         self.context
-            .set_state(&address, serialized.as_ref())
+            .set_state(sets)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
@@ -424,7 +428,7 @@ impl<'a> SabreState<'a> {
         name: &str,
     ) -> Result<Option<ContractRegistry>, ApplyError> {
         let address = make_contract_registry_address(name)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address])?;
         match d {
             Some(packed) => {
                 let contract_registries: ContractRegistryList =
@@ -455,7 +459,7 @@ impl<'a> SabreState<'a> {
         new_contract_registry: ContractRegistry,
     ) -> Result<(), ApplyError> {
         let address = make_contract_registry_address(name)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address.to_string()])?;
         let mut contract_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(contract_registries) => contract_registries,
@@ -500,8 +504,10 @@ impl<'a> SabreState<'a> {
                 )))
             }
         };
+        let mut sets = HashMap::new();
+        sets.insert(address, serialized);
         self.context
-            .set_state(&address, serialized.as_ref())
+            .set_state(sets)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
@@ -530,7 +536,7 @@ impl<'a> SabreState<'a> {
         namespace: &str,
     ) -> Result<Option<NamespaceRegistry>, ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address])?;
         match d {
             Some(packed) => {
                 let namespace_registries: NamespaceRegistryList =
@@ -560,7 +566,7 @@ impl<'a> SabreState<'a> {
         namespace: &str,
     ) -> Result<Option<NamespaceRegistryList>, ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address])?;
         match d {
             Some(packed) => {
                 let namespace_registries: NamespaceRegistryList =
@@ -585,7 +591,7 @@ impl<'a> SabreState<'a> {
         new_namespace_registry: NamespaceRegistry,
     ) -> Result<(), ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(&address)?;
+        let d = self.context.get_state(vec![address.to_string()])?;
         let mut namespace_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(namespace_registries) => namespace_registries,
@@ -630,8 +636,10 @@ impl<'a> SabreState<'a> {
                 )))
             }
         };
+        let mut sets = HashMap::new();
+        sets.insert(address, serialized);
         self.context
-            .set_state(&address, serialized.as_ref())
+            .set_state(sets)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }

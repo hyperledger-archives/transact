@@ -241,14 +241,21 @@ impl Externals for WasmExternals {
     ) -> Result<Option<RuntimeValue>, Trap> {
         match index {
             GET_STATE_IDX => {
-                let ptr: i32 = args.nth(0);
+                let head_ptr: u32 = args.nth(0);
+                let addresses = match self.ptr_collections.get(&head_ptr) {
+                    Some(addresses) => addresses.clone(),
+                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                };
+                let mut addr_vec = Vec::new();
+                for addr in addresses {
+                    let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
+                    addr_vec.push(address);
+                }
 
-                let addr = self.ptr_to_string(ptr as u32)?;
-
-                info!("Attempting to get state, address: {}", addr);
+                info!("Attempting to get state, addresses: {:?}", addr_vec);
 
                 let state = self.context
-                    .get_state(&addr)
+                    .get_state(addr_vec)
                     .map_err(ExternalsError::from)?
                     .unwrap_or(Vec::new());
 
@@ -264,8 +271,9 @@ impl Externals for WasmExternals {
                 info!("Attempting to set state, address: {}", addr);
 
                 let state = self.ptr_to_vec(state_ptr as u32)?;
-
-                if let Ok(()) = self.context.set_state(&addr, &state) {
+                let mut sets = HashMap::new();
+                sets.insert(addr, state);
+                if let Ok(()) = self.context.set_state(sets) {
                     Ok(Some(RuntimeValue::I32(1)))
                 } else {
                     Ok(Some(RuntimeValue::I32(0)))
