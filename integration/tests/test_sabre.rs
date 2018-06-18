@@ -216,7 +216,7 @@ fn test_sabre() {
         };
     assert!(response["data"][0]["status"]=="COMMITTED");
 
-    // Test that Sabre will successfully try to execuet the contract but the smart contract will
+    // Test that Sabre will successfully try to execute the contract but the smart contract will
     // return an invalid transaction because A has already been state.
     //
     // Send ExecuteContractAction with the following:
@@ -237,7 +237,7 @@ fn test_sabre() {
     println!("{}", message);
     assert!(message.contains("Wasm contract returned invalid transaction"));
 
-    // Test that Sabre will successfully try to execuet the contract but the smart contract will
+    // Test that Sabre will successfully try to execute the contract but the smart contract will
     // return an invalid transaction because Bad does not exist in state.
     //
     // Send ExecuteContractAction with the following:
