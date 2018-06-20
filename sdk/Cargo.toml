@@ -18,4 +18,4 @@ version = "0.1.0"
 authors = ["Cargill, Incorporated"]
 
 [dependencies]
-protobuf = "1.4"
+protobuf = "2"
