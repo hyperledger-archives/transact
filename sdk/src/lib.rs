@@ -296,7 +296,7 @@ pub enum ApplyError {
 impl std::fmt::Display for ApplyError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ApplyError::InvalidTransaction(ref s) => write!(f, "InvalidTransactio: {}", s),
+            ApplyError::InvalidTransaction(ref s) => write!(f, "InvalidTransaction: {}", s),
             ApplyError::InternalError(ref s) => write!(f, "InternalError: {}", s),
         }
     }
