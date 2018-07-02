@@ -20,3 +20,8 @@
 
 /docs/build
 /docs/source/cli/output
+
+/integration/target/
+/integration/Cargo.lock
+
+.DS_Store
