@@ -59,8 +59,8 @@ that can be passed into execute_entrypoint.
 .. code-block:: rust
 
   #[no_mangle]
-  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr) -> i32 {
-      execute_entrypoint(payload, signer, apply)
+  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr: signature: WasmPtr) -> i32 {
+      execute_entrypoint(payload, signer, signature, apply)
   }
 
 The apply method should have the following signature.
@@ -199,8 +199,8 @@ decorator, so they will only be compiled when compiling into Wasm.
 
   #[cfg(target_arch = "wasm32")]
   #[no_mangle]
-  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr) -> i32 {
-      execute_entrypoint(payload, signer, apply)
+  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr, signature: WasmPtr) -> i32 {
+      execute_entrypoint(payload, signer, signature, apply)
   }
 
 .. note:: Though the goal is compatibility with the transaction processor API,

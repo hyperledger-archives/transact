@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 extern crate protobuf;
+
 mod externs;
 
 use std::error::Error;
@@ -36,11 +37,12 @@ impl Header {
 pub struct TpProcessRequest<'a> {
     payload: Vec<u8>,
     header: &'a mut Header,
+    signature: String
 }
 
 impl<'a> TpProcessRequest<'a> {
-    pub fn new(payload: Vec<u8>, header: &'a mut Header) -> TpProcessRequest {
-        TpProcessRequest { payload, header }
+    pub fn new(payload: Vec<u8>, header: &'a mut Header, signature: String) -> TpProcessRequest {
+        TpProcessRequest { payload, header, signature }
     }
 
     pub fn get_payload(&self) -> &[u8] {
@@ -49,6 +51,10 @@ impl<'a> TpProcessRequest<'a> {
 
     pub fn get_header(&self) -> &Header {
         return self.header;
+    }
+
+    pub fn get_signature(&self) -> String {
+        return self.signature.to_string()
     }
 }
 
@@ -136,12 +142,21 @@ pub trait TransactionHandler {
 /// -2: Failed to deserialize signer
 /// -3: apply returned InvalidTransaction
 /// -4: apply returned InternalError
-pub unsafe fn execute_entrypoint<F>(payload_ptr: WasmPtr, signer_ptr: WasmPtr, apply: F) -> i32
+pub unsafe fn execute_entrypoint<F>(payload_ptr: WasmPtr, signer_ptr: WasmPtr, signature_ptr: WasmPtr, apply: F) -> i32
 where
     F: Fn(&TpProcessRequest, &mut TransactionContext) -> Result<bool, ApplyError>,
 {
     let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
         i.into_bytes()
+    } else {
+        return -1;
+    };
+
+    let signature = if let Ok(i) = WasmBuffer::from_raw(signature_ptr) {
+        match i.into_string() {
+            Ok(s) => s,
+            Err(_) => return -2,
+        }
     } else {
         return -1;
     };
@@ -157,7 +172,7 @@ where
 
     let mut header = Header::new(signer);
     match apply(
-        &TpProcessRequest::new(payload, &mut header),
+        &TpProcessRequest::new(payload, &mut header, signature),
         &mut TransactionContext::new(),
     ) {
         Ok(r) => if r {

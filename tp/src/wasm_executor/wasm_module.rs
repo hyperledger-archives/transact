@@ -32,6 +32,7 @@ impl WasmModule {
         &self,
         payload: Vec<u8>,
         signer: String,
+        signature: String,
     ) -> Result<Option<i32>, ExternalsError> {
         let mut env = WasmExternals::new(None, self.context.clone())?;
 
@@ -46,11 +47,15 @@ impl WasmModule {
         let signer_ptr = env.write_data(signer.into_bytes())? as i32;
         info!("Signer written to memory");
 
+        let signature_ptr = env.write_data(signature.into_bytes())? as i32;
+        info!("Signature written to memory");
+
         let result = instance.invoke_export(
             "entrypoint",
             &vec![
                 RuntimeValue::I32(payload_ptr),
                 RuntimeValue::I32(signer_ptr),
+                RuntimeValue::I32(signature_ptr),
             ],
             &mut env,
         )?;

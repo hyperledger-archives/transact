@@ -736,7 +736,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 delete_contract(delete_contract_payload, signer, &mut state)
             }
             Action::ExecuteContract(execute_contract_payload) => {
-                execute_contract(execute_contract_payload, signer, &mut state, context_clone)
+                execute_contract(execute_contract_payload, signer, request.get_signature(), &mut state, context_clone)
             }
             Action::CreateContractRegistry(create_contract_registry_payload) => {
                 create_contract_registry(create_contract_registry_payload, signer, &mut state)
@@ -904,6 +904,7 @@ fn delete_contract(
 fn execute_contract(
     payload: ExecuteContractAction,
     signer: &str,
+    signature: &str,
     state: &mut SabreState,
     context: TransactionContext,
 ) -> Result<(), ApplyError> {
@@ -1045,7 +1046,7 @@ fn execute_contract(
         WasmModule::new(contract.get_contract(), context).expect("Failed to create can_add module");
 
     let result = module
-        .entrypoint(payload.get_payload().to_vec(), signer.into())
+        .entrypoint(payload.get_payload().to_vec(), signer.into(), signature.into())
         .map_err(|e| ApplyError::InvalidTransaction(format!("{:?}", e)))?;
 
     match result {
