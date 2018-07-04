@@ -1,3 +1,5 @@
+/build
+
 /cli/Cargo.lock
 /cli/src/protos/
 /cli/target/
