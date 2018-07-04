@@ -1,8 +1,28 @@
 [package]
 name = "sawtooth-sabre"
 version = "0.1.0"
+description = "Sawtooth Sabre Transaction Processor"
 authors = ["Cargill Incorporated"]
 build = "build.rs"
+license="Apache"
+
+[package.metadata.deb]
+extended-description= """\
+    Sawtooth Sabre is a transaction family which implements on-chain smart \
+    contracts executed in a WebAssembly virtual machine.
+"""
+depends = "$auto"
+assets = [
+    ["packaging/systemd/sawtooth-sabre.service",
+    "/lib/systemd/system/sawtooth-sabre.service", "644"],
+    ["packaging/systemd/sawtooth-sabre", "/etc/default/sawtooth-sabre", "644"],
+    ["target/release/sawtooth-sabre", "/usr/bin/sawtooth-sabre", "755"],
+]
+maintainer-scripts = "packaging/ubuntu"
+conf-files = [
+    "/lib/systemd/system/sawtooth-sabre.service",
+    "/etc/default/sawtooth-sabre"
+]
 
 [dependencies]
 sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
