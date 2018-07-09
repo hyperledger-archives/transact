@@ -47,7 +47,7 @@ services:
     build:
       context: .
       dockerfile: cli/Dockerfile-installed
-    image: sawtooth-sabre-cli
+    image: sawtooth-sabre-cli:${ISOLATION_ID}
     container_name: sabre-shell
     entrypoint: |
         bash -c "
@@ -64,7 +64,7 @@ services:
     build:
       context: .
       dockerfile: tp/Dockerfile-installed
-    image: sawtooth-sabre-tp
+    image: sawtooth-sabre-tp:${ISOLATION_ID}
     container_name: sawtooth-sabre-tp
     depends_on:
       - validator
