@@ -66,7 +66,7 @@ node ('master') {
             // Use a docker container to build and protogen, so that the Jenkins
             // environment doesn't need all the dependencies.
 
-            stage("Build Lint Requirements") {
+            stage("Build Sabre") {
                 sh 'docker-compose -f docker-compose-installed.yaml build shell'
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
             }
