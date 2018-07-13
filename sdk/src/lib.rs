@@ -68,7 +68,7 @@ impl TransactionContext {
         unsafe {
             if addresses.is_empty(){
                 return Err(WasmSdkError::InvalidTransaction(
-                    "No address to delte".into(),
+                    "No address to delete".into(),
                 ));
             }
             let head = &addresses[0];
@@ -89,10 +89,16 @@ impl TransactionContext {
             unsafe {
                 let wasm_address_buffer = WasmBuffer::new(address.to_string().as_bytes())?;
                 let wasm_state_buffer = WasmBuffer::new(&state)?;
-                ptr_to_vec(externs::set_state(
+                let result = externs::set_state(
                     wasm_address_buffer.into_raw(),
                     wasm_state_buffer.into_raw(),
-                ))?;
+                );
+
+                if result == 0 {
+                    return Err(WasmSdkError::InvalidTransaction(
+                        "Unable to set state".into(),
+                    ));
+                }
             }
         }
         Ok(())

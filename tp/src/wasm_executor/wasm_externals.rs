@@ -273,10 +273,15 @@ impl Externals for WasmExternals {
                 let state = self.ptr_to_vec(state_ptr as u32)?;
                 let mut sets = HashMap::new();
                 sets.insert(addr, state);
-                if let Ok(()) = self.context.set_state(sets) {
-                    Ok(Some(RuntimeValue::I32(1)))
-                } else {
-                    Ok(Some(RuntimeValue::I32(0)))
+                match self.context.set_state(sets){
+                    Ok(()) => {
+                        Ok(Some(RuntimeValue::I32(1)))
+                    },
+                    Err(err) => {
+                        info!("Set Error: {}", err);
+                        Ok(Some(RuntimeValue::I32(0)))
+                    }
+
                 }
             }
             DELETE_STATE_IDX => {
