@@ -20,6 +20,9 @@ services:
     container_name: sabre-docs
     volumes:
       - ..:/project
+    build:
+      context: .
+      dockerfile: Dockerfile
     entrypoint: "bash -c \"\
       cd /project/cli && \
       cargo build && \
@@ -27,5 +30,3 @@ services:
       ./bin/generate_cli_output && \
       make html
       \""
-    build:
-      context: .
