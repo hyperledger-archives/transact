@@ -87,8 +87,8 @@ node ('master') {
 
             stage("Archive Build artifacts") {
                 sh 'mkdir -p build/debs'
-                sh 'docker run --rm -v $(pwd)/build/debs:/build/debs sawtooth-sabre-cli:${ISOLATION_ID} bash -c "cp /tmp/*.deb /build/debs"'
-                sh 'docker run --rm -v $(pwd)/build/debs:/build/debs sawtooth-sabre-tp:${ISOLATION_ID} bash -c "cp /tmp/*.deb /build/debs"'
+                sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-cli:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
+                sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-tp:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
                 archiveArtifacts artifacts: '*.tgz, *.zip'
                 archiveArtifacts artifacts: 'build/debs/*.deb'
                 archiveArtifacts artifacts: 'docs/build/html/**'
