@@ -81,10 +81,8 @@ node ('master') {
             }
 
             stage ("Build documentation") {
-                sh 'cd docs'
-                sh 'docker-compose up'
-                sh 'docker-compose down'
-                sh 'cd ..'
+                sh 'docker-compose -f docs/docker-compose.yaml up'
+                sh 'docker-compose -f docs/docker-compose.yaml down'
             }
 
             stage("Archive Build artifacts") {
