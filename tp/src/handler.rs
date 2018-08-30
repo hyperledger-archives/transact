@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use std;
 use std::collections::HashMap;
 
 use protobuf;
@@ -63,6 +64,24 @@ enum Action {
     UpdateNamespaceRegistryOwners(UpdateNamespaceRegistryOwnersAction),
     CreateNamespaceRegistryPermission(CreateNamespaceRegistryPermissionAction),
     DeleteNamespaceRegistryPermission(DeleteNamespaceRegistryPermissionAction),
+}
+
+impl std::fmt::Display for Action {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Action::CreateContract(_) => write!(f, "Action: Create Contract"),
+            Action::DeleteContract(_) => write!(f, "Action: Delete Contract"),
+            Action::ExecuteContract(_) => write!(f, "Action: Execute Contract"),
+            Action::CreateContractRegistry(_) => write!(f, "Action: Create Contract Registry"),
+            Action::DeleteContractRegistry(_) => write!(f, "Action: Delete Contract Registry"),
+            Action::UpdateContractRegistryOwners(_) => write!(f, "Action: Update Contract Registry Owners"),
+            Action::CreateNamespaceRegistry(_) => write!(f, "Action: Create Namespace Registry"),
+            Action::DeleteNamespaceRegistry(_) => write!(f, "Action: Delete Namespace Registry"),
+            Action::UpdateNamespaceRegistryOwners(_) => write!(f, "Action: Update Namespace Registry Owners"),
+            Action::CreateNamespaceRegistryPermission(_) => write!(f, "Create Namespace Registry Permission"),
+            Action::DeleteNamespaceRegistryPermission(_) => write!(f, "Delete Namespace Registry Permission")
+        }
+    }
 }
 
 struct SabreRequestPayload {
@@ -722,7 +741,7 @@ impl TransactionHandler for SabreTransactionHandler {
         let mut state = SabreState::new(context);
 
         info!(
-            "{:?} {:?} {:?}",
+            "{} {:?} {:?}",
             payload.get_action(),
             request.get_header().get_inputs(),
             request.get_header().get_outputs()
