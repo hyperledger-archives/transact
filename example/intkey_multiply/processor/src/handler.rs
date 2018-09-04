@@ -611,14 +611,14 @@ fn run_smart_permisson(state: &mut IntkeyState, signer: &str, payload: &[u8]) ->
             "Signer is not an agent: {}", signer
         )))
     };
+
     let org_id = agent.get_org_id();
-    let smart_permission = match state.get_smart_permission(org_id, "test")?{
-        Some(smart_permission) => smart_permission,
-        None => return Ok(1)
-    };
+
+    let smart_permission_addr = compute_smart_permission_address(org_id, "test");
 
     invoke_smart_permission(
-        smart_permission.get_function(),
+        smart_permission_addr,
+        "test".to_string(),
         agent.get_roles().to_vec(),
         org_id.to_string(),
         signer.to_string(),
