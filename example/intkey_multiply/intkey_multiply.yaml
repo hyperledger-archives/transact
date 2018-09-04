@@ -18,6 +18,8 @@ wasm: processor/target/wasm32-unknown-unknown/release/intkey-multiply.wasm
 inputs:
   - 'cad11d'
   - '1cf126'
+  - '00ec03'
 outputs:
   - '1cf126'
   - 'cad11d'
+  - '00ec03'
