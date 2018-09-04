@@ -28,6 +28,9 @@ message SabrePayload {
     UPDATE_NAMESPACE_REGISTRY_OWNERS = 9;
     CREATE_NAMESPACE_REGISTRY_PERMISSION = 10;
     DELETE_NAMESPACE_REGISTRY_PERMISSION = 11;
+    CREATE_SMART_PERMISSION = 12;
+    UPDATE_SMART_PERMISSION= 13;
+    DELETE_SMART_PERMISSION = 14;
   }
 
   Action action = 1;
@@ -45,6 +48,10 @@ message SabrePayload {
   UpdateNamespaceRegistryOwnersAction update_namespace_registry_owners = 10;
   CreateNamespaceRegistryPermissionAction create_namespace_registry_permission = 11;
   DeleteNamespaceRegistryPermissionAction delete_namespace_registry_permission = 12;
+
+  CreateSmartPermissionAction create_smart_permission = 13;
+  UpdateSmartPermissionAction update_smart_permission = 14;
+  DeleteSmartPermissionAction delete_smart_permission = 15;
 }
 
 // creates a Contract and updates ContractRegistry with a version entry
@@ -120,4 +127,27 @@ message CreateNamespaceRegistryPermissionAction {
 message DeleteNamespaceRegistryPermissionAction {
   string namespace = 1;
   string contract_name = 2;
+}
+
+// Creates a smart permission
+message CreateSmartPermissionAction {
+  string name = 1;
+  // ID of organization that owns the smart permission
+  string org_id = 2;
+  bytes function = 3;
+}
+
+// Updates a smart permission
+message UpdateSmartPermissionAction {
+  string name = 1;
+  // ID of organization that owns the smart permission
+  string org_id = 2;
+  bytes function = 3;
+}
+
+// Deletes  a smart permission
+message DeleteSmartPermissionAction {
+  string name = 1;
+  // ID of organization that owns the smart permission
+  string org_id = 2;
 }
