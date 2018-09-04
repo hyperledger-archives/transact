@@ -17,6 +17,8 @@ use std::string::FromUtf8Error;
 use std::error::Error as StdError;
 use std::fmt;
 
+use std::time::Instant;
+
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor,
                            MemoryInstance, MemoryRef, ModuleImportResolver, RuntimeArgs,
@@ -244,6 +246,7 @@ impl Externals for WasmExternals {
         index: usize,
         args: RuntimeArgs,
     ) -> Result<Option<RuntimeValue>, Trap> {
+        let timer = Instant::now();
         match index {
             GET_STATE_IDX => {
                 let head_ptr: u32 = args.nth(0);
@@ -266,6 +269,10 @@ impl Externals for WasmExternals {
 
                 let raw_ptr = self.write_data(state)?;
 
+
+                info!("GET_STATE Execution time: {} secs {} ms",
+                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
             SET_STATE_IDX => {
@@ -278,15 +285,19 @@ impl Externals for WasmExternals {
                 let state = self.ptr_to_vec(state_ptr as u32)?;
                 let mut sets = HashMap::new();
                 sets.insert(addr, state);
-                match self.context.set_state(sets){
+
+                match self.context.set_state(sets) {
                     Ok(()) => {
+                    info!("SET_STATE Execution time: {} secs {} ms",
+                          timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(1)))
                     },
                     Err(err) => {
                         info!("Set Error: {}", err);
+                        info!("SET_STATE Execution time: {} secs {} ms",
+                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(0)))
                     }
-
                 }
             }
             DELETE_STATE_IDX => {
@@ -320,10 +331,8 @@ impl Externals for WasmExternals {
             }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
-                info!("Getting pointer length\nraw {}", addr);
 
                 if let Some(ptr) = self.ptrs.get(&addr) {
-                    info!("ptr: {:?}", ptr);
                     Ok(Some(RuntimeValue::I32(ptr.length as i32)))
                 } else {
                     Ok(Some(RuntimeValue::I32(-1)))
@@ -341,9 +350,9 @@ impl Externals for WasmExternals {
             ALLOC_IDX => {
                 let len: i32 = args.nth(0);
 
-                info!("Allocating memory block of length: {}", len);
                 let raw_ptr = self.write_data(vec![0; len as usize])?;
-                info!("Block successfully allocated ptr: {}", raw_ptr as i32);
+                info!("ALLOC Execution time: {} secs {} ms",
+                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
@@ -442,6 +451,8 @@ impl Externals for WasmExternals {
 
                 match result {
                     Some(x) => {
+                        info!("SMART_PERMISSION Execution time: {} secs {} ms",
+                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
                         Ok(Some(RuntimeValue::I32(x)))
                     }
                     None =>Err(ExternalsError::to_trap("No result returned".into()))
