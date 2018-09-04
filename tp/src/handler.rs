@@ -29,18 +29,28 @@ use sawtooth_sdk::messages::processor::TpProcessRequest;
 use sawtooth_sdk::messages::setting::Setting;
 
 use addressing::{get_sawtooth_admins_address, make_contract_address,
-                 make_contract_registry_address, make_namespace_registry_address};
+                 make_contract_registry_address, make_namespace_registry_address,
+                 compute_agent_address, compute_org_address, compute_smart_permission_address};
 
 use protos::contract::{Contract, ContractList};
 use protos::contract_registry::{ContractRegistry, ContractRegistryList, ContractRegistry_Version};
 use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList,
                                  NamespaceRegistry_Permission};
+use protos::smart_permission::{
+    Agent,
+    AgentList,
+    Organization,
+    OrganizationList,
+    SmartPermission,
+    SmartPermissionList
+};
 use protos::payload::{CreateContractAction, CreateContractRegistryAction,
                       CreateNamespaceRegistryAction, CreateNamespaceRegistryPermissionAction,
                       DeleteContractAction, DeleteContractRegistryAction,
                       DeleteNamespaceRegistryAction, DeleteNamespaceRegistryPermissionAction,
                       ExecuteContractAction, SabrePayload, SabrePayload_Action,
-                      UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction};
+                      UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
+                      CreateSmartPermissionAction, UpdateSmartPermissionAction, DeleteSmartPermissionAction};
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
@@ -64,6 +74,9 @@ enum Action {
     UpdateNamespaceRegistryOwners(UpdateNamespaceRegistryOwnersAction),
     CreateNamespaceRegistryPermission(CreateNamespaceRegistryPermissionAction),
     DeleteNamespaceRegistryPermission(DeleteNamespaceRegistryPermissionAction),
+    CreateSmartPermission(CreateSmartPermissionAction),
+    UpdateSmartPermission(UpdateSmartPermissionAction),
+    DeleteSmartPermission(DeleteSmartPermissionAction)
 }
 
 impl std::fmt::Display for Action {
@@ -79,7 +92,10 @@ impl std::fmt::Display for Action {
             Action::DeleteNamespaceRegistry(_) => write!(f, "Action: Delete Namespace Registry"),
             Action::UpdateNamespaceRegistryOwners(_) => write!(f, "Action: Update Namespace Registry Owners"),
             Action::CreateNamespaceRegistryPermission(_) => write!(f, "Create Namespace Registry Permission"),
-            Action::DeleteNamespaceRegistryPermission(_) => write!(f, "Delete Namespace Registry Permission")
+            Action::DeleteNamespaceRegistryPermission(_) => write!(f, "Delete Namespace Registry Permission"),
+            Action::CreateSmartPermission(_) => write!(f, "Create smart permission"),
+            Action::UpdateSmartPermission(_) => write!(f, "Update smart permission"),
+            Action::DeleteSmartPermission(_) => write!(f, "Delete smart permission")
         }
     }
 }
@@ -293,6 +309,53 @@ impl SabreRequestPayload {
                 Action::DeleteNamespaceRegistryPermission(
                     delete_namespace_registry_permission.clone(),
                 )
+            }
+            SabrePayload_Action::CREATE_SMART_PERMISSION => {
+                let action = payload.get_create_smart_permission();
+
+                if  action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                }
+
+                if action.get_name().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                }
+
+                if action.get_function().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Function body required".into()));
+                }
+
+                Action::CreateSmartPermission(action.clone())
+            }
+            SabrePayload_Action::UPDATE_SMART_PERMISSION => {
+                let action = payload.get_update_smart_permission();
+
+                if  action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                }
+
+                if action.get_name().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                }
+
+                if action.get_function().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Function body required".into()));
+                }
+
+                Action::UpdateSmartPermission(action.clone())
+            }
+            SabrePayload_Action::DELETE_SMART_PERMISSION => {
+                let action = payload.get_delete_smart_permission();
+
+                if  action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                }
+
+                if action.get_name().is_empty() {
+                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                }
+
+                Action::DeleteSmartPermission(action.clone())
             }
             SabrePayload_Action::ACTION_UNSET => {
                 return Err(ApplyError::InvalidTransaction(String::from(
@@ -681,6 +744,168 @@ impl<'a> SabreState<'a> {
         };
         Ok(())
     }
+
+    pub fn get_smart_permission(
+        &mut self,
+        org_id: &str,
+        name: &str,
+    ) -> Result<Option<SmartPermission>, ApplyError> {
+        let address = compute_smart_permission_address(org_id, name);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let smart_permissions: SmartPermissionList =
+                    match protobuf::parse_from_bytes(packed.as_slice()) {
+                        Ok(smart_permissions) => smart_permissions,
+                        Err(err) => {
+                            return Err(ApplyError::InternalError(format!(
+                                "Cannot deserialize smart permission list: {:?}",
+                                err,
+                            )))
+                        }
+                    };
+
+                for smart_permission in smart_permissions.get_smart_permissions() {
+                    if smart_permission.name == name {
+                        return Ok(Some(smart_permission.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn set_smart_permission(
+        &mut self,
+        org_id: &str,
+        name: &str,
+        new_smart_permission: SmartPermission,
+    ) -> Result<(), ApplyError> {
+        let address = compute_smart_permission_address(org_id, name);
+        let d = self.context.get_state(vec![address.clone()])?;
+        let mut smart_permission_list = match d {
+            Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
+                Ok(smart_permissions) => smart_permissions,
+                Err(err) => {
+                    return Err(ApplyError::InternalError(format!(
+                        "Cannot deserialize smart permission list: {}",
+                        err,
+                    )))
+                }
+            },
+            None => SmartPermissionList::new(),
+        };
+        // remove old smart_permission if it exists and sort the smart_permission by name
+        let smart_permissions = smart_permission_list.get_smart_permissions().to_vec();
+        let mut index = None;
+        let mut count = 0;
+        for smart_permission in smart_permissions.clone() {
+            if smart_permission.name == name {
+                index = Some(count);
+                break;
+            }
+            count = count + 1;
+        }
+
+        match index {
+            Some(x) => {
+                smart_permission_list.smart_permissions.remove(x);
+            }
+            None => (),
+        };
+        smart_permission_list
+            .smart_permissions
+            .push(new_smart_permission);
+        smart_permission_list
+            .smart_permissions
+            .sort_by_key(|sp| sp.clone().name);
+        let serialized = match protobuf::Message::write_to_bytes(&smart_permission_list) {
+            Ok(serialized) => serialized,
+            Err(_) => {
+                return Err(ApplyError::InternalError(String::from(
+                    "Cannot serialize smart permission list",
+                )))
+            }
+        };
+        let mut sets = HashMap::new();
+        sets.insert(address, serialized);
+        self.context
+            .set_state(sets)
+            .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+        Ok(())
+    }
+
+    pub fn delete_smart_permission(&mut self, org_id: &str, name: &str) -> Result<(), ApplyError> {
+        let address = compute_smart_permission_address(org_id, name);
+        let d = self.context.delete_state(vec![address.clone()])?;
+        let deleted: Vec<String> = match d {
+            Some(deleted) => deleted.to_vec(),
+            None => {
+                return Err(ApplyError::InternalError(String::from(
+                    "Cannot delete smart_permission",
+                )))
+            }
+        };
+        if !deleted.contains(&address) {
+            return Err(ApplyError::InternalError(String::from(
+                "Cannot delete smart_permission",
+            )));
+        };
+        Ok(())
+    }
+
+    pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
+        let address = compute_org_address(id);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                    Ok(orgs) => orgs,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize organization list: {:?}",
+                            err,
+                        )))
+                    }
+                };
+
+                for org in orgs.get_organizations() {
+                    if org.org_id == id {
+                        return Ok(Some(org.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
+
+    pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
+        let address = compute_agent_address(public_key);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                    Ok(agents) => agents,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize record container: {:?}",
+                            err,
+                        )))
+                    }
+                };
+
+                for agent in agents.get_agents() {
+                    if agent.public_key == public_key {
+                        return Ok(Some(agent.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
 }
 
 pub struct SabreTransactionHandler {
@@ -796,6 +1021,21 @@ impl TransactionHandler for SabreTransactionHandler {
                 delete_namespace_registry_permission_payload,
                 signer,
                 &mut state,
+            ),
+           Action::CreateSmartPermission(payload) => create_smart_permission(
+               payload,
+               signer,
+               &mut state
+            ),
+           Action::UpdateSmartPermission(payload) => update_smart_permission(
+               payload,
+               signer,
+               &mut state
+            ),
+           Action::DeleteSmartPermission(payload) => delete_smart_permission(
+               payload,
+               signer,
+               &mut state
             ),
         }
     }
@@ -1452,6 +1692,155 @@ fn delete_namespace_registry_permission(
     };
     state.set_namespace_registry(namespace, namespace_registry)
 }
+
+pub fn is_admin(signer: &str, org_id: &str, state: &mut SabreState) -> Result<(), ApplyError> {
+    let admin = match state.get_agent(signer) {
+        Ok(None) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Signer is not an agent: {}",
+                signer,
+            )))
+        }
+        Ok(Some(admin)) => admin,
+        Err(err) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Failed to retrieve state: {}",
+                err,
+            )))
+        }
+    };
+
+    if admin.get_org_id() != org_id {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Signer is not associated with the organization: {}",
+            signer,
+        )));
+    }
+    if !admin.roles.contains(&"admin".to_string()) {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Signer is not an admin: {}",
+            signer,
+        )));
+    };
+
+    if !admin.active {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Admin is not currently an active agent: {}",
+            signer,
+        )));
+    }
+    Ok(())
+}
+
+fn create_smart_permission(
+    payload: CreateSmartPermissionAction,
+    signer: &str,
+    state: &mut SabreState
+) -> Result<(), ApplyError> {
+
+    // verify the signer of the transaction is authorized to create smart permissions
+    is_admin(signer, payload.get_org_id(), state)?;
+
+    // Check if the smart permissions already exists
+    match state.get_smart_permission(payload.get_org_id(), payload.get_name()) {
+        Ok(None) => (),
+        Ok(Some(_)) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Smart Permission already exists: {} ",
+                payload.get_name(),
+            )))
+        }
+        Err(err) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Failed to retrieve state: {}",
+                err,
+            )))
+        }
+    };
+
+    // Check that organizations exists
+    match state.get_organization(payload.get_org_id()) {
+        Ok(None) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Organization does not exist exists: {}",
+                payload.get_org_id(),
+            )))
+        }
+        Ok(Some(_)) => (),
+        Err(err) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Failed to retrieve state: {}",
+                err,
+            )))
+        }
+    };
+
+    let mut smart_permission = SmartPermission::new();
+    smart_permission.set_org_id(payload.get_org_id().to_string());
+    smart_permission.set_name(payload.get_name().to_string());
+    smart_permission.set_function(payload.get_function().to_vec());
+    state.set_smart_permission(payload.get_org_id(), payload.get_name(), smart_permission)
+}
+
+fn update_smart_permission(
+    payload: UpdateSmartPermissionAction,
+    signer: &str,
+    state: &mut SabreState
+) -> Result<(), ApplyError> {
+
+    // verify the signer of the transaction is authorized to update smart permissions
+    is_admin(signer, payload.get_org_id(), state)?;
+
+    // verify that the smart permission exists
+    let mut smart_permission =
+        match state.get_smart_permission(payload.get_org_id(), payload.get_name()) {
+            Ok(None) => {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Smart Permission does not exists: {} ",
+                    payload.get_name(),
+                )))
+            }
+            Ok(Some(smart_permission)) => smart_permission,
+            Err(err) => {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Failed to retrieve state: {}",
+                    err,
+                )))
+            }
+        };
+
+    smart_permission.set_function(payload.get_function().to_vec());
+    state.set_smart_permission(payload.get_org_id(), payload.get_name(), smart_permission)
+}
+
+fn delete_smart_permission(
+    payload: DeleteSmartPermissionAction,
+    signer: &str,
+    state: &mut SabreState
+) -> Result<(), ApplyError> {
+    // verify the signer of the transaction is authorized to delete smart permissions
+    is_admin(signer, payload.get_org_id(), state)?;
+
+    // verify that the smart permission exists
+    match state.get_smart_permission(payload.get_org_id(), payload.get_name()) {
+        Ok(None) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Smart Permission does not exists: {} ",
+                payload.get_name(),
+            )))
+        }
+        Ok(Some(_)) => (),
+        Err(err) => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Failed to retrieve state: {}",
+                err,
+            )))
+        }
+    };
+
+    state.delete_smart_permission(payload.get_org_id(), payload.get_name())
+}
+
 
 // helper function to check if the signer is allowed to update a namespace_registry
 fn can_update_namespace_registry(
