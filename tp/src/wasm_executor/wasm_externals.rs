@@ -25,6 +25,8 @@ use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, M
                            RuntimeValue, Signature, Trap, TrapKind, ValueType, Module,
                            ModuleInstance, ImportsBuilder};
 use wasm_executor::wasmi::memory_units::Pages;
+use protobuf;
+use protos::smart_permission::{SmartPermission, SmartPermissionList};
 
 // External function indices
 
@@ -130,6 +132,19 @@ const CREATE_COLLECTION: usize = 10;
 ///
 const ADD_TO_COLLECTION: usize = 11;
 
+/// Args
+/// 
+/// 1) Smart permissions full address 
+/// 2) Name of smart permission
+/// 3) Smart permission roles
+/// 4) Organization ID
+/// 5) Public Key
+/// 6) Payload for smart permission
+///
+/// Returns - pointer to smart permission result if successful, -1 if roles were
+/// not successfully retrieved from state, or -2 if the smart contract was not
+/// successfully retrieved from state.
+///
 const SMART_PERMISSION: usize = 12;
 
 pub struct WasmExternals {
@@ -237,6 +252,36 @@ impl WasmExternals {
         info!("create_collection: {:?}", head);
         self.ptr_collections.insert(head, vec![head]);
         Ok(head)
+    }
+
+    pub fn get_smart_permission(
+        &mut self,
+        address: String,
+        name: String,
+    ) -> Result<Option<SmartPermission>, ExternalsError> {
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let smart_permissions: SmartPermissionList =
+                    match protobuf::parse_from_bytes(packed.as_slice()) {
+                        Ok(smart_permissions) => smart_permissions,
+                        Err(err) => {
+                            return Err(ExternalsError {
+                                message: format!(
+                                    "Cannot deserialize smart permission list: {:?}", err)
+                            })
+                        }
+                    };
+
+                for smart_permission in smart_permissions.get_smart_permissions() {
+                    if smart_permission.name == name {
+                        return Ok(Some(smart_permission.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
     }
 }
 
@@ -421,11 +466,13 @@ impl Externals for WasmExternals {
                 Ok(Some(RuntimeValue::I32(head_ptr as i32)))
             }
             SMART_PERMISSION => {
-                let contract_ptr: i32 = args.nth(0);
-                let roles_head_ptr: u32 = args.nth(1);
-                let org_id_ptr: i32 = args.nth(2);
-                let public_key_ptr: i32 = args.nth(3);
-                let payload_ptr: i32 = args.nth(4);
+                let timer = Instant::now();
+                let contract_addr_ptr: i32 = args.nth(0);
+                let name: i32 = args.nth(1);
+                let roles_head_ptr: u32 = args.nth(2);
+                let org_id_ptr: i32 = args.nth(3);
+                let public_key_ptr: i32 = args.nth(4);
+                let payload_ptr: i32 = args.nth(5);
 
                 let roles = match self.ptr_collections.get(&roles_head_ptr) {
                     Some(roles) => roles.clone(),
@@ -439,11 +486,21 @@ impl Externals for WasmExternals {
                 let org_id = self.ptr_to_string(org_id_ptr as u32)?;
                 let public_key = self.ptr_to_string(public_key_ptr as u32)?;
                 let payload = self.ptr_to_vec(payload_ptr as u32)?;
-                let contract = self.ptr_to_vec(contract_ptr as u32)?;
+                let name = self.ptr_to_string(name as u32)?;
+                let contract_addr = self.ptr_to_string(contract_addr_ptr as u32)?;
 
                 let cloned_context = self.context.clone();
+
+                let contract = if let Some(sp) = self.get_smart_permission(contract_addr, name)? {
+                        sp
+                    } else {
+                        return Ok(Some(RuntimeValue::I32(-2)))
+                };
+
+                // Invoke Smart Permission
+
                 let module =
-                    SmartPermissionModule::new(&contract, cloned_context)
+                    SmartPermissionModule::new(contract.get_function(), cloned_context)
                         .expect("Failed to create can_add module");
                 let result = module
                     .entrypoint(role_vec, org_id, public_key, payload.to_vec())
@@ -481,6 +538,7 @@ impl ModuleImportResolver for WasmExternals {
             "invoke_smart_permission" => Ok(FuncInstance::alloc_host(
                 Signature::new(
                     &[ValueType::I32,
+                    ValueType::I32,
                     ValueType::I32,
                     ValueType::I32,
                     ValueType::I32,

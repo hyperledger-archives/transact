@@ -145,7 +145,8 @@ pub trait TransactionHandler {
 }
 
 pub fn invoke_smart_permission(
-    contract: &[u8],
+    contract_addr: String,
+    name: String,
     roles: Vec<String>,
     org_id: String,
     public_key: String,
@@ -165,13 +166,15 @@ pub fn invoke_smart_permission(
             externs::add_to_collection(
                 header_role_buffer.into_raw(), wasm_buffer.into_raw());
         }
+        let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
+        let name_buffer = WasmBuffer::new(name.as_bytes())?;
         let org_id_buffer = WasmBuffer::new(org_id.to_string().as_bytes())?;
         let public_key_buffer = WasmBuffer::new(public_key.to_string().as_bytes())?;
         let payload_buffer = WasmBuffer::new(payload)?;
-        let contract_buffer = WasmBuffer::new(contract)?;
 
         Ok(externs::invoke_smart_permission(
-            contract_buffer.into_raw(),
+            contract_addr_buffer.into_raw(),
+            name_buffer.into_raw(),
             header_role_buffer.into_raw(),
             org_id_buffer.into_raw(),
             public_key_buffer.into_raw(),

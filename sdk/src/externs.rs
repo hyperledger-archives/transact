@@ -30,7 +30,8 @@ extern "C" {
     pub fn add_to_collection(head: WasmPtr, ptr: WasmPtr) -> WasmPtr;
     pub fn create_collection(head: WasmPtr)-> WasmPtr;
     pub fn invoke_smart_permission(
-            contract: WasmPtr,
+            contract_addr: WasmPtr,
+            name: WasmPtr,
             roles: WasmPtrList,
             org_id: WasmPtr,
             public_key: WasmPtr,
