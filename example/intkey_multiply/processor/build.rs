@@ -24,14 +24,14 @@ fn main() {
     protoc_rust::run(protoc_rust::Args {
         out_dir: "src/protos",
         input: &[
-            "../../../contracts/sawtooth-pike/protos/state.proto",
+            "../../../protos/smart_permission.proto",
         ],
-        includes: &["../../../contracts/sawtooth-pike/protos"],
+        includes: &["../../../protos"],
         customize: Customize {
             ..Default::default()
         }
     }).expect("protoc");
 
     let mut file = File::create("src/protos/mod.rs").unwrap();
-    file.write_all(b"pub mod state;\n").unwrap();
+    file.write_all(b"pub mod smart_permission;\n").unwrap();
 }

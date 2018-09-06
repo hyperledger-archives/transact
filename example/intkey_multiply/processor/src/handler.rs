@@ -28,7 +28,7 @@ cfg_if! {
         use sabre_sdk::TransactionHandler;
         use sabre_sdk::TpProcessRequest;
         use sabre_sdk::{WasmPtr, execute_entrypoint, invoke_smart_permission};
-        use protos::state::{Agent, AgentList, Organization, OrganizationList, SmartPermission,
+        use protos::smart_permission::{Agent, AgentList, Organization, OrganizationList, SmartPermission,
                             SmartPermissionList};
         use protobuf;
     } else {
