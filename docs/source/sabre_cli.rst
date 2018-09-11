@@ -111,5 +111,18 @@ and ``--outputs`` should include any namespaces or addresses that the contract
 needs to have access to. Finally the ``--payload`` should be a path to
 the file that contains the Sabre contract bytes.
 
+sabre sp
+========
+
+The ``sabre sp`` subbcommand submits a Sabre transaction that can create,
+update, or delete smart permissions
+
+.. literalinclude:: cli/output/sabre_sp_usage.out
+  :language: console
+
+The ``--filename`` should be the path to a compiled WebAssembly file. The 
+``--org_id`` is the unique identifier for an organization that has been
+created and registered with the Pike transaction processor.
+
 .. Licensed under Creative Commons Attribution 4.0 International License
 .. https://creativecommons.org/licenses/by/4.0/
