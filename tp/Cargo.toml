@@ -31,8 +31,7 @@ simple_logger = "0.4.0"
 clap = "2"
 protobuf = "2"
 rust-crypto = "0.2.36"
-wasmi = { git = "https://github.com/pepyakin/wasmi.git" }
-
+wasmi = "0.4"
 
 [build-dependencies]
 protoc-rust = "2"
