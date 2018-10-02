@@ -97,7 +97,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
 
     // First two characters should be A followed by the number of elements.
     // Only check for A as this will be a map with 15 or less elements
-    // It is unlikley that an address will have that many hash collisons.
+    // It is unlikely that an address will have that many hash collisions.
     let data_type = hex_string.get(..1)
         .ok_or_else(|| ApplyError::InvalidTransaction("Unable to get data type".into()))?;
     if data_type != "A" {
@@ -108,7 +108,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
 
     let entries_hex = hex_string.get(1..2)
         .ok_or_else(|| ApplyError::InvalidTransaction(
-            "Unable to get number of entires in the map".into()))?;
+            "Unable to get number of entries in the map".into()))?;
 
     let entries  = u32::from_str_radix(entries_hex, 16)
         .map_err(|err| ApplyError::InvalidTransaction(
@@ -131,7 +131,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         // cannot be empty and must not be greater than 20 characters
         if string_type < 97 || string_type > 116 {
             return Err(ApplyError::InvalidTransaction(String::from(
-                "Name is either to long, to short, or not a string.",
+                "Name is either too long, too short, or not a string.",
             )))
         }
         start = start + 2;
@@ -158,7 +158,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
 
         start = start + 2;
         // For number less than 23 (decimal) the first two bytes represent the number. If it is
-        // greater than 23 the first two bytes represent the number of digits requreid to
+        // greater than 23 the first two bytes represent the number of digits required to
         // calculate the value followed by the actual bytes for the number.
         if number > 23 {
             number = number - 23;
@@ -209,7 +209,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
 fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
     // First two characters should be A followed by the number of elements.
     // Only check for A as this will be a map with 15 or less elements
-    // It is unlikley that an address will have that many hash collisons
+    // It is unlikely that an address will have that many hash collisions
     let mut hex_string = "A".to_string();
     let map_length = map.len() as u32;
     hex_string = hex_string + &format!("{:X}", map_length);
