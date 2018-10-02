@@ -102,9 +102,10 @@ Contract
 --------
 
 A Contract represents the Sabre smart contract. It is uniquely
-identified by its name and version number. The contract also contains the
-expected inputs and outputs used when executing the contract, the public
-key of the creator, and the compiled wasm code of the contract.
+identified by its name and version number. The contract also contains
+the expected inputs and outputs (namespaces) used when executing the
+contract, the public key of the creator, and the compiled wasm code of
+the contract.
 
 .. code-block:: protobuf
 
@@ -283,6 +284,14 @@ The outputs for CreateContractAction must include:
 * the address for the new contract
 * the address for the contract registry
 
+.. note:: These inputs/outputs are for the general Sawtooth transaction.
+   They are required for any transaction, whether it is a Sabre
+   transaction or a transaction of any other transaction family.
+   However, the inputs/outputs fields in the ``CreateContractAction``,
+   above,  are not related to the ones listed in the Sawtooth
+   transaction. The ``CreateContractAction`` inputs/outputs are
+   used to enforce namespace permissions for the contract.
+
 
 DeleteContractAction
 --------------------
@@ -339,7 +348,9 @@ or output is less than 6 characters the transaction is invalid. For every
 input, the namespace registry must have a read permission for the contract and
 for every output the namespace registry must have a write permission for the
 contract. If either are missing or the namespace registry does not exist,
-the transaction is invalid.
+the transaction is invalid. The inputs and outputs in the
+``ExecuteContractAction`` payload shall not be mistaken with the inputs and
+outputs of the Sawtooth transaction carrying the payload.
 
 The contract is then loaded into the wasm interpreter and run against the
 provided payload. A result is returned. If the result is 1 the transaction
