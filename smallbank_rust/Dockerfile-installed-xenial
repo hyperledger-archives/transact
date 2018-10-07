@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# docker build -f families/smallbank/smallbank_rust/Dockerfile-installed -t sawtooth-smallbank-tp-rust .
+# docker build -f families/smallbank/smallbank_rust/Dockerfile-installed-xenial -t sawtooth-smallbank-tp-rust .
 
 # -------------=== smallbank rust build ===-------------
 FROM ubuntu:xenial as smallbank-rust-builder
