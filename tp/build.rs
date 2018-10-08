@@ -30,9 +30,7 @@ fn main() {
             "../protos/contract.proto",
         ],
         includes: &["../protos"],
-        customize: Customize {
-            ..Default::default()
-        }
+        customize: Customize::default(),
     }).expect("protoc");
 
     let mut file = File::create("src/protos/mod.rs").unwrap();
