@@ -27,9 +27,7 @@ fn main() {
             "../../../protos/smart_permission.proto",
         ],
         includes: &["../../../protos"],
-        customize: Customize {
-            ..Default::default()
-        }
+        customize: Customize::default(),
     }).expect("protoc");
 
     let mut file = File::create("src/protos/mod.rs").unwrap();
