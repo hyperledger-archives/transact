@@ -27,7 +27,10 @@ cfg_if! {
         use sabre_sdk::TransactionContext;
         use sabre_sdk::TransactionHandler;
         use sabre_sdk::TpProcessRequest;
-        use sabre_sdk::{WasmPtr, execute_entrypoint};
+        use sabre_sdk::{WasmPtr, execute_entrypoint, invoke_smart_permission};
+        use protos::state::{Agent, AgentList, Organization, OrganizationList, SmartPermission,
+                            SmartPermissionList};
+        use protobuf;
     } else {
         use sawtooth_sdk::processor::handler::ApplyError;
         use sawtooth_sdk::processor::handler::TransactionContext;
@@ -39,10 +42,54 @@ cfg_if! {
 const MAX_VALUE: u32 = 4294967295;
 const MAX_NAME_LEN: usize = 20;
 
+#[cfg(target_arch = "wasm32")]
+const PIKE_NAMESPACE: &'static str = "cad11d";
+
+/// The smart permission prefix for global state (00ec03)
+#[cfg(target_arch = "wasm32")]
+const SMART_PERMISSION_PREFIX: &'static str = "00ec03";
+
+#[cfg(target_arch = "wasm32")]
+const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
+
+#[cfg(target_arch = "wasm32")]
+const PIKE_ORG_PREFIX: &'static str = "cad11d01";
+
+
 fn get_intkey_prefix() -> String {
     let mut sha = Sha512::new();
     sha.input_str("intkey");
     sha.result_str()[..6].to_string()
+}
+
+cfg_if! {
+    if #[cfg(target_arch = "wasm32")] {
+        fn compute_agent_address(name: &str) -> String {
+            let mut sha = Sha512::new();
+            sha.input(name.as_bytes());
+
+            String::from(PIKE_AGENT_PREFIX) + &sha.result_str()[..62].to_string()
+        }
+
+        fn compute_org_address(name: &str) -> String {
+            let mut sha = Sha512::new();
+            sha.input(name.as_bytes());
+
+            String::from(PIKE_ORG_PREFIX) + &sha.result_str()[..62].to_string()
+        }
+
+        fn compute_smart_permission_address(org_id: &str, name: &str) -> String {
+            let mut sha_org_id = Sha512::new();
+            sha_org_id.input(org_id.as_bytes());
+
+            let mut sha_name = Sha512::new();
+            sha_name.input(name.as_bytes());
+
+            String::from(SMART_PERMISSION_PREFIX)
+                + &sha_org_id.result_str()[..6].to_string()
+                + &sha_name.result_str()[..58].to_string()
+        }
+    }
 }
 
 fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError> {
@@ -350,7 +397,94 @@ impl<'a> IntkeyState<'a> {
 
         Ok(())
     }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
+        let address = compute_agent_address(public_key);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                    Ok(agents) => agents,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize record container: {:?}",
+                            err,
+                        )))
+                    }
+                };
+
+                for agent in agents.get_agents() {
+                    if agent.public_key == public_key {
+                        return Ok(Some(agent.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
+        let address = compute_org_address(id);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                    Ok(orgs) => orgs,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize organization list: {:?}",
+                            err,
+                        )))
+                    }
+                };
+
+                for org in orgs.get_organizations() {
+                    if org.org_id == id {
+                        return Ok(Some(org.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    pub fn get_smart_permission(
+        &mut self,
+        org_id: &str,
+        name: &str,
+    ) -> Result<Option<SmartPermission>, ApplyError> {
+        let address = compute_smart_permission_address(org_id, name);
+        let d = self.context.get_state(vec![address])?;
+        match d {
+            Some(packed) => {
+                let smart_permissions: SmartPermissionList =
+                    match protobuf::parse_from_bytes(packed.as_slice()) {
+                        Ok(smart_permissions) => smart_permissions,
+                        Err(err) => {
+                            return Err(ApplyError::InternalError(format!(
+                                "Cannot deserialize smart permission list: {:?}",
+                                err,
+                            )))
+                        }
+                    };
+
+                for smart_permission in smart_permissions.get_smart_permissions() {
+                    if smart_permission.name == name {
+                        return Ok(Some(smart_permission.clone()));
+                    }
+                }
+                Ok(None)
+            }
+            None => Ok(None),
+        }
+    }
 }
+
 
 pub struct IntkeyMultiplyTransactionHandler {
     family_name: String,
@@ -410,6 +544,27 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             request.get_header().get_outputs()[0]
         );
 
+        let signer = request.get_header().get_signer_public_key();
+
+        #[cfg(target_arch = "wasm32")]
+        let result = run_smart_permisson(
+            &mut state,
+            signer,
+            request.get_payload())
+            .map_err(|err| ApplyError::InvalidTransaction(
+                format!("Unable to run smart permission: {}", err)));
+
+        #[cfg(target_arch = "wasm32")]
+        match result {
+            Ok(1) => (),
+            Ok(0) => return Err(ApplyError::InvalidTransaction(format!(
+                "Agent does not have permission: {}", signer
+            ))),
+            _ => return Err(ApplyError::InvalidTransaction(
+                "Something went wrong".into()
+            ))
+        }
+
         match state.get(payload.get_name_a()) {
             Ok(None) => (),
             Ok(Some(_)) => {
@@ -447,6 +602,28 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
         state.set(&payload.get_name_a(), new_value as u32)
     }
+}
+#[cfg(target_arch = "wasm32")]
+fn run_smart_permisson(state: &mut IntkeyState, signer: &str, payload: &[u8]) -> Result<i32, ApplyError> {
+    let agent = match state.get_agent(signer)? {
+        Some(agent) => agent,
+        None => return Err(ApplyError::InvalidTransaction(format!(
+            "Signer is not an agent: {}", signer
+        )))
+    };
+    let org_id = agent.get_org_id();
+    let smart_permission = match state.get_smart_permission(org_id, "test")?{
+        Some(smart_permission) => smart_permission,
+        None => return Ok(1)
+    };
+
+    invoke_smart_permission(
+        smart_permission.get_function(),
+        agent.get_roles().to_vec(),
+        org_id.to_string(),
+        signer.to_string(),
+        payload).map_err(|err| ApplyError::InvalidTransaction(
+            format!("Unable to run smart permission: {}", err)))
 }
 
 #[cfg(target_arch = "wasm32")]
