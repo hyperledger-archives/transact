@@ -69,7 +69,7 @@ impl std::fmt::Display for TestError {
 // Execute the sabre cli command and parses the output returned to stdout.
 fn sabre_cli(command: String) -> Result<Value, TestError> {
     let mut command_vec = command.split(" ").collect::<Vec<&str>>();
-    command_vec.append(&mut vec!("--url", "http://rest-api:9708", "--wait", "100"));
+    command_vec.append(&mut vec!("--url", "http://rest-api:9708", "--wait", "300"));
     let x = Exec::cmd("sabre").args(&command_vec).stream_stdout()
         .map_err(|err| TestError::TestError(err.to_string()))?;
     let br = BufReader::new(x);

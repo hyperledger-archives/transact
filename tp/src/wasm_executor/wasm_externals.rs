@@ -20,7 +20,8 @@ use std::fmt;
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor,
                            MemoryInstance, MemoryRef, ModuleImportResolver, RuntimeArgs,
-                           RuntimeValue, Signature, Trap, TrapKind, ValueType};
+                           RuntimeValue, Signature, Trap, TrapKind, ValueType, Module,
+                           ModuleInstance, ImportsBuilder};
 use wasm_executor::wasmi::memory_units::Pages;
 
 // External function indices
@@ -127,6 +128,8 @@ const CREATE_COLLECTION: usize = 10;
 ///
 const ADD_TO_COLLECTION: usize = 11;
 
+const SMART_PERMISSION: usize = 12;
+
 pub struct WasmExternals {
     pub memory_ref: MemoryRef,
     context: TransactionContext,
@@ -219,6 +222,7 @@ impl WasmExternals {
     }
 
     pub fn add_to_collection(&mut self, head: u32, raw_ptr: u32) -> Result<u32, ExternalsError> {
+        info!("adding to collection: {:?}", raw_ptr);
         if let Some(x) = self.ptr_collections.get_mut(&head) {
             x.push(raw_ptr);
             Ok(head)
@@ -228,6 +232,7 @@ impl WasmExternals {
     }
 
     pub fn create_collection(&mut self, head: u32) -> Result<u32, ExternalsError> {
+        info!("create_collection: {:?}", head);
         self.ptr_collections.insert(head, vec![head]);
         Ok(head)
     }
@@ -406,6 +411,42 @@ impl Externals for WasmExternals {
                 self.add_to_collection(head_ptr, raw_ptr)?;
                 Ok(Some(RuntimeValue::I32(head_ptr as i32)))
             }
+            SMART_PERMISSION => {
+                let contract_ptr: i32 = args.nth(0);
+                let roles_head_ptr: u32 = args.nth(1);
+                let org_id_ptr: i32 = args.nth(2);
+                let public_key_ptr: i32 = args.nth(3);
+                let payload_ptr: i32 = args.nth(4);
+
+                let roles = match self.ptr_collections.get(&roles_head_ptr) {
+                    Some(roles) => roles.clone(),
+                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                };
+                let mut role_vec = Vec::new();
+                for role in roles {
+                    let role_str = self.ptr_to_string(role).map_err(ExternalsError::from)?;
+                    role_vec.push(role_str);
+                }
+                let org_id = self.ptr_to_string(org_id_ptr as u32)?;
+                let public_key = self.ptr_to_string(public_key_ptr as u32)?;
+                let payload = self.ptr_to_vec(payload_ptr as u32)?;
+                let contract = self.ptr_to_vec(contract_ptr as u32)?;
+
+                let cloned_context = self.context.clone();
+                let module =
+                    SmartPermissionModule::new(&contract, cloned_context)
+                        .expect("Failed to create can_add module");
+                let result = module
+                    .entrypoint(role_vec, org_id, public_key, payload.to_vec())
+                    .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
+
+                match result {
+                    Some(x) => {
+                        Ok(Some(RuntimeValue::I32(x)))
+                    }
+                    None =>Err(ExternalsError::to_trap("No result returned".into()))
+                }
+            }
             _ => Err(ExternalsError::to_trap("Function does not exist".into())),
         }
     }
@@ -425,6 +466,15 @@ impl ModuleImportResolver for WasmExternals {
             "delete_state" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
                 DELETE_STATE_IDX,
+            )),
+            "invoke_smart_permission" => Ok(FuncInstance::alloc_host(
+                Signature::new(
+                    &[ValueType::I32,
+                    ValueType::I32,
+                    ValueType::I32,
+                    ValueType::I32,
+                    ValueType::I32][..], Some(ValueType::I32)),
+                SMART_PERMISSION,
             )),
             "get_ptr_len" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
@@ -558,6 +608,82 @@ impl From<ContextError> for ExternalsError {
     fn from(e: ContextError) -> Self {
         ExternalsError {
             message: format!("{:?}", e),
+        }
+    }
+}
+
+struct SmartPermissionModule {
+    context: TransactionContext,
+    module: Module
+}
+
+impl SmartPermissionModule {
+    pub fn new(wasm: &[u8], context: TransactionContext) -> Result<SmartPermissionModule, ExternalsError> {
+        let module = Module::from_buffer(wasm)?;
+        Ok(SmartPermissionModule { context, module })
+    }
+
+    pub fn entrypoint(
+        &self,
+        roles: Vec<String>,
+        org_id: String,
+        public_key: String,
+        payload: Vec<u8>
+    ) -> Result<Option<i32>, ExternalsError> {
+        let mut env =  WasmExternals::new(None, self.context.clone())?;
+
+        let instance = ModuleInstance::new(&self.module, &ImportsBuilder::new().with_resolver("env", &env))?
+            .assert_no_start();
+
+        info!("Writing roles to memory");
+
+        let roles_write_results: Vec<Result<u32, ExternalsError>> = roles
+            .into_iter()
+            .map(|i| env.write_data(i.into_bytes()))
+            .collect();
+
+        let mut role_ptrs = Vec::new();
+
+        for i in roles_write_results {
+            if i.is_err() {
+                return Err(i.unwrap_err());
+            }
+            role_ptrs.push(i.unwrap());
+        }
+
+        let role_list_ptr = if role_ptrs.len() > 0 {
+            env.collect_ptrs(role_ptrs)? as i32
+        } else {
+            -1
+        };
+
+        info!("Roles written to memory: {:?}", role_list_ptr);
+
+        let org_id_ptr = env.write_data(org_id.into_bytes())? as i32;
+        info!("Organization ID written to memory");
+
+        let public_key_ptr = env.write_data(public_key.into_bytes())? as i32;
+        info!("Public key written to memory");
+
+        let payload_ptr = env.write_data(payload)? as i32;
+        info!("Payload written to memory");
+
+        let result = instance
+            .invoke_export(
+                "entrypoint",
+                &vec![
+                    RuntimeValue::I32(role_list_ptr),
+                    RuntimeValue::I32(org_id_ptr),
+                    RuntimeValue::I32(public_key_ptr),
+                    RuntimeValue::I32(payload_ptr)
+                ],
+                &mut env
+            )?;
+
+        if let Some(RuntimeValue::I32(i)) = result {
+            Ok(Some(i))
+        } else {
+            Ok(None)
         }
     }
 }
