@@ -108,7 +108,7 @@ impl TransactionContext {
         unsafe {
             if addresses.is_empty(){
                 return Err(WasmSdkError::InvalidTransaction(
-                    "No address to delte".into(),
+                    "No address to delete".into(),
                 ));
             }
             let head = &addresses[0];
@@ -142,6 +142,45 @@ pub trait TransactionHandler {
         request: &TpProcessRequest,
         context: &mut TransactionContext,
     ) -> Result<(), ApplyError>;
+}
+
+pub fn invoke_smart_permission(
+    contract_addr: String,
+    name: String,
+    roles: Vec<String>,
+    org_id: String,
+    public_key: String,
+    payload: &[u8]) -> Result<i32, WasmSdkError> {
+    unsafe {
+        if roles.is_empty(){
+            return Err(WasmSdkError::InvalidTransaction(
+                "No roles ".into(),
+            ));
+        }
+        let head = &roles[0];
+        let header_role_buffer = WasmBuffer::new(head.as_bytes())?;
+        externs::create_collection(header_role_buffer.into_raw());
+
+        for role in roles[1..].iter() {
+            let wasm_buffer = WasmBuffer::new(role.as_bytes())?;
+            externs::add_to_collection(
+                header_role_buffer.into_raw(), wasm_buffer.into_raw());
+        }
+        let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
+        let name_buffer = WasmBuffer::new(name.as_bytes())?;
+        let org_id_buffer = WasmBuffer::new(org_id.to_string().as_bytes())?;
+        let public_key_buffer = WasmBuffer::new(public_key.to_string().as_bytes())?;
+        let payload_buffer = WasmBuffer::new(payload)?;
+
+        Ok(externs::invoke_smart_permission(
+            contract_addr_buffer.into_raw(),
+            name_buffer.into_raw(),
+            header_role_buffer.into_raw(),
+            org_id_buffer.into_raw(),
+            public_key_buffer.into_raw(),
+            payload_buffer.into_raw()
+        ))
+    }
 }
 
 /// -1: Failed to deserialize payload
@@ -188,6 +227,137 @@ where
         },
         Err(ApplyError::InvalidTransaction(_)) => -3,
         Err(ApplyError::InternalError(_)) => -4,
+    }
+}
+
+pub struct Request {
+    roles: Vec<String>,
+    org_id: String,
+    public_key: String,
+    payload: Vec<u8>
+}
+
+impl Request {
+    pub fn new(
+        roles: Vec<String>,
+        org_id: String,
+        public_key: String,
+        payload: Vec<u8>
+    ) -> Request {
+        Request {
+            roles,
+            org_id,
+            public_key,
+            payload
+        }
+    }
+
+    pub fn get_roles(&self) -> Vec<String> {
+        self.roles.clone()
+    }
+
+    pub fn get_org_id(&self) -> String {
+        self.org_id.clone()
+    }
+
+    pub fn get_public_key(&self) -> String {
+        self.public_key.clone()
+    }
+
+    pub fn get_state(&self, address: String) -> Result<Option<Vec<u8>>, WasmSdkError> {
+        unsafe {
+            let wasm_buffer = WasmBuffer::new(address.as_bytes())?;
+            ptr_to_vec(externs::get_state(wasm_buffer.into_raw()))
+        }
+    }
+
+    pub fn get_payload<T>(&self) -> Vec<u8> {
+        self.payload.clone()
+    }
+}
+
+/// Error Codes:
+///
+/// -1: Failed to deserialize roles
+/// -2: Failed to deserialize org_id
+/// -3: Failed to deserialize public_key
+/// -4: Failed to deserialize payload
+/// -5: Failed to execute smart permission
+/// -6: StateSetError
+/// -7: AllocError
+/// -8: MemoryRetrievalError
+/// -9: Utf8EncodeError
+/// -10: ProtobufError
+///
+pub unsafe fn execute_smart_permission_entrypoint<F>(
+    roles_ptr: WasmPtrList,
+    org_id_ptr: WasmPtr,
+    public_key_ptr: WasmPtr,
+    payload_ptr: WasmPtr,
+    has_permission: F
+) -> i32
+where F: Fn(Request) -> Result<bool, WasmSdkError> {
+    let roles = if let Ok(i) = WasmBuffer::from_list(roles_ptr) {
+        let results: Vec<Result<String, WasmSdkError>> = i
+            .iter()
+            .map(|x| x.into_string())
+            .collect();
+
+        if results.iter().any(|x| x.is_err()) {
+            return -1;
+        } else {
+            results
+                .into_iter()
+                .map(|x| x.unwrap())
+                .collect()
+        }
+
+    } else {
+        return -1;
+    };
+
+    let org_id = if let Ok(i) = WasmBuffer::from_raw(org_id_ptr) {
+        match i.into_string() {
+            Ok(s) => s,
+            Err(_) => {
+                return -2;
+            }
+        }
+    } else {
+        return -2;
+    };
+
+    let public_key = if let Ok(i) = WasmBuffer::from_raw(public_key_ptr) {
+        match i.into_string() {
+            Ok(s) => s,
+            Err(_) => {
+                return -3;
+            }
+        }
+    } else {
+        return -3;
+    };
+
+    let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
+        i.into_bytes()
+    } else {
+        return -4;
+    };
+
+    match has_permission(Request::new(roles, org_id, public_key, payload)) {
+        Ok(r) => if r {
+            1
+        } else {
+            0
+        },
+        Err(WasmSdkError::StateSetError(_)) => -5,
+        Err(WasmSdkError::AllocError(_)) => -6,
+        Err(WasmSdkError::MemoryWriteError(_)) => -7,
+        Err(WasmSdkError::MemoryRetrievalError(_)) => -8,
+        Err(WasmSdkError::Utf8EncodeError(_)) => -9,
+        Err(WasmSdkError::ProtobufError(_)) => -10,
+        Err(WasmSdkError::InvalidTransaction(_)) => -11,
+        Err(WasmSdkError::InternalError(_)) => -12,
     }
 }
 

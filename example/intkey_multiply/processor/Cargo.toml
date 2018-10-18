@@ -15,6 +15,7 @@
 name = "intkey-multiply"
 version = "0.1.0"
 authors = ["Cargill Incorporated"]
+build = "build.rs"
 
 [dependencies]
 clap = "2"
@@ -33,3 +34,7 @@ rustc-serialize = "0.3.22"
 log = "0.3.0"
 log4rs = "0.7.0"
 zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
+
+
+[build-dependencies]
+protoc-rust = "2"

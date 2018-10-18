@@ -1,4 +1,4 @@
-FROM rust:1.22.1
+FROM rust:latest
 
 RUN apt-get update && apt-get install -y unzip libzmq3-dev
 
@@ -8,6 +8,6 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.5.1/proto
  && rm protoc-3.5.1-linux-x86_64.zip
 RUN apt-get update && apt-get install -y protobuf-compiler
 
-WORKDIR /project/tp
+WORKDIR /project/example/intkey_multiply/processor/
 
 ENV PATH=$PATH:/project/example/intkey_multiply/processor/target/debug/

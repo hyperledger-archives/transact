@@ -10,4 +10,5 @@ RUN apt-get update && apt-get install -y protobuf-compiler
 
 WORKDIR /project/tp
 
-ENV PATH=$PATH:/project/tp/target/debug/
+ENV PATH=$PATH:/project/tp/target/debug/ \
+    RUST_BACKTRACE=1

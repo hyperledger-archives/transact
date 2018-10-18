@@ -20,6 +20,7 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/ci xenial universe" >>
  && apt-get install -y -q --allow-downgrades \
     build-essential \
     git \
+    unzip \
     libffi-dev \
     libssl-dev \
     libzmq3-dev \
@@ -32,6 +33,12 @@ RUN apt-get update && apt-get install -y -q --no-install-recommends \
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  &&  chmod +x /usr/bin/rustup-init \
  && rustup-init -y
+
+ # For Building Protobufs
+ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.5.1/protoc-3.5.1-linux-x86_64.zip \
+  && unzip protoc-3.5.1-linux-x86_64.zip -d  /usr/local \
+  && rm protoc-3.5.1-linux-x86_64.zip
+ RUN apt-get update && apt-get install -y protobuf-compiler
 
 ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin \
  CARGO_INCREMENTAL=0
