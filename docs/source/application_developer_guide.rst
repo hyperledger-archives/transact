@@ -128,6 +128,7 @@ the handler a public module and add an empty main function.
 
 .. code-block:: rust
 
+  #[macro_use]
   extern crate cfg_if;
 
   cfg_if! {
