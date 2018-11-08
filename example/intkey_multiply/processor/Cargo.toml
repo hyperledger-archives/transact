@@ -29,11 +29,11 @@ sabre-sdk = {path = "../../../sdk"}
 
 [target.'cfg(unix)'.dependencies]
 rust-crypto = "0.2.36"
-sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
+sawtooth-sdk = "^0.1"
 rustc-serialize = "0.3.22"
 log = "0.3.0"
 log4rs = "0.7.0"
-zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
+sawtooth-zmq = "0.8.2-dev5"
 
 
 [build-dependencies]

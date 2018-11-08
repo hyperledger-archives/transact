@@ -29,7 +29,7 @@ Include the Sabre SDK in the dependencies list of the Cargo.toml file.
 .. code-block:: none
 
   [dependencies]
-  sabre-sdk = {path = "../../../sdk"}
+  sabre-sdk = "^0.1"
 
 The Sabre SDK the provides the following required structs needed to write
 a smart contract.
