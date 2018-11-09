@@ -14,8 +14,15 @@
 
 [package]
 name = "sabre-sdk"
-version = "0.1.3"
+version = "0.1.0"
 authors = ["Cargill, Incorporated"]
+license = "Apache-2.0"
+description = """\
+    Sawtooth Sabre is a transaction family which implements on-chain smart \
+    contracts executed in a WebAssembly virtual machine.
+"""
+documentation = "https://sawtooth.hyperledger.org/docs/sabre/releases/latest/"
+
 
 [dependencies]
 protobuf = "2"

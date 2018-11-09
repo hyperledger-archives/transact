@@ -71,6 +71,10 @@ node ('master') {
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
             }
 
+            stage("Test Sabre") {
+                sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml up --build'
+            }
+
             stage("Create git archive") {
                 sh '''
                     REPO=$(git remote show -n origin | grep Fetch | awk -F'[/.]' '{print $6}')
