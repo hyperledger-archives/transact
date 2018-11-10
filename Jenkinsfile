@@ -72,7 +72,7 @@ node ('master') {
             }
 
             stage("Test Sabre") {
-                sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml up --build'
+                sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml up --build --abort-on-container-exit --exit-code-from test_sabre'
             }
 
             stage("Create git archive") {
