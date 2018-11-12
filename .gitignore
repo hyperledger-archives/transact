@@ -12,6 +12,7 @@
 /example/intkey_multiply/cli/Cargo.lock
 /example/intkey_multiply/processor/target/
 /example/intkey_multiply/processor/Cargo.lock
+/example/intkey_multiply/processor/src/protos/
 
 /integration/target/
 /integration/Cargo.lock
@@ -58,3 +59,6 @@ contracts/sawtooth-pike/sp_sdk/target/
 contracts/sawtooth-pike/tp/Cargo.lock
 contracts/sawtooth-pike/tp/src/protos/
 contracts/sawtooth-pike/tp/target/
+
+contracts/sawtooth-pike/examples/intkey/Cargo.lock
+contracts/sawtooth-pike/examples/intkey/target/
