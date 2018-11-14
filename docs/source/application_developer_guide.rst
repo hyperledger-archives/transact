@@ -20,7 +20,7 @@ value pair in the intkey state.
 
 Writing A Sabre Smart Contract
 ==============================
-The Saber Smart Contracts use a similar API to the Sawtooth transaction
+The Sabre Smart Contracts use a similar API to the Sawtooth transaction
 processor API. If you are unfamiliar, please take a look at
 https://sawtooth.hyperledger.org/docs/core/nightly/master/sdks.html.
 
