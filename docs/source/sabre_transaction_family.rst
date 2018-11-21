@@ -417,11 +417,11 @@ The contract registry is deleted.
 The inputs for DeleteContractRegistryAction must include:
 
 * the address for the contract registry
+* the settings address for ``sawtooth.swa.administrators``
 
 The outputs for DeleteContractRegistryAction must include:
 
 * the address for the contract registry
-* the settings address for ``sawtooth.swa.administrators``
 
 UpdateContractRegistryOwnersAction
 ----------------------------------
