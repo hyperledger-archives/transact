@@ -58,6 +58,8 @@ address in a NamespaceRegistryList
     repeated NamespaceRegistry registries = 1;
   }
 
+.. _TPdoc-ContractRegistry-label:
+
 ContractRegistry
 ----------------
 ContractRegistry keeps track of versions of the Sabre contract and the list of
