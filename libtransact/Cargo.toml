@@ -1,6 +1,6 @@
 [package]
 name = "transact"
 version = "0.1.0"
-authors = ["Bitwise IO"]
+authors = ["Bitwise IO, Inc."]
 
 [dependencies]
