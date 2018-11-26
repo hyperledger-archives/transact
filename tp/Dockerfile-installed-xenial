@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# docker build -f tp/Dockerfile-installed -t sawtooth-sabre-tp .
+# docker build -f tp/Dockerfile-installed-xenial -t sawtooth-sabre-tp .
 
 # -------------=== sabre tp build ===-------------
 

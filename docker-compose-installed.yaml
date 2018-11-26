@@ -68,7 +68,7 @@ services:
   sabre-tp:
     build:
       context: .
-      dockerfile: tp/Dockerfile-installed
+      dockerfile: tp/Dockerfile-installed-${DISTRO}
     image: sawtooth-sabre-tp:${ISOLATION_ID}
     container_name: sawtooth-sabre-tp
     depends_on:
@@ -78,7 +78,7 @@ services:
   sabre-cli:
     build:
       context: .
-      dockerfile: cli/Dockerfile-installed
+      dockerfile: cli/Dockerfile-installed-${DISTRO}
     image: sawtooth-sabre-cli:${ISOLATION_ID}
     container_name: sabre-cli
     volumes:
