@@ -1,7 +1,4 @@
-
-/target
 **/*.rs.bk
 
-/target
-**/*.rs.bk
-Cargo.lock
+/libtransact/target
+/libtransact/Cargo.lock
