@@ -1,0 +1,20 @@
+version: "3.6"
+
+services:
+  transact:
+    build:
+      context: ../..
+      dockerfile: docker/Dockerfile
+      args:
+        - http_proxy
+        - https_proxy
+        - no_proxy
+    image: transact:${ISOLATION_ID}
+    volumes:
+      - ../..:/project/transact
+    command: |
+      bash -c "
+        cd /project/transact
+        cargo fmt -- --check
+        cargo clippy -- -D clippy:all
+      "
