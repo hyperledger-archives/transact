@@ -1,7 +1,7 @@
 **/*.rs.bk
 
-/libtransact/target
-/libtransact/Cargo.lock
+/target
+/Cargo.lock
 
 # Editor files
 .idea/
