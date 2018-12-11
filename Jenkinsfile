@@ -67,7 +67,7 @@ node ('master') {
             // environment doesn't need all the dependencies.
 
             stage("Build Sabre") {
-                sh 'docker-compose -f docker-compose-installed.yaml build shell'
+                sh 'docker-compose -f docker-compose-installed.yaml build sabre-cli'
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
             }
 

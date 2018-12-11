@@ -18,6 +18,8 @@ services:
   validator:
     image: hyperledger/sawtooth-validator:1.0
     container_name: sabre-validator
+    volumes:
+      - .:/project
     expose:
       - 9704
     ports:
@@ -26,8 +28,14 @@ services:
         bash -c "
         sawadm keygen &&
         sawtooth keygen &&
-        sawset genesis &&
-        sawadm genesis config-genesis.batch &&
+        mkdir -p /project/keys && \
+        cp /root/.sawtooth/keys/* /project/keys &&
+        sawset genesis -k /etc/sawtooth/keys/validator.priv &&
+        sawset proposal create \
+          -k /etc/sawtooth/keys/validator.priv \
+          sawtooth.swa.administrators=$$(cat project/keys/root.pub) \
+          -o config.batch && \
+        sawadm genesis config-genesis.batch config.batch && \
         sawtooth-validator -vv \
           --endpoint tcp://validator:9705 \
           --bind component:tcp://eth0:9704 \
@@ -44,10 +52,7 @@ services:
     entrypoint: sawtooth-rest-api --connect tcp://validator:9704 --bind rest-api:9708 -vv
 
   shell:
-    build:
-      context: .
-      dockerfile: cli/Dockerfile-installed
-    image: sawtooth-sabre-cli:${ISOLATION_ID}
+    image: hyperledger/sawtooth-all:1.0
     container_name: sabre-shell
     entrypoint: |
         bash -c "
@@ -69,3 +74,14 @@ services:
     depends_on:
       - validator
     entrypoint: sawtooth-sabre -vv --connect tcp://validator:9704
+
+  sabre-cli:
+    build:
+      context: .
+      dockerfile: cli/Dockerfile-installed
+    image: sawtooth-sabre-cli:${ISOLATION_ID}
+    container_name: sabre-cli
+    volumes:
+      - .:/project
+      - ./keys:/root/.sawtooth/keys
+    entrypoint: tail -f /dev/null

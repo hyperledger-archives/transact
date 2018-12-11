@@ -1082,7 +1082,7 @@ fn create_contract(
 
     if !contract_registry.owners.contains(&signer.into()) {
         return Err(ApplyError::InvalidTransaction(format!(
-            "Only owners can submit new versions of contracts {}",
+            "Only owners can submit new versions of contracts: {}",
             signer,
         )))
     }

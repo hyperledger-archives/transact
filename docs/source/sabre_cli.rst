@@ -8,8 +8,8 @@ and their permissions.
 
 sabre
 =====
-``sabre`` is the top level command for Sabre and it contains 4 subcommands.
-Theses commands are ``upload``, ``ns``, ``perm``, and ``exec``. The subcommands
+``sabre`` is the top level command for Sabre. It contains the following
+subcommands: ``cr``, ``upload``, ``ns``, ``perm``, and ``exec``. The subcommands
 have options and arguments that control their behavior. All subcommands include
 ``-key``, the name of the signing key, and ``--url``, the url to the Sawtooth
 REST API.
@@ -60,7 +60,7 @@ following information:
   outputs:
     - <output addresses>
 
-Note only an owner of the associated contract registry is allowed to upload
+Only an owner of the associated contract registry is allowed to upload
 a new version of a contract.
 
 sabre ns

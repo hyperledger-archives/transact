@@ -15,7 +15,7 @@ guide will use an example smart contract called intkey-multiply. This smart
 contract will take intkey values, multiply them, and store the new intkey key
 value pair in the intkey state.
 
-.. note: This guide assumes familiarity with Sawtooth Transaction Processors
+.. note:: This guide assumes familiarity with Sawtooth Transaction Processors
   and that cargo/rust is already installed.
 
 .. _writing-sabre-sm-label:
