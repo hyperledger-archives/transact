@@ -2,3 +2,6 @@
 
 /libtransact/target
 /libtransact/Cargo.lock
+
+# Editor files
+.idea/
