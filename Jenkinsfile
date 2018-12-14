@@ -57,7 +57,7 @@ pipeline {
     }
     post {
         always {
-            sh 'docker-compose down'
+            sh 'docker-compose -f docker/compose/docker-compose.yaml down'
         }
         success {
             archiveArtifacts 'target/doc/**'
