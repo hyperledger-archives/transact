@@ -60,7 +60,7 @@ pipeline {
             sh 'docker-compose -f docker/compose/docker-compose.yaml down'
         }
         success {
-            archiveArtifacts 'target/doc/**'
+            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js'
         }
     }
 }
