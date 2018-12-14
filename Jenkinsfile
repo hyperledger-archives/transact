@@ -35,18 +35,24 @@ pipeline {
 
     stages {
         stage("Run lint") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo fmt --version"'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo clippy --version"'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml up --build'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo fmt --version"'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo clippy --version"'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml up --build'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+            }
         }
 
         stage("Run unit tests") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo test"'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo test"'
+            }
         }
 
         stage("Build rust docs") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
+            }
         }
     }
     post {
