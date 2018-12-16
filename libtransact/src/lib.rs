@@ -14,6 +14,7 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+#[allow(renamed_and_removed_lints)]
 pub mod protos;
 pub mod receipts;
 pub mod state;
