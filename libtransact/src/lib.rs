@@ -18,3 +18,4 @@
 pub mod protos;
 pub mod receipts;
 pub mod state;
+pub mod transaction;
