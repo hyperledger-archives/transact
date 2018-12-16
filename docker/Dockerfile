@@ -4,7 +4,8 @@ RUN apt-get update && \
     apt-get install -y \
     curl \
     unzip \
-    gcc
+    gcc \
+    protobuf-compiler
 
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
     chmod +x /usr/bin/rustup-init && \
