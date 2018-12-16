@@ -35,26 +35,32 @@ pipeline {
 
     stages {
         stage("Run lint") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo fmt --version"'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo clippy --version"'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml up --build'
-            sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo fmt --version"'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo clippy --version"'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml up --build'
+                sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+            }
         }
 
         stage("Run unit tests") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo test"'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo test"'
+            }
         }
 
         stage("Build rust docs") {
-            sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
+            steps {
+                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
+            }
         }
     }
     post {
         always {
-            sh 'docker-compose down'
+            sh 'docker-compose -f docker/compose/docker-compose.yaml down'
         }
         success {
-            archiveArtifacts 'target/doc/**'
+            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js'
         }
     }
 }
