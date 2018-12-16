@@ -28,6 +28,7 @@
 //! `TransactionExecutionResult`s back to the `Scheduler` via the `SchedulerExecutionInterface`.
 
 pub mod parallel;
+pub mod serial;
 
 use crate::context::ContextId;
 use crate::protocol::batch::BatchPair;
