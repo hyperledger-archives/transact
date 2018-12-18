@@ -22,10 +22,37 @@
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
 mod error;
+pub mod hashmap;
 
-use crate::receipts::StateChange;
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;
+
+/// A change to be applied to state, in terms of keys and values.
+///
+/// A `StateChange` represents the basic level of changes that can be applied to
+/// values in state.  This covers the setting of a key/value pair, or the
+/// deletion of a key.
+#[derive(Debug)]
+pub enum StateChange<K, V> {
+    Set { key: K, value: V },
+    Delete { key: K },
+}
+
+impl<K, V> Clone for StateChange<K, V>
+where
+    K: Clone,
+    V: Clone,
+{
+    fn clone(&self) -> Self {
+        match self {
+            StateChange::Set { key, value } => StateChange::Set {
+                key: key.clone(),
+                value: value.clone(),
+            },
+            StateChange::Delete { key } => StateChange::Delete { key: key.clone() },
+        }
+    }
+}
 
 /// `state::Write` provides a way to write to a particular state storage system.
 ///
