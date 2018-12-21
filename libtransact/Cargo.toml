@@ -5,3 +5,7 @@ authors = ["Bitwise IO, Inc."]
 edition = "2018"
 
 [dependencies]
+protobuf = "2"
+
+[build-dependencies]
+protoc-rust = "2"
