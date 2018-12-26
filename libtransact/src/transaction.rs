@@ -125,6 +125,25 @@ impl From<protos::transaction::Transaction> for Transaction {
     }
 }
 
+pub struct TransactionPair {
+    transaction: Transaction,
+    header: TransactionHeader,
+}
+
+impl TransactionPair {
+    pub fn transaction(&self) -> &Transaction {
+        &self.transaction
+    }
+
+    pub fn header(&self) -> &TransactionHeader {
+        &self.header
+    }
+
+    pub fn take(self) -> (Transaction, TransactionHeader) {
+        (self.transaction, self.header)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::super::protos;
