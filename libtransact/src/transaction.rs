@@ -17,6 +17,7 @@ pub struct TransactionHeader {
     batcher_public_key: Vec<u8>,
     dependencies: Vec<Vec<u8>>,
     family_name: String,
+    family_version: String,
     inputs: Vec<Vec<u8>>,
     outputs: Vec<Vec<u8>>,
     nonce: Vec<u8>,
@@ -36,6 +37,10 @@ impl TransactionHeader {
 
     pub fn family_name(&self) -> &str {
         &self.family_name
+    }
+
+    pub fn family_version(&self) -> &str {
+        &self.family_version
     }
 
     pub fn inputs(&self) -> &[Vec<u8>] {
@@ -67,6 +72,7 @@ impl From<protos::transaction::TransactionHeader> for TransactionHeader {
     fn from(header: protos::transaction::TransactionHeader) -> Self {
         TransactionHeader {
             family_name: header.get_family_name().to_string(),
+            family_version: header.get_family_version().to_string(),
             batcher_public_key: hex::decode(header.get_batcher_public_key()).unwrap(),
             dependencies: header
                 .get_dependencies()
@@ -94,7 +100,7 @@ impl From<protos::transaction::TransactionHeader> for TransactionHeader {
 impl From<TransactionHeader> for protos::transaction::TransactionHeader {
     fn from(header: TransactionHeader) -> Self {
         let mut proto_header = protos::transaction::TransactionHeader::new();
-        proto_header.set_family_name(header.family_name().to_string());
+        proto_header.set_family_version(header.family_version().to_string());
         proto_header.set_batcher_public_key(hex::encode(header.batcher_public_key()));
         proto_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
         proto_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
@@ -204,6 +210,7 @@ pub struct TransactionBuilder {
     batcher_public_key: Option<Vec<u8>>,
     dependencies: Option<Vec<Vec<u8>>>,
     family_name: Option<String>,
+    family_version: Option<String>,
     inputs: Option<Vec<Vec<u8>>>,
     outputs: Option<Vec<Vec<u8>>>,
     nonce: Option<Vec<u8>>,
@@ -228,6 +235,11 @@ impl TransactionBuilder {
 
     pub fn with_family_name(mut self, family_name: String) -> TransactionBuilder {
         self.family_name = Some(family_name);
+        self
+    }
+
+    pub fn with_family_version(mut self, family_version: String) -> TransactionBuilder {
+        self.family_version = Some(family_version);
         self
     }
 
@@ -272,6 +284,9 @@ impl TransactionBuilder {
         let family_name = self.family_name.ok_or_else(|| {
             TransactionBuildError::MissingField("'family_name' field is required".to_string())
         })?;
+        let family_version = self.family_version.ok_or_else(|| {
+            TransactionBuildError::MissingField("'family_version' field is required".to_string())
+        })?;
         let inputs = self.inputs.ok_or_else(|| {
             TransactionBuildError::MissingField("'inputs' field is required".to_string())
         })?;
@@ -303,6 +318,7 @@ impl TransactionBuilder {
             batcher_public_key,
             dependencies,
             family_name,
+            family_version,
             inputs,
             outputs,
             nonce,
@@ -349,6 +365,7 @@ mod tests {
     use sawtooth_sdk;
 
     static FAMILY_NAME: &str = "test_family";
+    static FAMILY_VERSION: &str = "0.1";
     static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
     static KEY2: &str = "222222222222222222222222222222222222222222222222222222222222222222";
     static KEY3: &str = "333333333333333333333333333333333333333333333333333333333333333333";
@@ -379,6 +396,7 @@ mod tests {
             pair.header().dependencies()
         );
         assert_eq!(FAMILY_NAME, pair.header.family_name());
+        assert_eq!(FAMILY_VERSION, pair.header.family_version());
         assert_eq!(
             vec![
                 hex::decode(KEY4).unwrap(),
@@ -406,6 +424,7 @@ mod tests {
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
             .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
             .with_family_name(FAMILY_NAME.to_string())
+            .with_family_version(FAMILY_VERSION.to_string())
             .with_inputs(vec![
                 hex::decode(KEY4).unwrap(),
                 hex::decode(&KEY5[0..4]).unwrap(),
@@ -432,6 +451,7 @@ mod tests {
         builder =
             builder.with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()]);
         builder = builder.with_family_name(FAMILY_NAME.to_string());
+        builder = builder.with_family_version(FAMILY_VERSION.to_string());
         builder = builder.with_inputs(vec![
             hex::decode(KEY4).unwrap(),
             hex::decode(&KEY5[0..4]).unwrap(),
@@ -454,6 +474,7 @@ mod tests {
             batcher_public_key: hex::decode(KEY1).unwrap(),
             dependencies: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
             family_name: FAMILY_NAME.to_string(),
+            family_version: FAMILY_VERSION.to_string(),
             inputs: vec![
                 hex::decode(KEY4).unwrap(),
                 hex::decode(&KEY5[0..4]).unwrap(),
@@ -473,6 +494,7 @@ mod tests {
             header.dependencies()
         );
         assert_eq!(FAMILY_NAME, header.family_name());
+        assert_eq!(FAMILY_VERSION, header.family_version());
         assert_eq!(
             vec![
                 hex::decode(KEY4).unwrap(),
@@ -502,6 +524,7 @@ mod tests {
             KEY3.to_string(),
         ]));
         proto.set_family_name(FAMILY_NAME.to_string());
+        proto.set_family_version(FAMILY_VERSION.to_string());
         proto.set_inputs(protobuf::RepeatedField::from_vec(vec![
             KEY4.to_string(),
             (&KEY5[0..4]).to_string(),
@@ -528,6 +551,7 @@ mod tests {
             header.dependencies()
         );
         assert_eq!(FAMILY_NAME, header.family_name());
+        assert_eq!(FAMILY_VERSION, header.family_version());
         assert_eq!(
             vec![
                 hex::decode(KEY4).unwrap(),
