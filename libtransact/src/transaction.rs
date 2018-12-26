@@ -86,6 +86,19 @@ impl From<protos::transaction::TransactionHeader> for TransactionHeader {
     }
 }
 
+impl From<TransactionHeader> for protos::transaction::TransactionHeader {
+    fn from(header: TransactionHeader) -> Self {
+        let mut proto_header = protos::transaction::TransactionHeader::new();
+        proto_header.set_family_name(header.family_name().to_string());
+        proto_header.set_batcher_public_key(hex::encode(header.batcher_public_key()));
+        proto_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
+        proto_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
+        proto_header.set_nonce(String::from_utf8(header.nonce().to_vec()).unwrap());
+        proto_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
+        proto_header
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
     header: Vec<u8>,
