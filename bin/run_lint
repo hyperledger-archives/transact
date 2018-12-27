@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+set -e
+
+
+function clean_up {
+    docker-compose -f docker/compose/docker-compose.yaml down
+}
+
+trap clean_up EXIT
+
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo fmt --version
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo fmt -- --check
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo clippy --version
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo clippy -- -D clippy::all

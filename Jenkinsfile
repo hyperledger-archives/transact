@@ -36,16 +36,13 @@ pipeline {
     stages {
         stage("Run lint") {
             steps {
-                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo fmt --version"'
-                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo clippy --version"'
-                sh 'docker-compose -f docker/compose/docker-compose.yaml up --build'
-                sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+                sh './bin/run_lint'
             }
         }
 
         stage("Run unit tests") {
             steps {
-                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo test"'
+                sh './bin/run_tests'
             }
         }
 
