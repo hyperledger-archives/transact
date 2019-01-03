@@ -33,6 +33,21 @@ impl From<protos::batch::BatchHeader> for BatchHeader {
     }
 }
 
+impl From<BatchHeader> for protos::batch::BatchHeader {
+    fn from(header: BatchHeader) -> Self {
+        let mut proto_header = protos::batch::BatchHeader::new();
+        proto_header.set_signer_public_key(hex::encode(header.signer_public_key));
+        proto_header.set_transaction_ids(
+            header
+                .transaction_ids
+                .iter()
+                .map(hex::encode)
+                .collect::<protobuf::RepeatedField<String>>(),
+        );
+        proto_header
+    }
+}
+
 pub struct Batch {
     header: Vec<u8>,
     header_signature: String,
