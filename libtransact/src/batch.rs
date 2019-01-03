@@ -77,6 +77,25 @@ impl Batch {
     }
 }
 
+pub struct BatchPair {
+    batch: Batch,
+    header: BatchHeader,
+}
+
+impl BatchPair {
+    pub fn batch(&self) -> &Batch {
+        &self.batch
+    }
+
+    pub fn header(&self) -> &BatchHeader {
+        &self.header
+    }
+
+    pub fn take(self) -> (Batch, BatchHeader) {
+        (self.batch, self.header)
+    }
+}
+
 impl From<protos::batch::Batch> for Batch {
     fn from(batch: protos::batch::Batch) -> Self {
         Batch {
