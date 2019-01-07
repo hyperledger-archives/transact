@@ -71,6 +71,8 @@ pub struct TransactionReceipt<K, V> {
     pub events: Vec<Event>,
     /// Transaction family defined data.
     pub data: Vec<Vec<u8>>,
+
+    pub transaction_id: String,
 }
 
 /// An `Event` is metadata about a `Transaction`'s processing. Events are
@@ -115,6 +117,7 @@ where
                     state_changes: transaction_receipt.state_changes.clone(),
                     events: transaction_receipt.events.clone(),
                     data: transaction_receipt.data.clone(),
+                    transaction_id: transaction_receipt.transaction_id.clone(),
                 })
             }
         }
