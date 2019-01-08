@@ -5,6 +5,7 @@ use std;
 use std::error::Error as StdError;
 
 use crate::protos;
+use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
 use crate::signing;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -68,47 +69,64 @@ impl TransactionHeader {
     }
 }
 
-impl From<protos::transaction::TransactionHeader> for TransactionHeader {
-    fn from(header: protos::transaction::TransactionHeader) -> Self {
-        TransactionHeader {
+impl From<hex::FromHexError> for ProtoConversionError {
+    fn from(e: hex::FromHexError) -> Self {
+        ProtoConversionError::SerializationError(format!("{}", e))
+    }
+}
+
+impl From<std::string::FromUtf8Error> for ProtoConversionError {
+    fn from(e: std::string::FromUtf8Error) -> Self {
+        ProtoConversionError::SerializationError(format!("{}", e))
+    }
+}
+
+impl FromProto<protos::transaction::TransactionHeader> for TransactionHeader {
+    fn from_proto(
+        header: protos::transaction::TransactionHeader,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(TransactionHeader {
             family_name: header.get_family_name().to_string(),
             family_version: header.get_family_version().to_string(),
-            batcher_public_key: hex::decode(header.get_batcher_public_key()).unwrap(),
+            batcher_public_key: hex::decode(header.get_batcher_public_key())?,
             dependencies: header
                 .get_dependencies()
                 .iter()
-                .map(|d| hex::decode(d).unwrap())
-                .collect(),
+                .map(|d| hex::decode(d).map_err(ProtoConversionError::from))
+                .collect::<Result<_, _>>()?,
             inputs: header
                 .get_inputs()
                 .iter()
-                .map(|d| hex::decode(d).unwrap())
-                .collect(),
+                .map(|d| hex::decode(d).map_err(ProtoConversionError::from))
+                .collect::<Result<_, _>>()?,
             nonce: header.get_nonce().to_string().into_bytes(),
             outputs: header
                 .get_outputs()
                 .iter()
-                .map(|d| hex::decode(d).unwrap())
-                .collect(),
-            payload_hash: hex::decode(header.get_payload_sha512()).unwrap(),
+                .map(|d| hex::decode(d).map_err(ProtoConversionError::from))
+                .collect::<Result<_, _>>()?,
+            payload_hash: hex::decode(header.get_payload_sha512())?,
             payload_hash_method: HashMethod::SHA512,
-            signer_public_key: hex::decode(header.get_signer_public_key()).unwrap(),
-        }
+            signer_public_key: hex::decode(header.get_signer_public_key())?,
+        })
     }
 }
 
-impl From<TransactionHeader> for protos::transaction::TransactionHeader {
-    fn from(header: TransactionHeader) -> Self {
+impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
+    fn from_native(header: TransactionHeader) -> Result<Self, ProtoConversionError> {
         let mut proto_header = protos::transaction::TransactionHeader::new();
         proto_header.set_family_version(header.family_version().to_string());
         proto_header.set_batcher_public_key(hex::encode(header.batcher_public_key()));
         proto_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
         proto_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
-        proto_header.set_nonce(String::from_utf8(header.nonce().to_vec()).unwrap());
+        proto_header.set_nonce(String::from_utf8(header.nonce().to_vec())?);
         proto_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
-        proto_header
+        Ok(proto_header)
     }
 }
+
+impl IntoProto<protos::transaction::TransactionHeader> for TransactionHeader {}
+impl IntoNative<TransactionHeader> for protos::transaction::TransactionHeader {}
 
 #[derive(Debug, PartialEq, Clone)]
 pub struct Transaction {
@@ -327,7 +345,10 @@ impl TransactionBuilder {
             signer_public_key,
         };
 
-        let header_proto: protos::transaction::TransactionHeader = header.clone().into();
+        let header_proto: protos::transaction::TransactionHeader = header
+            .clone()
+            .into_proto()
+            .map_err(|e| TransactionBuildError::SerializationError(format!("{}", e)))?;
         let header_bytes = header_proto
             .write_to_bytes()
             .map_err(|e| TransactionBuildError::SerializationError(format!("{}", e)))?;
@@ -543,7 +564,7 @@ mod tests {
             protobuf::parse_from_bytes(&header_bytes).unwrap();
 
         // Convert to a TransactionHeader
-        let header: TransactionHeader = header_proto.into();
+        let header: TransactionHeader = header_proto.into_native().unwrap();
 
         assert_eq!(KEY1, hex::encode(header.batcher_public_key()));
         assert_eq!(
