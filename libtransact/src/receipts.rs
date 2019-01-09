@@ -25,6 +25,9 @@
 //! represent issues that have resulted from aborted control flow but the
 //! expected status of a transaction's result.
 
+use super::protos;
+use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+
 /// A change to be applied to state, in terms of keys and values.
 ///
 /// A `StateChange` represents the basic level of changes that can be applied to
@@ -51,6 +54,56 @@ where
         }
     }
 }
+
+impl FromProto<protos::transaction_receipt::StateChange> for StateChange<String, Vec<u8>> {
+    fn from_proto(
+        state_change: protos::transaction_receipt::StateChange,
+    ) -> Result<Self, ProtoConversionError> {
+        match state_change.get_field_type() {
+            protos::transaction_receipt::StateChange_Type::SET => Ok(StateChange::Set {
+                key: state_change.get_address().to_string(),
+                value: state_change.get_value().to_vec(),
+            }),
+            protos::transaction_receipt::StateChange_Type::DELETE => Ok(StateChange::Delete {
+                key: state_change.get_address().to_string(),
+            }),
+            protos::transaction_receipt::StateChange_Type::TYPE_UNSET => {
+                Err(ProtoConversionError::InvalidTypeError(
+                    "Cannot convert StateChange with type unset. /
+                    StageChange type must be StateChange_Type::SET or StateChange_Type::DELETE."
+                        .to_string(),
+                ))
+            }
+        }
+    }
+}
+
+impl FromNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::StateChange {
+    fn from_native(
+        state_change: StateChange<String, Vec<u8>>,
+    ) -> Result<Self, ProtoConversionError> {
+        let mut proto_state_change = protos::transaction_receipt::StateChange::new();
+
+        match state_change {
+            StateChange::Set { key, value } => {
+                proto_state_change.set_value(value);
+                proto_state_change.set_address(key);
+                proto_state_change
+                    .set_field_type(protos::transaction_receipt::StateChange_Type::SET);
+                Ok(proto_state_change)
+            }
+            StateChange::Delete { key } => {
+                proto_state_change.set_address(key);
+                proto_state_change
+                    .set_field_type(protos::transaction_receipt::StateChange_Type::DELETE);
+                Ok(proto_state_change)
+            }
+        }
+    }
+}
+
+impl IntoProto<protos::transaction_receipt::StateChange> for StateChange<String, Vec<u8>> {}
+impl IntoNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::StateChange {}
 
 /// An `InvalidTransaction` has information about why the transaction failed.
 #[derive(Debug, Clone)]
@@ -161,6 +214,38 @@ where
         Self {
             batch_id: self.batch_id.clone(),
             transaction_results: self.transaction_results.clone(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static ADDRESS: &str = "5b7349700e158b598043efd6d7610345a75a00b22ac14c9278db53f586179a92b72fbd";
+    static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    #[test]
+    fn state_change_fields() {
+        let state_change_set = StateChange::Set {
+            key: ADDRESS.to_string(),
+            value: BYTES1.to_vec(),
+        };
+        check_state_change(state_change_set);
+        let state_change_delete = StateChange::Delete {
+            key: ADDRESS.to_string(),
+        };
+        check_state_change(state_change_delete);
+    }
+
+    fn check_state_change(state_change: StateChange<String, Vec<u8>>) {
+        match state_change {
+            StateChange::Set { key, value } => {
+                assert_eq!(ADDRESS, key);
+                assert_eq!(BYTES1.to_vec(), value);
+            }
+            StateChange::Delete { key } => {
+                assert_eq!(ADDRESS, key);
+            }
         }
     }
 }
