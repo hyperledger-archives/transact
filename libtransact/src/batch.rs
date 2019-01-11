@@ -1,5 +1,6 @@
 use hex;
 
+use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
 use crate::transaction::Transaction;
 
 use super::protos;
@@ -19,22 +20,22 @@ impl BatchHeader {
     }
 }
 
-impl From<protos::batch::BatchHeader> for BatchHeader {
-    fn from(header: protos::batch::BatchHeader) -> Self {
-        BatchHeader {
-            signer_public_key: hex::decode(header.get_signer_public_key()).unwrap(),
+impl FromProto<protos::batch::BatchHeader> for BatchHeader {
+    fn from_proto(header: protos::batch::BatchHeader) -> Result<Self, ProtoConversionError> {
+        Ok(BatchHeader {
+            signer_public_key: hex::decode(header.get_signer_public_key())?,
             transaction_ids: header
                 .get_transaction_ids()
                 .to_vec()
                 .into_iter()
-                .map(|t| hex::decode(t).unwrap())
-                .collect(),
-        }
+                .map(|t| hex::decode(t).map_err(ProtoConversionError::from))
+                .collect::<Result<_, _>>()?,
+        })
     }
 }
 
-impl From<BatchHeader> for protos::batch::BatchHeader {
-    fn from(header: BatchHeader) -> Self {
+impl FromNative<BatchHeader> for protos::batch::BatchHeader {
+    fn from_native(header: BatchHeader) -> Result<Self, ProtoConversionError> {
         let mut proto_header = protos::batch::BatchHeader::new();
         proto_header.set_signer_public_key(hex::encode(header.signer_public_key));
         proto_header.set_transaction_ids(
@@ -44,9 +45,12 @@ impl From<BatchHeader> for protos::batch::BatchHeader {
                 .map(hex::encode)
                 .collect::<protobuf::RepeatedField<String>>(),
         );
-        proto_header
+        Ok(proto_header)
     }
 }
+
+impl IntoProto<protos::batch::BatchHeader> for BatchHeader {}
+impl IntoNative<BatchHeader> for protos::batch::BatchHeader {}
 
 pub struct Batch {
     header: Vec<u8>,
@@ -140,7 +144,7 @@ mod tests {
             protobuf::parse_from_bytes(&header_bytes).unwrap();
 
         // Convert to a BatchHeader
-        let header: BatchHeader = header_proto.into();
+        let header: BatchHeader = header_proto.into_native().unwrap();
 
         assert_eq!(KEY1, hex::encode(header.signer_public_key()));
         assert_eq!(
