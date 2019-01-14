@@ -223,7 +223,7 @@ impl std::fmt::Display for TransactionBuildError {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct TransactionBuilder {
     batcher_public_key: Option<Vec<u8>>,
     dependencies: Option<Vec<Vec<u8>>>,
@@ -625,5 +625,113 @@ mod tests {
         assert_eq!(BYTES1.to_vec(), transaction.header());
         assert_eq!(SIGNATURE1, transaction.header_signature());
         assert_eq!(BYTES2.to_vec(), transaction.payload());
+    }
+}
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::super::protos;
+    use super::*;
+    use test::Bencher;
+
+    use crate::signing::hash::HashSigner;
+
+    static FAMILY_NAME: &str = "test_family";
+    static FAMILY_VERSION: &str = "0.1";
+    static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
+    static KEY2: &str = "222222222222222222222222222222222222222222222222222222222222222222";
+    static KEY3: &str = "333333333333333333333333333333333333333333333333333333333333333333";
+    static KEY4: &str = "444444444444444444444444444444444444444444444444444444444444444444";
+    static KEY5: &str = "555555555555555555555555555555555555555555555555555555555555555555";
+    static KEY6: &str = "666666666666666666666666666666666666666666666666666666666666666666";
+    static KEY7: &str = "777777777777777777777777777777777777777777777777777777777777777777";
+    static KEY8: &str = "888888888888888888888888888888888888888888888888888888888888888888";
+    static NONCE: &str = "f9kdzz";
+    static HASH: &str = "0000000000000000000000000000000000000000000000000000000000000000";
+    static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    static BYTES2: [u8; 4] = [0x05, 0x06, 0x07, 0x08];
+    static SIGNATURE1: &str =
+        "sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1";
+
+    #[bench]
+    fn bench_transaction_builder(b: &mut Bencher) {
+        let signer = HashSigner::new();
+        let transaction = TransactionBuilder::new()
+            .with_batcher_public_key(hex::decode(KEY1).unwrap())
+            .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
+            .with_family_name(FAMILY_NAME.to_string())
+            .with_family_version(FAMILY_VERSION.to_string())
+            .with_inputs(vec![
+                hex::decode(KEY4).unwrap(),
+                hex::decode(&KEY5[0..4]).unwrap(),
+            ])
+            .with_nonce(NONCE.to_string().into_bytes())
+            .with_outputs(vec![
+                hex::decode(KEY6).unwrap(),
+                hex::decode(&KEY7[0..4]).unwrap(),
+            ])
+            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload(BYTES2.to_vec());
+
+        b.iter(|| transaction.clone().build_pair(&signer));
+    }
+
+    #[bench]
+    fn bench_transaction_creation(b: &mut Bencher) {
+        b.iter(|| Transaction {
+            header: BYTES1.to_vec(),
+            header_signature: SIGNATURE1.to_string(),
+            payload: BYTES2.to_vec(),
+        });
+    }
+
+    #[bench]
+    fn bench_txn_header_into_proto(b: &mut Bencher) {
+        let header = TransactionHeader {
+            batcher_public_key: hex::decode(KEY1).unwrap(),
+            dependencies: vec![hex::decode(KEY2).unwrap()],
+            family_name: FAMILY_NAME.to_string(),
+            family_version: FAMILY_VERSION.to_string(),
+            inputs: vec![
+                hex::decode(KEY4).unwrap(),
+                hex::decode(&KEY5[0..4]).unwrap(),
+            ],
+            nonce: NONCE.to_string().into_bytes(),
+            outputs: vec![
+                hex::decode(KEY6).unwrap(),
+                hex::decode(&KEY7[0..4]).unwrap(),
+            ],
+            payload_hash: hex::decode(HASH).unwrap(),
+            payload_hash_method: HashMethod::SHA512,
+            signer_public_key: hex::decode(KEY8).unwrap(),
+        };
+
+        b.iter(|| header.clone().into_proto());
+    }
+
+    #[bench]
+    fn bench_txn_header_into_native(b: &mut Bencher) {
+        let mut proto = protos::transaction::TransactionHeader::new();
+        proto.set_batcher_public_key(KEY1.to_string());
+        proto.set_dependencies(protobuf::RepeatedField::from_vec(vec![
+            KEY2.to_string(),
+            KEY3.to_string(),
+        ]));
+        proto.set_family_name(FAMILY_NAME.to_string());
+        proto.set_family_version(FAMILY_VERSION.to_string());
+        proto.set_inputs(protobuf::RepeatedField::from_vec(vec![
+            KEY4.to_string(),
+            (&KEY5[0..4]).to_string(),
+        ]));
+        proto.set_nonce(NONCE.to_string());
+        proto.set_outputs(protobuf::RepeatedField::from_vec(vec![
+            KEY6.to_string(),
+            (&KEY7[0..4]).to_string(),
+        ]));
+        proto.set_payload_sha512(HASH.to_string());
+        proto.set_signer_public_key(KEY8.to_string());
+
+        b.iter(|| proto.clone().into_native());
     }
 }
