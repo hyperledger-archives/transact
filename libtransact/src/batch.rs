@@ -1,10 +1,15 @@
 use hex;
+use protobuf::Message;
+use std;
+use std::error::Error as StdError;
 
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use crate::signing;
 use crate::transaction::Transaction;
 
 use super::protos;
 
+#[derive(Clone)]
 pub struct BatchHeader {
     signer_public_key: Vec<u8>,
     transaction_ids: Vec<Vec<u8>>,
@@ -77,6 +82,25 @@ impl Batch {
     }
 }
 
+pub struct BatchPair {
+    batch: Batch,
+    header: BatchHeader,
+}
+
+impl BatchPair {
+    pub fn batch(&self) -> &Batch {
+        &self.batch
+    }
+
+    pub fn header(&self) -> &BatchHeader {
+        &self.header
+    }
+
+    pub fn take(self) -> (Batch, BatchHeader) {
+        (self.batch, self.header)
+    }
+}
+
 impl From<protos::batch::Batch> for Batch {
     fn from(batch: protos::batch::Batch) -> Self {
         Batch {
@@ -93,9 +117,116 @@ impl From<protos::batch::Batch> for Batch {
     }
 }
 
+#[derive(Debug)]
+pub enum BatchBuildError {
+    MissingField(String),
+    SerializationError(String),
+    SigningError(String),
+}
+
+impl StdError for BatchBuildError {
+    fn description(&self) -> &str {
+        match *self {
+            BatchBuildError::MissingField(ref msg) => msg,
+            BatchBuildError::SerializationError(ref msg) => msg,
+            BatchBuildError::SigningError(ref msg) => msg,
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            BatchBuildError::MissingField(_) => None,
+            BatchBuildError::SerializationError(_) => None,
+            BatchBuildError::SigningError(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for BatchBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            BatchBuildError::MissingField(ref s) => write!(f, "MissingField: {}", s),
+            BatchBuildError::SerializationError(ref s) => write!(f, "SerializationError: {}", s),
+            BatchBuildError::SigningError(ref s) => write!(f, "SigningError: {}", s),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct BatchBuilder {
+    transactions: Option<Vec<Transaction>>,
+    trace: Option<bool>,
+}
+
+impl BatchBuilder {
+    pub fn new() -> Self {
+        BatchBuilder::default()
+    }
+
+    pub fn with_transactions(mut self, transactions: Vec<Transaction>) -> BatchBuilder {
+        self.transactions = Some(transactions);
+        self
+    }
+
+    pub fn with_trace(mut self, trace: bool) -> BatchBuilder {
+        self.trace = Some(trace);
+        self
+    }
+
+    pub fn build_pair(self, signer: &signing::Signer) -> Result<BatchPair, BatchBuildError> {
+        let transactions = self.transactions.ok_or_else(|| {
+            BatchBuildError::MissingField("'transactions' field is required".to_string())
+        })?;
+        let trace = self.trace.unwrap_or(false);
+        let transaction_ids = transactions
+            .iter()
+            .flat_map(|t| {
+                vec![hex::decode(t.header_signature())
+                    .map_err(|e| BatchBuildError::SerializationError(format!("{}", e)))]
+            })
+            .collect::<Result<_, _>>()?;
+
+        let signer_public_key = signer.public_key().to_vec();
+
+        let header = BatchHeader {
+            signer_public_key,
+            transaction_ids,
+        };
+
+        let header_proto: protos::batch::BatchHeader = header
+            .clone()
+            .into_proto()
+            .map_err(|e| BatchBuildError::SerializationError(format!("{}", e)))?;
+        let header_bytes = header_proto
+            .write_to_bytes()
+            .map_err(|e| BatchBuildError::SerializationError(format!("{}", e)))?;
+
+        let header_signature = hex::encode(
+            signer
+                .sign(&header_bytes)
+                .map_err(|e| BatchBuildError::SigningError(format!("{}", e)))?,
+        );
+
+        let batch = Batch {
+            header: header_bytes,
+            header_signature,
+            transactions,
+            trace,
+        };
+
+        Ok(BatchPair { batch, header })
+    }
+
+    pub fn build(self, signer: &signing::Signer) -> Result<Batch, BatchBuildError> {
+        Ok(self.build_pair(signer)?.batch)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::signing::hash::HashSigner;
+    use crate::signing::Signer;
     use protobuf::Message;
     use sawtooth_sdk;
 
@@ -113,6 +244,80 @@ mod tests {
         "sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2";
     static SIGNATURE3: &str =
         "sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3";
+
+    fn check_builder_batch(signer: &Signer, pair: &BatchPair) {
+        assert_eq!(
+            vec![
+                SIGNATURE2.as_bytes().to_vec(),
+                SIGNATURE3.as_bytes().to_vec()
+            ],
+            pair.header().transaction_ids()
+        );
+        assert_eq!(signer.public_key(), pair.header().signer_public_key());
+        assert_eq!(
+            vec![
+                Transaction::new(
+                    BYTES2.to_vec(),
+                    hex::encode(SIGNATURE2.to_string()),
+                    BYTES3.to_vec()
+                ),
+                Transaction::new(
+                    BYTES4.to_vec(),
+                    hex::encode(SIGNATURE3.to_string()),
+                    BYTES5.to_vec()
+                ),
+            ],
+            pair.batch().transactions()
+        );
+        assert_eq!(true, pair.batch().trace());
+    }
+
+    #[test]
+    fn batch_builder_chain() {
+        let signer = HashSigner::new();
+
+        let pair = BatchBuilder::new()
+            .with_transactions(vec![
+                Transaction::new(
+                    BYTES2.to_vec(),
+                    hex::encode(SIGNATURE2.to_string()),
+                    BYTES3.to_vec(),
+                ),
+                Transaction::new(
+                    BYTES4.to_vec(),
+                    hex::encode(SIGNATURE3.to_string()),
+                    BYTES5.to_vec(),
+                ),
+            ])
+            .with_trace(true)
+            .build_pair(&signer)
+            .unwrap();
+
+        check_builder_batch(&signer, &pair);
+    }
+
+    #[test]
+    fn batch_builder_separate() {
+        let signer = HashSigner::new();
+
+        let mut builder = BatchBuilder::new();
+        builder = builder.with_transactions(vec![
+            Transaction::new(
+                BYTES2.to_vec(),
+                hex::encode(SIGNATURE2.to_string()),
+                BYTES3.to_vec(),
+            ),
+            Transaction::new(
+                BYTES4.to_vec(),
+                hex::encode(SIGNATURE3.to_string()),
+                BYTES5.to_vec(),
+            ),
+        ]);
+        builder = builder.with_trace(true);
+        let pair = builder.build_pair(&signer).unwrap();
+
+        check_builder_batch(&signer, &pair);
+    }
 
     #[test]
     fn batch_header_fields() {
