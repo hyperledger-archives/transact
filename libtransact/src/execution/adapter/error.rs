@@ -15,11 +15,16 @@
  * -----------------------------------------------------------------------------
  */
 
-pub mod batch;
-pub mod execution;
-#[allow(renamed_and_removed_lints)]
-pub mod protos;
-pub mod receipts;
-pub mod signing;
-pub mod state;
-pub mod transaction;
+use crate::transaction::TransactionPair;
+
+/// During processing of the Transaction, something unexpected happened.
+/// The `Executor` immediately retries the `TransactionPair` for all of these
+/// errors.
+pub enum ExecutionAdapterError {
+    /// Executing the transaction took too much time and so abort
+    TimeOutError(TransactionPair),
+    /// This ExecutionAdaptor does not have the capability to process the `TransactionPair`
+    /// given to it. This can happen due to a timing error in routing the `TransactionPair`
+    /// to the `ExecutionAdapter`.
+    RoutingError(TransactionPair),
+}
