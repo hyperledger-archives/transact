@@ -5,7 +5,10 @@ RUN apt-get update && \
     curl \
     unzip \
     gcc \
-    protobuf-compiler
+    libssl-dev \
+    pkg-config \
+    protobuf-compiler \
+    libzmq3-dev
 
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
     chmod +x /usr/bin/rustup-init && \

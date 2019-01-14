@@ -5,7 +5,12 @@ authors = ["Bitwise IO, Inc."]
 edition = "2018"
 
 [dependencies]
+hex = "0.3"
 protobuf = "2"
+sha2 = "0.8"
+
+[dev-dependencies]
+sawtooth-sdk = "0.1"
 
 [build-dependencies]
 protoc-rust = "2"
