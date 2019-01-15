@@ -27,6 +27,7 @@
 
 use super::protos;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use std::error::Error as StdError;
 
 /// A change to be applied to state, in terms of keys and values.
 ///
@@ -243,6 +244,95 @@ impl FromNative<Event> for protos::events::Event {
 impl IntoProto<protos::events::Event> for Event {}
 impl IntoNative<Event> for protos::events::Event {}
 
+#[derive(Debug)]
+pub enum TransactionReceiptBuilderError {
+    MissingField(String),
+}
+
+impl StdError for TransactionReceiptBuilderError {
+    fn description(&self) -> &str {
+        match *self {
+            TransactionReceiptBuilderError::MissingField(ref msg) => msg,
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            TransactionReceiptBuilderError::MissingField(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for TransactionReceiptBuilderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            TransactionReceiptBuilderError::MissingField(ref s) => write!(f, "MissingField: {}", s),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct TransactionReceiptBuilder<K, V>
+where
+    K: std::default::Default,
+    V: std::default::Default,
+{
+    pub state_changes: Vec<StateChange<K, V>>,
+    pub events: Vec<Event>,
+    pub data: Vec<Vec<u8>>,
+    pub transaction_id: Option<String>,
+}
+
+impl<K, V> TransactionReceiptBuilder<K, V>
+where
+    K: std::default::Default,
+    V: std::default::Default,
+{
+    pub fn new() -> Self {
+        TransactionReceiptBuilder::default()
+    }
+
+    pub fn with_state_changes(
+        mut self,
+        state_changes: Vec<StateChange<K, V>>,
+    ) -> TransactionReceiptBuilder<K, V> {
+        self.state_changes = state_changes;
+        self
+    }
+
+    pub fn with_events(mut self, events: Vec<Event>) -> TransactionReceiptBuilder<K, V> {
+        self.events = events;
+        self
+    }
+
+    pub fn with_data(mut self, data: Vec<Vec<u8>>) -> TransactionReceiptBuilder<K, V> {
+        self.data = data;
+        self
+    }
+
+    pub fn with_transaction_id(
+        mut self,
+        transaction_id: String,
+    ) -> TransactionReceiptBuilder<K, V> {
+        self.transaction_id = Some(transaction_id);
+        self
+    }
+
+    pub fn build(self) -> Result<TransactionReceipt<K, V>, TransactionReceiptBuilderError> {
+        let transaction_id = self.transaction_id.ok_or_else(|| {
+            TransactionReceiptBuilderError::MissingField(
+                "'transaction_id' field is required".to_string(),
+            )
+        })?;
+
+        Ok(TransactionReceipt {
+            state_changes: self.state_changes,
+            events: self.events,
+            data: self.data,
+            transaction_id,
+        })
+    }
+}
 /// The outcome of a transaction's execution.
 ///
 /// A `TransactionStatus` covers the possible outcomes that can occur during a
@@ -483,5 +573,52 @@ mod tests {
         }
         assert_eq!(vec!(make_event_2()), transaction_receipt.events);
         assert_eq!(vec!(BYTES2.to_vec(),), transaction_receipt.data);
+    }
+
+    #[test]
+    fn transaction_receipt_builder_chain() {
+        let transaction_receipt = TransactionReceiptBuilder::new()
+            .with_state_changes(vec![
+                StateChange::Set {
+                    key: ADDRESS.to_string(),
+                    value: BYTES1.to_vec(),
+                },
+                StateChange::Delete {
+                    key: ADDRESS.to_string(),
+                },
+            ])
+            .with_events(vec![make_event_1(), make_event_2()])
+            .with_data(vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()])
+            .with_transaction_id(TRANSACTION_ID.to_string())
+            .build()
+            .unwrap();
+
+        check_transaction_receipt(transaction_receipt)
+    }
+
+    #[test]
+    fn transaction_receipt_builder_separate() {
+        let mut transaction_receipt_builder = TransactionReceiptBuilder::new();
+        transaction_receipt_builder = transaction_receipt_builder.with_state_changes(vec![
+            StateChange::Set {
+                key: ADDRESS.to_string(),
+                value: BYTES1.to_vec(),
+            },
+            StateChange::Delete {
+                key: ADDRESS.to_string(),
+            },
+        ]);
+        transaction_receipt_builder =
+            transaction_receipt_builder.with_events(vec![make_event_1(), make_event_2()]);
+        transaction_receipt_builder = transaction_receipt_builder.with_data(vec![
+            BYTES1.to_vec(),
+            BYTES2.to_vec(),
+            BYTES3.to_vec(),
+        ]);
+        transaction_receipt_builder =
+            transaction_receipt_builder.with_transaction_id(TRANSACTION_ID.to_string());
+        let transaction_receipt = transaction_receipt_builder.build().unwrap();
+
+        check_transaction_receipt(transaction_receipt)
     }
 }
