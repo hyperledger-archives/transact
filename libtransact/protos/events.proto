@@ -15,11 +15,6 @@
 
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "sawtooth.sdk.protobuf";
-option go_package = "events_pb2";
-
-
 message Event {
   // Used to subscribe to events and servers as a hint for how to deserialize
   // event_data and what pairs to expect in attributes.
