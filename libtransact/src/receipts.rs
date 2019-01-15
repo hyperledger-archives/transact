@@ -245,6 +245,73 @@ impl IntoProto<protos::events::Event> for Event {}
 impl IntoNative<Event> for protos::events::Event {}
 
 #[derive(Debug)]
+pub enum EventBuilderError {
+    MissingField(String),
+}
+
+impl StdError for EventBuilderError {
+    fn description(&self) -> &str {
+        match *self {
+            EventBuilderError::MissingField(ref msg) => msg,
+        }
+    }
+
+    fn cause(&self) -> Option<&StdError> {
+        match *self {
+            EventBuilderError::MissingField(_) => None,
+        }
+    }
+}
+
+impl std::fmt::Display for EventBuilderError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            EventBuilderError::MissingField(ref s) => write!(f, "MissingField: {}", s),
+        }
+    }
+}
+
+#[derive(Default)]
+pub struct EventBuilder {
+    pub event_type: Option<String>,
+    pub attributes: Vec<(String, String)>,
+    pub data: Vec<u8>,
+}
+
+impl EventBuilder {
+    pub fn new() -> Self {
+        EventBuilder::default()
+    }
+
+    pub fn with_event_type(mut self, event_type: String) -> EventBuilder {
+        self.event_type = Some(event_type);
+        self
+    }
+
+    pub fn with_attributes(mut self, attributes: Vec<(String, String)>) -> EventBuilder {
+        self.attributes = attributes;
+        self
+    }
+
+    pub fn with_data(mut self, data: Vec<u8>) -> EventBuilder {
+        self.data = data;
+        self
+    }
+
+    pub fn build(self) -> Result<Event, EventBuilderError> {
+        let event_type = self.event_type.ok_or_else(|| {
+            EventBuilderError::MissingField("'event_type' field is required".to_string())
+        })?;
+
+        Ok(Event {
+            event_type,
+            attributes: self.attributes,
+            data: self.data,
+        })
+    }
+}
+
+#[derive(Debug)]
 pub enum TransactionReceiptBuilderError {
     MissingField(String),
 }
@@ -620,5 +687,34 @@ mod tests {
         let transaction_receipt = transaction_receipt_builder.build().unwrap();
 
         check_transaction_receipt(transaction_receipt)
+    }
+
+    #[test]
+    fn event_builder_chain() {
+        let event = EventBuilder::new()
+            .with_event_type(EVENT_TYPE1.to_string())
+            .with_attributes(vec![
+                (ATTR1.0.to_string(), ATTR1.1.to_string()),
+                (ATTR2.0.to_string(), ATTR2.1.to_string()),
+            ])
+            .with_data(BYTES2.to_vec())
+            .build()
+            .unwrap();
+
+        check_event(event);
+    }
+
+    #[test]
+    fn event_builder_separate() {
+        let mut event_builder = EventBuilder::new();
+        event_builder = event_builder.with_event_type(EVENT_TYPE1.to_string());
+        event_builder = event_builder.with_attributes(vec![
+            (ATTR1.0.to_string(), ATTR1.1.to_string()),
+            (ATTR2.0.to_string(), ATTR2.1.to_string()),
+        ]);
+        event_builder = event_builder.with_data(BYTES2.to_vec());
+        let event = event_builder.build().unwrap();
+
+        check_event(event);
     }
 }
