@@ -51,7 +51,7 @@ pub trait ExecutionAdapter {
     fn execute(&self, transaction_pair: TransactionPair, context_id: ContextId);
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Hash, Clone)]
 pub struct TransactionFamily {
     family_name: String,
     family_version: String,
