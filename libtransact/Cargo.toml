@@ -14,3 +14,6 @@ sawtooth-sdk = "0.1"
 
 [build-dependencies]
 protoc-rust = "2"
+
+[features]
+nightly = []

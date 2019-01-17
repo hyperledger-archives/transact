@@ -152,7 +152,7 @@ impl std::fmt::Display for BatchBuildError {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct BatchBuilder {
     transactions: Option<Vec<Transaction>>,
     trace: Option<bool>,
@@ -384,4 +384,80 @@ mod tests {
 
     #[test]
     fn batch_sawtooth10_compatibility() {}
+}
+
+#[cfg(all(feature = "nightly", test))]
+mod benchmarks {
+    extern crate test;
+    use super::*;
+    use crate::signing::hash::HashSigner;
+    use test::Bencher;
+
+    static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
+    static KEY2: &str = "222222222222222222222222222222222222222222222222222222222222222222";
+    static KEY3: &str = "333333333333333333333333333333333333333333333333333333333333333333";
+    static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    static BYTES2: [u8; 4] = [0x05, 0x06, 0x07, 0x08];
+    static BYTES3: [u8; 4] = [0x09, 0x0a, 0x0b, 0x0c];
+    static BYTES4: [u8; 4] = [0x0d, 0x0e, 0x0f, 0x10];
+    static BYTES5: [u8; 4] = [0x11, 0x12, 0x13, 0x14];
+    static SIGNATURE1: &str =
+        "sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1";
+    static SIGNATURE2: &str =
+        "sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2sig2";
+    static SIGNATURE3: &str =
+        "sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3";
+
+    #[bench]
+    fn bench_batch_creation(b: &mut Bencher) {
+        b.iter(|| Batch {
+            header: BYTES1.to_vec(),
+            header_signature: SIGNATURE1.to_string(),
+            transactions: vec![
+                Transaction::new(BYTES2.to_vec(), SIGNATURE2.to_string(), BYTES3.to_vec()),
+                Transaction::new(BYTES4.to_vec(), SIGNATURE3.to_string(), BYTES5.to_vec()),
+            ],
+            trace: true,
+        });
+    }
+
+    #[bench]
+    fn bench_batch_builder(b: &mut Bencher) {
+        let signer = HashSigner::new();
+        let batch = BatchBuilder::new()
+            .with_transactions(vec![
+                Transaction::new(
+                    BYTES2.to_vec(),
+                    hex::encode(SIGNATURE2.to_string()),
+                    BYTES3.to_vec(),
+                ),
+                Transaction::new(
+                    BYTES4.to_vec(),
+                    hex::encode(SIGNATURE3.to_string()),
+                    BYTES5.to_vec(),
+                ),
+            ])
+            .with_trace(true);
+        b.iter(|| batch.clone().build_pair(&signer));
+    }
+
+    #[bench]
+    fn bench_batch_header_into_native(b: &mut Bencher) {
+        let mut proto_header = protos::batch::BatchHeader::new();
+        proto_header.set_signer_public_key(KEY1.to_string());
+        proto_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![
+            KEY2.to_string(),
+            KEY3.to_string(),
+        ]));
+        b.iter(|| proto_header.clone().into_native());
+    }
+
+    #[bench]
+    fn bench_batch_header_into_proto(b: &mut Bencher) {
+        let native_header = BatchHeader {
+            signer_public_key: hex::decode(KEY1).unwrap(),
+            transaction_ids: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+        };
+        b.iter(|| native_header.clone().into_proto());
+    }
 }

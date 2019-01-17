@@ -14,6 +14,7 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+#![cfg_attr(feature = "nightly", feature(test))]
 
 pub mod batch;
 pub mod execution;
