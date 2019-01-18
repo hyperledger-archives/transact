@@ -399,7 +399,7 @@ impl MerkleDatabase {
                     return Err(StateDatabaseError::NotFound(format!(
                         "invalid address {} from root {}",
                         address, self.root_hash
-                    )))
+                    )));
                 }
                 Some(child_hash) => get_node_by_hash(&self.db, child_hash)?,
             }
@@ -431,7 +431,7 @@ impl MerkleDatabase {
                             "invalid address {} from root {}",
                             tokens.join(""),
                             self.root_hash
-                        )))
+                        )));
                     }
                     (false, false) => {
                         new_branch = true;
