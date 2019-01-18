@@ -271,7 +271,7 @@ impl std::fmt::Display for EventBuilderError {
     }
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct EventBuilder {
     pub event_type: Option<String>,
     pub attributes: Vec<(String, String)>,
@@ -848,5 +848,56 @@ mod benchmarks {
             value: BYTES1.to_vec(),
         };
         b.iter(|| state_change_set.clone().into_proto());
+    }
+
+    #[bench]
+    fn bench_event_creation(b: &mut Bencher) {
+        b.iter(|| Event {
+            event_type: EVENT_TYPE1.to_string(),
+            attributes: vec![
+                (ATTR1.0.to_string(), ATTR1.1.to_string()),
+                (ATTR2.0.to_string(), ATTR2.1.to_string()),
+            ],
+            data: BYTES2.to_vec(),
+        });
+    }
+
+    #[bench]
+    fn bench_event_builder(b: &mut Bencher) {
+        let event = EventBuilder::new()
+            .with_event_type(EVENT_TYPE1.to_string())
+            .with_attributes(vec![
+                (ATTR1.0.to_string(), ATTR1.1.to_string()),
+                (ATTR2.0.to_string(), ATTR2.1.to_string()),
+            ])
+            .with_data(BYTES2.to_vec());
+        b.iter(|| event.clone().build());
+    }
+
+    #[bench]
+    fn bench_event_into_proto(b: &mut Bencher) {
+        let event = Event {
+            event_type: EVENT_TYPE1.to_string(),
+            attributes: vec![
+                (ATTR1.0.to_string(), ATTR1.1.to_string()),
+                (ATTR2.0.to_string(), ATTR2.1.to_string()),
+            ],
+            data: BYTES2.to_vec(),
+        };
+        b.iter(|| event.clone().into_proto());
+    }
+
+    #[bench]
+    fn bench_event_into_native(b: &mut Bencher) {
+        let mut proto_event = protos::events::Event::new();
+        proto_event.set_event_type(EVENT_TYPE1.to_string());
+        let mut proto_event_attribute = protos::events::Event_Attribute::new();
+        proto_event_attribute.set_key(ATTR3.0.to_string());
+        proto_event_attribute.set_value(ATTR3.1.to_string());
+        proto_event.set_attributes(protobuf::RepeatedField::from_vec(vec![
+            proto_event_attribute,
+        ]));
+        proto_event.set_data(BYTES3.to_vec());
+        b.iter(|| proto_event.clone().into_native());
     }
 }
