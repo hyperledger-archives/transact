@@ -20,18 +20,21 @@ use std::error::Error as StdError;
 #[derive(Debug)]
 pub enum ProtoConversionError {
     SerializationError(String),
+    InvalidTypeError(String),
 }
 
 impl StdError for ProtoConversionError {
     fn description(&self) -> &str {
         match *self {
             ProtoConversionError::SerializationError(ref msg) => msg,
+            ProtoConversionError::InvalidTypeError(ref msg) => msg,
         }
     }
 
     fn cause(&self) -> Option<&StdError> {
         match *self {
             ProtoConversionError::SerializationError(_) => None,
+            ProtoConversionError::InvalidTypeError(_) => None,
         }
     }
 }
@@ -42,6 +45,7 @@ impl std::fmt::Display for ProtoConversionError {
             ProtoConversionError::SerializationError(ref s) => {
                 write!(f, "SerializationError: {}", s)
             }
+            ProtoConversionError::InvalidTypeError(ref s) => write!(f, "InvalidTypeError: {}", s),
         }
     }
 }
