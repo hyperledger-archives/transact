@@ -21,6 +21,7 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/ci xenial universe" >>
  && apt-get install -y -q --allow-downgrades \
     build-essential \
     git \
+    latexmk \
     libffi-dev \
     libssl-dev \
     libzmq3-dev \
@@ -43,7 +44,7 @@ RUN apt-get update && apt-get install -y -q \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install \
-    sphinx==1.5.6 \
+    sphinx \
     sphinxcontrib-httpdomain \
     sphinxcontrib-openapi \
     sphinx_rtd_theme
