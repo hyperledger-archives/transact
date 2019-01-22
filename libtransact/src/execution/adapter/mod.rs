@@ -23,7 +23,6 @@ pub mod error;
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
-use crate::receipts::ExecutionResult;
 use crate::transaction::TransactionPair;
 
 pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
@@ -56,4 +55,31 @@ pub trait ExecutionAdapter {
 pub struct TransactionFamily {
     family_name: String,
     family_version: String,
+}
+
+/// An `InvalidTransaction` has information about why the transaction failed.
+#[derive(Debug, Clone)]
+pub struct InvalidTransaction {
+    /// human readable reason for why the transaction was invalid.
+    pub error_message: String,
+    /// Transaction specific data that is returned to the client
+    /// who submitted the Transaction.
+    pub error_data: Vec<u8>,
+}
+
+/// The outcome of a transaction's execution.
+///
+/// A `TransactionStatus` covers the possible outcomes that can occur during a
+/// transaction's execution.
+#[derive(Debug, Clone)]
+pub enum TransactionStatus {
+    Invalid(InvalidTransaction),
+    Valid,
+}
+
+/// The `ExecutionResult` provides the status for a given transaction.
+#[derive(Debug, Clone)]
+pub struct ExecutionResult {
+    pub transaction_id: String,
+    pub status: TransactionStatus,
 }

@@ -14,16 +14,8 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-//! The `receipts` module contains structs that supply information on the
-//! outcomes of transaction processing.  They supply information on the success
-//! or failure of the transactions, and changes that may be applied to state.
-//!
-//! The `TransactionProcessingResult` and `BatchProcessingResult` have information
-//! about the processing of transactions and batches.
-//!
-//! These results are not related to `std::result::Result`, in that they do not
-//! represent issues that have resulted from aborted control flow but the
-//! expected status of a transaction's result.
+//! The `receipts` module contains structs that supply information on the processing
+//! of `Transaction`s
 
 use super::protos;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
@@ -105,16 +97,6 @@ impl FromNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::S
 
 impl IntoProto<protos::transaction_receipt::StateChange> for StateChange<String, Vec<u8>> {}
 impl IntoNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::StateChange {}
-
-/// An `InvalidTransaction` has information about why the transaction failed.
-#[derive(Debug, Clone)]
-pub struct InvalidTransaction {
-    /// human readable reason for why the transaction was invalid.
-    pub error_message: String,
-    /// Transaction specific data that is returned to the client
-    /// who submitted the Transaction.
-    pub error_data: Vec<u8>,
-}
 
 /// A `TransactionReceipt` has the state changes associated with a valid transaction.
 #[derive(Debug, Clone)]
@@ -399,31 +381,6 @@ where
             transaction_id,
         })
     }
-}
-
-/// The outcome of a transaction's execution.
-///
-/// A `TransactionStatus` covers the possible outcomes that can occur during a
-/// transaction's execution.
-#[derive(Debug, Clone)]
-pub enum TransactionStatus {
-    Invalid(InvalidTransaction),
-    Valid,
-}
-
-/// The `ExecutionResult` provides the status for a given transaction.
-#[derive(Debug, Clone)]
-pub struct ExecutionResult {
-    pub transaction_id: String,
-    pub status: TransactionStatus,
-}
-
-/// A collection of `ExecutionResult`s for transactions that are considered an
-/// atomic unit of work.
-#[derive(Debug, Clone)]
-pub struct BatchProcessingResult {
-    pub batch_id: Vec<u8>,
-    pub transaction_results: Vec<ExecutionResult>,
 }
 
 #[cfg(test)]
