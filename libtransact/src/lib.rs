@@ -22,6 +22,7 @@ pub mod execution;
 #[allow(renamed_and_removed_lints)]
 pub mod protos;
 pub mod receipts;
+pub mod scheduler;
 pub mod signing;
 pub mod state;
 pub mod transaction;
