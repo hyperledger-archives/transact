@@ -400,80 +400,30 @@ where
         })
     }
 }
+
 /// The outcome of a transaction's execution.
 ///
 /// A `TransactionStatus` covers the possible outcomes that can occur during a
 /// transaction's execution.
-#[derive(Debug)]
-pub enum TransactionStatus<K, V> {
+#[derive(Debug, Clone)]
+pub enum TransactionStatus {
     Invalid(InvalidTransaction),
-    Valid(TransactionReceipt<K, V>),
+    Valid,
 }
 
-impl<K, V> Clone for TransactionStatus<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            TransactionStatus::Invalid(invalid_transaction) => {
-                TransactionStatus::Invalid(InvalidTransaction {
-                    error_message: invalid_transaction.error_message.clone(),
-                    error_data: invalid_transaction.error_data.clone(),
-                })
-            }
-            TransactionStatus::Valid(transaction_receipt) => {
-                TransactionStatus::Valid(TransactionReceipt {
-                    state_changes: transaction_receipt.state_changes.clone(),
-                    events: transaction_receipt.events.clone(),
-                    data: transaction_receipt.data.clone(),
-                    transaction_id: transaction_receipt.transaction_id.clone(),
-                })
-            }
-        }
-    }
+/// The `ExecutionResult` provides the status for a given transaction.
+#[derive(Debug, Clone)]
+pub struct ExecutionResult {
+    pub transaction_id: String,
+    pub status: TransactionStatus,
 }
 
-/// The `TransactionProcessingResult` provides the status for a given transaction.
-#[derive(Debug)]
-pub struct TransactionProcessingResult<K, V> {
-    pub transaction_id: Vec<u8>,
-    pub status: TransactionStatus<K, V>,
-}
-
-impl<K, V> Clone for TransactionProcessingResult<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            transaction_id: self.transaction_id.clone(),
-            status: self.status.clone(),
-        }
-    }
-}
-
-/// A collection of `TransactionProcessingResult`s for transactions that are considered an
+/// A collection of `ExecutionResult`s for transactions that are considered an
 /// atomic unit of work.
-#[derive(Debug)]
-pub struct BatchProcessingResult<K, V> {
+#[derive(Debug, Clone)]
+pub struct BatchProcessingResult {
     pub batch_id: Vec<u8>,
-    pub transaction_results: Vec<TransactionProcessingResult<K, V>>,
-}
-
-impl<K, V> Clone for BatchProcessingResult<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            batch_id: self.batch_id.clone(),
-            transaction_results: self.transaction_results.clone(),
-        }
-    }
+    pub transaction_results: Vec<ExecutionResult>,
 }
 
 #[cfg(test)]

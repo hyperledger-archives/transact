@@ -23,17 +23,16 @@ pub mod error;
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
-use crate::receipts::TransactionProcessingResult;
+use crate::receipts::ExecutionResult;
 use crate::transaction::TransactionPair;
 
-pub type OnDoneCallback<K, V> =
-    FnMut(Result<TransactionProcessingResult<K, V>, ExecutionAdapterError>);
+pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
 pub type OnRegisterCallback = FnMut(TransactionFamily);
 pub type OnUnregisterCallback = FnMut(TransactionFamily);
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.
-pub trait ExecutionAdapter<K, V> {
+pub trait ExecutionAdapter {
     /// Register a callback to be fired when the execution adapter registers a new
     /// capability.
     fn on_register(&self, callback: Box<OnRegisterCallback>);
@@ -43,7 +42,7 @@ pub trait ExecutionAdapter<K, V> {
     fn on_unregister(&self, callback: Box<OnUnregisterCallback>);
 
     /// The on_done callback fires whenever a `TransactionPair` has been executed.
-    fn on_done(&self, callback: Box<OnDoneCallback<K, V>>);
+    fn on_done(&self, callback: Box<OnDoneCallback>);
 
     /// Execute the transaction and provide an callback that handles the result.
     ///
