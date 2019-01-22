@@ -22,7 +22,7 @@ pub mod error;
 
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
-use crate::execution::ContextId;
+use crate::context::ContextId;
 use crate::receipts::TransactionProcessingResult;
 use crate::transaction::TransactionPair;
 

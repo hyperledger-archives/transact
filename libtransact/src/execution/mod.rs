@@ -20,7 +20,3 @@
 //!
 
 pub mod adapter;
-
-/// Unique id that references a "Context" from which a `Transaction` can query state and
-/// modify events, data, and state.
-pub type ContextId = [u8; 16];
