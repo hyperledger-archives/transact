@@ -57,6 +57,22 @@ pub struct TransactionFamily {
     family_version: String,
 }
 
+impl TransactionFamily {
+    pub fn new(family_name: String, family_version: String) -> Self {
+        TransactionFamily {
+            family_name,
+            family_version,
+        }
+    }
+
+    pub fn from_pair(transaction_pair: &TransactionPair) -> Self {
+        Self::new(
+            transaction_pair.header().family_name().to_string(),
+            transaction_pair.header().family_version().to_string(),
+        )
+    }
+}
+
 /// An `InvalidTransaction` has information about why the transaction failed.
 #[derive(Debug, Clone)]
 pub struct InvalidTransaction {
