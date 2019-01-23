@@ -27,6 +27,10 @@ pub struct ExecutionTask {
 }
 
 impl ExecutionTask {
+    pub fn new(pair: TransactionPair, context_id: ContextId) -> Self {
+        ExecutionTask { pair, context_id }
+    }
+
     pub fn pair(&self) -> &TransactionPair {
         &self.pair
     }
