@@ -19,6 +19,8 @@
 //! and its associated state.
 
 pub mod error;
+#[cfg(test)]
+pub mod test_adapter;
 
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
