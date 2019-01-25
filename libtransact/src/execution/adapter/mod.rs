@@ -40,15 +40,17 @@ pub trait ExecutionAdapter {
     /// new capability.
     fn on_unregister(&self, callback: Box<OnUnregisterCallback>);
 
-    /// The on_done callback fires whenever a `TransactionPair` has been executed.
-    fn on_done(&self, callback: Box<OnDoneCallback>);
-
     /// Execute the transaction and provide an callback that handles the result.
     ///
     ///
     /// The `on_done` callback is fired when the transaction returns from processing or there
     /// is an error.
-    fn execute(&self, transaction_pair: TransactionPair, context_id: ContextId);
+    fn execute(
+        &self,
+        transaction_pair: TransactionPair,
+        context_id: ContextId,
+        on_done: Box<OnDoneCallback>,
+    );
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone)]
