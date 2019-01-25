@@ -144,3 +144,96 @@ impl Default for TestExecutionAdapter {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    use super::*;
+    use crate::signing::hash::HashSigner;
+    use crate::transaction::{HashMethod, TransactionBuilder};
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    static FAMILY_VERSION: &str = "1.0";
+
+    #[test]
+    fn test_noop_adapter() {
+        let registered = Arc::new(AtomicBool::new(false));
+        let registered_c = Arc::clone(&registered);
+        let noop_adapter = TestExecutionAdapter::new();
+
+        let transaction_pair1 = make_transaction();
+        let transaction_pair2 = make_transaction();
+
+        let on_register = Box::new(move |_| {
+            registered_c.store(true, Ordering::Relaxed);
+        });
+
+        noop_adapter.on_register(on_register);
+
+        let registered_c = Arc::clone(&registered);
+
+        let on_unregister = Box::new(move |_| {
+            registered_c.store(false, Ordering::Relaxed);
+        });
+
+        noop_adapter.on_unregister(on_unregister);
+
+        noop_adapter.register();
+
+        assert!(
+            registered.load(Ordering::Relaxed),
+            "The noop adapter is registered",
+        );
+
+        let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+        let on_done = Box::new(
+            move |execution_result: Result<ExecutionResult, ExecutionAdapterError>| {
+                assert!(
+                    execution_result.is_ok(),
+                    "There was no error handling the transaction"
+                );
+                assert_eq!(
+                    execution_result.unwrap().status,
+                    TransactionStatus::Valid,
+                    "The transaction is valid"
+                );
+            },
+        );
+
+        noop_adapter.execute(transaction_pair1, context_id.clone(), on_done);
+
+        let on_done_error = Box::new(
+            move |execution_result: Result<ExecutionResult, ExecutionAdapterError>| {
+                assert!(
+                    execution_result.is_err(),
+                    "There was an error due to the TransactionFamily not being registered"
+                );
+            },
+        );
+
+        noop_adapter.unregister();
+
+        noop_adapter.execute(transaction_pair2, context_id, on_done_error);
+    }
+
+    fn make_transaction() -> TransactionPair {
+        let signer = HashSigner::new();
+
+        TransactionBuilder::new()
+            .with_batcher_public_key(vec![])
+            .with_dependencies(vec![vec![]])
+            .with_family_name("test".to_string())
+            .with_family_version(FAMILY_VERSION.to_string())
+            .with_inputs(vec![vec![]])
+            .with_outputs(vec![vec![]])
+            .with_nonce(vec![])
+            .with_payload(vec![])
+            .with_payload_hash_method(HashMethod::SHA512)
+            .build_pair(&signer)
+            .expect("The TransactionBuilder was supplied all the options")
+    }
+}
