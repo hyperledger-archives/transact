@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2019 Bitwise IO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Contains components that are used to directly execute a `Transaction`
-//! and return a `receipts::TransactionProcessingResult`.
-//!
-
-pub mod adapter;
+/// Unique id that references a "Context" from which a `Transaction` can query state and
+/// modify events, data, and state.
+pub type ContextId = [u8; 16];

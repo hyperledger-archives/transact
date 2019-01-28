@@ -22,18 +22,16 @@ pub mod error;
 
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
-use crate::execution::ContextId;
-use crate::receipts::TransactionProcessingResult;
+use crate::context::ContextId;
 use crate::transaction::TransactionPair;
 
-pub type OnDoneCallback<K, V> =
-    FnMut(Result<TransactionProcessingResult<K, V>, ExecutionAdapterError>);
+pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
 pub type OnRegisterCallback = FnMut(TransactionFamily);
 pub type OnUnregisterCallback = FnMut(TransactionFamily);
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.
-pub trait ExecutionAdapter<K, V> {
+pub trait ExecutionAdapter {
     /// Register a callback to be fired when the execution adapter registers a new
     /// capability.
     fn on_register(&self, callback: Box<OnRegisterCallback>);
@@ -43,7 +41,7 @@ pub trait ExecutionAdapter<K, V> {
     fn on_unregister(&self, callback: Box<OnUnregisterCallback>);
 
     /// The on_done callback fires whenever a `TransactionPair` has been executed.
-    fn on_done(&self, callback: Box<OnDoneCallback<K, V>>);
+    fn on_done(&self, callback: Box<OnDoneCallback>);
 
     /// Execute the transaction and provide an callback that handles the result.
     ///
@@ -57,4 +55,31 @@ pub trait ExecutionAdapter<K, V> {
 pub struct TransactionFamily {
     family_name: String,
     family_version: String,
+}
+
+/// An `InvalidTransaction` has information about why the transaction failed.
+#[derive(Debug, Clone)]
+pub struct InvalidTransaction {
+    /// human readable reason for why the transaction was invalid.
+    pub error_message: String,
+    /// Transaction specific data that is returned to the client
+    /// who submitted the Transaction.
+    pub error_data: Vec<u8>,
+}
+
+/// The outcome of a transaction's execution.
+///
+/// A `TransactionStatus` covers the possible outcomes that can occur during a
+/// transaction's execution.
+#[derive(Debug, Clone)]
+pub enum TransactionStatus {
+    Invalid(InvalidTransaction),
+    Valid,
+}
+
+/// The `ExecutionResult` provides the status for a given transaction.
+#[derive(Debug, Clone)]
+pub struct ExecutionResult {
+    pub transaction_id: String,
+    pub status: TransactionStatus,
 }

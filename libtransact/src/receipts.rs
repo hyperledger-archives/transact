@@ -14,16 +14,8 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-//! The `receipts` module contains structs that supply information on the
-//! outcomes of transaction processing.  They supply information on the success
-//! or failure of the transactions, and changes that may be applied to state.
-//!
-//! The `TransactionProcessingResult` and `BatchProcessingResult` have information
-//! about the processing of transactions and batches.
-//!
-//! These results are not related to `std::result::Result`, in that they do not
-//! represent issues that have resulted from aborted control flow but the
-//! expected status of a transaction's result.
+//! The `receipts` module contains structs that supply information on the processing
+//! of `Transaction`s
 
 use super::protos;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
@@ -105,16 +97,6 @@ impl FromNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::S
 
 impl IntoProto<protos::transaction_receipt::StateChange> for StateChange<String, Vec<u8>> {}
 impl IntoNative<StateChange<String, Vec<u8>>> for protos::transaction_receipt::StateChange {}
-
-/// An `InvalidTransaction` has information about why the transaction failed.
-#[derive(Debug, Clone)]
-pub struct InvalidTransaction {
-    /// human readable reason for why the transaction was invalid.
-    pub error_message: String,
-    /// Transaction specific data that is returned to the client
-    /// who submitted the Transaction.
-    pub error_data: Vec<u8>,
-}
 
 /// A `TransactionReceipt` has the state changes associated with a valid transaction.
 #[derive(Debug, Clone)]
@@ -398,81 +380,6 @@ where
             data: self.data,
             transaction_id,
         })
-    }
-}
-/// The outcome of a transaction's execution.
-///
-/// A `TransactionStatus` covers the possible outcomes that can occur during a
-/// transaction's execution.
-#[derive(Debug)]
-pub enum TransactionStatus<K, V> {
-    Invalid(InvalidTransaction),
-    Valid(TransactionReceipt<K, V>),
-}
-
-impl<K, V> Clone for TransactionStatus<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        match self {
-            TransactionStatus::Invalid(invalid_transaction) => {
-                TransactionStatus::Invalid(InvalidTransaction {
-                    error_message: invalid_transaction.error_message.clone(),
-                    error_data: invalid_transaction.error_data.clone(),
-                })
-            }
-            TransactionStatus::Valid(transaction_receipt) => {
-                TransactionStatus::Valid(TransactionReceipt {
-                    state_changes: transaction_receipt.state_changes.clone(),
-                    events: transaction_receipt.events.clone(),
-                    data: transaction_receipt.data.clone(),
-                    transaction_id: transaction_receipt.transaction_id.clone(),
-                })
-            }
-        }
-    }
-}
-
-/// The `TransactionProcessingResult` provides the status for a given transaction.
-#[derive(Debug)]
-pub struct TransactionProcessingResult<K, V> {
-    pub transaction_id: Vec<u8>,
-    pub status: TransactionStatus<K, V>,
-}
-
-impl<K, V> Clone for TransactionProcessingResult<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            transaction_id: self.transaction_id.clone(),
-            status: self.status.clone(),
-        }
-    }
-}
-
-/// A collection of `TransactionProcessingResult`s for transactions that are considered an
-/// atomic unit of work.
-#[derive(Debug)]
-pub struct BatchProcessingResult<K, V> {
-    pub batch_id: Vec<u8>,
-    pub transaction_results: Vec<TransactionProcessingResult<K, V>>,
-}
-
-impl<K, V> Clone for BatchProcessingResult<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
-    fn clone(&self) -> Self {
-        Self {
-            batch_id: self.batch_id.clone(),
-            transaction_results: self.transaction_results.clone(),
-        }
     }
 }
 
