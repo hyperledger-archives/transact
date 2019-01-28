@@ -14,6 +14,7 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+pub mod tree;
 
 use crate::context::ContextId;
 use crate::execution::adapter::ExecutionResult;
