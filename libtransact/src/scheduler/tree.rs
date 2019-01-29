@@ -246,3 +246,169 @@ impl<T: Clone> RadixTree<T> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tree_creation() {
+        let tree: RadixTree<i32> = RadixTree::new();
+        assert_eq!(tree.root.borrow().children.len(), 0);
+        assert_eq!(tree.root.borrow().address, "".to_string());
+    }
+
+    #[test]
+    fn tree_insert_children() {
+        // R
+        //  A
+        //   D
+        //    I
+        //     S
+        //      H
+        //     X
+        //    O
+        //     N
+        let tree: RadixTree<i32> = RadixTree::new();
+        tree.get_or_create("radix");
+        tree.get_or_create("radish");
+        tree.get_or_create("radon");
+
+        assert_eq!(tree.root.borrow().children.len(), 1);
+
+        let found_node_rad = tree.get_or_create("rad");
+        assert_eq!(found_node_rad.borrow().address, "rad".to_string());
+        assert_eq!(found_node_rad.borrow().children.len(), 2);
+
+        let found_node_radi = tree.get_or_create("radi");
+        assert_eq!(found_node_radi.borrow().address, "radi".to_string());
+        assert_eq!(found_node_radi.borrow().children.len(), 2);
+
+        let found_node_radix = tree.get_or_create("radix");
+        assert_eq!(found_node_radix.borrow().address, "radix".to_string());
+        assert_eq!(found_node_radix.borrow().children.len(), 0);
+
+        let found_node_radish = tree.get_or_create("radish");
+        assert_eq!(found_node_radish.borrow().address, "radish".to_string());
+        assert_eq!(found_node_radish.borrow().children.len(), 0);
+
+        let found_node_radon = tree.get_or_create("radon");
+        assert_eq!(found_node_radon.borrow().address, "radon".to_string());
+        assert_eq!(found_node_radon.borrow().children.len(), 0);
+    }
+
+    #[test]
+    fn tree_walk_to_address() {
+        // R
+        //  A
+        //   D
+        //    I
+        //     S
+        //      H
+        //     X
+        //    O
+        //     N
+        let tree: RadixTree<i32> = RadixTree::new();
+        tree.get_or_create("radix");
+        tree.get_or_create("radish");
+        tree.get_or_create("radon");
+
+        let walk_to_results_rad = tree.walk_to_address("rad");
+        assert_eq!(walk_to_results_rad.len(), 2);
+
+        let walk_to_results_radon = tree.walk_to_address("radon");
+        assert_eq!(walk_to_results_radon.len(), 3);
+
+        let walk_to_results_radix = tree.walk_to_address("radix");
+        assert_eq!(walk_to_results_radix.len(), 4);
+    }
+
+    #[test]
+    fn tree_walk() {
+        // R
+        //  A
+        //   D
+        //    I
+        //     S
+        //      H
+        //     X
+        //    O
+        //     N
+        let tree: RadixTree<i32> = RadixTree::new();
+        tree.get_or_create("radix");
+        tree.get_or_create("radish");
+        tree.get_or_create("radon");
+
+        let walk_results_radix = tree.walk("radix");
+        assert_eq!(walk_results_radix.len(), 4);
+        assert!(walk_results_radix.contains(&("radix".to_string(), None)));
+
+        let walk_results_rad = tree.walk("rad");
+        assert_eq!(walk_results_rad.len(), 6);
+        assert!(walk_results_rad.contains(&("rad".to_string(), None)));
+    }
+
+    fn update_data(data: Option<i32>) -> Option<i32> {
+        if data.is_none() {
+            return Some(1);
+        } else {
+            return Some(data.unwrap() + 1);
+        }
+    }
+
+    #[test]
+    fn tree_node_update() {
+        // R
+        //  A
+        //   D
+        //    I
+        //     S
+        //      H
+        //     X
+        //    O
+        //     N
+        let tree: RadixTree<i32> = RadixTree::new();
+        tree.get_or_create("radix");
+        tree.get_or_create("radish");
+        tree.get_or_create("radon");
+
+        tree.update("radix", &update_data, false);
+        let updated_node = tree.get_or_create("radix");
+        assert_eq!(updated_node.borrow().data, Some(1));
+        tree.update("radix", &update_data, false);
+        assert_eq!(updated_node.borrow().data, Some(2));
+    }
+
+    #[test]
+    fn tree_prune() {
+        // R
+        //  A
+        //   D
+        //    I
+        //     S
+        //      H
+        //     X
+        //    O
+        //     N
+        let tree: RadixTree<i32> = RadixTree::new();
+        tree.get_or_create("radix");
+        tree.get_or_create("radish");
+        tree.get_or_create("radon");
+
+        tree.prune("rad");
+        let parent_node = tree.get_or_create("rad");
+        let mut parent_node_walk = tree.walk("rad");
+
+        assert_eq!(parent_node.borrow().children.len(), 0);
+        assert!(!parent_node_walk.contains(&("radi".to_string(), None)));
+        assert!(parent_node_walk.contains(&("rad".to_string(), None)));
+
+        tree.get_or_create("radish");
+        tree.get_or_create("radix");
+        parent_node_walk = tree.walk("rad");
+
+        assert_eq!(parent_node.borrow().children.len(), 1);
+        assert!(parent_node_walk.contains(&("radix".to_string(), None)));
+        assert!(parent_node_walk.contains(&("radish".to_string(), None)));
+    }
+}
