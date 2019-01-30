@@ -17,6 +17,10 @@
 
 use crate::protos::merkle;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use protobuf::Message;
+
+use super::merkle_error::StateDatabaseError;
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Successor {
     pub successor: Vec<u8>,
@@ -43,10 +47,20 @@ impl FromNative<Successor> for merkle::ChangeLogEntry_Successor {
     }
 }
 
+impl Successor {
+    fn to_bytes(&self) -> Result<Vec<u8>, StateDatabaseError> {
+        Ok(self.clone().into_proto()?.write_to_bytes()?)
+    }
+
+    fn from_bytes(bytes: &[u8]) -> Result<Successor, StateDatabaseError> {
+        Ok(Successor::from_proto(protobuf::parse_from_bytes(bytes)?)?)
+    }
+}
+
 impl IntoProto<merkle::ChangeLogEntry_Successor> for Successor {}
 impl IntoNative<Successor> for merkle::ChangeLogEntry_Successor {}
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ChangeLogEntry {
     pub parent: Vec<u8>,
     pub additions: Vec<Vec<u8>>,
