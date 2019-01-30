@@ -103,6 +103,18 @@ impl FromNative<ChangeLogEntry> for merkle::ChangeLogEntry {
 impl IntoProto<merkle::ChangeLogEntry> for ChangeLogEntry {}
 impl IntoNative<ChangeLogEntry> for merkle::ChangeLogEntry {}
 
+impl ChangeLogEntry {
+    pub fn to_bytes(&self) -> Result<Vec<u8>, StateDatabaseError> {
+        Ok(self.clone().into_proto()?.write_to_bytes()?)
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Result<ChangeLogEntry, StateDatabaseError> {
+        Ok(ChangeLogEntry::from_proto(protobuf::parse_from_bytes(
+            bytes,
+        )?)?)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -177,6 +189,33 @@ mod tests {
                 deletions: vec!(BYTES2.to_vec(), BYTES3.to_vec()),
             }),
             change_log_entry.successors
+        )
+    }
+    #[test]
+    fn change_log_entry_roundtrip() {
+        let entry_before = ChangeLogEntry {
+            parent: BYTES1.to_vec(),
+            additions: vec![BYTES2.to_vec(), BYTES3.to_vec()],
+            successors: vec![Successor {
+                successor: BYTES1.to_vec(),
+                deletions: vec![BYTES2.to_vec(), BYTES3.to_vec()],
+            }],
+        };
+
+        let bytes = entry_before
+            .to_bytes()
+            .expect("Failed to serialize entry into bytes");
+        let entry_afer =
+            ChangeLogEntry::from_bytes(&bytes).expect("Failed to desearialize entry from bytes");
+
+        assert_eq!(BYTES1.to_vec(), entry_afer.parent);
+        assert_eq!(vec!(BYTES2.to_vec(), BYTES3.to_vec()), entry_afer.additions);
+        assert_eq!(
+            vec!(Successor {
+                successor: BYTES1.to_vec(),
+                deletions: vec!(BYTES2.to_vec(), BYTES3.to_vec()),
+            }),
+            entry_afer.successors
         )
     }
 }

@@ -17,6 +17,7 @@
 use std::error::Error;
 use std::fmt;
 
+use crate::protos::ProtoConversionError;
 use cbor::decoder::DecodeError;
 use cbor::encoder::EncodeError;
 use protobuf::ProtobufError;
@@ -33,6 +34,7 @@ pub enum StateDatabaseError {
     InvalidHash(String),
     InvalidChangeLogIndex(String),
     DatabaseError(DatabaseError),
+    ProtobufConversionError(ProtoConversionError),
     UnknownError,
 }
 
@@ -59,6 +61,9 @@ impl fmt::Display for StateDatabaseError {
             StateDatabaseError::DatabaseError(ref err) => {
                 write!(f, "A database error occurred: {}", err)
             }
+            StateDatabaseError::ProtobufConversionError(ref err) => {
+                write!(f, "A protobuf conversion error occurred: {}", err)
+            }
             StateDatabaseError::UnknownError => write!(f, "An unknown error occurred"),
         }
     }
@@ -75,6 +80,7 @@ impl Error for StateDatabaseError {
             StateDatabaseError::InvalidHash(ref msg) => &msg,
             StateDatabaseError::InvalidChangeLogIndex(ref msg) => &msg,
             StateDatabaseError::DatabaseError(ref err) => err.description(),
+            StateDatabaseError::ProtobufConversionError(ref err) => err.description(),
             StateDatabaseError::UnknownError => "Unknown Error",
         }
     }
@@ -89,6 +95,7 @@ impl Error for StateDatabaseError {
             StateDatabaseError::InvalidHash(_) => None,
             StateDatabaseError::InvalidChangeLogIndex(_) => None,
             StateDatabaseError::DatabaseError(ref err) => Some(err),
+            StateDatabaseError::ProtobufConversionError(ref err) => Some(err),
             StateDatabaseError::UnknownError => None,
         }
     }
@@ -123,5 +130,11 @@ impl From<ProtobufError> for StateDatabaseError {
                 StateDatabaseError::ChangeLogEncodingError(err.to_string())
             }
         }
+    }
+}
+
+impl From<ProtoConversionError> for StateDatabaseError {
+    fn from(err: ProtoConversionError) -> Self {
+        StateDatabaseError::ProtobufConversionError(err)
     }
 }
