@@ -165,7 +165,7 @@ list. A smart permission list contains one field:
 Addressing
 ----------
 
-Sabre objects are stored under 3 namespaces:
+Sabre objects are stored under 4 namespaces:
 
   - ``00ec00``: Namespace for NamespaceRegistry
   - ``00ec01``: Namespace for ContractRegistry
@@ -386,7 +386,7 @@ Create a contract registry with no version.
     repeated string owners = 2;
   }
 
-If the contract registry for the provided contract name already exists, the
+If the contract registry for the provided contract name already exists, then
 the transaction is invalid.
 
 Only those whose public keys are stored in ``sawtooth.swa.administrators`` are
@@ -612,7 +612,7 @@ The outputs for DeleteNamespaceRegistryPermissionAction must include:
 * the address for the namespace registry
 
 CreateSmartPermissionAction
---------------------------
+---------------------------
 
 This operation loads a smart permission into Global State.  The
 bytes provided are compiled smart permission code.  org_id is the Organization
