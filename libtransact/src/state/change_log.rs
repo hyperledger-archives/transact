@@ -45,9 +45,54 @@ impl FromNative<Successor> for merkle::ChangeLogEntry_Successor {
 
 impl IntoProto<merkle::ChangeLogEntry_Successor> for Successor {}
 impl IntoNative<Successor> for merkle::ChangeLogEntry_Successor {}
+
+#[derive(Debug)]
+pub struct ChangeLogEntry {
+    pub parent: Vec<u8>,
+    pub additions: Vec<Vec<u8>>,
+    pub successors: Vec<Successor>,
+}
+
+impl FromProto<merkle::ChangeLogEntry> for ChangeLogEntry {
+    fn from_proto(change_log_entry: merkle::ChangeLogEntry) -> Result<Self, ProtoConversionError> {
+        Ok(ChangeLogEntry {
+            parent: change_log_entry.get_parent().to_vec(),
+            additions: change_log_entry.get_additions().to_vec(),
+            successors: change_log_entry
+                .get_successors()
+                .to_vec()
+                .into_iter()
+                .map(Successor::from_proto)
+                .collect::<Result<Vec<Successor>, ProtoConversionError>>()?,
+        })
+    }
+}
+
+impl FromNative<ChangeLogEntry> for merkle::ChangeLogEntry {
+    fn from_native(change_log_entry: ChangeLogEntry) -> Result<Self, ProtoConversionError> {
+        let mut proto_change_log_entry = merkle::ChangeLogEntry::new();
+        proto_change_log_entry.set_parent(change_log_entry.parent);
+        proto_change_log_entry.set_additions(protobuf::RepeatedField::from_vec(
+            change_log_entry.additions,
+        ));
+        proto_change_log_entry.set_successors(protobuf::RepeatedField::from_vec(
+            change_log_entry
+                .successors
+                .into_iter()
+                .map(merkle::ChangeLogEntry_Successor::from_native)
+                .collect::<Result<Vec<merkle::ChangeLogEntry_Successor>, ProtoConversionError>>()?,
+        ));
+        Ok(proto_change_log_entry)
+    }
+}
+
+impl IntoProto<merkle::ChangeLogEntry> for ChangeLogEntry {}
+impl IntoNative<ChangeLogEntry> for merkle::ChangeLogEntry {}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::protos;
     use sawtooth_sdk;
 
     static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
@@ -62,5 +107,62 @@ mod tests {
         };
         assert_eq!(BYTES1.to_vec(), successor.successor);
         assert_eq!(vec!(BYTES2.to_vec(), BYTES3.to_vec()), successor.deletions);
+    }
+
+    #[test]
+    fn change_log_entry_fields() {
+        let entry = ChangeLogEntry {
+            parent: BYTES1.to_vec(),
+            additions: vec![BYTES2.to_vec(), BYTES3.to_vec()],
+            successors: vec![Successor {
+                successor: BYTES1.to_vec(),
+                deletions: vec![BYTES2.to_vec(), BYTES3.to_vec()],
+            }],
+        };
+        assert_eq!(BYTES1.to_vec(), entry.parent);
+        assert_eq!(vec!(BYTES2.to_vec(), BYTES3.to_vec()), entry.additions);
+        assert_eq!(
+            vec!(Successor {
+                successor: BYTES1.to_vec(),
+                deletions: vec!(BYTES2.to_vec(), BYTES3.to_vec()),
+            }),
+            entry.successors
+        )
+    }
+
+    #[test]
+    fn change_log_entry_receipt_sawtooth10_compatibility() {
+        let mut proto_entry = sawtooth_sdk::messages::merkle::ChangeLogEntry::new();
+        let mut proto_successor = sawtooth_sdk::messages::merkle::ChangeLogEntry_Successor::new();
+        proto_successor.set_successor(BYTES1.to_vec());
+        proto_successor.set_deletions(protobuf::RepeatedField::from_vec(vec![
+            BYTES2.to_vec(),
+            BYTES3.to_vec(),
+        ]));
+        proto_entry.set_parent(BYTES1.to_vec());
+        proto_entry.set_additions(protobuf::RepeatedField::from_vec(vec![
+            BYTES2.to_vec(),
+            BYTES3.to_vec(),
+        ]));
+        proto_entry.set_successors(protobuf::RepeatedField::from_vec(vec![proto_successor]));
+
+        let entry_bytes = protobuf::Message::write_to_bytes(&proto_entry).unwrap();
+
+        let proto: protos::merkle::ChangeLogEntry =
+            protobuf::parse_from_bytes(&entry_bytes).unwrap();
+
+        let change_log_entry: ChangeLogEntry = proto.into_native().unwrap();
+        assert_eq!(BYTES1.to_vec(), change_log_entry.parent);
+        assert_eq!(
+            vec!(BYTES2.to_vec(), BYTES3.to_vec()),
+            change_log_entry.additions
+        );
+        assert_eq!(
+            vec!(Successor {
+                successor: BYTES1.to_vec(),
+                deletions: vec!(BYTES2.to_vec(), BYTES3.to_vec()),
+            }),
+            change_log_entry.successors
+        )
     }
 }
