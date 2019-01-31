@@ -89,6 +89,37 @@ impl Write for MerkleDatabase {
     }
 }
 
+impl Read for MerkleDatabase {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn get(
+        &self,
+        state_id: &Self::StateId,
+        keys: &[Self::Key],
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
+        self.set_merkle_root(state_id.to_string())
+            .map_err(|err| match err {
+                StateDatabaseError::NotFound(msg) => StateReadError::InvalidStateId(msg),
+                _ => StateReadError::StorageError(Box::new(err)),
+            })?;
+        keys.iter().try_fold(HashMap::new(), |mut result, key| {
+            let value = match self.get_by_address(key) {
+                Ok(value) => Ok(value.value),
+                Err(err) => match err {
+                    StateDatabaseError::NotFound(_) => Ok(None),
+                    _ => Err(StateReadError::StorageError(Box::new(err))),
+                },
+            }?;
+            if value.is_some() {
+                result.insert(key.to_string(), value.unwrap());
+            }
+            Ok(result)
+        })
+    }
+}
+
 impl MerkleDatabase {
     /// Constructs a new MerkleDatabase, backed by a given Database
     ///
