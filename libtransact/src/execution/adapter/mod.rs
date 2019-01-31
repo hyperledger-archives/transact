@@ -51,10 +51,26 @@ pub trait ExecutionAdapter {
     fn execute(&self, transaction_pair: TransactionPair, context_id: ContextId);
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Hash, Clone)]
 pub struct TransactionFamily {
     family_name: String,
     family_version: String,
+}
+
+impl TransactionFamily {
+    pub fn new(family_name: String, family_version: String) -> Self {
+        TransactionFamily {
+            family_name,
+            family_version,
+        }
+    }
+
+    pub fn from_pair(transaction_pair: &TransactionPair) -> Self {
+        Self::new(
+            transaction_pair.header().family_name().to_string(),
+            transaction_pair.header().family_version().to_string(),
+        )
+    }
 }
 
 /// An `InvalidTransaction` has information about why the transaction failed.

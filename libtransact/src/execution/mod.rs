@@ -16,7 +16,7 @@
  */
 
 //! Contains components that are used to directly execute a `Transaction`
-//! and return a `receipts::TransactionProcessingResult`.
-//!
+//! and return a `execution::adapter::ExecutionResult`.
 
 pub mod adapter;
+pub mod executor_internal;
