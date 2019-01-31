@@ -1361,28 +1361,44 @@ mod tests {
     fn merkle_trie_pruning_parent() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
-            let mut updates: HashMap<String, Vec<u8>> = HashMap::with_capacity(3);
-            updates.insert("ab0000".to_string(), "0001".as_bytes().to_vec());
-            updates.insert("ab0a01".to_string(), "0002".as_bytes().to_vec());
-            updates.insert("abff00".to_string(), "0003".as_bytes().to_vec());
+            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "0002".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff00".to_string(),
+                value: "0003".as_bytes().to_vec(),
+            });
 
             let parent_root = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
             merkle_db.set_merkle_root(parent_root.clone()).unwrap();
 
             let parent_root_bytes = ::hex::decode(parent_root.clone()).expect("Proper hex");
             // check that we have a change log entry for the new root
             let mut parent_change_log = expect_change_log(&db, &parent_root_bytes);
-            assert!(parent_change_log.get_successors().is_empty());
+            assert!(parent_change_log.successors.is_empty());
 
             assert_value_at_address(&merkle_db, "ab0000", "0001");
             assert_value_at_address(&merkle_db, "ab0a01", "0002");
             assert_value_at_address(&merkle_db, "abff00", "0003");
 
             let successor_root = merkle_db
-                .set("ab0000", "test".as_bytes())
+                .commit(
+                    &parent_root,
+                    &[StateChange::Set {
+                        key: "ab0000".to_string(),
+                        value: "test".as_bytes().to_vec(),
+                    }],
+                )
                 .expect("Set failed to work");
             let successor_root_bytes = ::hex::decode(successor_root.clone()).expect("proper hex");
 
@@ -1391,31 +1407,34 @@ mod tests {
             let successor_change_log = expect_change_log(&db, &successor_root_bytes);
 
             assert_has_successors(&parent_change_log, &[&successor_root_bytes]);
-            assert_eq!(parent_root_bytes, successor_change_log.get_parent());
+            assert_eq!(parent_root_bytes, successor_change_log.parent);
 
             merkle_db
                 .set_merkle_root(successor_root)
                 .expect("Unable to apply the new merkle root");
             assert_eq!(
                 parent_change_log
-                    .get_successors()
+                    .successors
                     .first()
                     .unwrap()
-                    .get_deletions()
+                    .deletions
                     .len(),
-                MerkleDatabase::prune(&db, &parent_root)
+                merkle_db
+                    .prune(vec!(parent_root.clone()))
                     .expect("Prune should have no errors")
                     .len()
             );
 
             let reader = db.reader().unwrap();
             for addition in parent_change_log
-                .get_successors()
+                .successors
+                .clone()
                 .first()
                 .unwrap()
-                .get_deletions()
+                .deletions
+                .clone()
             {
-                assert!(reader.get(addition).is_none());
+                assert!(reader.get(&addition).is_none());
             }
 
             assert!(reader
@@ -1426,7 +1445,6 @@ mod tests {
             assert!(merkle_db.set_merkle_root(parent_root).is_err());
         })
     }
-
     #[test]
     /// This test creates a merkle trie with multiple entries and produces two
     /// distinct successor tries from that first.
@@ -1440,14 +1458,24 @@ mod tests {
     fn merkle_trie_pruinng_successors() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
-            let mut updates: HashMap<String, Vec<u8>> = HashMap::with_capacity(3);
-            updates.insert("ab0000".to_string(), "0001".as_bytes().to_vec());
-            updates.insert("ab0a01".to_string(), "0002".as_bytes().to_vec());
-            updates.insert("abff00".to_string(), "0003".as_bytes().to_vec());
+            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "0002".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff00".to_string(),
+                value: "0003".as_bytes().to_vec(),
+            });
 
             let parent_root = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
             let parent_root_bytes = ::hex::decode(parent_root.clone()).expect("Proper hex");
 
@@ -1457,14 +1485,28 @@ mod tests {
             assert_value_at_address(&merkle_db, "abff00", "0003");
 
             let successor_root_left = merkle_db
-                .set("ab0000", "left".as_bytes())
+                .commit(
+                    &parent_root,
+                    &[StateChange::Set {
+                        key: "ab0000".to_string(),
+                        value: "left".as_bytes().to_vec(),
+                    }],
+                )
                 .expect("Set failed to work");
+
             let successor_root_left_bytes =
                 ::hex::decode(successor_root_left.clone()).expect("proper hex");
 
             let successor_root_right = merkle_db
-                .set("ab0a01", "right".as_bytes())
+                .commit(
+                    &parent_root,
+                    &[StateChange::Set {
+                        key: "ab0a01".to_string(),
+                        value: "right".as_bytes().to_vec(),
+                    }],
+                )
                 .expect("Set failed to work");
+
             let successor_root_right_bytes =
                 ::hex::decode(successor_root_right.clone()).expect("proper hex");
 
@@ -1480,8 +1522,9 @@ mod tests {
             // Let's prune the left successor:
 
             assert_eq!(
-                successor_left_change_log.get_additions().len(),
-                MerkleDatabase::prune(&db, &successor_root_left)
+                successor_left_change_log.additions.len(),
+                merkle_db
+                    .prune(vec!(successor_root_left.clone()))
                     .expect("Prune should have no errors")
                     .len()
             );
@@ -1501,30 +1544,40 @@ mod tests {
     fn merkle_trie_pruning_duplicate_leaves() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
-            let updates: HashMap<String, Vec<u8>> = vec![
-                ("ab0000".to_string(), "0001".as_bytes().to_vec()),
-                ("ab0001".to_string(), "0002".as_bytes().to_vec()),
-                ("ab0002".to_string(), "0003".as_bytes().to_vec()),
-            ]
-            .into_iter()
-            .collect();
+            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "0002".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff00".to_string(),
+                value: "0003".as_bytes().to_vec(),
+            });
 
             let parent_root = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
             let parent_root_bytes = ::hex::decode(parent_root.clone()).expect("Proper hex");
 
             // create the middle root
             merkle_db.set_merkle_root(parent_root.clone()).unwrap();
-            let updates: HashMap<String, Vec<u8>> = vec![
-                ("ab0000".to_string(), "change0".as_bytes().to_vec()),
-                ("ab0001".to_string(), "change1".as_bytes().to_vec()),
-            ]
-            .into_iter()
-            .collect();
+            updates.clear();
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "change0".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0001".to_string(),
+                value: "change1".as_bytes().to_vec(),
+            });
+
             let successor_root_middle = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
 
             // create the last root
@@ -1533,20 +1586,28 @@ mod tests {
                 .unwrap();
             // Set the value back to the original
             let successor_root_last = merkle_db
-                .set("ab0000", "0001".as_bytes())
+                .commit(
+                    &merkle_db.get_merkle_root(),
+                    &[StateChange::Set {
+                        key: "ab0000".to_string(),
+                        value: "0001".as_bytes().to_vec(),
+                    }],
+                )
                 .expect("Set failed to work");
 
             merkle_db.set_merkle_root(successor_root_last).unwrap();
             let parent_change_log = expect_change_log(&db, &parent_root_bytes);
             assert_eq!(
                 parent_change_log
-                    .get_successors()
+                    .successors
+                    .clone()
                     .first()
                     .unwrap()
-                    .get_deletions()
+                    .deletions
                     .len()
                     - 1,
-                MerkleDatabase::prune(&db, &parent_root)
+                merkle_db
+                    .prune(vec!(parent_root))
                     .expect("Prune should have no errors")
                     .len()
             );
@@ -1554,6 +1615,7 @@ mod tests {
             assert_value_at_address(&merkle_db, "ab0000", "0001");
         })
     }
+
     #[test]
     /// This test creates a merkle trie with multiple entries and produces a
     /// successor with duplicate That changes one new leaf, followed by a second
@@ -1562,29 +1624,39 @@ mod tests {
     fn merkle_trie_pruning_successor_duplicate_leaves() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
-            let updates: HashMap<String, Vec<u8>> = vec![
-                ("ab0000".to_string(), "0001".as_bytes().to_vec()),
-                ("ab0001".to_string(), "0002".as_bytes().to_vec()),
-                ("ab0002".to_string(), "0003".as_bytes().to_vec()),
-            ]
-            .into_iter()
-            .collect();
+            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "0002".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff00".to_string(),
+                value: "0003".as_bytes().to_vec(),
+            });
 
             let parent_root = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
 
             // create the middle root
             merkle_db.set_merkle_root(parent_root.clone()).unwrap();
-            let updates: HashMap<String, Vec<u8>> = vec![
-                ("ab0000".to_string(), "change0".as_bytes().to_vec()),
-                ("ab0001".to_string(), "change1".as_bytes().to_vec()),
-            ]
-            .into_iter()
-            .collect();
+            updates.clear();
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "change0".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0001".to_string(),
+                value: "change1".as_bytes().to_vec(),
+            });
             let successor_root_middle = merkle_db
-                .update(&updates, &[], false)
+                .commit(&merkle_db.get_merkle_root(), &updates)
                 .expect("Update failed to work");
 
             // create the last root
@@ -1593,7 +1665,13 @@ mod tests {
                 .unwrap();
             // Set the value back to the original
             let successor_root_last = merkle_db
-                .set("ab0000", "0001".as_bytes())
+                .commit(
+                    &merkle_db.get_merkle_root(),
+                    &[StateChange::Set {
+                        key: "ab0000".to_string(),
+                        value: "0001".as_bytes().to_vec(),
+                    }],
+                )
                 .expect("Set failed to work");
             let successor_root_bytes =
                 ::hex::decode(successor_root_last.clone()).expect("Proper hex");
@@ -1602,45 +1680,15 @@ mod tests {
             merkle_db.set_merkle_root(parent_root).unwrap();
             let last_change_log = expect_change_log(&db, &successor_root_bytes);
             assert_eq!(
-                last_change_log.get_additions().len() - 1,
-                MerkleDatabase::prune(&db, &successor_root_last)
+                last_change_log.additions.len() - 1,
+                merkle_db
+                    .prune(vec!(successor_root_last))
                     .expect("Prune should have no errors")
                     .len()
             );
 
             assert_value_at_address(&merkle_db, "ab0000", "0001");
         })
-    }
-
-    fn expect_change_log(db: &LmdbDatabase, root_hash: &[u8]) -> ChangeLogEntry {
-        let reader = db.reader().unwrap();
-        protobuf::parse_from_bytes(
-            &reader
-                .index_get(CHANGE_LOG_INDEX, root_hash)
-                .expect("No db errors")
-                .expect("A change log entry"),
-        )
-        .expect("The change log entry to have bytes")
-    }
-
-    fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]]) {
-        assert_eq!(successor_roots.len(), change_log.get_successors().len());
-        for successor_root in successor_roots {
-            let mut has_root = false;
-            for successor in change_log.get_successors() {
-                if &successor.get_successor() == successor_root {
-                    has_root = true;
-                    break;
-                }
-            }
-            if !has_root {
-                panic!(format!(
-                    "Root {} not found in change log {:?}",
-                    ::hex::encode(successor_root),
-                    change_log
-                ));
-            }
-        }
     }
 
     #[test]
@@ -1717,6 +1765,37 @@ mod tests {
             Ok(expected_value),
             from_utf8(&value.unwrap().get(address).unwrap())
         );
+    }
+
+    fn expect_change_log(db: &LmdbDatabase, root_hash: &[u8]) -> ChangeLogEntry {
+        let reader = db.reader().unwrap();
+        ChangeLogEntry::from_bytes(
+            &reader
+                .index_get(CHANGE_LOG_INDEX, root_hash)
+                .expect("No db errors")
+                .expect("A change log entry"),
+        )
+        .expect("The change log entry to have bytes")
+    }
+
+    fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]]) {
+        assert_eq!(successor_roots.len(), change_log.successors.len());
+        for successor_root in successor_roots {
+            let mut has_root = false;
+            for successor in change_log.successors.clone() {
+                if &successor.successor == successor_root {
+                    has_root = true;
+                    break;
+                }
+            }
+            if !has_root {
+                panic!(format!(
+                    "Root {} not found in change log {:?}",
+                    ::hex::encode(successor_root),
+                    change_log
+                ));
+            }
+        }
     }
 
     fn make_lmdb(merkle_path: &str) -> LmdbDatabase {
