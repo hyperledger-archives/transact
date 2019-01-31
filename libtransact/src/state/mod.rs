@@ -145,9 +145,9 @@ pub trait Prune: Sync + Send + Clone {
     ///
     /// # Errors
     ///
-    /// StateWriteError is returned if any issues occur while trying to
+    /// StatePruneError is returned if any issues occur while trying to
     /// prune past results.
-    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateWriteError>;
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError>;
 }
 
 /// `state::Read` provides a way to retrieve state from a particular storage
