@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Intel Corporation
+ * Copyright 2019 Bitwise IO, Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,34 +17,26 @@
  */
 
 use std::collections::BTreeMap;
-use std::collections::HashMap;
-use std::collections::HashSet;
-use std::collections::VecDeque;
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Cursor;
 
 use cbor;
 use cbor::decoder::GenericDecoder;
 use cbor::encoder::GenericEncoder;
-use cbor::value::Bytes;
-use cbor::value::Key;
-use cbor::value::Text;
-use cbor::value::Value;
+use cbor::value::{Bytes, Key, Text, Value};
 
 use openssl;
 
-use protobuf;
-use protobuf::Message;
+use std::sync::{Arc, Mutex};
 
 use crate::database::error::DatabaseError;
-use crate::database::lmdb::DatabaseReader;
-use crate::database::lmdb::LmdbDatabase;
-use crate::database::lmdb::LmdbDatabaseWriter;
+use crate::database::lmdb::{DatabaseReader, LmdbDatabase, LmdbDatabaseWriter};
 
-use crate::protos::merkle::ChangeLogEntry;
-use crate::protos::merkle::ChangeLogEntry_Successor;
+use super::change_log::{ChangeLogEntry, Successor};
+use super::error::{StateReadError, StateWriteError};
+use super::{Read, StateChange, Write};
 
-use crate::state::merkle_error::StateDatabaseError;
-use crate::state::{StateIter, StateReader};
+use super::merkle_error::StateDatabaseError;
 
 const TOKEN_SIZE: usize = 2;
 
@@ -51,14 +44,49 @@ pub const CHANGE_LOG_INDEX: &str = "change_log";
 pub const DUPLICATE_LOG_INDEX: &str = "duplicate_log";
 pub const INDEXES: [&str; 2] = [CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX];
 
+type StateIter = Iterator<Item = Result<(String, Vec<u8>), StateDatabaseError>>;
 type StateHash = Vec<u8>;
 
 /// Merkle Database
 #[derive(Clone)]
 pub struct MerkleDatabase {
-    root_hash: String,
+    root_hash: Arc<Mutex<String>>,
     db: LmdbDatabase,
-    root_node: Node,
+    root_node: Arc<Mutex<Node>>,
+}
+
+impl Write for MerkleDatabase {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn commit(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange<Self::Key, Self::Value>],
+    ) -> Result<Self::StateId, StateWriteError> {
+        self.set_merkle_root(state_id.to_string())
+            .map_err(|err| match err {
+                StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
+                _ => StateWriteError::StorageError(Box::new(err)),
+            })?;
+        self.update(state_changes, false)
+            .map_err(|err| StateWriteError::StorageError(Box::new(err)))
+    }
+
+    fn compute_state_id(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange<Self::Key, Self::Value>],
+    ) -> Result<Self::StateId, StateWriteError> {
+        self.set_merkle_root(state_id.to_string())
+            .map_err(|err| match err {
+                StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
+                _ => StateWriteError::StorageError(Box::new(err)),
+            })?;
+        self.update(state_changes, true)
+            .map_err(|err| StateWriteError::StorageError(Box::new(err)))
+    }
 }
 
 impl MerkleDatabase {
@@ -70,144 +98,127 @@ impl MerkleDatabase {
         let root_node = get_node_by_hash(&db, &root_hash)?;
 
         Ok(MerkleDatabase {
-            root_hash,
-            root_node,
+            root_hash: Arc::new(Mutex::new(root_hash)),
+            root_node: Arc::new(Mutex::new(root_node)),
             db,
         })
     }
 
-    /// Prunes nodes that are no longer needed under a given state root
-    /// Returns a list of addresses that were deleted
-    pub fn prune(db: &LmdbDatabase, merkle_root: &str) -> Result<Vec<String>, StateDatabaseError> {
-        let root_bytes = ::hex::decode(merkle_root).map_err(|_| {
-            StateDatabaseError::InvalidHash(format!("{} is not a valid hash", merkle_root))
-        })?;
-        let mut db_writer = db.writer()?;
-        let change_log = get_change_log(&db_writer, &root_bytes)?;
+/// Prunes nodes that are no longer needed under a given state root
+/// Returns a list of addresses that were deleted
+pub fn prune(db: &LmdbDatabase, merkle_root: &str) -> Result<Vec<String>, StateDatabaseError> {
+    let root_bytes = ::hex::decode(merkle_root).map_err(|_| {
+        StateDatabaseError::InvalidHash(format!("{} is not a valid hash", merkle_root))
+    })?;
+    let mut db_writer = db.writer()?;
+    let change_log = get_change_log(&db_writer, &root_bytes)?;
 
-        if change_log.is_none() {
-            // There's no change log for this entry
-            return Ok(vec![]);
+    if change_log.is_none() {
+        // There's no change log for this entry
+        return Ok(vec![]);
+    }
+
+    let mut change_log = change_log.unwrap();
+    let removed_addresses = if change_log.get_successors().len() > 1 {
+        // Currently, we don't clean up a parent with multiple successors
+        vec![]
+    } else if change_log.get_successors().is_empty() {
+        // deleting the tip of a trie lineage
+
+        let (deletion_candidates, duplicates) = MerkleDatabase::remove_duplicate_hashes(
+            &mut db_writer,
+            change_log.take_additions(),
+        )?;
+
+        for hash in &deletion_candidates {
+            let hash_hex = ::hex::encode(hash);
+            delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
         }
 
-        let mut change_log = change_log.unwrap();
-        let removed_addresses = if change_log.get_successors().len() > 1 {
-            // Currently, we don't clean up a parent with multiple successors
-            vec![]
-        } else if change_log.get_successors().is_empty() {
-            // deleting the tip of a trie lineage
+        for hash in &duplicates {
+            decrement_ref_count(&mut db_writer, hash)?;
+        }
 
-            let (deletion_candidates, duplicates) = MerkleDatabase::remove_duplicate_hashes(
+        db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
+        let parent_root_bytes = &change_log.get_parent();
+
+        if let Some(ref mut parent_change_log) =
+            get_change_log(&db_writer, parent_root_bytes)?.as_mut()
+        {
+            let successors = parent_change_log.take_successors();
+            let new_successors = successors
+                .into_iter()
+                .filter(|successor| root_bytes != successor.get_successor())
+                .collect::<Vec<_>>();
+            parent_change_log.set_successors(protobuf::RepeatedField::from_vec(new_successors));
+
+            write_change_log(&mut db_writer, parent_root_bytes, &parent_change_log)?;
+        }
+
+        deletion_candidates.into_iter().collect()
+    } else {
+        // deleting a parent
+        let mut successor = change_log.take_successors().pop().unwrap();
+
+        let (deletion_candidates, duplicates): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
+            MerkleDatabase::remove_duplicate_hashes(
                 &mut db_writer,
-                change_log.take_additions(),
+                successor.take_deletions(),
             )?;
 
-            for hash in &deletion_candidates {
-                let hash_hex = ::hex::encode(hash);
-                delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
-            }
+        for hash in &deletion_candidates {
+            let hash_hex = ::hex::encode(hash);
+            delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
+        }
 
-            for hash in &duplicates {
-                decrement_ref_count(&mut db_writer, hash)?;
-            }
+        for hash in &duplicates {
+            decrement_ref_count(&mut db_writer, hash)?;
+        }
 
-            db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
-            let parent_root_bytes = &change_log.get_parent();
+        db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
 
-            if let Some(ref mut parent_change_log) =
-                get_change_log(&db_writer, parent_root_bytes)?.as_mut()
-            {
-                let successors = parent_change_log.take_successors();
-                let new_successors = successors
-                    .into_iter()
-                    .filter(|successor| root_bytes != successor.get_successor())
-                    .collect::<Vec<_>>();
-                parent_change_log.set_successors(protobuf::RepeatedField::from_vec(new_successors));
+        deletion_candidates.into_iter().collect()
+    };
 
-                write_change_log(&mut db_writer, parent_root_bytes, &parent_change_log)?;
-            }
+    db_writer.commit()?;
+    Ok(removed_addresses.iter().map(::hex::encode).collect())
+}
 
-            deletion_candidates.into_iter().collect()
+fn remove_duplicate_hashes(
+    db_writer: &mut LmdbDatabaseWriter,
+    deletions: protobuf::RepeatedField<Vec<u8>>,
+) -> Result<(Vec<StateHash>, Vec<StateHash>), StateDatabaseError> {
+    Ok(deletions.into_iter().partition(|key| {
+        if let Ok(count) = get_ref_count(db_writer, &key) {
+            count == 0
         } else {
-            // deleting a parent
-            let mut successor = change_log.take_successors().pop().unwrap();
-
-            let (deletion_candidates, duplicates): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
-                MerkleDatabase::remove_duplicate_hashes(
-                    &mut db_writer,
-                    successor.take_deletions(),
-                )?;
-
-            for hash in &deletion_candidates {
-                let hash_hex = ::hex::encode(hash);
-                delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
-            }
-
-            for hash in &duplicates {
-                decrement_ref_count(&mut db_writer, hash)?;
-            }
-
-            db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
-
-            deletion_candidates.into_iter().collect()
-        };
-
-        db_writer.commit()?;
-        Ok(removed_addresses.iter().map(::hex::encode).collect())
-    }
-
-    fn remove_duplicate_hashes(
-        db_writer: &mut LmdbDatabaseWriter,
-        deletions: protobuf::RepeatedField<Vec<u8>>,
-    ) -> Result<(Vec<StateHash>, Vec<StateHash>), StateDatabaseError> {
-        Ok(deletions.into_iter().partition(|key| {
-            if let Ok(count) = get_ref_count(db_writer, &key) {
-                count == 0
-            } else {
-                false
-            }
-        }))
-    }
-
+            false
+        }
+    }))
+}
     /// Returns the current merkle root for this MerkleDatabase
     pub fn get_merkle_root(&self) -> String {
-        self.root_hash.clone()
+        self.root_hash
+            .lock()
+            .expect("Couldn't lock root_hash mutex!")
+            .clone()
     }
 
     /// Sets the current merkle root for this MerkleDatabase
     pub fn set_merkle_root<S: Into<String>>(
-        &mut self,
+        &self,
         merkle_root: S,
     ) -> Result<(), StateDatabaseError> {
         let new_root = merkle_root.into();
-        self.root_node = get_node_by_hash(&self.db, &new_root)?;
-        self.root_hash = new_root;
+        *self
+            .root_node
+            .lock()
+            .expect("Couldn't lock root_node mutex") = get_node_by_hash(&self.db, &new_root)?;
+        *self
+            .root_hash
+            .lock()
+            .expect("Couldn't lock root_hash mutex") = new_root;
         Ok(())
-    }
-
-    /// Sets the given data at the given address.
-    ///
-    /// Returns a Result with the new merkle root hash, or an error if the
-    /// address is not in the tree.
-    ///
-    /// Note, continued calls to get, without changing the merkle root to the
-    /// result of this function, will not retrieve the results provided here.
-    pub fn set(&self, address: &str, data: &[u8]) -> Result<String, StateDatabaseError> {
-        let mut updates = HashMap::with_capacity(1);
-        updates.insert(address.to_string(), data.to_vec());
-        self.update(&updates, &[], false)
-    }
-
-    /// Deletes the value at the given address.
-    ///
-    /// Returns a Result with the new merkle root hash, or an error if the
-    /// address is not in the tree.
-    ///
-    /// Note, continued calls to get, without changing the merkle root to the
-    /// result of this function, will still retrieve the data at the address
-    /// provided
-    pub fn delete(&self, address: &str) -> Result<String, StateDatabaseError> {
-        self.update(&HashMap::with_capacity(0), &[address.to_string()], false)
     }
 
     /// Updates the tree with multiple changes.  Applies both set and deletes,
@@ -219,8 +230,7 @@ impl MerkleDatabase {
     /// Returns a Result with the new root hash.
     pub fn update(
         &self,
-        set_items: &HashMap<String, Vec<u8>>,
-        delete_items: &[String],
+        state_changes: &[StateChange<String, Vec<u8>>],
         is_virtual: bool,
     ) -> Result<String, StateDatabaseError> {
         let mut path_map = HashMap::new();
@@ -228,30 +238,34 @@ impl MerkleDatabase {
         let mut deletions = HashSet::new();
         let mut additions = HashSet::new();
 
-        for (set_address, set_value) in set_items {
-            let tokens = tokenize_address(set_address);
-            let mut set_path_map = self.get_path_by_tokens(&tokens, false)?;
-
-            {
-                let node = set_path_map
-                    .get_mut(set_address)
-                    .expect("Path map not correctly generated");
-                node.value = Some(set_value.to_vec());
+        let mut delete_items = vec![];
+        for state_change in state_changes {
+            match state_change {
+                StateChange::Set { key, value } => {
+                    let tokens = tokenize_address(key);
+                    let mut set_path_map = self.get_path_by_tokens(&tokens, false)?;
+                    {
+                        let node = set_path_map
+                            .get_mut(key)
+                            .expect("Path map not correctly generated");
+                        node.value = Some(value.to_vec());
+                    }
+                    for pkey in set_path_map.keys() {
+                        additions.insert(pkey.clone());
+                    }
+                    path_map.extend(set_path_map);
+                }
+                StateChange::Delete { key } => {
+                    let tokens = tokenize_address(key);
+                    let del_path_map = self.get_path_by_tokens(&tokens, true)?;
+                    path_map.extend(del_path_map);
+                    delete_items.push(key);
+                }
             }
-            path_map.extend(set_path_map);
-        }
-        for pkey in path_map.keys() {
-            additions.insert(pkey.clone());
         }
 
         for del_address in delete_items.iter() {
-            let tokens = tokenize_address(del_address);
-            let del_path_map = self.get_path_by_tokens(&tokens, true)?;
-            path_map.extend(del_path_map);
-        }
-
-        for del_address in delete_items.iter() {
-            path_map.remove(del_address);
+            path_map.remove(*del_address);
             let (mut parent_address, mut path_branch) = parent_and_branch(del_address);
             while parent_address != "" {
                 let remove_parent = {
@@ -283,7 +297,7 @@ impl MerkleDatabase {
                 if parent_address == "" {
                     let parent_node = path_map
                         .get_mut(parent_address)
-                        .expect("Path map not correctly generated or entry is deleted");
+                        .expect("Path map not correctly generated");
 
                     if let Some(old_hash_key) = parent_node.children.remove(path_branch) {
                         deletions.insert(old_hash_key);
@@ -308,9 +322,9 @@ impl MerkleDatabase {
 
             if path != "" {
                 let (parent_address, path_branch) = parent_and_branch(&path);
-                let mut parent = path_map
+                let parent = path_map
                     .get_mut(parent_address)
-                    .expect("Path map not correctly generated or entry is deleted");
+                    .expect("Path map not correctly generated");
                 if let Some(old_hash_key) = parent
                     .children
                     .insert(path_branch.to_string(), ::hex::encode(hash_key.clone()))
@@ -344,7 +358,13 @@ impl MerkleDatabase {
         let mut db_writer = self.db.writer()?;
 
         // We expect this to be hex, since we generated it
-        let root_hash_bytes = ::hex::decode(&self.root_hash).expect("Improper hex");
+        let root_hash_bytes = ::hex::decode(
+            &*self
+                .root_hash
+                .lock()
+                .expect("Couldn't lock root_hash mutex"),
+        )
+        .expect("Improper hex");
 
         for &(ref key, ref value) in batch {
             match db_writer.put(::hex::encode(key).as_bytes(), &value) {
@@ -358,21 +378,21 @@ impl MerkleDatabase {
 
         let mut current_change_log = get_change_log(&db_writer, &root_hash_bytes)?;
         if let Some(change_log) = current_change_log.as_mut() {
-            let mut successors = change_log.mut_successors();
-            let mut successor = ChangeLogEntry_Successor::new();
-            successor.set_successor(Vec::from(successor_root_hash));
-            successor.set_deletions(protobuf::RepeatedField::from_slice(deletions));
-            successors.push(successor);
+            let successor = Successor {
+                successor: Vec::from(successor_root_hash),
+                deletions: deletions.to_vec(),
+            };
+            change_log.successors.push(successor);
         }
 
-        let mut next_change_log = ChangeLogEntry::new();
-        next_change_log.set_parent(root_hash_bytes.clone());
-        next_change_log.set_additions(protobuf::RepeatedField::from(
-            batch
+        let next_change_log = ChangeLogEntry {
+            parent: root_hash_bytes.clone(),
+            additions: batch
                 .iter()
                 .map(|&(ref hash, _)| hash.clone())
                 .collect::<Vec<Vec<u8>>>(),
-        ));
+            successors: vec![],
+        };
 
         if current_change_log.is_some() {
             write_change_log(
@@ -391,14 +411,22 @@ impl MerkleDatabase {
         let tokens = tokenize_address(address);
 
         // There's probably a better way to do this than a clone
-        let mut node = self.root_node.clone();
+        let mut node = self
+            .root_node
+            .lock()
+            .expect("Couldn't lock root_node mutex")
+            .clone();
 
         for token in tokens.iter() {
             node = match node.children.get(&token.to_string()) {
                 None => {
                     return Err(StateDatabaseError::NotFound(format!(
                         "invalid address {} from root {}",
-                        address, self.root_hash
+                        address,
+                        self.root_hash
+                            .lock()
+                            .expect("Couldn't lock root_hash mutex")
+                            .clone()
                     )));
                 }
                 Some(child_hash) => get_node_by_hash(&self.db, child_hash)?,
@@ -406,6 +434,18 @@ impl MerkleDatabase {
         }
         Ok(node)
     }
+
+    pub fn contains(&self, address: &str) -> Result<bool, StateDatabaseError> {
+        match self.get_by_address(address) {
+            Ok(_) => Ok(true),
+            Err(StateDatabaseError::NotFound(_)) => Ok(false),
+            Err(err) => Err(err),
+        }
+    }
+
+    pub fn leaves(&self, prefix: Option<&str>) -> Result<Box<StateIter>, StateDatabaseError> {
+       Ok(Box::new(MerkleLeafIterator::new(self.clone(), prefix)?))
+   }
 
     fn get_path_by_tokens(
         &self,
@@ -415,7 +455,13 @@ impl MerkleDatabase {
         let mut nodes = HashMap::new();
 
         let mut path = String::new();
-        nodes.insert(path.clone(), self.root_node.clone());
+        nodes.insert(
+            path.clone(),
+            self.root_node
+                .lock()
+                .expect("Couldn't lock root_node mutex")
+                .clone(),
+        );
 
         let mut new_branch = false;
 
@@ -431,6 +477,9 @@ impl MerkleDatabase {
                             "invalid address {} from root {}",
                             tokens.join(""),
                             self.root_hash
+                                .lock()
+                                .expect("Couldn't lock root_hash mutex")
+                                .clone()
                         )));
                     }
                     (false, false) => {
@@ -444,29 +493,6 @@ impl MerkleDatabase {
             nodes.insert(path.clone(), node);
         }
         Ok(nodes)
-    }
-}
-
-impl StateReader for MerkleDatabase {
-    /// Returns true if the given address exists in the MerkleDatabase;
-    /// false, otherwise.
-    fn contains(&self, address: &str) -> Result<bool, StateDatabaseError> {
-        match self.get_by_address(address) {
-            Ok(_) => Ok(true),
-            Err(StateDatabaseError::NotFound(_)) => Ok(false),
-            Err(err) => Err(err),
-        }
-    }
-
-    /// Returns the data for a given address, if they exist at that node.  If
-    /// not, returns None.  Will return an StateDatabaseError::NotFound, if the
-    /// given address is not in the tree
-    fn get(&self, address: &str) -> Result<Option<Vec<u8>>, StateDatabaseError> {
-        Ok(self.get_by_address(address)?.value)
-    }
-
-    fn leaves(&self, prefix: Option<&str>) -> Result<Box<StateIter>, StateDatabaseError> {
-        Ok(Box::new(MerkleLeafIterator::new(self.clone(), prefix)?))
     }
 }
 
@@ -545,9 +571,11 @@ where
     let log_bytes = db_reader.index_get(CHANGE_LOG_INDEX, root_hash)?;
 
     Ok(match log_bytes {
-        Some(bytes) => Some(protobuf::parse_from_bytes(&bytes)?),
+        Some(bytes) => Some(ChangeLogEntry::from_bytes(&bytes)?),
+
         None => None,
     })
+    //TODO maybe check hex::decode here ? ??
 }
 
 /// Writes the given change log entry to the database
@@ -556,7 +584,7 @@ fn write_change_log(
     root_hash: &[u8],
     change_log: &ChangeLogEntry,
 ) -> Result<(), StateDatabaseError> {
-    db_writer.index_put(CHANGE_LOG_INDEX, root_hash, &change_log.write_to_bytes()?)?;
+    db_writer.index_put(CHANGE_LOG_INDEX, root_hash, &change_log.to_bytes()?)?;
     Ok(())
 }
 
@@ -637,14 +665,6 @@ fn encode_and_hash(node: Node) -> Result<(Vec<u8>, Vec<u8>), StateDatabaseError>
 
 /// Given a path, split it into its parent's path and the specific branch for
 /// this path, such that the following assertion is true:
-///
-/// ```
-/// let (parent_path, branch) = parent_and_branch(some_path);
-/// let mut path = String::new();
-/// path.push(parent_path);
-/// path.push(branch);
-/// assert_eq!(some_path, &path);
-/// ```
 fn parent_and_branch(path: &str) -> (&str, &str) {
     let parent_address = if !path.is_empty() {
         &path[..path.len() - TOKEN_SIZE]
@@ -739,7 +759,7 @@ impl Node {
         };
 
         let children = match children_raw {
-            Some(Value::Map(mut child_map)) => {
+            Some(Value::Map(child_map)) => {
                 let mut result = BTreeMap::new();
                 for (k, v) in child_map {
                     result.insert(key_to_string(k)?, text_to_string(v)?);
