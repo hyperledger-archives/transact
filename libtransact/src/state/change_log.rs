@@ -113,6 +113,10 @@ impl ChangeLogEntry {
             bytes,
         )?)?)
     }
+
+    pub fn take_successors(&mut self) -> Vec<Successor> {
+        ::std::mem::replace(&mut self.successors, Vec::new())
+    }
 }
 
 #[cfg(test)]
