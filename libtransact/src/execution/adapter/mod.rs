@@ -19,6 +19,8 @@
 //! and its associated state.
 
 pub mod error;
+#[cfg(test)]
+pub mod test_adapter;
 
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
@@ -76,7 +78,7 @@ impl TransactionFamily {
 }
 
 /// An `InvalidTransaction` has information about why the transaction failed.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct InvalidTransaction {
     /// human readable reason for why the transaction was invalid.
     pub error_message: String,
@@ -89,7 +91,7 @@ pub struct InvalidTransaction {
 ///
 /// A `TransactionStatus` covers the possible outcomes that can occur during a
 /// transaction's execution.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TransactionStatus {
     Invalid(InvalidTransaction),
     Valid,

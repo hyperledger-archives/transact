@@ -20,6 +20,7 @@ use crate::transaction::TransactionPair;
 /// During processing of the Transaction, something unexpected happened.
 /// The `Executor` immediately retries the `TransactionPair` for all of these
 /// errors.
+#[derive(Debug)]
 pub enum ExecutionAdapterError {
     /// Executing the transaction took too much time and so abort
     TimeOutError(TransactionPair),
