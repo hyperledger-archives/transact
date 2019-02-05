@@ -53,6 +53,9 @@ pub trait ExecutionAdapter: Send {
         context_id: ContextId,
         on_done: Box<OnDoneCallback>,
     );
+
+    /// Stop the internal threads and the Executor will no longer call execute.
+    fn stop(self: Box<Self>) -> bool;
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone)]

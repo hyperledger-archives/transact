@@ -87,6 +87,10 @@ impl ExecutionAdapter for TestExecutionAdapter {
             on_done,
         );
     }
+
+    fn stop(self: Box<Self>) -> bool {
+        true
+    }
 }
 
 impl TestExecutionAdapterState {
