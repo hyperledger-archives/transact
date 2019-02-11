@@ -45,18 +45,18 @@ impl TestExecutionAdapter {
         }
     }
 
-    pub fn register(&self) {
+    pub fn register(&self, name: &str, version: &str) {
         self.state
             .lock()
             .expect("Noop mutex is poisoned")
-            .register();
+            .register(name, version);
     }
 
-    pub fn unregister(&self) {
+    pub fn unregister(&self, name: &str, version: &str) {
         self.state
             .lock()
             .expect("Noop mutex is poisoned")
-            .unregister();
+            .unregister(name, version);
     }
 }
 
@@ -126,18 +126,18 @@ impl TestExecutionAdapterState {
         }
     }
 
-    fn register(&mut self) {
+    fn register(&mut self, name: &str, version: &str) {
         if let Some(register_callback) = &mut self.registration_callback {
             self.available = true;
-            let tf = TransactionFamily::new("test".to_string(), "1.0".to_string());
+            let tf = TransactionFamily::new(name.to_string(), version.to_string());
             register_callback(tf);
         }
     }
 
-    fn unregister(&mut self) {
+    fn unregister(&mut self, name: &str, version: &str) {
         if let Some(unregister_callback) = &mut self.unregistration_callback {
             self.available = false;
-            let tf = TransactionFamily::new("test".to_string(), "1.0".to_string());
+            let tf = TransactionFamily::new(name.to_string(), version.to_string());
             unregister_callback(tf)
         }
     }
@@ -185,7 +185,7 @@ mod tests {
 
         noop_adapter.on_unregister(on_unregister);
 
-        noop_adapter.register();
+        noop_adapter.register("test", "1.0");
 
         assert!(
             registered.load(Ordering::Relaxed),
@@ -219,7 +219,7 @@ mod tests {
             },
         );
 
-        noop_adapter.unregister();
+        noop_adapter.unregister("test", "1.0");
 
         noop_adapter.execute(transaction_pair2, context_id, on_done_error);
     }
