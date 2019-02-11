@@ -19,4 +19,4 @@
 //! and return a `execution::adapter::ExecutionResult`.
 
 pub mod adapter;
-pub mod executor_internal;
+pub mod executer_internal;
