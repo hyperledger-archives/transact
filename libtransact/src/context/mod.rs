@@ -19,6 +19,8 @@
 /// modify events, data, and state.
 pub type ContextId = [u8; 16];
 
+pub mod manager;
+
 use crate::receipts::Event;
 use std::fmt::Debug;
 use std::mem;
