@@ -29,7 +29,7 @@ use cbor::value::Key;
 use cbor::value::Text;
 use cbor::value::Value;
 
-use hashlib::sha512_digest_bytes;
+use openssl;
 
 use protobuf;
 use protobuf::Message;
@@ -39,8 +39,8 @@ use crate::database::lmdb::DatabaseReader;
 use crate::database::lmdb::LmdbDatabase;
 use crate::database::lmdb::LmdbDatabaseWriter;
 
-use proto::merkle::ChangeLogEntry;
-use proto::merkle::ChangeLogEntry_Successor;
+use crate::protos::merkle::ChangeLogEntry;
+use crate::protos::merkle::ChangeLogEntry_Successor;
 
 use crate::state::merkle_error::StateDatabaseError;
 use crate::state::{StateIter, StateReader};
@@ -772,7 +772,8 @@ fn text_to_string(text_val: Value) -> Result<String, StateDatabaseError> {
 
 /// Creates a hash of the given bytes
 fn hash(input: &[u8]) -> Vec<u8> {
-    let bytes = sha512_digest_bytes(input);
+    let mut bytes: Vec<u8> = Vec::new();
+    bytes.extend(openssl::sha::sha512(input).iter());
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
 }
@@ -780,11 +781,11 @@ fn hash(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use database::error::DatabaseError;
-    use database::lmdb::DatabaseReader;
-    use database::lmdb::LmdbContext;
-    use database::lmdb::LmdbDatabase;
-    use proto::merkle::ChangeLogEntry;
+    use crate::database::error::DatabaseError;
+    use crate::database::lmdb::DatabaseReader;
+    use crate::database::lmdb::LmdbContext;
+    use crate::database::lmdb::LmdbDatabase;
+    use crate::protos::merkle::ChangeLogEntry;
 
     use protobuf;
     use rand::{seq, thread_rng};

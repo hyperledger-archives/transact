@@ -12,9 +12,13 @@ lmdb-zero = ">=0.4.1"
 cpython = "0.2"
 log = { version = "0.4", features = ["std"] }
 python3-sys = "0.2"
+cbor-codec = "0.7"
+libc = ">=0.2.35"
+openssl = "0.10"
 
 [dev-dependencies]
 sawtooth-sdk = "0.1"
+rand = "0.4"
 
 [build-dependencies]
 protoc-rust = "2"
