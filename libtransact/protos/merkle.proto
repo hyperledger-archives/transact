@@ -14,9 +14,6 @@
 // -----------------------------------------------------------------------------
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "sawtooth.sdk.protobuf";
-option go_package = "merkle_pb2";
 
 // An Entry in the change log for a given state root.
 message ChangeLogEntry {
