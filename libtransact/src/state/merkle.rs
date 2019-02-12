@@ -34,16 +34,16 @@ use hashlib::sha512_digest_bytes;
 use protobuf;
 use protobuf::Message;
 
-use database::error::DatabaseError;
-use database::lmdb::DatabaseReader;
-use database::lmdb::LmdbDatabase;
-use database::lmdb::LmdbDatabaseWriter;
+use crate::database::error::DatabaseError;
+use crate::database::lmdb::DatabaseReader;
+use crate::database::lmdb::LmdbDatabase;
+use crate::database::lmdb::LmdbDatabaseWriter;
 
 use proto::merkle::ChangeLogEntry;
 use proto::merkle::ChangeLogEntry_Successor;
 
-use state::error::StateDatabaseError;
-use state::{StateIter, StateReader};
+use crate::state::merkle_error::StateDatabaseError;
+use crate::state::{StateIter, StateReader};
 
 const TOKEN_SIZE: usize = 2;
 
