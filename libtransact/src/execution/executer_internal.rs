@@ -25,7 +25,7 @@
 //                                                                                                --------- ExecutionAdapter
 //
 
-use crate::execution::adapter::TransactionFamily;
+use crate::execution::TransactionFamily;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionResult};
 use crate::scheduler::ExecutionTask;
 use log::warn;

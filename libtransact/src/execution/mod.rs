@@ -21,3 +21,38 @@
 pub mod adapter;
 pub mod executer;
 mod executer_internal;
+
+use crate::transaction::TransactionPair;
+
+/// A Transaction Family Descriptor
+#[derive(Eq, PartialEq, Debug, Hash, Clone)]
+pub struct TransactionFamily {
+    family_name: String,
+    family_version: String,
+}
+
+impl TransactionFamily {
+    /// Constructs a new Transaction Family Descriptor.
+    pub fn new(family_name: String, family_version: String) -> Self {
+        TransactionFamily {
+            family_name,
+            family_version,
+        }
+    }
+
+    /// Creates a Transaction Family Descriptor using the information in a TransactionPair.
+    pub fn from_pair(transaction_pair: &TransactionPair) -> Self {
+        Self::new(
+            transaction_pair.header().family_name().to_string(),
+            transaction_pair.header().family_version().to_string(),
+        )
+    }
+
+    pub fn family_name(&self) -> &str {
+        &self.family_name
+    }
+
+    pub fn family_version(&self) -> &str {
+        &self.family_version
+    }
+}

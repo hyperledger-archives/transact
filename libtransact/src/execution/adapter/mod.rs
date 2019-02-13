@@ -25,6 +25,7 @@ pub mod test_adapter;
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
+use crate::execution::TransactionFamily;
 use crate::transaction::TransactionPair;
 
 pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
@@ -56,28 +57,6 @@ pub trait ExecutionAdapter: Send {
 
     /// Stop the internal threads and the Executor will no longer call execute.
     fn stop(self: Box<Self>) -> bool;
-}
-
-#[derive(Eq, PartialEq, Debug, Hash, Clone)]
-pub struct TransactionFamily {
-    family_name: String,
-    family_version: String,
-}
-
-impl TransactionFamily {
-    pub fn new(family_name: String, family_version: String) -> Self {
-        TransactionFamily {
-            family_name,
-            family_version,
-        }
-    }
-
-    pub fn from_pair(transaction_pair: &TransactionPair) -> Self {
-        Self::new(
-            transaction_pair.header().family_name().to_string(),
-            transaction_pair.header().family_version().to_string(),
-        )
-    }
 }
 
 /// An `InvalidTransaction` has information about why the transaction failed.
