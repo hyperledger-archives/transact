@@ -20,4 +20,4 @@
 
 pub mod adapter;
 pub mod executer;
-pub mod executer_internal;
+mod executer_internal;
