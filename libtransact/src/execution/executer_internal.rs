@@ -244,11 +244,12 @@ impl ExecuterThread {
                             let (pair, context_id) = task.take();
 
                             let callback = Box::new(move |result| {
+                                // Without this line, the function is considered a FnOnce, instead
+                                // of an Fn.  This seems to be a strange quirk of the compiler
                                 let res_sender = results_sender.clone();
                                 match result {
                                     Ok(tp_processing_result) => {
-                                        if let Err(err) = results_sender.send(tp_processing_result)
-                                        {
+                                        if let Err(err) = res_sender.send(tp_processing_result) {
                                             warn!(
                                             "Sending TransactionProcessingResult on channel: {}",
                                             err

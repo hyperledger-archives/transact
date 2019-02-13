@@ -28,8 +28,6 @@ use crate::context::ContextId;
 use crate::execution::ExecutionRegistry;
 use crate::transaction::TransactionPair;
 
-pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
-
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.
 pub trait ExecutionAdapter: Send {
@@ -44,7 +42,7 @@ pub trait ExecutionAdapter: Send {
         &self,
         transaction_pair: TransactionPair,
         context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     );
 
     /// Stop the internal threads and the Executor will no longer call execute.

@@ -17,10 +17,9 @@
 
 use crate::context::ContextId;
 use crate::execution::adapter::{
-    ExecutionAdapter, ExecutionAdapterError, ExecutionResult, OnDoneCallback, TransactionFamily,
-    TransactionStatus,
+    ExecutionAdapter, ExecutionAdapterError, ExecutionResult, TransactionStatus,
 };
-use crate::execution::ExecutionRegistry;
+use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::transaction::TransactionPair;
 use std::sync::{Arc, Mutex};
 
@@ -71,7 +70,7 @@ impl ExecutionAdapter for TestExecutionAdapter {
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     ) {
         self.state.lock().expect("mutex is not poisoned").execute(
             transaction_pair,
@@ -94,10 +93,9 @@ impl TestExecutionAdapterState {
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     ) {
-        let mut on_done = on_done;
-        if self.available {
+        on_done(if self.available {
             let transaction_status = TransactionStatus::Valid;
 
             let transaction_result = ExecutionResult {
@@ -108,10 +106,10 @@ impl TestExecutionAdapterState {
                 status: transaction_status,
             };
 
-            on_done(Ok(transaction_result));
+            Ok(transaction_result)
         } else {
-            on_done(Err(ExecutionAdapterError::RoutingError(transaction_pair)));
-        }
+            Err(ExecutionAdapterError::RoutingError(transaction_pair))
+        });
     }
 
     fn register(&mut self, name: &str, version: &str) {
