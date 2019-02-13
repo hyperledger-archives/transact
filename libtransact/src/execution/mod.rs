@@ -56,3 +56,17 @@ impl TransactionFamily {
         &self.family_version
     }
 }
+
+/// The registry of transaction families
+pub trait ExecutionRegistry: Send {
+    /// Register the given transaction family.
+    ///
+    /// Adding a family to the registry indicates that the family can be processed by an
+    /// ExecutionAdapter.
+    fn register_transaction_family(&mut self, family: TransactionFamily);
+
+    /// Unregister the given transaction family.
+    ///
+    /// Signals that a transaction family can no longer be processed by an ExecutionAdapter.
+    fn unregister_transaction_family(&mut self, family: &TransactionFamily);
+}
