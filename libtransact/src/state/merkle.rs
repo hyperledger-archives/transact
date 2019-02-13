@@ -33,8 +33,8 @@ use crate::database::error::DatabaseError;
 use crate::database::lmdb::{DatabaseReader, LmdbDatabase, LmdbDatabaseWriter};
 
 use super::change_log::{ChangeLogEntry, Successor};
-use super::error::{StateReadError, StateWriteError};
-use super::{Read, StateChange, Write};
+use super::error::{StatePruneError, StateReadError, StateWriteError};
+use super::{Prune, Read, StateChange, Write};
 
 use super::merkle_error::StateDatabaseError;
 
@@ -120,6 +120,26 @@ impl Read for MerkleDatabase {
     }
 }
 
+impl Prune for MerkleDatabase {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
+        state_ids
+            .iter()
+            .try_fold(Vec::new(), |mut result, state_id| {
+                result.extend(MerkleDatabase::prune(&self.db, state_id).map_err(
+                    |err| match err {
+                        StateDatabaseError::NotFound(msg) => StatePruneError::InvalidStateId(msg),
+                        _ => StatePruneError::StorageError(Box::new(err)),
+                    },
+                )?);
+                Ok(result)
+            })
+    }
+}
+
 impl MerkleDatabase {
     /// Constructs a new MerkleDatabase, backed by a given Database
     ///
@@ -135,98 +155,93 @@ impl MerkleDatabase {
         })
     }
 
-/// Prunes nodes that are no longer needed under a given state root
-/// Returns a list of addresses that were deleted
-pub fn prune(db: &LmdbDatabase, merkle_root: &str) -> Result<Vec<String>, StateDatabaseError> {
-    let root_bytes = ::hex::decode(merkle_root).map_err(|_| {
-        StateDatabaseError::InvalidHash(format!("{} is not a valid hash", merkle_root))
-    })?;
-    let mut db_writer = db.writer()?;
-    let change_log = get_change_log(&db_writer, &root_bytes)?;
+    /// Prunes nodes that are no longer needed under a given state root
+    /// Returns a list of addresses that were deleted
+    pub fn prune(db: &LmdbDatabase, merkle_root: &str) -> Result<Vec<String>, StateDatabaseError> {
+        let root_bytes = ::hex::decode(merkle_root).map_err(|_| {
+            StateDatabaseError::InvalidHash(format!("{} is not a valid hash", merkle_root))
+        })?;
+        let mut db_writer = db.writer()?;
+        let change_log = get_change_log(&db_writer, &root_bytes)?;
 
-    if change_log.is_none() {
-        // There's no change log for this entry
-        return Ok(vec![]);
+        if change_log.is_none() {
+            // There's no change log for this entry
+            return Ok(vec![]);
+        }
+
+        let mut change_log = change_log.unwrap();
+        let removed_addresses = if change_log.successors.len() > 1 {
+            // Currently, we don't clean up a parent with multiple successors
+            vec![]
+        } else if change_log.successors.is_empty() {
+            // deleting the tip of a trie lineage
+
+            let (deletion_candidates, duplicates) =
+                MerkleDatabase::remove_duplicate_hashes(&mut db_writer, change_log.additions)?;
+
+            for hash in &deletion_candidates {
+                let hash_hex = ::hex::encode(hash);
+                delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
+            }
+
+            for hash in &duplicates {
+                decrement_ref_count(&mut db_writer, hash)?;
+            }
+
+            db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
+            let parent_root_bytes = &change_log.parent;
+
+            if let Some(ref mut parent_change_log) =
+                get_change_log(&db_writer, parent_root_bytes)?.as_mut()
+            {
+                let successors = parent_change_log.take_successors();
+                let new_successors = successors
+                    .into_iter()
+                    .filter(|successor| root_bytes != successor.successor)
+                    .collect::<Vec<_>>();
+                parent_change_log.successors = new_successors;
+
+                write_change_log(&mut db_writer, parent_root_bytes, &parent_change_log)?;
+            }
+
+            deletion_candidates.into_iter().collect()
+        } else {
+            // deleting a parent
+            let successor = change_log.successors.pop().unwrap();
+
+            let (deletion_candidates, duplicates): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
+                MerkleDatabase::remove_duplicate_hashes(&mut db_writer, successor.deletions)?;
+
+            for hash in &deletion_candidates {
+                let hash_hex = ::hex::encode(hash);
+                delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
+            }
+
+            for hash in &duplicates {
+                decrement_ref_count(&mut db_writer, hash)?;
+            }
+
+            db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
+
+            deletion_candidates.into_iter().collect()
+        };
+
+        db_writer.commit()?;
+        Ok(removed_addresses.iter().map(::hex::encode).collect())
     }
 
-    let mut change_log = change_log.unwrap();
-    let removed_addresses = if change_log.get_successors().len() > 1 {
-        // Currently, we don't clean up a parent with multiple successors
-        vec![]
-    } else if change_log.get_successors().is_empty() {
-        // deleting the tip of a trie lineage
-
-        let (deletion_candidates, duplicates) = MerkleDatabase::remove_duplicate_hashes(
-            &mut db_writer,
-            change_log.take_additions(),
-        )?;
-
-        for hash in &deletion_candidates {
-            let hash_hex = ::hex::encode(hash);
-            delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
-        }
-
-        for hash in &duplicates {
-            decrement_ref_count(&mut db_writer, hash)?;
-        }
-
-        db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
-        let parent_root_bytes = &change_log.get_parent();
-
-        if let Some(ref mut parent_change_log) =
-            get_change_log(&db_writer, parent_root_bytes)?.as_mut()
-        {
-            let successors = parent_change_log.take_successors();
-            let new_successors = successors
-                .into_iter()
-                .filter(|successor| root_bytes != successor.get_successor())
-                .collect::<Vec<_>>();
-            parent_change_log.set_successors(protobuf::RepeatedField::from_vec(new_successors));
-
-            write_change_log(&mut db_writer, parent_root_bytes, &parent_change_log)?;
-        }
-
-        deletion_candidates.into_iter().collect()
-    } else {
-        // deleting a parent
-        let mut successor = change_log.take_successors().pop().unwrap();
-
-        let (deletion_candidates, duplicates): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
-            MerkleDatabase::remove_duplicate_hashes(
-                &mut db_writer,
-                successor.take_deletions(),
-            )?;
-
-        for hash in &deletion_candidates {
-            let hash_hex = ::hex::encode(hash);
-            delete_ignore_missing(&mut db_writer, hash_hex.as_bytes())?
-        }
-
-        for hash in &duplicates {
-            decrement_ref_count(&mut db_writer, hash)?;
-        }
-
-        db_writer.index_delete(CHANGE_LOG_INDEX, &root_bytes)?;
-
-        deletion_candidates.into_iter().collect()
-    };
-
-    db_writer.commit()?;
-    Ok(removed_addresses.iter().map(::hex::encode).collect())
-}
-
-fn remove_duplicate_hashes(
-    db_writer: &mut LmdbDatabaseWriter,
-    deletions: protobuf::RepeatedField<Vec<u8>>,
-) -> Result<(Vec<StateHash>, Vec<StateHash>), StateDatabaseError> {
-    Ok(deletions.into_iter().partition(|key| {
-        if let Ok(count) = get_ref_count(db_writer, &key) {
-            count == 0
-        } else {
-            false
-        }
-    }))
-}
+    fn remove_duplicate_hashes(
+        db_writer: &mut LmdbDatabaseWriter,
+        deletions: Vec<Vec<u8>>,
+    ) -> Result<(Vec<StateHash>, Vec<StateHash>), StateDatabaseError> {
+        Ok(deletions.into_iter().partition(|key| {
+            if let Ok(count) = get_ref_count(db_writer, &key) {
+                count == 0
+            } else {
+                false
+            }
+        }))
+    }
     /// Returns the current merkle root for this MerkleDatabase
     pub fn get_merkle_root(&self) -> String {
         self.root_hash
@@ -1321,18 +1336,18 @@ mod tests {
                 assert_value_at_address(&merkle_db, &address, &value);
             }
 
-for delete_change in delete_items {
-    match delete_change {
-        StateChange::Delete { key } => {
-            assert!(!merkle_db
-                .get(&merkle_db.get_merkle_root(), &[key.clone()])
-                .unwrap()
-                .contains_key(&key));
-        }
-        _ => (),
-    }
-}
-})
+            for delete_change in delete_items {
+                match delete_change {
+                    StateChange::Delete { key } => {
+                        assert!(!merkle_db
+                            .get(&merkle_db.get_merkle_root(), &[key.clone()])
+                            .unwrap()
+                            .contains_key(&key));
+                    }
+                    _ => (),
+                }
+            }
+        })
     }
 
     #[test]
