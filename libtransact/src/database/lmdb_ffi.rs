@@ -14,8 +14,8 @@
  * limitations under the License.
  * ------------------------------------------------------------------------------
  */
-use cpython::{PyList, PyObject, Python};
 use crate::database::lmdb::*;
+use cpython::{PyList, PyObject, Python};
 use py_ffi;
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_void};

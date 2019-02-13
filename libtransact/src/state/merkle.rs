@@ -490,8 +490,8 @@ impl MerkleDatabase {
     }
 
     pub fn leaves(&self, prefix: Option<&str>) -> Result<Box<StateIter>, StateDatabaseError> {
-       Ok(Box::new(MerkleLeafIterator::new(self.clone(), prefix)?))
-   }
+        Ok(Box::new(MerkleLeafIterator::new(self.clone(), prefix)?))
+    }
 
     fn get_path_by_tokens(
         &self,

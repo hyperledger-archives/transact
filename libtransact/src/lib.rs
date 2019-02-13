@@ -18,7 +18,9 @@
 
 pub mod batch;
 pub mod context;
+pub mod database;
 pub mod execution;
+
 #[allow(renamed_and_removed_lints)]
 pub mod protos;
 pub mod receipts;
@@ -26,16 +28,15 @@ pub mod scheduler;
 pub mod signing;
 pub mod state;
 pub mod transaction;
-pub mod database;
 
 #[macro_use]
 extern crate log;
-extern crate python3_sys as py_ffi;
 extern crate cbor;
 extern crate cpython;
 extern crate hex;
 extern crate libc;
 extern crate lmdb_zero;
+extern crate python3_sys as py_ffi;
 
 #[cfg(test)]
 extern crate rand;
