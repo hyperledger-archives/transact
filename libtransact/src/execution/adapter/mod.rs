@@ -18,7 +18,7 @@
 //! Contains execution adapter components and interfaces that proxy the `Transaction`
 //! and its associated state.
 
-pub mod error;
+mod error;
 #[cfg(test)]
 pub mod test_adapter;
 
