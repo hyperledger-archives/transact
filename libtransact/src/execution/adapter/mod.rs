@@ -28,12 +28,12 @@ use crate::context::ContextId;
 use crate::transaction::TransactionPair;
 
 pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
-pub type OnRegisterCallback = FnMut(TransactionFamily);
-pub type OnUnregisterCallback = FnMut(TransactionFamily);
+pub type OnRegisterCallback = FnMut(TransactionFamily) + Send;
+pub type OnUnregisterCallback = FnMut(TransactionFamily) + Send;
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.
-pub trait ExecutionAdapter {
+pub trait ExecutionAdapter: Send {
     /// Register a callback to be fired when the execution adapter registers a new
     /// capability.
     fn on_register(&self, callback: Box<OnRegisterCallback>);
@@ -53,6 +53,9 @@ pub trait ExecutionAdapter {
         context_id: ContextId,
         on_done: Box<OnDoneCallback>,
     );
+
+    /// Stop the internal threads and the Executor will no longer call execute.
+    fn stop(self: Box<Self>) -> bool;
 }
 
 #[derive(Eq, PartialEq, Debug, Hash, Clone)]
