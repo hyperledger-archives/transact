@@ -6,7 +6,6 @@ edition = "2018"
 
 [dependencies]
 hex = "0.3"
-log = "0.4"
 protobuf = "2"
 sha2 = "0.8"
 lmdb-zero = ">=0.4.1"
