@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -12,29 +12,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- * -----------------------------------------------------------------------------
+ * ------------------------------------------------------------------------------
  */
-#![cfg_attr(feature = "nightly", feature(test))]
 
-pub mod batch;
-pub mod context;
-pub mod database;
-pub mod execution;
-
-#[allow(renamed_and_removed_lints)]
-pub mod protos;
-pub mod receipts;
-pub mod scheduler;
-pub mod signing;
-pub mod state;
-pub mod transaction;
-
-#[macro_use]
-extern crate log;
-extern crate cbor;
-extern crate hex;
-extern crate libc;
-extern crate lmdb_zero;
-
-#[cfg(test)]
-extern crate rand;
+pub mod error;
+pub mod lmdb;

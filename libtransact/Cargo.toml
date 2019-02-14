@@ -9,9 +9,15 @@ hex = "0.3"
 log = "0.4"
 protobuf = "2"
 sha2 = "0.8"
+lmdb-zero = ">=0.4.1"
+log = { version = "0.4", features = ["std"] }
+cbor-codec = "0.7"
+libc = ">=0.2.35"
+openssl = "0.10"
 
 [dev-dependencies]
 sawtooth-sdk = "0.1"
+rand = "0.4"
 
 [build-dependencies]
 protoc-rust = "2"
