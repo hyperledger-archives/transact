@@ -32,6 +32,19 @@ pub enum StateChange<K, V> {
     Delete { key: K },
 }
 
+impl<K: PartialEq, V> StateChange<K, V> {
+    /// Compares StateChanges based on the key, regardless of variant
+    pub fn has_key(&self, k: &K) -> bool {
+        if let StateChange::Set { key, .. } = self {
+            key == k
+        } else if let StateChange::Delete { key } = self {
+            key == k
+        } else {
+            false
+        }
+    }
+}
+
 impl<K, V> Clone for StateChange<K, V>
 where
     K: Clone,
