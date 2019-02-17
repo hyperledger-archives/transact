@@ -31,10 +31,3 @@ pub mod transaction;
 
 #[macro_use]
 extern crate log;
-extern crate cbor;
-extern crate hex;
-extern crate libc;
-extern crate lmdb_zero;
-
-#[cfg(test)]
-extern crate rand;
