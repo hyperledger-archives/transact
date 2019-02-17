@@ -17,6 +17,7 @@ openssl = "0.10"
 
 [dev-dependencies]
 sawtooth-sdk = "0.1"
+rand_hc = "0.1"
 
 [build-dependencies]
 protoc-rust = "2"

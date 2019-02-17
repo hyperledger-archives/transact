@@ -1,4 +1,5 @@
 pub mod error;
+pub mod xo;
 
 use crate::batch::BatchPair;
 use crate::transaction::TransactionPair;
