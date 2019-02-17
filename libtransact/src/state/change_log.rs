@@ -47,16 +47,6 @@ impl FromNative<Successor> for merkle::ChangeLogEntry_Successor {
     }
 }
 
-impl Successor {
-    fn to_bytes(&self) -> Result<Vec<u8>, StateDatabaseError> {
-        Ok(self.clone().into_proto()?.write_to_bytes()?)
-    }
-
-    fn from_bytes(bytes: &[u8]) -> Result<Successor, StateDatabaseError> {
-        Ok(Successor::from_proto(protobuf::parse_from_bytes(bytes)?)?)
-    }
-}
-
 impl IntoProto<merkle::ChangeLogEntry_Successor> for Successor {}
 impl IntoNative<Successor> for merkle::ChangeLogEntry_Successor {}
 
