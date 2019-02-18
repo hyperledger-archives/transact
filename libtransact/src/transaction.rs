@@ -4,9 +4,14 @@ use sha2::{Digest, Sha512};
 use std;
 use std::error::Error as StdError;
 
+use rand::distributions::Alphanumeric;
+use rand::Rng;
+
 use crate::protos;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
 use crate::signing;
+
+static DEFAULT_NONCE_SIZE: usize = 32;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum HashMethod {
@@ -297,9 +302,7 @@ impl TransactionBuilder {
         let batcher_public_key = self
             .batcher_public_key
             .unwrap_or_else(|| signer.public_key().to_vec());
-        let dependencies = self.dependencies.ok_or_else(|| {
-            TransactionBuildError::MissingField("'dependencies' field is required".to_string())
-        })?;
+        let dependencies = self.dependencies.unwrap_or_else(|| vec![]);
         let family_name = self.family_name.ok_or_else(|| {
             TransactionBuildError::MissingField("'family_name' field is required".to_string())
         })?;
@@ -312,9 +315,14 @@ impl TransactionBuilder {
         let outputs = self.outputs.ok_or_else(|| {
             TransactionBuildError::MissingField("'outputs' field is required".to_string())
         })?;
-        let nonce = self.nonce.ok_or_else(|| {
-            TransactionBuildError::MissingField("'nonce' field is required".to_string())
-        })?;
+        let nonce = self.nonce.unwrap_or_else(|| {
+            rand::thread_rng()
+                .sample_iter(&Alphanumeric)
+                .take(DEFAULT_NONCE_SIZE)
+                .collect::<String>()
+                .as_bytes()
+                .to_vec()
+        });
         let payload_hash_method = self.payload_hash_method.ok_or_else(|| {
             TransactionBuildError::MissingField(
                 "'payload_hash_method' field is required".to_string(),
