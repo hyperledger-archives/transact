@@ -18,29 +18,20 @@
 //! Contains execution adapter components and interfaces that proxy the `Transaction`
 //! and its associated state.
 
-pub mod error;
+mod error;
 #[cfg(test)]
 pub mod test_adapter;
 
 pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
+use crate::execution::ExecutionRegistry;
 use crate::transaction::TransactionPair;
-
-pub type OnDoneCallback = FnMut(Result<ExecutionResult, ExecutionAdapterError>);
-pub type OnRegisterCallback = FnMut(TransactionFamily) + Send;
-pub type OnUnregisterCallback = FnMut(TransactionFamily) + Send;
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.
 pub trait ExecutionAdapter: Send {
-    /// Register a callback to be fired when the execution adapter registers a new
-    /// capability.
-    fn on_register(&self, callback: Box<OnRegisterCallback>);
-
-    /// Register a callback to be fired when the execution adapter unregisters a
-    /// new capability.
-    fn on_unregister(&self, callback: Box<OnUnregisterCallback>);
+    fn start(&mut self, execution_registry: Box<dyn ExecutionRegistry>);
 
     /// Execute the transaction and provide an callback that handles the result.
     ///
@@ -51,33 +42,11 @@ pub trait ExecutionAdapter: Send {
         &self,
         transaction_pair: TransactionPair,
         context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     );
 
     /// Stop the internal threads and the Executor will no longer call execute.
     fn stop(self: Box<Self>) -> bool;
-}
-
-#[derive(Eq, PartialEq, Debug, Hash, Clone)]
-pub struct TransactionFamily {
-    family_name: String,
-    family_version: String,
-}
-
-impl TransactionFamily {
-    pub fn new(family_name: String, family_version: String) -> Self {
-        TransactionFamily {
-            family_name,
-            family_version,
-        }
-    }
-
-    pub fn from_pair(transaction_pair: &TransactionPair) -> Self {
-        Self::new(
-            transaction_pair.header().family_name().to_string(),
-            transaction_pair.header().family_version().to_string(),
-        )
-    }
 }
 
 /// An `InvalidTransaction` has information about why the transaction failed.

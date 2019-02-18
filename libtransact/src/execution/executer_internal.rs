@@ -25,8 +25,8 @@
 //                                                                                                --------- ExecutionAdapter
 //
 
-use crate::execution::adapter::TransactionFamily;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionResult};
+use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::scheduler::ExecutionTask;
 use log::warn;
 use std::collections::{HashMap, HashSet};
@@ -170,26 +170,22 @@ impl ExecuterThread {
 
     pub fn start(&mut self) -> Result<(), ExecuterThreadError> {
         if self.sender.is_none() {
-            let (registration_sender, receiver) = channel();
+            let (registry_sender, receiver) = channel();
 
-            for (index, execution_adapter) in self.execution_adapters.drain(0..).enumerate() {
+            for (index, mut execution_adapter) in self.execution_adapters.drain(0..).enumerate() {
                 let (sender, adapter_receiver) = channel();
                 let ee_sender = NamedExecutionEventSender::new(sender, index);
-                Self::add_register_callback(
-                    execution_adapter.as_ref(),
-                    ee_sender.clone(),
-                    registration_sender.clone(),
-                );
-                Self::add_unregister_callback(
-                    execution_adapter.as_ref(),
-                    ee_sender,
-                    registration_sender.clone(),
-                );
+
+                execution_adapter.start(Box::new(InternalRegistry {
+                    event_sender: ee_sender,
+                    registry_sender: registry_sender.clone(),
+                }));
+
                 match Self::start_execution_adapter_thread(
                     Arc::clone(&self.stop),
                     execution_adapter,
                     adapter_receiver,
-                    &registration_sender,
+                    &registry_sender,
                     index,
                 ) {
                     Ok(join_handle) => {
@@ -202,7 +198,7 @@ impl ExecuterThread {
                 }
             }
 
-            self.sender = Some(registration_sender);
+            self.sender = Some(registry_sender);
             match self.start_thread(receiver) {
                 Ok(join_handle) => {
                     self.internal_thread = Some(join_handle);
@@ -248,11 +244,12 @@ impl ExecuterThread {
                             let (pair, context_id) = task.take();
 
                             let callback = Box::new(move |result| {
+                                // Without this line, the function is considered a FnOnce, instead
+                                // of an Fn.  This seems to be a strange quirk of the compiler
                                 let res_sender = results_sender.clone();
                                 match result {
                                     Ok(tp_processing_result) => {
-                                        if let Err(err) = results_sender.send(tp_processing_result)
-                                        {
+                                        if let Err(err) = res_sender.send(tp_processing_result) {
                                             warn!(
                                             "Sending TransactionProcessingResult on channel: {}",
                                             err
@@ -428,48 +425,6 @@ impl ExecuterThread {
         if let Some(p) = p {
             parked.insert(transaction_family, p);
         }
-    }
-
-    fn add_register_callback(
-        execution_adapter: &ExecutionAdapter,
-        sender: NamedExecutionEventSender,
-        register_sender: RegistrationExecutionEventSender,
-    ) {
-        let callback: Box<FnMut(TransactionFamily) + Send> =
-            Box::new(move |transaction_family: TransactionFamily| {
-                if let Err(err) =
-                    register_sender.send(RegistrationExecutionEvent::RegistrationChange(
-                        RegistrationChange::RegisterRequest((transaction_family, sender.clone())),
-                    ))
-                {
-                    warn!(
-                        "During sending registration of transaction family on channel: {}",
-                        err
-                    );
-                }
-            });
-        execution_adapter.on_register(callback);
-    }
-
-    fn add_unregister_callback(
-        execution_adapter: &ExecutionAdapter,
-        sender: NamedExecutionEventSender,
-        unregister_sender: RegistrationExecutionEventSender,
-    ) {
-        let callback: Box<FnMut(TransactionFamily) + Send> =
-            Box::new(move |transaction_family: TransactionFamily| {
-                if let Err(err) =
-                    unregister_sender.send(RegistrationExecutionEvent::RegistrationChange(
-                        RegistrationChange::UnregisterRequest((transaction_family, sender.clone())),
-                    ))
-                {
-                    warn!(
-                        "During sending unregistration of transaction family on channel: {}",
-                        err
-                    );
-                }
-            });
-        execution_adapter.on_unregister(callback);
     }
 }
 
@@ -730,5 +685,40 @@ mod tests {
         (0..NUMBER_OF_TRANSACTIONS)
             .map(move |_| create_txn(&signer))
             .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
+    }
+}
+
+struct InternalRegistry {
+    registry_sender: RegistrationExecutionEventSender,
+    event_sender: NamedExecutionEventSender,
+}
+
+impl ExecutionRegistry for InternalRegistry {
+    fn register_transaction_family(&mut self, family: TransactionFamily) {
+        if let Err(err) = self
+            .registry_sender
+            .send(RegistrationExecutionEvent::RegistrationChange(
+                RegistrationChange::RegisterRequest((family, self.event_sender.clone())),
+            ))
+        {
+            warn!(
+                "During sending registration of transaction family on channel: {}",
+                err
+            );
+        }
+    }
+
+    fn unregister_transaction_family(&mut self, family: &TransactionFamily) {
+        if let Err(err) = self
+            .registry_sender
+            .send(RegistrationExecutionEvent::RegistrationChange(
+                RegistrationChange::UnregisterRequest((family.clone(), self.event_sender.clone())),
+            ))
+        {
+            warn!(
+                "During sending unregistration of transaction family on channel: {}",
+                err
+            );
+        }
     }
 }

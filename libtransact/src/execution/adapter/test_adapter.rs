@@ -17,15 +17,14 @@
 
 use crate::context::ContextId;
 use crate::execution::adapter::{
-    ExecutionAdapter, ExecutionAdapterError, ExecutionResult, OnDoneCallback, OnRegisterCallback,
-    OnUnregisterCallback, TransactionFamily, TransactionStatus,
+    ExecutionAdapter, ExecutionAdapterError, ExecutionResult, TransactionStatus,
 };
+use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::transaction::TransactionPair;
 use std::sync::{Arc, Mutex};
 
 struct TestExecutionAdapterState {
-    registration_callback: Option<Box<OnRegisterCallback>>,
-    unregistration_callback: Option<Box<OnUnregisterCallback>>,
+    registry: Option<Box<dyn ExecutionRegistry>>,
     available: bool,
 }
 
@@ -38,8 +37,7 @@ impl TestExecutionAdapter {
     pub fn new() -> Self {
         TestExecutionAdapter {
             state: Arc::new(Mutex::new(TestExecutionAdapterState {
-                registration_callback: None,
-                unregistration_callback: None,
+                registry: None,
                 available: false,
             })),
         }
@@ -61,25 +59,18 @@ impl TestExecutionAdapter {
 }
 
 impl ExecutionAdapter for TestExecutionAdapter {
-    fn on_register(&self, callback: Box<OnRegisterCallback>) {
+    fn start(&mut self, execution_registry: Box<dyn ExecutionRegistry>) {
         self.state
             .lock()
             .expect("mutex is not poisoned")
-            .on_register(callback);
-    }
-
-    fn on_unregister(&self, callback: Box<OnUnregisterCallback>) {
-        self.state
-            .lock()
-            .expect("mutex is not poisoned")
-            .on_unregister(callback);
+            .on_start(execution_registry);
     }
 
     fn execute(
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     ) {
         self.state.lock().expect("mutex is not poisoned").execute(
             transaction_pair,
@@ -94,22 +85,17 @@ impl ExecutionAdapter for TestExecutionAdapter {
 }
 
 impl TestExecutionAdapterState {
-    fn on_register(&mut self, callback: Box<OnRegisterCallback>) {
-        self.registration_callback = Some(callback);
-    }
-
-    fn on_unregister(&mut self, callback: Box<OnUnregisterCallback>) {
-        self.unregistration_callback = Some(callback);
+    fn on_start(&mut self, callback: Box<dyn ExecutionRegistry>) {
+        self.registry = Some(callback);
     }
 
     fn execute(
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<OnDoneCallback>,
+        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
     ) {
-        let mut on_done = on_done;
-        if self.available {
+        on_done(if self.available {
             let transaction_status = TransactionStatus::Valid;
 
             let transaction_result = ExecutionResult {
@@ -120,25 +106,25 @@ impl TestExecutionAdapterState {
                 status: transaction_status,
             };
 
-            on_done(Ok(transaction_result));
+            Ok(transaction_result)
         } else {
-            on_done(Err(ExecutionAdapterError::RoutingError(transaction_pair)));
-        }
+            Err(ExecutionAdapterError::RoutingError(transaction_pair))
+        });
     }
 
     fn register(&mut self, name: &str, version: &str) {
-        if let Some(register_callback) = &mut self.registration_callback {
+        if let Some(registry) = &mut self.registry {
             self.available = true;
             let tf = TransactionFamily::new(name.to_string(), version.to_string());
-            register_callback(tf);
+            registry.register_transaction_family(tf);
         }
     }
 
     fn unregister(&mut self, name: &str, version: &str) {
-        if let Some(unregister_callback) = &mut self.unregistration_callback {
+        if let Some(registry) = &mut self.registry {
             self.available = false;
             let tf = TransactionFamily::new(name.to_string(), version.to_string());
-            unregister_callback(tf)
+            registry.unregister_transaction_family(&tf)
         }
     }
 }
@@ -164,31 +150,18 @@ mod tests {
 
     #[test]
     fn test_noop_adapter() {
-        let registered = Arc::new(AtomicBool::new(false));
-        let registered_c = Arc::clone(&registered);
-        let noop_adapter = TestExecutionAdapter::new();
+        let mut noop_adapter = TestExecutionAdapter::new();
+        let registry = MockRegistry::default();
 
         let transaction_pair1 = make_transaction();
         let transaction_pair2 = make_transaction();
 
-        let on_register = Box::new(move |_| {
-            registered_c.store(true, Ordering::Relaxed);
-        });
-
-        noop_adapter.on_register(on_register);
-
-        let registered_c = Arc::clone(&registered);
-
-        let on_unregister = Box::new(move |_| {
-            registered_c.store(false, Ordering::Relaxed);
-        });
-
-        noop_adapter.on_unregister(on_unregister);
+        noop_adapter.start(Box::new(registry.clone()));
 
         noop_adapter.register("test", "1.0");
 
         assert!(
-            registered.load(Ordering::Relaxed),
+            registry.registered.load(Ordering::Relaxed),
             "The noop adapter is registered",
         );
 
@@ -221,6 +194,11 @@ mod tests {
 
         noop_adapter.unregister("test", "1.0");
 
+        assert!(
+            !registry.registered.load(Ordering::Relaxed),
+            "The noop adapter is unregistered",
+        );
+
         noop_adapter.execute(transaction_pair2, context_id, on_done_error);
     }
 
@@ -239,5 +217,20 @@ mod tests {
             .with_payload_hash_method(HashMethod::SHA512)
             .build_pair(&signer)
             .expect("The TransactionBuilder was supplied all the options")
+    }
+
+    #[derive(Clone, Default)]
+    struct MockRegistry {
+        registered: Arc<AtomicBool>,
+    }
+
+    impl ExecutionRegistry for MockRegistry {
+        fn register_transaction_family(&mut self, _family: TransactionFamily) {
+            self.registered.store(true, Ordering::Relaxed);
+        }
+
+        fn unregister_transaction_family(&mut self, _family: &TransactionFamily) {
+            self.registered.store(false, Ordering::Relaxed);
+        }
     }
 }
