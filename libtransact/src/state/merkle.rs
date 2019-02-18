@@ -1455,7 +1455,7 @@ mod tests {
     /// - it verifies that the pruned successor's ChangeLogEntry is removed
     /// - it verifies the original and the remaining successor still are
     ///   persisted
-    fn merkle_trie_pruinng_successors() {
+    fn merkle_trie_pruning_successors() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
