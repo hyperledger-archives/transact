@@ -1,8 +1,6 @@
 pub mod error;
 pub mod hash;
 
-use std;
-
 pub use crate::signing::error::Error;
 
 pub trait Signer {
