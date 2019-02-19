@@ -22,7 +22,7 @@
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
 pub mod change_log;
-mod error;
+pub mod error;
 pub mod hashmap;
 pub mod merkle;
 pub mod merkle_error;
