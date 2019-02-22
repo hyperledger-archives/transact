@@ -15,64 +15,14 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-
 use std::collections::HashMap;
 use std::collections::VecDeque;
-use std::error::Error as StdError;
 use std::str;
 
+pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
-use crate::protocol::receipt::{
-    Event, StateChange, TransactionReceipt, TransactionReceiptBuilder,
-    TransactionReceiptBuilderError,
-};
-use crate::state::error::StateReadError;
+use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
 use crate::state::Read;
-
-#[derive(Debug)]
-pub enum ContextManagerError {
-    MissingContextError(String),
-    TransactionReceiptBuilderError(TransactionReceiptBuilderError),
-    StateReadError(StateReadError),
-}
-
-impl StdError for ContextManagerError {
-    fn description(&self) -> &str {
-        match *self {
-            ContextManagerError::MissingContextError(ref msg) => msg,
-            ContextManagerError::TransactionReceiptBuilderError(ref err) => err.description(),
-            ContextManagerError::StateReadError(ref err) => err.description(),
-        }
-    }
-}
-
-impl std::fmt::Display for ContextManagerError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ContextManagerError::MissingContextError(ref s) => {
-                write!(f, "Unable to find specified Context: {:?}", s)
-            }
-            ContextManagerError::TransactionReceiptBuilderError(ref err) => {
-                write!(f, "A TransactionReceiptBuilder error occured: {}", err)
-            }
-            ContextManagerError::StateReadError(ref err) => {
-                write!(f, "A State Read error occured: {}", err)
-            }
-        }
-    }
-}
-
-impl From<TransactionReceiptBuilderError> for ContextManagerError {
-    fn from(err: TransactionReceiptBuilderError) -> Self {
-        ContextManagerError::TransactionReceiptBuilderError(err)
-    }
-}
-
-impl From<StateReadError> for ContextManagerError {
-    fn from(err: StateReadError) -> Self {
-        ContextManagerError::StateReadError(err)
-    }
-}
 
 pub struct ContextManager {
     contexts: HashMap<ContextId, Context>,

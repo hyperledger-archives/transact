@@ -19,6 +19,7 @@
 /// modify events, data, and state.
 pub type ContextId = [u8; 16];
 
+mod error;
 pub mod manager;
 
 use crate::context::manager::ContextManagerError;
