@@ -36,7 +36,7 @@ use super::change_log::{ChangeLogEntry, Successor};
 use super::error::{StatePruneError, StateReadError, StateWriteError};
 use super::{Prune, Read, StateChange, Write};
 
-use super::merkle_error::StateDatabaseError;
+pub use super::merkle_error::StateDatabaseError;
 
 const TOKEN_SIZE: usize = 2;
 

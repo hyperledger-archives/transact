@@ -25,7 +25,7 @@ pub mod change_log;
 pub mod error;
 pub mod hashmap;
 pub mod merkle;
-pub mod merkle_error;
+mod merkle_error;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;
