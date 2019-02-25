@@ -207,7 +207,8 @@ impl MerkleDatabase {
             deletion_candidates.into_iter().collect()
         } else {
             // deleting a parent
-            let successor = change_log.successors.pop().unwrap();
+            let mut successor = change_log.successors.pop().unwrap();
+            successor.deletions.push(root_bytes.clone());
 
             let (deletion_candidates, duplicates): (Vec<Vec<u8>>, Vec<Vec<u8>>) =
                 MerkleDatabase::remove_duplicate_hashes(&mut db_writer, successor.deletions)?;
