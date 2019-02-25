@@ -1412,36 +1412,39 @@ mod tests {
             merkle_db
                 .set_merkle_root(successor_root)
                 .expect("Unable to apply the new merkle root");
-            assert_eq!(
-                parent_change_log
-                    .successors
-                    .first()
-                    .unwrap()
-                    .deletions
-                    .len(),
-                merkle_db
-                    .prune(vec!(parent_root.clone()))
-                    .expect("Prune should have no errors")
-                    .len()
-            );
 
-            let reader = db.reader().unwrap();
-            for addition in parent_change_log
+            let mut deletions = parent_change_log
                 .successors
-                .clone()
                 .first()
                 .unwrap()
                 .deletions
-                .clone()
+                .clone();
+            deletions.push(parent_root_bytes.clone());
+            assert_eq!(
+                deletions.len(),
+                merkle_db
+                    .prune(vec![parent_root.clone()])
+                    .expect("Prune should have no errors")
+                    .len()
+            );
             {
-                assert!(reader.get(&addition).is_none());
+                let reader = db.reader().unwrap();
+                for addition in parent_change_log
+                    .successors
+                    .clone()
+                    .first()
+                    .unwrap()
+                    .deletions
+                    .clone()
+                {
+                    assert!(reader.get(&addition).is_none());
+                }
+
+                assert!(reader
+                    .index_get(CHANGE_LOG_INDEX, &parent_root_bytes)
+                    .expect("DB query should succeed")
+                    .is_none());
             }
-
-            assert!(reader
-                .index_get(CHANGE_LOG_INDEX, &parent_root_bytes)
-                .expect("DB query should succeed")
-                .is_none());
-
             assert!(merkle_db.set_merkle_root(parent_root).is_err());
         })
     }
@@ -1604,8 +1607,7 @@ mod tests {
                     .first()
                     .unwrap()
                     .deletions
-                    .len()
-                    - 1,
+                    .len(),
                 merkle_db
                     .prune(vec!(parent_root))
                     .expect("Prune should have no errors")
