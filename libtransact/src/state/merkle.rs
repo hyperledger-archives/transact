@@ -453,6 +453,14 @@ impl MerkleDatabase {
         Ok(())
     }
 
+    pub fn get_value(&self, address: &str) -> Result<Option<Vec<u8>>, StateDatabaseError> {
+        match self.get_by_address(address) {
+            Ok(value) => Ok(value.value),
+            Err(StateDatabaseError::NotFound(_)) => Ok(None),
+            Err(err) => Err(err),
+        }
+    }
+
     fn get_by_address(&self, address: &str) -> Result<Node, StateDatabaseError> {
         let tokens = tokenize_address(address);
 
