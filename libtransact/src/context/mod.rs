@@ -27,6 +27,14 @@ use uuid::Uuid;
 
 use crate::receipts::StateChange;
 
+/// ContextManager functionality used by the Scheduler.
+pub trait ContextLifecycle: Send {
+    /// Create a new Context, returning a unique ContextId.
+    fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId;
+
+    fn drop_context(&mut self, context_id: ContextId);
+}
+
 #[derive(Debug, Clone, Default)]
 pub struct Context {
     base_contexts: Vec<ContextId>,
