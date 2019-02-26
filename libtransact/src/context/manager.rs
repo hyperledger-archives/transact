@@ -1,5 +1,6 @@
 /*
  * Copyright 2019 Bitwise IO, Inc.
+ * Copyright 2019 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -73,12 +74,13 @@ impl From<StateReadError> for ContextManagerError {
     }
 }
 
-pub struct ContextManager<R: Read<StateId = String, Key = String, Value = Vec<u8>>> {
+pub struct ContextManager {
     contexts: HashMap<ContextId, Context>,
-    database: R,
+    database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
 }
-impl<R: Read<StateId = String, Key = String, Value = Vec<u8>>> ContextManager<R> {
-    pub fn new(database: R) -> Self {
+
+impl ContextManager {
+    pub fn new(database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>) -> Self {
         ContextManager {
             contexts: HashMap::new(),
             database,
@@ -301,16 +303,14 @@ mod tests {
     );
     static ATTR2: (&str, &str) = ("block_num", "3");
 
-    fn make_manager(
-        state_changes: Option<Vec<state::StateChange>>,
-    ) -> (ContextManager<HashMapState>, String) {
+    fn make_manager(state_changes: Option<Vec<state::StateChange>>) -> (ContextManager, String) {
         let state = HashMapState::new();
         let mut state_id = HashMapState::state_id(&HashMap::new());
         if let Some(changes) = state_changes {
             state_id = state.commit(&state_id, changes.as_slice()).unwrap();
         }
 
-        (ContextManager::new(state), state_id)
+        (ContextManager::new(Box::new(state)), state_id)
     }
 
     fn check_state_change(state_change: StateChange) {
