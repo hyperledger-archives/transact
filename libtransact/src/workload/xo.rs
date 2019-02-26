@@ -53,8 +53,7 @@ impl TransactionWorkload for XoTransactionWorkload {
             .sample_iter(&Alphanumeric)
             .take(NONCE_SIZE)
             .collect::<String>()
-            .as_bytes()
-            .to_vec();
+            .into_bytes();
 
         let payload = Payload::new_as_create_with_random_name(&mut self.rng);
 
@@ -135,8 +134,7 @@ impl Payload {
         match self.action {
             Action::CREATE => String::from(format!("create,{},", self.name)),
         }
-        .as_bytes()
-        .to_vec()
+        .into_bytes()
     }
 
     fn address(&self) -> Vec<u8> {
