@@ -257,7 +257,7 @@ impl ExecuterThread {
                                         );
                                         }
                                     }
-                                    Err(ExecutionAdapterError::TimeOutError(transaction_pair)) => {
+                                    Err(ExecutionAdapterError::TimeoutError(transaction_pair)) => {
                                         let sender = sender.clone();
 
                                         let execution_task =

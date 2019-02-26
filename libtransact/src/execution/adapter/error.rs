@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2019 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +17,7 @@
  */
 
 use crate::transaction::TransactionPair;
+use std::{error::Error, fmt};
 
 /// During processing of the Transaction, something unexpected happened.
 /// The `Executor` immediately retries the `TransactionPair` for all of these
@@ -23,9 +25,43 @@ use crate::transaction::TransactionPair;
 #[derive(Debug)]
 pub enum ExecutionAdapterError {
     /// Executing the transaction took too much time and so abort
-    TimeOutError(TransactionPair),
+    TimeoutError(TransactionPair),
     /// This ExecutionAdaptor does not have the capability to process the `TransactionPair`
     /// given to it. This can happen due to a timing error in routing the `TransactionPair`
     /// to the `ExecutionAdapter`.
     RoutingError(TransactionPair),
+
+    GeneralExecutionError(Box<dyn Error>),
+}
+
+impl Error for ExecutionAdapterError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match *self {
+            ExecutionAdapterError::GeneralExecutionError(ref err) => Some(&**err),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Display for ExecutionAdapterError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            ExecutionAdapterError::TimeoutError(ref pair) => write!(
+                f,
+                "Timeout while processing {}/{}: {}",
+                pair.header().family_name(),
+                pair.header().family_version(),
+                pair.transaction().header_signature()
+            ),
+            ExecutionAdapterError::RoutingError(pair) => write!(
+                f,
+                "Unable to route {}/{}",
+                pair.header().family_name(),
+                pair.header().family_version()
+            ),
+            ExecutionAdapterError::GeneralExecutionError(err) => {
+                write!(f, "General Execution Error: {}", &err)
+            }
+        }
+    }
 }
