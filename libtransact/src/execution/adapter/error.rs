@@ -25,11 +25,11 @@ use std::{error::Error, fmt};
 #[derive(Debug)]
 pub enum ExecutionAdapterError {
     /// Executing the transaction took too much time and so abort
-    TimeoutError(TransactionPair),
+    TimeoutError(Box<TransactionPair>),
     /// This ExecutionAdaptor does not have the capability to process the `TransactionPair`
     /// given to it. This can happen due to a timing error in routing the `TransactionPair`
     /// to the `ExecutionAdapter`.
-    RoutingError(TransactionPair),
+    RoutingError(Box<TransactionPair>),
 
     GeneralExecutionError(Box<dyn Error>),
 }

@@ -97,7 +97,9 @@ impl TestExecutionAdapterState {
         on_done(if self.available {
             Ok(ExecutionTaskCompletionNotification::Valid(context_id))
         } else {
-            Err(ExecutionAdapterError::RoutingError(transaction_pair))
+            Err(ExecutionAdapterError::RoutingError(Box::new(
+                transaction_pair,
+            )))
         });
     }
 

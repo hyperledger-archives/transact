@@ -261,7 +261,7 @@ impl ExecuterThread {
                                         let sender = sender.clone();
 
                                         let execution_task =
-                                            ExecutionTask::new(transaction_pair, context_id);
+                                            ExecutionTask::new(*transaction_pair, context_id);
                                         let execution_event = (res_sender, execution_task);
                                         if let Err(err) =
                                             sender.send(RegistrationExecutionEvent::Execution(
@@ -275,7 +275,7 @@ impl ExecuterThread {
                                         let sender = sender.clone();
 
                                         let execution_task =
-                                            ExecutionTask::new(transaction_pair, context_id);
+                                            ExecutionTask::new(*transaction_pair, context_id);
                                         let execution_event = (res_sender, execution_task);
                                         if let Err(err) =
                                             sender.send(RegistrationExecutionEvent::Execution(
