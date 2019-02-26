@@ -36,7 +36,7 @@ use super::change_log::{ChangeLogEntry, Successor};
 use super::error::{StatePruneError, StateReadError, StateWriteError};
 use super::{Prune, Read, StateChange, Write};
 
-use super::merkle_error::StateDatabaseError;
+pub use super::merkle_error::StateDatabaseError;
 
 const TOKEN_SIZE: usize = 2;
 
@@ -452,6 +452,14 @@ impl MerkleDatabase {
 
         db_writer.commit()?;
         Ok(())
+    }
+
+    pub fn get_value(&self, address: &str) -> Result<Option<Vec<u8>>, StateDatabaseError> {
+        match self.get_by_address(address) {
+            Ok(value) => Ok(value.value),
+            Err(StateDatabaseError::NotFound(_)) => Ok(None),
+            Err(err) => Err(err),
+        }
     }
 
     fn get_by_address(&self, address: &str) -> Result<Node, StateDatabaseError> {
