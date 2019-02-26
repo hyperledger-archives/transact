@@ -27,8 +27,6 @@ use cbor::value::{Bytes, Key, Text, Value};
 
 use openssl;
 
-use std::sync::{Arc, Mutex};
-
 use crate::database::error::DatabaseError;
 use crate::database::lmdb::{DatabaseReader, LmdbDatabase, LmdbDatabaseWriter};
 
@@ -47,15 +45,12 @@ pub const INDEXES: [&str; 2] = [CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX];
 type StateIter = Iterator<Item = Result<(String, Vec<u8>), StateDatabaseError>>;
 type StateHash = Vec<u8>;
 
-/// Merkle Database
 #[derive(Clone)]
-pub struct MerkleDatabase {
-    root_hash: Arc<Mutex<String>>,
+pub struct MerkleState {
     db: LmdbDatabase,
-    root_node: Arc<Mutex<Node>>,
 }
 
-impl Write for MerkleDatabase {
+impl Write for MerkleState {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -65,12 +60,16 @@ impl Write for MerkleDatabase {
         state_id: &Self::StateId,
         state_changes: &[StateChange<Self::Key, Self::Value>],
     ) -> Result<Self::StateId, StateWriteError> {
-        self.set_merkle_root(state_id.to_string())
+        let mut merkle_tree = MerkleDatabase::new(self.db.clone(), Some(state_id))
+            .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
+        merkle_tree
+            .set_merkle_root(state_id.to_string())
             .map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
                 _ => StateWriteError::StorageError(Box::new(err)),
             })?;
-        self.update(state_changes, false)
+        merkle_tree
+            .update(state_changes, false)
             .map_err(|err| StateWriteError::StorageError(Box::new(err)))
     }
 
@@ -79,17 +78,22 @@ impl Write for MerkleDatabase {
         state_id: &Self::StateId,
         state_changes: &[StateChange<Self::Key, Self::Value>],
     ) -> Result<Self::StateId, StateWriteError> {
-        self.set_merkle_root(state_id.to_string())
+        let mut merkle_tree = MerkleDatabase::new(self.db.clone(), Some(state_id))
+            .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
+
+        merkle_tree
+            .set_merkle_root(state_id.to_string())
             .map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
                 _ => StateWriteError::StorageError(Box::new(err)),
             })?;
-        self.update(state_changes, true)
+        merkle_tree
+            .update(state_changes, true)
             .map_err(|err| StateWriteError::StorageError(Box::new(err)))
     }
 }
 
-impl Read for MerkleDatabase {
+impl Read for MerkleState {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -99,13 +103,17 @@ impl Read for MerkleDatabase {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        self.set_merkle_root(state_id.to_string())
+        let mut merkle_tree = MerkleDatabase::new(self.db.clone(), Some(state_id))
+            .map_err(|err| StateReadError::StorageError(Box::new(err)))?;
+
+        merkle_tree
+            .set_merkle_root(state_id.to_string())
             .map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateReadError::InvalidStateId(msg),
                 _ => StateReadError::StorageError(Box::new(err)),
             })?;
         keys.iter().try_fold(HashMap::new(), |mut result, key| {
-            let value = match self.get_by_address(key) {
+            let value = match merkle_tree.get_by_address(key) {
                 Ok(value) => Ok(value.value),
                 Err(err) => match err {
                     StateDatabaseError::NotFound(_) => Ok(None),
@@ -120,7 +128,7 @@ impl Read for MerkleDatabase {
     }
 }
 
-impl Prune for MerkleDatabase {
+impl Prune for MerkleState {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -140,6 +148,14 @@ impl Prune for MerkleDatabase {
     }
 }
 
+/// Merkle Database
+#[derive(Clone)]
+pub struct MerkleDatabase {
+    root_hash: String,
+    db: LmdbDatabase,
+    root_node: Node,
+}
+
 impl MerkleDatabase {
     /// Constructs a new MerkleDatabase, backed by a given Database
     ///
@@ -149,9 +165,9 @@ impl MerkleDatabase {
         let root_node = get_node_by_hash(&db, &root_hash)?;
 
         Ok(MerkleDatabase {
-            root_hash: Arc::new(Mutex::new(root_hash)),
-            root_node: Arc::new(Mutex::new(root_node)),
+            root_hash,
             db,
+            root_node,
         })
     }
 
@@ -245,26 +261,17 @@ impl MerkleDatabase {
     }
     /// Returns the current merkle root for this MerkleDatabase
     pub fn get_merkle_root(&self) -> String {
-        self.root_hash
-            .lock()
-            .expect("Couldn't lock root_hash mutex!")
-            .clone()
+        self.root_hash.clone()
     }
 
     /// Sets the current merkle root for this MerkleDatabase
     pub fn set_merkle_root<S: Into<String>>(
-        &self,
+        &mut self,
         merkle_root: S,
     ) -> Result<(), StateDatabaseError> {
         let new_root = merkle_root.into();
-        *self
-            .root_node
-            .lock()
-            .expect("Couldn't lock root_node mutex") = get_node_by_hash(&self.db, &new_root)?;
-        *self
-            .root_hash
-            .lock()
-            .expect("Couldn't lock root_hash mutex") = new_root;
+        self.root_node = get_node_by_hash(&self.db, &new_root)?;
+        self.root_hash = new_root;
         Ok(())
     }
 
@@ -405,13 +412,7 @@ impl MerkleDatabase {
         let mut db_writer = self.db.writer()?;
 
         // We expect this to be hex, since we generated it
-        let root_hash_bytes = ::hex::decode(
-            &*self
-                .root_hash
-                .lock()
-                .expect("Couldn't lock root_hash mutex"),
-        )
-        .expect("Improper hex");
+        let root_hash_bytes = ::hex::decode(&self.root_hash).expect("Improper hex");
 
         for &(ref key, ref value) in batch {
             match db_writer.put(::hex::encode(key).as_bytes(), &value) {
@@ -466,11 +467,7 @@ impl MerkleDatabase {
         let tokens = tokenize_address(address);
 
         // There's probably a better way to do this than a clone
-        let mut node = self
-            .root_node
-            .lock()
-            .expect("Couldn't lock root_node mutex")
-            .clone();
+        let mut node = self.root_node.clone();
 
         for token in tokens.iter() {
             node = match node.children.get(&token.to_string()) {
@@ -478,10 +475,7 @@ impl MerkleDatabase {
                     return Err(StateDatabaseError::NotFound(format!(
                         "invalid address {} from root {}",
                         address,
-                        self.root_hash
-                            .lock()
-                            .expect("Couldn't lock root_hash mutex")
-                            .clone()
+                        self.root_hash.clone()
                     )));
                 }
                 Some(child_hash) => get_node_by_hash(&self.db, child_hash)?,
@@ -510,13 +504,7 @@ impl MerkleDatabase {
         let mut nodes = HashMap::new();
 
         let mut path = String::new();
-        nodes.insert(
-            path.clone(),
-            self.root_node
-                .lock()
-                .expect("Couldn't lock root_node mutex")
-                .clone(),
-        );
+        nodes.insert(path.clone(), self.root_node.clone());
 
         let mut new_branch = false;
 
@@ -531,10 +519,7 @@ impl MerkleDatabase {
                         return Err(StateDatabaseError::NotFound(format!(
                             "invalid address {} from root {}",
                             tokens.join(""),
-                            self.root_hash
-                                .lock()
-                                .expect("Couldn't lock root_hash mutex")
-                                .clone()
+                            self.root_hash.clone()
                         )));
                     }
                     (false, false) => {
@@ -551,8 +536,8 @@ impl MerkleDatabase {
     }
 }
 
-/// A MerkleLeafIterator is fixed to iterate over the state address/value pairs
-/// the merkle root hash at the time of its creation.
+// A MerkleLeafIterator is fixed to iterate over the state address/value pairs
+// the merkle root hash at the time of its creation.
 pub struct MerkleLeafIterator {
     merkle_db: MerkleDatabase,
     visited: VecDeque<(String, Node)>,
@@ -937,7 +922,7 @@ mod tests {
     fn merkle_trie_root_advance() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let merkle_db = MerkleDatabase::new(db.clone(), None).unwrap();
+            let mut merkle_db = MerkleDatabase::new(db.clone(), None).unwrap();
 
             let orig_root = merkle_db.get_merkle_root();
             let orig_root_bytes = &::hex::decode(orig_root.clone()).unwrap();
@@ -955,8 +940,8 @@ mod tests {
                 key: "abcd".to_string(),
                 value: "data_value".as_bytes().to_vec(),
             };
-
-            let new_root = merkle_db.commit(&orig_root, &[state_change]).unwrap();
+            merkle_db.set_merkle_root(orig_root.clone()).unwrap();
+            let new_root = merkle_db.update(&[state_change], false).unwrap();
             let new_root_bytes = &::hex::decode(new_root.clone()).unwrap();
 
             assert_eq!(merkle_db.get_merkle_root(), orig_root, "Incorrect root");
@@ -986,16 +971,14 @@ mod tests {
     #[test]
     fn merkle_trie_delete() {
         run_test(|merkle_path| {
-            let merkle_db = make_db(&merkle_path);
+            let mut merkle_db = make_db(&merkle_path);
 
             let state_change_set = StateChange::Set {
                 key: "1234".to_string(),
                 value: "deletable".as_bytes().to_vec(),
             };
 
-            let new_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &[state_change_set])
-                .unwrap();
+            let new_root = merkle_db.update(&[state_change_set], false).unwrap();
             merkle_db.set_merkle_root(new_root).unwrap();
             assert_value_at_address(&merkle_db, "1234", "deletable");
 
@@ -1004,17 +987,13 @@ mod tests {
             };
 
             // deleting an unknown key should return an error
-            assert!(merkle_db
-                .commit(&merkle_db.get_merkle_root(), &[state_change_del_1])
-                .is_err());
+            assert!(merkle_db.update(&[state_change_del_1], false).is_err());
 
             let state_change_del_2 = StateChange::Delete {
                 key: "1234".to_string(),
             };
 
-            let del_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &[state_change_del_2])
-                .unwrap();
+            let del_root = merkle_db.update(&[state_change_del_2], false).unwrap();
 
             // del_root hasn't been set yet, so address should still have value
             assert_value_at_address(&merkle_db, "1234", "deletable");
@@ -1026,7 +1005,7 @@ mod tests {
     #[test]
     fn merkle_trie_update() {
         run_test(|merkle_path| {
-            let merkle_db = make_db(&merkle_path);
+            let mut merkle_db = make_db(&merkle_path);
             let init_root = merkle_db.get_merkle_root();
 
             let key_hashes = (0..1000)
@@ -1038,17 +1017,16 @@ mod tests {
                 .collect::<Vec<_>>();
 
             let mut values = HashMap::new();
-            let mut new_root = init_root.clone();
             for &(ref key, ref hashed) in key_hashes.iter() {
                 let state_change_set = StateChange::Set {
                     key: hashed.to_string(),
                     value: key.as_bytes().to_vec(),
                 };
-                new_root = merkle_db.commit(&new_root, &[state_change_set]).unwrap();
+                let new_root = merkle_db.update(&[state_change_set], false).unwrap();
+                merkle_db.set_merkle_root(new_root.clone()).unwrap();
                 values.insert(hashed.clone(), key.to_string());
             }
 
-            merkle_db.set_merkle_root(new_root).unwrap();
             assert_ne!(init_root, merkle_db.get_merkle_root());
 
             let mut rng = thread_rng();
@@ -1073,16 +1051,12 @@ mod tests {
 
             state_changes.extend_from_slice(&delete_items);
 
-            let virtual_root = merkle_db
-                .compute_state_id(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let virtual_root = merkle_db.update(&state_changes, true).unwrap();
 
             // virtual root shouldn't match actual contents of tree
             assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
 
-            let actual_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let actual_root = merkle_db.update(&state_changes, false).unwrap();
             // the virtual root should be the same as the actual root
             assert_eq!(virtual_root, actual_root);
             assert_ne!(actual_root, merkle_db.get_merkle_root());
@@ -1096,10 +1070,7 @@ mod tests {
             for delete_change in delete_items {
                 match delete_change {
                     StateChange::Delete { key } => {
-                        assert!(!merkle_db
-                            .get(&merkle_db.get_merkle_root(), &[key.clone()])
-                            .unwrap()
-                            .contains_key(&key));
+                        assert!(!merkle_db.get_by_address(&key.clone()).is_ok());
                     }
                     _ => (),
                 }
@@ -1117,7 +1088,8 @@ mod tests {
     /// (set & delete).
     fn merkle_trie_update_same_address_space() {
         run_test(|merkle_path| {
-            let merkle_db = make_db(merkle_path);
+            let mut merkle_db = make_db(merkle_path);
+
             let init_root = merkle_db.get_merkle_root();
             let key_hashes = vec![
                 // matching prefix e55420
@@ -1148,17 +1120,17 @@ mod tests {
                 ),
             ];
             let mut values = HashMap::new();
-            let mut new_root = init_root.clone();
+            //let mut new_root = init_root.clone();
             for &(ref key, ref hashed) in key_hashes.iter() {
                 let state_change_set = StateChange::Set {
                     key: hashed.to_string(),
                     value: key.as_bytes().to_vec(),
                 };
-                new_root = merkle_db.commit(&new_root, &[state_change_set]).unwrap();
+                let new_root = merkle_db.update(&[state_change_set], false).unwrap();
+                merkle_db.set_merkle_root(new_root).unwrap();
                 values.insert(hashed.to_string(), key.to_string());
             }
 
-            merkle_db.set_merkle_root(new_root).unwrap();
             assert_ne!(init_root, merkle_db.get_merkle_root());
             let mut state_changes = vec![];
             // Perform some updates on the lower keys
@@ -1198,16 +1170,12 @@ mod tests {
 
             state_changes.extend_from_slice(&delete_items);
 
-            let virtual_root = merkle_db
-                .compute_state_id(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let virtual_root = merkle_db.update(&state_changes, true).unwrap();
 
             // virtual root shouldn't match actual contents of tree
             assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
 
-            let actual_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let actual_root = merkle_db.update(&state_changes, false).unwrap();
             // the virtual root should be the same as the actual root
             assert_eq!(virtual_root, actual_root);
             assert_ne!(actual_root, merkle_db.get_merkle_root());
@@ -1220,12 +1188,7 @@ mod tests {
 
             for delete_change in delete_items {
                 match delete_change {
-                    StateChange::Delete { key } => {
-                        assert!(!merkle_db
-                            .get(&merkle_db.get_merkle_root(), &[key.clone()])
-                            .unwrap()
-                            .contains_key(&key));
-                    }
+                    StateChange::Delete { key } => assert!(!merkle_db.get_by_address(&key).is_ok()),
                     _ => (),
                 }
             }
@@ -1242,7 +1205,8 @@ mod tests {
     /// (set & delete).
     fn merkle_trie_update_same_address_space_with_no_children() {
         run_test(|merkle_path| {
-            let merkle_db = make_db(merkle_path);
+            let mut merkle_db = make_db(merkle_path);
+
             let init_root = merkle_db.get_merkle_root();
             let key_hashes = vec![
                 (
@@ -1268,17 +1232,16 @@ mod tests {
                 ),
             ];
             let mut values = HashMap::new();
-            let mut new_root = init_root.clone();
             for &(ref key, ref hashed) in key_hashes.iter() {
                 let state_change_set = StateChange::Set {
                     key: hashed.to_string(),
                     value: key.as_bytes().to_vec(),
                 };
-                new_root = merkle_db.commit(&new_root, &[state_change_set]).unwrap();
+                let new_root = merkle_db.update(&[state_change_set], false).unwrap();
+                merkle_db.set_merkle_root(new_root).unwrap();
                 values.insert(hashed.to_string(), key.to_string());
             }
 
-            merkle_db.set_merkle_root(new_root).unwrap();
             assert_ne!(init_root, merkle_db.get_merkle_root());
 
             // matching prefix e55420, however this will be newly added and not set already in trie
@@ -1325,16 +1288,12 @@ mod tests {
 
             state_changes.extend_from_slice(&delete_items);
 
-            let virtual_root = merkle_db
-                .compute_state_id(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let virtual_root = merkle_db.update(&state_changes, true).unwrap();
 
             // virtual root shouldn't match actual contents of tree
             assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
 
-            let actual_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &state_changes)
-                .unwrap();
+            let actual_root = merkle_db.update(&state_changes, false).unwrap();
 
             // the virtual root should be the same as the actual root
             assert_eq!(virtual_root, actual_root);
@@ -1349,10 +1308,7 @@ mod tests {
             for delete_change in delete_items {
                 match delete_change {
                     StateChange::Delete { key } => {
-                        assert!(!merkle_db
-                            .get(&merkle_db.get_merkle_root(), &[key.clone()])
-                            .unwrap()
-                            .contains_key(&key));
+                        assert!(!merkle_db.get_by_address(&key).is_ok());
                     }
                     _ => (),
                 }
@@ -1371,7 +1327,7 @@ mod tests {
     fn merkle_trie_pruning_parent() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
             let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
@@ -1388,7 +1344,7 @@ mod tests {
             });
 
             let parent_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
             merkle_db.set_merkle_root(parent_root.clone()).unwrap();
 
@@ -1402,12 +1358,12 @@ mod tests {
             assert_value_at_address(&merkle_db, "abff00", "0003");
 
             let successor_root = merkle_db
-                .commit(
-                    &parent_root,
+                .update(
                     &[StateChange::Set {
                         key: "ab0000".to_string(),
                         value: "test".as_bytes().to_vec(),
                     }],
+                    false,
                 )
                 .expect("Set failed to work");
             let successor_root_bytes = ::hex::decode(successor_root.clone()).expect("proper hex");
@@ -1432,8 +1388,7 @@ mod tests {
             deletions.push(parent_root_bytes.clone());
             assert_eq!(
                 deletions.len(),
-                merkle_db
-                    .prune(vec![parent_root.clone()])
+                MerkleDatabase::prune(&db, &parent_root)
                     .expect("Prune should have no errors")
                     .len()
             );
@@ -1458,6 +1413,7 @@ mod tests {
             assert!(merkle_db.set_merkle_root(parent_root).is_err());
         })
     }
+
     #[test]
     /// This test creates a merkle trie with multiple entries and produces two
     /// distinct successor tries from that first.
@@ -1471,7 +1427,7 @@ mod tests {
     fn merkle_trie_pruning_successors() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
             let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
@@ -1488,7 +1444,7 @@ mod tests {
             });
 
             let parent_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
             let parent_root_bytes = ::hex::decode(parent_root.clone()).expect("Proper hex");
 
@@ -1498,12 +1454,12 @@ mod tests {
             assert_value_at_address(&merkle_db, "abff00", "0003");
 
             let successor_root_left = merkle_db
-                .commit(
-                    &parent_root,
+                .update(
                     &[StateChange::Set {
                         key: "ab0000".to_string(),
                         value: "left".as_bytes().to_vec(),
                     }],
+                    false,
                 )
                 .expect("Set failed to work");
 
@@ -1511,12 +1467,12 @@ mod tests {
                 ::hex::decode(successor_root_left.clone()).expect("proper hex");
 
             let successor_root_right = merkle_db
-                .commit(
-                    &parent_root,
+                .update(
                     &[StateChange::Set {
                         key: "ab0a01".to_string(),
                         value: "right".as_bytes().to_vec(),
                     }],
+                    false,
                 )
                 .expect("Set failed to work");
 
@@ -1534,13 +1490,9 @@ mod tests {
 
             // Let's prune the left successor:
 
-            assert_eq!(
-                successor_left_change_log.additions.len(),
-                merkle_db
-                    .prune(vec!(successor_root_left.clone()))
-                    .expect("Prune should have no errors")
-                    .len()
-            );
+            let res = MerkleDatabase::prune(&db, &successor_root_left)
+                .expect("Prune should have no errors");
+            assert_eq!(successor_left_change_log.additions.len(), res.len());
 
             parent_change_log = expect_change_log(&db, &parent_root_bytes);
             assert_has_successors(&parent_change_log, &[&successor_root_right_bytes]);
@@ -1557,7 +1509,7 @@ mod tests {
     fn merkle_trie_pruning_duplicate_leaves() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
             let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
             updates.push(StateChange::Set {
                 key: "ab0000".to_string(),
@@ -1573,7 +1525,7 @@ mod tests {
             });
 
             let parent_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
             let parent_root_bytes = ::hex::decode(parent_root.clone()).expect("Proper hex");
 
@@ -1590,7 +1542,7 @@ mod tests {
             });
 
             let successor_root_middle = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
 
             // create the last root
@@ -1599,12 +1551,12 @@ mod tests {
                 .unwrap();
             // Set the value back to the original
             let successor_root_last = merkle_db
-                .commit(
-                    &merkle_db.get_merkle_root(),
+                .update(
                     &[StateChange::Set {
                         key: "ab0000".to_string(),
                         value: "0001".as_bytes().to_vec(),
                     }],
+                    false,
                 )
                 .expect("Set failed to work");
 
@@ -1618,8 +1570,7 @@ mod tests {
                     .unwrap()
                     .deletions
                     .len(),
-                merkle_db
-                    .prune(vec!(parent_root))
+                MerkleDatabase::prune(&db, &parent_root)
                     .expect("Prune should have no errors")
                     .len()
             );
@@ -1636,7 +1587,7 @@ mod tests {
     fn merkle_trie_pruning_successor_duplicate_leaves() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
-            let merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
+            let mut merkle_db = MerkleDatabase::new(db.clone(), None).expect("No db errors");
             let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
@@ -1653,7 +1604,7 @@ mod tests {
             });
 
             let parent_root = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
 
             // create the middle root
@@ -1668,7 +1619,7 @@ mod tests {
                 value: "change1".as_bytes().to_vec(),
             });
             let successor_root_middle = merkle_db
-                .commit(&merkle_db.get_merkle_root(), &updates)
+                .update(&updates, false)
                 .expect("Update failed to work");
 
             // create the last root
@@ -1677,12 +1628,12 @@ mod tests {
                 .unwrap();
             // Set the value back to the original
             let successor_root_last = merkle_db
-                .commit(
-                    &merkle_db.get_merkle_root(),
+                .update(
                     &[StateChange::Set {
                         key: "ab0000".to_string(),
                         value: "0001".as_bytes().to_vec(),
                     }],
+                    false,
                 )
                 .expect("Set failed to work");
             let successor_root_bytes =
@@ -1693,8 +1644,7 @@ mod tests {
             let last_change_log = expect_change_log(&db, &successor_root_bytes);
             assert_eq!(
                 last_change_log.additions.len() - 1,
-                merkle_db
-                    .prune(vec!(successor_root_last))
+                MerkleDatabase::prune(&db, &successor_root_last)
                     .expect("Prune should have no errors")
                     .len()
             );
@@ -1706,7 +1656,7 @@ mod tests {
     #[test]
     fn leaf_iteration() {
         run_test(|merkle_path| {
-            let merkle_db = make_db(merkle_path);
+            let mut merkle_db = make_db(merkle_path);
 
             {
                 let mut leaf_iter = merkle_db.leaves(None).unwrap();
@@ -1717,15 +1667,14 @@ mod tests {
             }
 
             let addresses = vec!["ab0000", "aba001", "abff02"];
-            let mut new_root = merkle_db.get_merkle_root();
             for (i, key) in addresses.iter().enumerate() {
                 let state_change_set = StateChange::Set {
                     key: key.to_string(),
                     value: format!("{:04x}", i * 10).as_bytes().to_vec(),
                 };
-                new_root = merkle_db.commit(&new_root, &[state_change_set]).unwrap();
+                let new_root = merkle_db.update(&[state_change_set], false).unwrap();
+                merkle_db.set_merkle_root(new_root).unwrap();
             }
-            merkle_db.set_merkle_root(new_root).unwrap();
             assert_value_at_address(&merkle_db, "ab0000", "0000");
             assert_value_at_address(&merkle_db, "aba001", "000a");
             assert_value_at_address(&merkle_db, "abff02", "0014");
@@ -1771,11 +1720,11 @@ mod tests {
     }
 
     fn assert_value_at_address(merkle_db: &MerkleDatabase, address: &str, expected_value: &str) {
-        let value = merkle_db.get(&merkle_db.get_merkle_root(), &[address.to_string()]);
+        let value = merkle_db.get_by_address(&address.to_string());
         assert!(value.is_ok(), format!("Value not returned: {:?}", value));
         assert_eq!(
             Ok(expected_value),
-            from_utf8(&value.unwrap().get(address).unwrap())
+            from_utf8(&value.unwrap().value.unwrap())
         );
     }
 
