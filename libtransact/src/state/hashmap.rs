@@ -133,6 +133,10 @@ impl Read for HashMapState {
             .filter_map(|k| state.get(&k).cloned().map(|v| (k, v)))
             .collect())
     }
+
+    fn clone_box(&self) -> Box<Read<StateId = String, Key = String, Value = Vec<u8>>> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 #[cfg(test)]

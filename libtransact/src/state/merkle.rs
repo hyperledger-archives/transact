@@ -126,6 +126,10 @@ impl Read for MerkleState {
             Ok(result)
         })
     }
+
+    fn clone_box(&self) -> Box<Read<StateId = String, Key = String, Value = Vec<u8>>> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 impl Prune for MerkleState {

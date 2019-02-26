@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2019 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -147,7 +148,7 @@ pub trait Prune: Sync + Send + Clone {
 /// It provides the ability to read values from an underlying storage
 ///
 /// Implementations are expected to be thread-safe.
-pub trait Read: Sync + Send + Clone {
+pub trait Read: Send + Send {
     /// A reference to a checkpoint in state. It could be a merkle hash for
     /// a merkle database.
     type StateId;
@@ -171,4 +172,13 @@ pub trait Read: Sync + Send + Clone {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError>;
+
+    fn clone_box(&self)
+        -> Box<Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>>;
+}
+
+impl<S, K, V> Clone for Box<Read<StateId = S, Key = K, Value = V>> {
+    fn clone(&self) -> Box<Read<StateId = S, Key = K, Value = V>> {
+        self.clone_box()
+    }
 }
