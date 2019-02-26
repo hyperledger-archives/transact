@@ -285,6 +285,9 @@ impl ExecuterThread {
                                             warn!("During retry of RoutingError: {}", err);
                                         }
                                     }
+                                    Err(ExecutionAdapterError::GeneralExecutionError(err)) => {
+                                        error!("General Execution Error: {}", err);
+                                    }
                                 }
                             });
                             execution_adapter.execute(pair, context_id, callback);
