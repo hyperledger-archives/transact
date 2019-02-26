@@ -140,3 +140,91 @@ pub trait ExecutionTaskCompletionNotifier: Send {
     /// Sends a notification to the scheduler.
     fn notify(&self, notification: ExecutionTaskCompletionNotification);
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::workload::xo::XoBatchWorkload;
+    use crate::workload::BatchWorkload;
+
+    use std::sync::{Arc, Condvar, Mutex};
+    use std::thread;
+
+    pub fn test_scheduler(scheduler: &mut Scheduler) {
+        let mut workload = XoBatchWorkload::new_with_seed(5);
+        scheduler.add_batch(workload.next_batch().unwrap());
+    }
+
+    /// Tests that cancel will properly drain the scheduler by adding a couple
+    /// of batches and then calling cancel twice.
+    pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
+        let mut workload = XoBatchWorkload::new_with_seed(4);
+        scheduler.add_batch(workload.next_batch().unwrap());
+        scheduler.add_batch(workload.next_batch().unwrap());
+        assert_eq!(scheduler.cancel().len(), 2);
+        assert_eq!(scheduler.cancel().len(), 0);
+    }
+
+    /// Tests a simple scheduler worklfow of processing a single transaction.
+    ///
+    /// For the purposes of this test, we simply return an invalid transaction
+    /// as we are not testing the actual execution of the transaction but
+    /// rather the flow of getting a result after adding the batch.
+    pub fn test_scheduler_flow_with_one_transaction(scheduler: &mut Scheduler) {
+        let shared = Arc::new((Mutex::new(false), Condvar::new()));
+        let shared2 = shared.clone();
+
+        let mut workload = XoBatchWorkload::new_with_seed(8);
+
+        scheduler.set_result_callback(Box::new(move |_batch_result| {
+            let &(ref lock, ref cvar) = &*shared2;
+
+            let mut inner = lock.lock().unwrap();
+            *inner = true;
+            cvar.notify_one();
+        }));
+
+        let mut task_iterator = scheduler.take_task_iterator();
+        let notifier = scheduler.new_notifier();
+
+        thread::Builder::new()
+            .name(String::from(
+                "Thread-test_scheduler_flow_with_one_transaction",
+            ))
+            .spawn(move || loop {
+                let context_id = [
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x01,
+                ];
+                match task_iterator.next() {
+                    Some(task) => {
+                        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+                            context_id,
+                            InvalidTransactionResult {
+                                transaction_id: task
+                                    .pair()
+                                    .transaction()
+                                    .header_signature()
+                                    .to_string(),
+                                error_message: String::from("invalid"),
+                                error_data: vec![],
+                            },
+                        ));
+                    }
+                    None => {
+                        break;
+                    }
+                }
+            })
+            .unwrap();
+
+        scheduler.add_batch(workload.next_batch().unwrap());
+
+        let &(ref lock, ref cvar) = &*shared;
+
+        let mut inner = lock.lock().unwrap();
+        while !(*inner) {
+            inner = cvar.wait(inner).unwrap();
+        }
+    }
+}
