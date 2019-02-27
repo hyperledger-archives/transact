@@ -28,6 +28,8 @@ pub mod scheduler;
 pub mod signing;
 pub mod state;
 pub mod transaction;
+#[cfg(test)]
+pub mod workload;
 
 #[macro_use]
 extern crate log;
