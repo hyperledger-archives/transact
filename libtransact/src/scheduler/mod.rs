@@ -63,6 +63,7 @@ impl ExecutionTask {
 }
 
 /// Result from executing an invalid transaction.
+#[derive(Debug, PartialEq)]
 pub struct InvalidTransactionResult {
     /// Transaction identifier.
     pub transaction_id: String,
@@ -93,6 +94,7 @@ pub struct BatchExecutionResult {
     pub results: Vec<TransactionExecutionResult>,
 }
 
+#[derive(Debug, PartialEq)]
 pub enum ExecutionTaskCompletionNotification {
     /// The transation was invalid.
     Invalid(ContextId, InvalidTransactionResult),
