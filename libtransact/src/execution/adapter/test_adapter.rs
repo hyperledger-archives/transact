@@ -16,10 +16,9 @@
  */
 
 use crate::context::ContextId;
-use crate::execution::adapter::{
-    ExecutionAdapter, ExecutionAdapterError, ExecutionResult, TransactionStatus,
-};
+use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
 use crate::execution::{ExecutionRegistry, TransactionFamily};
+use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::transaction::TransactionPair;
 use std::sync::{Arc, Mutex};
 
@@ -70,7 +69,7 @@ impl ExecutionAdapter for TestExecutionAdapter {
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
+        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
     ) {
         self.state.lock().expect("mutex is not poisoned").execute(
             transaction_pair,
@@ -92,21 +91,11 @@ impl TestExecutionAdapterState {
     fn execute(
         &self,
         transaction_pair: TransactionPair,
-        _context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
+        context_id: ContextId,
+        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
     ) {
         on_done(if self.available {
-            let transaction_status = TransactionStatus::Valid;
-
-            let transaction_result = ExecutionResult {
-                transaction_id: transaction_pair
-                    .transaction()
-                    .header_signature()
-                    .to_string(),
-                status: transaction_status,
-            };
-
-            Ok(transaction_result)
+            Ok(ExecutionTaskCompletionNotification::Valid(context_id))
         } else {
             Err(ExecutionAdapterError::RoutingError(transaction_pair))
         });
@@ -168,15 +157,20 @@ mod tests {
         let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
         let on_done = Box::new(
-            move |execution_result: Result<ExecutionResult, ExecutionAdapterError>| {
+            move |notification: Result<
+                ExecutionTaskCompletionNotification,
+                ExecutionAdapterError,
+            >| {
                 assert!(
-                    execution_result.is_ok(),
+                    notification.is_ok(),
                     "There was no error handling the transaction"
                 );
-                assert_eq!(
-                    execution_result.unwrap().status,
-                    TransactionStatus::Valid,
-                    "The transaction is valid"
+                assert!(
+                    match notification.unwrap() {
+                        ExecutionTaskCompletionNotification::Valid(_) => true,
+                        _ => false,
+                    },
+                    "The transaction was not valid"
                 );
             },
         );
@@ -184,9 +178,12 @@ mod tests {
         noop_adapter.execute(transaction_pair1, context_id.clone(), on_done);
 
         let on_done_error = Box::new(
-            move |execution_result: Result<ExecutionResult, ExecutionAdapterError>| {
+            move |notification: Result<
+                ExecutionTaskCompletionNotification,
+                ExecutionAdapterError,
+            >| {
                 assert!(
-                    execution_result.is_err(),
+                    notification.is_err(),
                     "There was an error due to the TransactionFamily not being registered"
                 );
             },

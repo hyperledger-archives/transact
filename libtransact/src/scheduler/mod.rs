@@ -31,7 +31,6 @@ pub mod tree;
 
 use crate::batch::BatchPair;
 use crate::context::ContextId;
-use crate::execution::adapter::ExecutionResult;
 use crate::receipts::TransactionReceipt;
 use crate::transaction::TransactionPair;
 
@@ -61,13 +60,6 @@ impl ExecutionTask {
     pub fn take(self) -> (TransactionPair, ContextId) {
         (self.pair, self.context_id)
     }
-}
-
-/// Scheduler functionality used by the Executor.
-pub trait SchedulePair: Send {
-    fn add_execution_result(&self, execution_result: ExecutionResult);
-
-    fn get_schedule_iterator(&self) -> Box<Iterator<Item = ExecutionTask> + Send>;
 }
 
 /// Result from executing an invalid transaction.
