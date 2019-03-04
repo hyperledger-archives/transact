@@ -36,16 +36,12 @@ use std::collections::HashMap;
 /// values in state.  This covers the setting of a key/value pair, or the
 /// deletion of a key.
 #[derive(Debug)]
-pub enum StateChange<K, V> {
-    Set { key: K, value: V },
-    Delete { key: K },
+pub enum StateChange {
+    Set { key: String, value: Vec<u8> },
+    Delete { key: String },
 }
 
-impl<K, V> Clone for StateChange<K, V>
-where
-    K: Clone,
-    V: Clone,
-{
+impl Clone for StateChange {
     fn clone(&self) -> Self {
         match self {
             StateChange::Set { key, value } => StateChange::Set {
@@ -93,7 +89,7 @@ pub trait Write: Sync + Send + Clone {
     fn commit(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError>;
 
     /// Given a `StateId` and a slice of `StateChange` values, compute the
@@ -111,7 +107,7 @@ pub trait Write: Sync + Send + Clone {
     fn compute_state_id(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError>;
 }
 

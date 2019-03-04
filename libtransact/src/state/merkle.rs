@@ -58,7 +58,7 @@ impl Write for MerkleState {
     fn commit(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
         let mut merkle_tree = MerkleRadixTree::new(self.db.clone(), Some(state_id))
             .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
@@ -76,7 +76,7 @@ impl Write for MerkleState {
     fn compute_state_id(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
         let mut merkle_tree = MerkleRadixTree::new(self.db.clone(), Some(state_id))
             .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
@@ -284,7 +284,7 @@ impl MerkleRadixTree {
     /// Returns a Result with the new root hash.
     pub fn update(
         &self,
-        state_changes: &[StateChange<String, Vec<u8>>],
+        state_changes: &[StateChange],
         is_virtual: bool,
     ) -> Result<String, StateDatabaseError> {
         let mut path_map = HashMap::new();
@@ -1328,7 +1328,7 @@ mod tests {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             let mut merkle_db = MerkleRadixTree::new(db.clone(), None).expect("No db errors");
-            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+            let mut updates: Vec<StateChange> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
                 key: "ab0000".to_string(),
@@ -1428,7 +1428,7 @@ mod tests {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             let mut merkle_db = MerkleRadixTree::new(db.clone(), None).expect("No db errors");
-            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+            let mut updates: Vec<StateChange> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
                 key: "ab0000".to_string(),
@@ -1510,7 +1510,7 @@ mod tests {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             let mut merkle_db = MerkleRadixTree::new(db.clone(), None).expect("No db errors");
-            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+            let mut updates: Vec<StateChange> = Vec::with_capacity(3);
             updates.push(StateChange::Set {
                 key: "ab0000".to_string(),
                 value: "0001".as_bytes().to_vec(),
@@ -1588,7 +1588,7 @@ mod tests {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             let mut merkle_db = MerkleRadixTree::new(db.clone(), None).expect("No db errors");
-            let mut updates: Vec<StateChange<String, Vec<u8>>> = Vec::with_capacity(3);
+            let mut updates: Vec<StateChange> = Vec::with_capacity(3);
 
             updates.push(StateChange::Set {
                 key: "ab0000".to_string(),

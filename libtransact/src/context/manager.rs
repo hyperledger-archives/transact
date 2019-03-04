@@ -298,13 +298,11 @@ mod tests {
     static KEY3: &str = "333333333333333333333333333333333333333333333333333333333333333333";
     static KEY4: &str = "444444444444444444444444444444444444444444444444444444444444444444";
     static KEY5: &str = "555555555555555555555555555555555555555555555555555555555555555555";
-    static VALUE1: &str = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
-    static VALUE2: &str = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
-    static VALUE3: &str = "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc";
-    static VALUE4: &str = "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd";
 
     static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
     static BYTES2: [u8; 4] = [0x05, 0x06, 0x07, 0x08];
+    static BYTES3: [u8; 4] = [0x09, 0x10, 0x11, 0x12];
+    static BYTES4: [u8; 4] = [0x13, 0x14, 0x15, 0x16];
 
     static EVENT_TYPE1: &str = "sawtooth/block-commit";
     static ATTR1: (&str, &str) = (
@@ -315,8 +313,8 @@ mod tests {
     static ATTR2: (&str, &str) = ("block_num", "3");
 
     fn make_manager(
-        state_changes: Option<Vec<state::StateChange<String, String>>>,
-    ) -> (ContextManager<String, String, HashMapState>, String) {
+        state_changes: Option<Vec<state::StateChange>>,
+    ) -> (ContextManager<String, Vec<u8>, HashMapState>, String) {
         let state = HashMapState::new();
         let mut state_id = HashMapState::state_id(&HashMap::new());
         if let Some(changes) = state_changes {
@@ -326,11 +324,11 @@ mod tests {
         (ContextManager::new(state), state_id)
     }
 
-    fn check_state_change(state_change: StateChange<String, String>) {
+    fn check_state_change(state_change: StateChange<String, Vec<u8>>) {
         match state_change {
             StateChange::Set { key, value } => {
                 assert_eq!(KEY1, key);
-                assert_eq!(VALUE1, value);
+                assert_eq!(BYTES1.to_vec(), value);
             }
             StateChange::Delete { key } => {
                 assert_eq!(KEY1, key);
@@ -339,7 +337,7 @@ mod tests {
     }
 
     fn check_transaction_receipt(
-        transaction_receipt: TransactionReceipt<String, String>,
+        transaction_receipt: TransactionReceipt<String, Vec<u8>>,
         event: Event,
     ) {
         for state_change in transaction_receipt.state_changes {
@@ -400,7 +398,7 @@ mod tests {
         let mut context = manager.get_context(&context_id).unwrap();
         assert_eq!(&context_id, context.id());
 
-        let set_result = manager.set_state(&context_id, KEY1.to_string(), VALUE1.to_string());
+        let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
         assert!(set_result.is_ok());
         let delete_result = manager.delete_state(&context_id, KEY1.to_string()).unwrap();
         assert!(delete_result.is_some());
@@ -437,14 +435,14 @@ mod tests {
 
         let context_id = manager.create_context(Vec::new(), &state_id);
 
-        let set_result = manager.set_state(&context_id, KEY1.to_string(), VALUE1.to_string());
+        let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
         assert!(set_result.is_ok());
 
         let get_value = manager
             .get_context(&context_id)
             .unwrap()
             .get_state(&KEY1.to_string());
-        assert_eq!(get_value, Some(&VALUE1.to_string()));
+        assert_eq!(get_value, Some(&BYTES3.to_vec()));
     }
 
     #[test]
@@ -452,40 +450,40 @@ mod tests {
         // Creating a ContextManager with a single Context.
         let state_changes = vec![state::StateChange::Set {
             key: KEY1.to_string(),
-            value: VALUE1.to_string(),
+            value: BYTES1.to_vec(),
         }];
         let (mut manager, state_id) = make_manager(Some(state_changes));
         let ancestor_context = manager.create_context(Vec::new(), &state_id);
 
         assert!(manager
-            .set_state(&ancestor_context, KEY2.to_string(), VALUE2.to_string())
+            .set_state(&ancestor_context, KEY2.to_string(), BYTES2.to_vec())
             .is_ok());
 
         let current_context_id = manager.create_context(vec![ancestor_context], &state_id);
         assert!(manager
-            .set_state(&current_context_id, KEY3.to_string(), VALUE3.to_string())
+            .set_state(&current_context_id, KEY3.to_string(), BYTES3.to_vec())
             .is_ok());
         assert!(manager
-            .set_state(&current_context_id, KEY4.to_string(), VALUE4.to_string())
+            .set_state(&current_context_id, KEY4.to_string(), BYTES4.to_vec())
             .is_ok());
 
         let deleted_state_value = manager
             .delete_state(&current_context_id, KEY1.to_string())
             .unwrap();
         assert!(deleted_state_value.is_some());
-        assert_eq!(deleted_state_value, Some(VALUE1.to_string()));
+        assert_eq!(deleted_state_value, Some(BYTES1.to_vec()));
 
         let deleted_ancestor_value = manager
             .delete_state(&current_context_id, KEY2.to_string())
             .unwrap();
         assert!(deleted_ancestor_value.is_some());
-        assert_eq!(deleted_ancestor_value, Some(VALUE2.to_string()));
+        assert_eq!(deleted_ancestor_value, Some(BYTES2.to_vec()));
 
         let deleted_current_value = manager
             .delete_state(&current_context_id, KEY3.to_string())
             .unwrap();
         assert!(deleted_current_value.is_some());
-        assert_eq!(deleted_current_value, Some(VALUE3.to_string()));
+        assert_eq!(deleted_current_value, Some(BYTES3.to_vec()));
 
         assert!(manager
             .delete_state(&current_context_id, KEY5.to_string())
@@ -498,21 +496,21 @@ mod tests {
         // Creating a ContextManager with a single Context, with a HashMapState backing it
         let state_changes = vec![state::StateChange::Set {
             key: KEY1.to_string(),
-            value: VALUE1.to_string(),
+            value: BYTES1.to_vec(),
         }];
         let (mut manager, state_id) = make_manager(Some(state_changes));
         let ancestor_context = manager.create_context(Vec::new(), &state_id);
-        let add_result = manager.set_state(&ancestor_context, KEY2.to_string(), VALUE2.to_string());
+        let add_result = manager.set_state(&ancestor_context, KEY2.to_string(), BYTES2.to_vec());
         assert!(add_result.is_ok());
 
         let context_id = manager.create_context(vec![ancestor_context], &state_id);
 
         // Validates the result from adding the state change to the Context within the ContextManager.
         assert!(manager
-            .set_state(&context_id, KEY3.to_string(), VALUE3.to_string())
+            .set_state(&context_id, KEY3.to_string(), BYTES3.to_vec())
             .is_ok());
         assert!(manager
-            .set_state(&context_id, KEY4.to_string(), VALUE4.to_string())
+            .set_state(&context_id, KEY4.to_string(), BYTES4.to_vec())
             .is_ok());
         assert!(manager
             .delete_state(&context_id, KEY4.to_string())
@@ -531,11 +529,11 @@ mod tests {
         assert_eq!(key_values.len(), 2);
         assert_eq!(
             key_values.pop().unwrap(),
-            (KEY1.to_string(), Some(VALUE1.to_string()))
+            (KEY1.to_string(), Some(BYTES1.to_vec()))
         );
         assert_eq!(
             key_values.pop().unwrap(),
-            (KEY2.to_string(), Some(VALUE2.to_string()))
+            (KEY2.to_string(), Some(BYTES2.to_vec()))
         );
     }
 }

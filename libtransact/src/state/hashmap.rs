@@ -23,7 +23,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// An collection of key-value pairs that represents state at a particular point.
-pub type State = HashMap<String, String>;
+pub type State = HashMap<String, Vec<u8>>;
 
 /// A collection of states.
 ///
@@ -63,10 +63,7 @@ impl HashMapState {
         format!("{:?}", state)
     }
 
-    fn next_state(
-        current_state: &State,
-        state_changes: &[StateChange<String, String>],
-    ) -> (String, State) {
+    fn next_state(current_state: &State, state_changes: &[StateChange]) -> (String, State) {
         let next_state = state_changes
             .iter()
             .fold(current_state.clone(), |mut memo, ch| {
@@ -84,12 +81,12 @@ impl HashMapState {
 impl Write for HashMapState {
     type StateId = String;
     type Key = String;
-    type Value = String;
+    type Value = Vec<u8>;
 
     fn commit(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
         let mut states = self.states.lock().expect("Couldn't lock states mutex!");
         let state = states.get(state_id).ok_or_else(|| {
@@ -106,7 +103,7 @@ impl Write for HashMapState {
     fn compute_state_id(
         &self,
         state_id: &Self::StateId,
-        state_changes: &[StateChange<Self::Key, Self::Value>],
+        state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
         let states = self.states.lock().expect("Couldn't lock states mutex!");
         let state = states.get(state_id).ok_or_else(|| {
@@ -122,7 +119,7 @@ impl Write for HashMapState {
 impl Read for HashMapState {
     type StateId = String;
     type Key = String;
-    type Value = String;
+    type Value = Vec<u8>;
 
     fn get(&self, state_id: &Self::StateId, keys: &[Self::Key]) -> Result<State, StateReadError> {
         let states = self.states.lock().expect("Couldn't lock states mutex!");
@@ -142,10 +139,11 @@ impl Read for HashMapState {
 mod tests {
     use super::*;
 
-    fn make_state_changes(
-        sets: Vec<(&str, &str)>,
-        deletes: Vec<&str>,
-    ) -> Vec<StateChange<String, String>> {
+    static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
+    static BYTES2: [u8; 4] = [0x05, 0x06, 0x07, 0x08];
+    static BYTES3: [u8; 4] = [0x09, 0x10, 0x11, 0x12];
+
+    fn make_state_changes(sets: Vec<(&str, &[u8])>, deletes: Vec<&str>) -> Vec<StateChange> {
         sets.into_iter()
             .map(|(key, value)| StateChange::Set {
                 key: key.into(),
@@ -174,7 +172,7 @@ mod tests {
         );
 
         let state_changes = make_state_changes(
-            vec![("a", "value_a"), ("b", "value_b"), ("c", "value_c")],
+            vec![("a", &BYTES1), ("b", &BYTES2), ("c", &BYTES3)],
             vec!["c"],
         );
 
@@ -194,8 +192,8 @@ mod tests {
             .unwrap();
 
         let mut expected_state = HashMap::new();
-        expected_state.insert("a".to_string(), "value_a".to_string());
-        expected_state.insert("b".to_string(), "value_b".to_string());
+        expected_state.insert("a".to_string(), BYTES1.to_vec());
+        expected_state.insert("b".to_string(), BYTES2.to_vec());
 
         assert_eq!(expected_state, found_state);
         assert_eq!(2, found_state.len());
