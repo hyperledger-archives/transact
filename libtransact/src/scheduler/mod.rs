@@ -27,7 +27,7 @@
 //! must be consumed by a component responsible for iterating over the `Transaction`s and providing
 //! `TransactionExecutionResult`s back to the `Scheduler` via the `SchedulerExecutionInterface`.
 
-pub mod tree;
+pub mod parallel;
 
 use crate::batch::BatchPair;
 use crate::context::ContextId;
