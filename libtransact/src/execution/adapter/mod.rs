@@ -26,6 +26,7 @@ pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
 use crate::execution::ExecutionRegistry;
+use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::transaction::TransactionPair;
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
@@ -42,36 +43,9 @@ pub trait ExecutionAdapter: Send {
         &self,
         transaction_pair: TransactionPair,
         context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionResult, ExecutionAdapterError>)>,
+        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
     );
 
     /// Stop the internal threads and the Executor will no longer call execute.
     fn stop(self: Box<Self>) -> bool;
-}
-
-/// An `InvalidTransaction` has information about why the transaction failed.
-#[derive(Debug, Clone, PartialEq)]
-pub struct InvalidTransaction {
-    /// human readable reason for why the transaction was invalid.
-    pub error_message: String,
-    /// Transaction specific data that is returned to the client
-    /// who submitted the Transaction.
-    pub error_data: Vec<u8>,
-}
-
-/// The outcome of a transaction's execution.
-///
-/// A `TransactionStatus` covers the possible outcomes that can occur during a
-/// transaction's execution.
-#[derive(Debug, Clone, PartialEq)]
-pub enum TransactionStatus {
-    Invalid(InvalidTransaction),
-    Valid,
-}
-
-/// The `ExecutionResult` provides the status for a given transaction.
-#[derive(Debug, Clone)]
-pub struct ExecutionResult {
-    pub transaction_id: String,
-    pub status: TransactionStatus,
 }

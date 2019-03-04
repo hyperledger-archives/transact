@@ -19,7 +19,8 @@ use crate::execution::adapter::ExecutionAdapter;
 use crate::execution::executer_internal::{
     ExecuterThread, RegistrationExecutionEvent, RegistrationExecutionEventSender,
 };
-use crate::scheduler::SchedulePair;
+use crate::scheduler::ExecutionTask;
+use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
 use log::warn;
 use std::collections::HashMap;
@@ -51,7 +52,8 @@ impl IteratorAdapter {
 
     fn start(
         &mut self,
-        schedule: Box<SchedulePair>,
+        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<ExecutionTaskCompletionNotifier>,
         internal: RegistrationExecutionEventSender,
         done_callback: Box<FnMut(usize) + Send>,
     ) -> Result<(), std::io::Error> {
@@ -62,12 +64,10 @@ impl IteratorAdapter {
         if self.threads.is_none() {
             let (sender, receiver) = channel();
 
-            let it = schedule.get_schedule_iterator();
-
             let join_handle = thread::Builder::new()
                 .name(format!("iterator_adapter_{}", self.id))
                 .spawn(move || {
-                    for execution_task in it {
+                    for execution_task in task_iterator {
                         if stop.load(Ordering::Relaxed) {
                             break;
                         }
@@ -88,8 +88,8 @@ impl IteratorAdapter {
             let join_handle_receive = thread::Builder::new()
                 .name(format!("iterator_adapter_receive_thread_{}", self.id))
                 .spawn(move || loop {
-                    while let Ok(execution_result) = receiver.recv() {
-                        schedule.add_execution_result(execution_result);
+                    while let Ok(notification) = receiver.recv() {
+                        notifier.notify(notification);
 
                         if stop.load(Ordering::Relaxed) {
                             done_callback(id);
@@ -124,7 +124,11 @@ pub struct Executer {
 }
 
 impl Executer {
-    pub fn execute(&self, schedule: Box<SchedulePair>) -> Result<(), ExecuterError> {
+    pub fn execute(
+        &self,
+        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<ExecutionTaskCompletionNotifier>,
+    ) -> Result<(), ExecuterError> {
         if let Some(sender) = self.executer_thread.sender() {
             let index = self
                 .schedulers
@@ -141,7 +145,7 @@ impl Executer {
 
             let done_callback = Box::new(move |index| {
                 debug!(
-                    "Callback called removing iterator adapter {} for SchedulePair",
+                    "Callback called removing iterator adapter {} for SchedulerExecutionInterface",
                     index
                 );
 
@@ -152,7 +156,7 @@ impl Executer {
             });
 
             iterator_adapter
-                .start(schedule, sender, done_callback)
+                .start(task_iterator, notifier, sender, done_callback)
                 .map_err(|err| {
                     ExecuterError::ResourcesUnavailable(err.description().to_string())
                 })?;
@@ -213,10 +217,12 @@ mod tests {
 
     use super::*;
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
-    use crate::execution::adapter::ExecutionResult;
     use crate::scheduler::ExecutionTask;
+    use crate::scheduler::ExecutionTaskCompletionNotification;
+    use crate::scheduler::ExecutionTaskCompletionNotifier;
     use crate::signing::{hash::HashSigner, Signer};
     use crate::transaction::{HashMethod, TransactionBuilder, TransactionPair};
+    use std::collections::VecDeque;
     use std::time::Duration;
 
     static FAMILY_NAME1: &str = "test1";
@@ -251,18 +257,18 @@ mod tests {
 
         executer.start().expect("Executer did not correctly start");
 
-        let schedule1 = MockSchedule::new();
-        let schedule1_results = schedule1.clone();
+        let iterator1 = MockTaskExecutionIterator::new();
+        let notifier1 = MockExecutionTaskCompletionNotifier::new();
 
-        let schedule2 = MockSchedule::new();
-        let schedule2_results = schedule2.clone();
+        let iterator2 = MockTaskExecutionIterator::new();
+        let notifier2 = MockExecutionTaskCompletionNotifier::new();
 
         executer
-            .execute(Box::new(schedule1))
+            .execute(Box::new(iterator1), Box::new(notifier1.clone()))
             .expect("Start has been called so the executer can execute");
 
         executer
-            .execute(Box::new(schedule2))
+            .execute(Box::new(iterator2), Box::new(notifier2.clone()))
             .expect("Start has been called so the executer can execute");
 
         adapter1.register("test1", "1.0");
@@ -271,13 +277,13 @@ mod tests {
         std::thread::sleep(Duration::from_millis(200));
 
         assert_eq!(
-            schedule1_results.num_results(),
+            notifier1.num_results(),
             NUMBER_OF_TRANSACTIONS,
             "All transactions for schedule 1 received a result"
         );
 
         assert_eq!(
-            schedule2_results.num_results(),
+            notifier2.num_results(),
             NUMBER_OF_TRANSACTIONS,
             "All transactions for schedule 2 received a result"
         );
@@ -304,31 +310,48 @@ mod tests {
             .expect("The TransactionBuilder was not given the correct items")
     }
 
-    fn create_iterator() -> impl Iterator<Item = ExecutionTask> {
-        let signer = HashSigner::new();
-        let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    struct MockTaskExecutionIterator {
+        tasks: VecDeque<ExecutionTask>,
+    }
 
-        let family_name = |i| {
-            if i % 2 == 0 {
-                FAMILY_NAME1
-            } else {
-                FAMILY_NAME2
+    impl MockTaskExecutionIterator {
+        fn new() -> Self {
+            let signer = HashSigner::new();
+            let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+            let family_name = |i| {
+                if i % 2 == 0 {
+                    FAMILY_NAME1
+                } else {
+                    FAMILY_NAME2
+                }
+            };
+
+            MockTaskExecutionIterator {
+                tasks: (0..NUMBER_OF_TRANSACTIONS)
+                    .map(move |i| create_txn(&signer, family_name(i)))
+                    .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
+                    .collect(),
             }
-        };
+        }
+    }
 
-        (0..NUMBER_OF_TRANSACTIONS)
-            .map(move |i| create_txn(&signer, family_name(i)))
-            .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
+    impl Iterator for MockTaskExecutionIterator {
+        type Item = ExecutionTask;
+
+        fn next(&mut self) -> Option<ExecutionTask> {
+            self.tasks.pop_front()
+        }
     }
 
     #[derive(Clone)]
-    struct MockSchedule {
-        results: Arc<Mutex<Vec<ExecutionResult>>>,
+    struct MockExecutionTaskCompletionNotifier {
+        results: Arc<Mutex<Vec<ExecutionTaskCompletionNotification>>>,
     }
 
-    impl MockSchedule {
+    impl MockExecutionTaskCompletionNotifier {
         fn new() -> Self {
-            MockSchedule {
+            MockExecutionTaskCompletionNotifier {
                 results: Arc::new(Mutex::new(vec![])),
             }
         }
@@ -336,21 +359,17 @@ mod tests {
         fn num_results(&self) -> usize {
             self.results
                 .lock()
-                .expect("The MockScheduler lock is poisoned")
+                .expect("The MockTaskExecutionIterator lock is poisoned")
                 .len()
         }
     }
 
-    impl SchedulePair for MockSchedule {
-        fn get_schedule_iterator(&self) -> Box<Iterator<Item = ExecutionTask> + Send> {
-            Box::new(create_iterator())
-        }
-
-        fn add_execution_result(&self, execution_result: ExecutionResult) {
+    impl ExecutionTaskCompletionNotifier for MockExecutionTaskCompletionNotifier {
+        fn notify(&self, notification: ExecutionTaskCompletionNotification) {
             self.results
                 .lock()
                 .expect("The MockScheduler lock is poisoned")
-                .push(execution_result);
+                .push(notification);
         }
     }
 }
