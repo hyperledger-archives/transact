@@ -22,23 +22,22 @@ pub type ContextId = [u8; 16];
 pub mod manager;
 
 use crate::receipts::Event;
-use std::fmt::Debug;
 use std::mem;
 use uuid::Uuid;
 
 use crate::receipts::StateChange;
 
 #[derive(Debug, Clone, Default)]
-pub struct Context<K, V> {
+pub struct Context {
     base_contexts: Vec<ContextId>,
-    state_changes: Vec<StateChange<K, V>>,
+    state_changes: Vec<StateChange>,
     id: ContextId,
     data: Vec<Vec<u8>>,
     events: Vec<Event>,
     state_id: String,
 }
 
-impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
+impl Context {
     pub fn new(state_id: &str, base_contexts: Vec<ContextId>) -> Self {
         Context {
             base_contexts,
@@ -57,7 +56,7 @@ impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
         &self.events
     }
 
-    pub fn state_changes(&self) -> &Vec<StateChange<K, V>> {
+    pub fn state_changes(&self) -> &Vec<StateChange> {
         &self.state_changes
     }
 
@@ -85,7 +84,7 @@ impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
         }
     }
 
-    pub fn get_state(&self, key: &K) -> Option<&V> {
+    pub fn get_state(&self, key: &str) -> Option<&[u8]> {
         if let Some(StateChange::Set { value: v, .. }) = self
             .state_changes
             .iter()
@@ -98,13 +97,13 @@ impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
     }
 
     /// Adds StateChange::Set without deleting previous StateChanges associated with the Key
-    pub fn set_state(&mut self, key: K, value: V) {
+    pub fn set_state(&mut self, key: String, value: Vec<u8>) {
         let new_state_change = StateChange::Set { key, value };
         self.state_changes.push(new_state_change);
     }
 
     /// Adds StateChange::Delete and returns the value associated to the key being deleted
-    pub fn delete_state(&mut self, key: K) -> Option<V> {
+    pub fn delete_state(&mut self, key: &str) -> Option<Vec<u8>> {
         let found_state_change = self
             .state_changes
             .iter_mut()
@@ -112,7 +111,9 @@ impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
             .find(|state_change| state_change.has_key(&key));
         if let Some(StateChange::Set { .. }) = found_state_change {
             // If a StateChange::Set is found associated with the key, the value set is returned.
-            let mut new_state_change: StateChange<_, _> = StateChange::Delete { key };
+            let mut new_state_change: StateChange = StateChange::Delete {
+                key: key.to_string(),
+            };
             mem::swap(found_state_change.unwrap(), &mut new_state_change);
             if let StateChange::Set { value: v, .. } = new_state_change {
                 return Some(v);
@@ -120,13 +121,15 @@ impl<K: PartialEq + Clone + Debug, V: Clone + Debug> Context<K, V> {
         } else if found_state_change.is_none() {
             // If no StateChange, Set or Delete, is found associated with the key, a new Delete
             // is added to the list of StateChanges with the value returned as None.
-            self.state_changes.push(StateChange::Delete { key });
+            self.state_changes.push(StateChange::Delete {
+                key: key.to_string(),
+            });
         }
         None
     }
 
     /// Checks to see if the Key is referenced by any StateChanges within the Context
-    pub fn contains(&self, key: &K) -> bool {
+    pub fn contains(&self, key: &str) -> bool {
         for state_change in self.state_changes().iter().rev() {
             match state_change {
                 StateChange::Set { key: k, .. } => {
@@ -160,29 +163,29 @@ mod tests {
     #[test]
     fn get_state() {
         let first_key = &KEY1.to_string();
-        let first_value = &BYTES1;
+        let first_value = &BYTES1.to_vec();
         let base_contexts = Vec::new();
         let mut context = Context::new(&KEY3, base_contexts);
-        context.set_state(first_key, first_value);
+        context.set_state(first_key.to_string(), first_value.to_vec());
         assert!(context.contains(&first_key));
         let state_value = context.get_state(&first_key);
-        assert_eq!(state_value, Some(&first_value));
+        assert_eq!(state_value, Some(first_value.as_slice()));
     }
 
     #[test]
     fn test_compare_state_change() {
-        let first_set: StateChange<String, [u8; 4]> = StateChange::Set {
+        let first_set: StateChange = StateChange::Set {
             key: KEY1.to_string(),
-            value: BYTES1,
+            value: BYTES1.to_vec(),
         };
-        let second_set: StateChange<String, [u8; 4]> = StateChange::Set {
+        let second_set: StateChange = StateChange::Set {
             key: KEY2.to_string(),
-            value: BYTES2,
+            value: BYTES2.to_vec(),
         };
-        let delete_first: StateChange<String, [u8; 4]> = StateChange::Delete {
+        let delete_first: StateChange = StateChange::Delete {
             key: KEY1.to_string(),
         };
-        let delete_second: StateChange<String, [u8; 4]> = StateChange::Delete {
+        let delete_second: StateChange = StateChange::Delete {
             key: KEY2.to_string(),
         };
         let first_set_key = KEY1.to_string();
@@ -194,51 +197,45 @@ mod tests {
 
     #[test]
     fn test_contains() {
-        let first_key = &KEY1.to_string();
-        let second_key = &KEY2.to_string();
-
         let base_contexts = Vec::new();
         let mut context = Context::new(&KEY3, base_contexts);
-        context.set_state(first_key, &BYTES1);
-        assert!(context.contains(&first_key));
+        context.set_state(KEY1.to_string(), BYTES1.to_vec());
+        assert!(context.contains(&KEY1));
 
-        context.set_state(first_key, &BYTES2);
-        assert!(context.contains(&first_key));
+        context.set_state(KEY1.to_string(), BYTES2.to_vec());
+        assert!(context.contains(&KEY1));
 
-        context.set_state(second_key, &BYTES3);
-        let deleted_value = context.delete_state(&first_key);
-        assert_eq!(deleted_value, Some(&BYTES2));
+        context.set_state(KEY2.to_string(), BYTES3.to_vec());
+        let deleted_value = context.delete_state(&KEY1);
+        assert_eq!(deleted_value, Some(BYTES2.to_vec()));
 
-        assert!(context.contains(&second_key));
-        assert!(!context.contains(&first_key));
+        assert!(context.contains(&KEY2));
+        assert!(!context.contains(&KEY1));
     }
 
     #[test]
     fn verify_state_changes() {
-        let first_key = &KEY1.to_string();
-        let second_key = &KEY2.to_string();
-
         let mut context = Context::new(&KEY3, Vec::new());
-        context.set_state(first_key, &BYTES1);
-        context.set_state(first_key, &BYTES2);
-        context.set_state(second_key, &BYTES3);
+        context.set_state(KEY1.to_string(), BYTES1.to_vec());
+        context.set_state(KEY1.to_string(), BYTES2.to_vec());
+        context.set_state(KEY2.to_string(), BYTES3.to_vec());
         assert_eq!(context.state_changes().len(), 3);
 
-        let deleted_value = context.delete_state(&first_key);
-        assert_ne!(deleted_value, Some(&BYTES3));
+        let deleted_value = context.delete_state(&KEY1);
+        assert_ne!(deleted_value, Some(BYTES3.to_vec()));
 
         assert_eq!(context.state_changes().len(), 3);
         let first_key_set = context
             .state_changes()
             .iter()
             .cloned()
-            .find(|change| change.has_key(&first_key));
+            .find(|change| change.has_key(&KEY1));
         if let Some(StateChange::Set { key: k, value: v }) = first_key_set {
-            assert_eq!(k, first_key);
+            assert_eq!(k, KEY1.to_string());
             assert_ne!(Some(v), deleted_value);
         }
         if let StateChange::Set { key: k, value: v } = &context.state_changes()[1] {
-            assert_eq!(k, &first_key);
+            assert_eq!(k, KEY1);
             assert_eq!(Some(v.clone()), deleted_value);
         }
     }

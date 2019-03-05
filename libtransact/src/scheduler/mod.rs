@@ -81,7 +81,7 @@ pub enum TransactionExecutionResult {
     Invalid(InvalidTransactionResult),
 
     /// The transation was valid and execution produced a TransactionReceipt.
-    Valid(TransactionReceipt<String, Vec<u8>>),
+    Valid(TransactionReceipt),
 }
 
 /// Result of executing a batch.

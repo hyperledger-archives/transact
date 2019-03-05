@@ -18,8 +18,6 @@
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::error::Error as StdError;
-use std::fmt::Debug;
-use std::hash::Hash;
 use std::str;
 
 use crate::context::{Context, ContextId};
@@ -75,16 +73,11 @@ impl From<StateReadError> for ContextManagerError {
     }
 }
 
-pub struct ContextManager<K, V, R: Read<StateId = String, Key = K, Value = V>> {
-    contexts: HashMap<ContextId, Context<K, V>>,
+pub struct ContextManager<R: Read<StateId = String, Key = String, Value = Vec<u8>>> {
+    contexts: HashMap<ContextId, Context>,
     database: R,
 }
-impl<
-        K: Hash + Eq + Clone + Debug + Default,
-        V: Clone + Debug + Default,
-        R: Read<StateId = String, Key = K, Value = V>,
-    > ContextManager<K, V, R>
-{
+impl<R: Read<StateId = String, Key = String, Value = Vec<u8>>> ContextManager<R> {
     pub fn new(database: R) -> Self {
         ContextManager {
             contexts: HashMap::new(),
@@ -96,7 +89,7 @@ impl<
     fn get_context_mut(
         &mut self,
         context_id: &ContextId,
-    ) -> Result<&mut Context<K, V>, ContextManagerError> {
+    ) -> Result<&mut Context, ContextManagerError> {
         self.contexts.get_mut(context_id).ok_or_else(|| {
             ContextManagerError::MissingContextError(
                 str::from_utf8(context_id)
@@ -107,7 +100,7 @@ impl<
     }
 
     /// Returns a Context within the ContextManager's Context list specified by the ContextId
-    fn get_context(&self, context_id: &ContextId) -> Result<&Context<K, V>, ContextManagerError> {
+    fn get_context(&self, context_id: &ContextId) -> Result<&Context, ContextManagerError> {
         self.contexts.get(context_id).ok_or_else(|| {
             ContextManagerError::MissingContextError(
                 str::from_utf8(context_id)
@@ -119,11 +112,12 @@ impl<
 
     /// Get the values associated with list of keys, from a specific Context.
     /// If a key is not found in the context, State is then checked for these keys.
+    /// Keys are returned with the associated value, if found in Context or State.
     pub fn get(
         &self,
         context_id: &ContextId,
-        keys: &[K],
-    ) -> Result<Vec<(K, Option<V>)>, ContextManagerError> {
+        keys: &[String],
+    ) -> Result<Vec<(String, Vec<u8>)>, ContextManagerError> {
         let mut key_values = Vec::new();
         for key in keys.iter().rev() {
             let mut context = self.get_context(context_id)?;
@@ -145,25 +139,20 @@ impl<
                 }
             }
             if context.contains(&key) {
-                match context
+                if let Some(StateChange::Set { key: k, value: v }) = context
                     .state_changes()
                     .iter()
                     .rev()
                     .find(|state_change| state_change.has_key(&key))
                 {
-                    Some(StateChange::Set { key: k, value: v }) => {
-                        key_values.push((k.clone(), Some(v.clone())))
-                    }
-                    _ => {
-                        key_values.push((key.clone(), None));
-                    }
+                    key_values.push((k.clone(), v.clone()));
                 }
             } else if let Some(v) = self
                 .database
-                .get(context.state_id(), &[key.clone()])?
-                .get(&key)
+                .get(context.state_id(), &[key.to_string()])?
+                .get(&key.to_string())
             {
-                key_values.push((key.clone(), Some(v.clone())))
+                key_values.push((key.to_string(), v.clone()));
             }
         }
         Ok(key_values)
@@ -173,8 +162,8 @@ impl<
     pub fn set_state(
         &mut self,
         context_id: &ContextId,
-        key: K,
-        value: V,
+        key: String,
+        value: Vec<u8>,
     ) -> Result<(), ContextManagerError> {
         let context = self.get_context_mut(context_id)?;
         context.set_state(key, value);
@@ -186,11 +175,11 @@ impl<
     pub fn delete_state(
         &mut self,
         context_id: &ContextId,
-        key: K,
-    ) -> Result<Option<V>, ContextManagerError> {
+        key: &str,
+    ) -> Result<Option<Vec<u8>>, ContextManagerError> {
         // Adding a StateChange::Delete to the specified Context, which will occur no matter which
         // Context or State the key and associated value is found in.
-        let context_value = self.get_context_mut(context_id)?.delete_state(key.clone());
+        let context_value = self.get_context_mut(context_id)?.delete_state(key);
         if let Some(value) = context_value {
             return Ok(Some(value));
         }
@@ -217,14 +206,14 @@ impl<
         }
         if containing_context.contains(&key) {
             if let Some(v) = containing_context.get_state(&key) {
-                return Ok(Some(v.clone()));
+                return Ok(Some(v.to_vec()));
             }
         } else if let Some(value) = self
             .database
-            .get(current_context.state_id(), &[key.clone()])?
-            .get(&key)
+            .get(current_context.state_id(), &[key.to_string()])?
+            .get(&key.to_string())
         {
-            return Ok(Some(value.clone()));
+            return Ok(Some(value.to_vec()));
         }
         Ok(None)
     }
@@ -267,7 +256,7 @@ impl<
         &self,
         context_id: &ContextId,
         transaction_id: &str,
-    ) -> Result<TransactionReceipt<K, V>, ContextManagerError> {
+    ) -> Result<TransactionReceipt, ContextManagerError> {
         let context = self.get_context(context_id)?;
         let new_transaction_receipt = TransactionReceiptBuilder::new()
             .with_state_changes(context.state_changes().to_vec())
@@ -314,7 +303,7 @@ mod tests {
 
     fn make_manager(
         state_changes: Option<Vec<state::StateChange>>,
-    ) -> (ContextManager<String, Vec<u8>, HashMapState>, String) {
+    ) -> (ContextManager<HashMapState>, String) {
         let state = HashMapState::new();
         let mut state_id = HashMapState::state_id(&HashMap::new());
         if let Some(changes) = state_changes {
@@ -324,7 +313,7 @@ mod tests {
         (ContextManager::new(state), state_id)
     }
 
-    fn check_state_change(state_change: StateChange<String, Vec<u8>>) {
+    fn check_state_change(state_change: StateChange) {
         match state_change {
             StateChange::Set { key, value } => {
                 assert_eq!(KEY1, key);
@@ -336,10 +325,7 @@ mod tests {
         }
     }
 
-    fn check_transaction_receipt(
-        transaction_receipt: TransactionReceipt<String, Vec<u8>>,
-        event: Event,
-    ) {
+    fn check_transaction_receipt(transaction_receipt: TransactionReceipt, event: Event) {
         for state_change in transaction_receipt.state_changes {
             check_state_change(state_change)
         }
@@ -400,7 +386,7 @@ mod tests {
 
         let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
         assert!(set_result.is_ok());
-        let delete_result = manager.delete_state(&context_id, KEY1.to_string()).unwrap();
+        let delete_result = manager.delete_state(&context_id, KEY1).unwrap();
         assert!(delete_result.is_some());
 
         // Adding an Event to the Context, to be used to build the TransactionReceipt
@@ -442,7 +428,7 @@ mod tests {
             .get_context(&context_id)
             .unwrap()
             .get_state(&KEY1.to_string());
-        assert_eq!(get_value, Some(&BYTES3.to_vec()));
+        assert_eq!(get_value, Some(BYTES3.as_ref()));
     }
 
     #[test]
@@ -467,26 +453,20 @@ mod tests {
             .set_state(&current_context_id, KEY4.to_string(), BYTES4.to_vec())
             .is_ok());
 
-        let deleted_state_value = manager
-            .delete_state(&current_context_id, KEY1.to_string())
-            .unwrap();
+        let deleted_state_value = manager.delete_state(&current_context_id, KEY1).unwrap();
         assert!(deleted_state_value.is_some());
         assert_eq!(deleted_state_value, Some(BYTES1.to_vec()));
 
-        let deleted_ancestor_value = manager
-            .delete_state(&current_context_id, KEY2.to_string())
-            .unwrap();
+        let deleted_ancestor_value = manager.delete_state(&current_context_id, KEY2).unwrap();
         assert!(deleted_ancestor_value.is_some());
         assert_eq!(deleted_ancestor_value, Some(BYTES2.to_vec()));
 
-        let deleted_current_value = manager
-            .delete_state(&current_context_id, KEY3.to_string())
-            .unwrap();
+        let deleted_current_value = manager.delete_state(&current_context_id, KEY3).unwrap();
         assert!(deleted_current_value.is_some());
         assert_eq!(deleted_current_value, Some(BYTES3.to_vec()));
 
         assert!(manager
-            .delete_state(&current_context_id, KEY5.to_string())
+            .delete_state(&current_context_id, KEY5)
             .unwrap()
             .is_none());
     }
@@ -512,13 +492,10 @@ mod tests {
         assert!(manager
             .set_state(&context_id, KEY4.to_string(), BYTES4.to_vec())
             .is_ok());
-        assert!(manager
-            .delete_state(&context_id, KEY4.to_string())
-            .unwrap()
-            .is_some());
+        assert!(manager.delete_state(&context_id, KEY4).unwrap().is_some());
 
         // Creating a collection of keys to retrieve the values saved in Context or State.
-        let keys = vec![
+        let keys = [
             KEY1.to_string(),
             KEY2.to_string(),
             KEY4.to_string(),
@@ -529,11 +506,11 @@ mod tests {
         assert_eq!(key_values.len(), 2);
         assert_eq!(
             key_values.pop().unwrap(),
-            (KEY1.to_string(), Some(BYTES1.to_vec()))
+            (KEY1.to_string(), BYTES1.to_vec())
         );
         assert_eq!(
             key_values.pop().unwrap(),
-            (KEY2.to_string(), Some(BYTES2.to_vec()))
+            (KEY2.to_string(), BYTES2.to_vec())
         );
     }
 }
