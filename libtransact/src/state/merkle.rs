@@ -844,7 +844,7 @@ mod tests {
     use crate::database::error::DatabaseError;
     use crate::database::lmdb::{DatabaseReader, LmdbContext, LmdbDatabase};
 
-    use super::{Read, StateChange, Write};
+    use super::StateChange;
     use crate::state::change_log::ChangeLogEntry;
 
     use rand::seq::IteratorRandom;
