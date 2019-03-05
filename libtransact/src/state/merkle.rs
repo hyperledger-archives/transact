@@ -862,7 +862,8 @@ mod tests {
     use super::{Read, StateChange, Write};
     use crate::state::change_log::ChangeLogEntry;
 
-    use rand::{seq, thread_rng};
+    use rand::seq::IteratorRandom;
+    use rand::thread_rng;
     use std::env;
     use std::fs::remove_file;
     use std::panic;
@@ -1053,7 +1054,7 @@ mod tests {
             let mut rng = thread_rng();
             let mut state_changes = vec![];
             // Perform some updates on the lower keys
-            for i in seq::sample_iter(&mut rng, 0..500, 50).unwrap() {
+            for i in (0..500_u32).choose_multiple(&mut rng, 50) {
                 let hash_key = hex_hash(format!("{:016x}", i).as_bytes());
                 state_changes.push(StateChange::Set {
                     key: hash_key.clone(),
@@ -1064,7 +1065,7 @@ mod tests {
 
             let mut delete_items = vec![];
             // perform some deletions on the upper keys
-            for i in seq::sample_iter(&mut rng, 500..1000, 50).unwrap() {
+            for i in (500..1000_u32).choose_multiple(&mut rng, 50) {
                 let hash = hex_hash(format!("{:016x}", i).as_bytes());
                 delete_items.push(StateChange::Delete { key: hash.clone() });
                 values.remove(&hash);
