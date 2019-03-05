@@ -160,6 +160,20 @@ impl Transaction {
     pub fn payload(&self) -> &[u8] {
         &self.payload
     }
+
+    pub fn into_pair(self) -> Result<TransactionPair, TransactionBuildError> {
+        let header_proto: protos::transaction::TransactionHeader =
+            protobuf::parse_from_bytes(&self.header)
+                .map_err(|e| TransactionBuildError::DeserializationError(format!("{}", e)))?;
+        let header: TransactionHeader = header_proto
+            .into_native()
+            .map_err(|e| TransactionBuildError::DeserializationError(format!("{}", e)))?;
+
+        Ok(TransactionPair {
+            transaction: self,
+            header,
+        })
+    }
 }
 
 impl From<protos::transaction::Transaction> for Transaction {
@@ -194,6 +208,7 @@ impl TransactionPair {
 
 #[derive(Debug)]
 pub enum TransactionBuildError {
+    DeserializationError(String),
     MissingField(String),
     SerializationError(String),
     SigningError(String),
@@ -202,6 +217,7 @@ pub enum TransactionBuildError {
 impl StdError for TransactionBuildError {
     fn description(&self) -> &str {
         match *self {
+            TransactionBuildError::DeserializationError(ref msg) => msg,
             TransactionBuildError::MissingField(ref msg) => msg,
             TransactionBuildError::SerializationError(ref msg) => msg,
             TransactionBuildError::SigningError(ref msg) => msg,
@@ -210,6 +226,7 @@ impl StdError for TransactionBuildError {
 
     fn cause(&self) -> Option<&StdError> {
         match *self {
+            TransactionBuildError::DeserializationError(_) => None,
             TransactionBuildError::MissingField(_) => None,
             TransactionBuildError::SerializationError(_) => None,
             TransactionBuildError::SigningError(_) => None,
@@ -220,6 +237,9 @@ impl StdError for TransactionBuildError {
 impl std::fmt::Display for TransactionBuildError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            TransactionBuildError::DeserializationError(ref s) => {
+                write!(f, "DeserializationError: {}", s)
+            }
             TransactionBuildError::MissingField(ref s) => write!(f, "MissingField: {}", s),
             TransactionBuildError::SerializationError(ref s) => {
                 write!(f, "SerializationError: {}", s)
