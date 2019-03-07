@@ -69,7 +69,9 @@ impl ExecutionAdapter for TestExecutionAdapter {
         &self,
         transaction_pair: TransactionPair,
         _context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
+        on_done: Box<
+            dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>) + Send,
+        >,
     ) {
         self.state.lock().expect("mutex is not poisoned").execute(
             transaction_pair,
@@ -92,7 +94,9 @@ impl TestExecutionAdapterState {
         &self,
         transaction_pair: TransactionPair,
         context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
+        on_done: Box<
+            dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>) + Send,
+        >,
     ) {
         on_done(if self.available {
             Ok(ExecutionTaskCompletionNotification::Valid(context_id))

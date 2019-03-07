@@ -43,7 +43,9 @@ pub trait ExecutionAdapter: Send {
         &self,
         transaction_pair: TransactionPair,
         context_id: ContextId,
-        on_done: Box<dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>)>,
+        on_done: Box<
+            dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>) + Send,
+        >,
     );
 
     /// Stop the internal threads and the Executor will no longer call execute.
