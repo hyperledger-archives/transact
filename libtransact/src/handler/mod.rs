@@ -114,7 +114,7 @@ pub trait TransactionContext {
     ) -> Result<(), ContextError>;
 }
 
-pub trait TransactionHandler {
+pub trait TransactionHandler: Send {
     /// TransactionHandler that defines the business logic for a new transaction family.
     /// The family_name, family_versions, and namespaces functions are
     /// used by the processor to route processing requests to the handler.
