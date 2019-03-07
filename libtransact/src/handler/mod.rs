@@ -94,7 +94,7 @@ pub trait TransactionContext {
     /// # Arguments
     ///
     /// * `data` - the data to add
-    fn add_receipt_data(&self, data: &[u8]) -> Result<(), ContextError>;
+    fn add_receipt_data(&self, data: Vec<u8>) -> Result<(), ContextError>;
 
     /// add_event adds a new event to the execution result for this transaction.
     ///
@@ -110,7 +110,7 @@ pub trait TransactionContext {
         &self,
         event_type: String,
         attributes: Vec<(String, String)>,
-        data: &[u8],
+        data: Vec<u8>,
     ) -> Result<(), ContextError>;
 }
 
