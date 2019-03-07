@@ -27,7 +27,13 @@ pub trait TransactionContext {
     /// # Arguments
     ///
     /// * `address` - the address to fetch
-    fn get_state_entry(&self, address: &str) -> Result<Option<Vec<u8>>, ContextError>;
+    fn get_state_entry(&self, address: &str) -> Result<Option<Vec<u8>>, ContextError> {
+        Ok(self
+            .get_state_entries(&[address.to_string()])?
+            .into_iter()
+            .map(|(_, val)| val)
+            .next())
+    }
 
     /// get_state_entries queries the validator state for data at each of the
     /// addresses in the given list. The addresses that have been set
@@ -48,7 +54,9 @@ pub trait TransactionContext {
     ///
     /// * `address` - address of where to store the data
     /// * `data` - payload is the data to store at the address
-    fn set_state_entry(&self, address: String, data: Vec<u8>) -> Result<(), ContextError>;
+    fn set_state_entry(&self, address: String, data: Vec<u8>) -> Result<(), ContextError> {
+        self.set_state_entries(vec![(address, data)])
+    }
 
     /// set_state_entries requests that each address in the provided map be
     /// set in validator state to its corresponding value.
@@ -65,7 +73,12 @@ pub trait TransactionContext {
     /// # Arguments
     ///
     /// * `address` - the address to delete
-    fn delete_state_entry(&self, address: &str) -> Result<Option<String>, ContextError>;
+    fn delete_state_entry(&self, address: &str) -> Result<Option<String>, ContextError> {
+        Ok(self
+            .delete_state_entries(&[address.to_string()])?
+            .into_iter()
+            .next())
+    }
 
     /// delete_state_entries requests that each of the provided addresses be unset
     /// in validator state. A list of successfully deleted addresses
