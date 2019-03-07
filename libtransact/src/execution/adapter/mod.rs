@@ -19,6 +19,7 @@
 //! and its associated state.
 
 mod error;
+pub mod static_adapter;
 #[cfg(test)]
 pub mod test_adapter;
 
