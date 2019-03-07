@@ -287,6 +287,27 @@ pub mod sync {
         internal_manager: Arc<Mutex<super::ContextManager>>,
     }
 
+    impl ContextLifecycle for ContextManager {
+        /// Creates a Context, and returns the resulting ContextId.
+        fn create_context(
+            &mut self,
+            dependent_contexts: &[ContextId],
+            state_id: &str,
+        ) -> ContextId {
+            self.internal_manager
+                .lock()
+                .expect("Lock in create_context was poisoned")
+                .create_context(dependent_contexts, state_id)
+        }
+
+        fn drop_context(&mut self, context_id: ContextId) {
+            self.internal_manager
+                .lock()
+                .expect("Lock in drop_context was poisoned")
+                .drop_context(context_id)
+        }
+    }
+
     impl ContextManager {
         /// Constructs a new Context Manager around a given state Read.
         ///
@@ -371,17 +392,6 @@ pub mod sync {
                 .add_data(context_id, data)
         }
 
-        pub fn create_context(
-            &self,
-            dependent_contexts: &[ContextId],
-            state_id: &str,
-        ) -> ContextId {
-            self.internal_manager
-                .lock()
-                .expect("Lock in create_context was poisoned")
-                .create_context(dependent_contexts, state_id)
-        }
-
         pub fn get_transaction_receipt(
             &self,
             context_id: &ContextId,
@@ -391,13 +401,6 @@ pub mod sync {
                 .lock()
                 .expect("Lock in get_transaction_receipt was poisoned")
                 .get_transaction_receipt(context_id, transaction_id)
-        }
-
-        pub fn drop_context(&self, context_id: ContextId) {
-            self.internal_manager
-                .lock()
-                .expect("Lock in drop_context was poisoned")
-                .drop_context(context_id)
         }
     }
 
