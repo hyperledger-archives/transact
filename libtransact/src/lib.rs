@@ -20,7 +20,7 @@ pub mod batch;
 pub mod context;
 pub mod database;
 pub mod execution;
-
+pub mod handler;
 #[allow(renamed_and_removed_lints)]
 pub mod protos;
 pub mod receipts;
