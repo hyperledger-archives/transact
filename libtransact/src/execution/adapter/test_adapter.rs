@@ -16,7 +16,7 @@
  */
 
 use crate::context::ContextId;
-use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
+use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionOperationError};
 use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::protocol::transaction::TransactionPair;
 use crate::scheduler::ExecutionTaskCompletionNotification;
@@ -58,11 +58,18 @@ impl TestExecutionAdapter {
 }
 
 impl ExecutionAdapter for TestExecutionAdapter {
-    fn start(&mut self, execution_registry: Box<dyn ExecutionRegistry>) {
+    fn start(
+        &mut self,
+        execution_registry: Box<dyn ExecutionRegistry>,
+    ) -> Result<(), ExecutionOperationError> {
         self.state
             .lock()
-            .expect("mutex is not poisoned")
+            .map_err(|err| {
+                ExecutionOperationError::StartError(format!("State lock failed on start: {}", err))
+            })?
             .on_start(execution_registry);
+
+        Ok(())
     }
 
     fn execute(
@@ -72,16 +79,22 @@ impl ExecutionAdapter for TestExecutionAdapter {
         on_done: Box<
             dyn Fn(Result<ExecutionTaskCompletionNotification, ExecutionAdapterError>) + Send,
         >,
-    ) {
-        self.state.lock().expect("mutex is not poisoned").execute(
-            transaction_pair,
-            _context_id,
-            on_done,
-        );
+    ) -> Result<(), ExecutionOperationError> {
+        self.state
+            .lock()
+            .map_err(|err| {
+                ExecutionOperationError::ExecuteError(format!(
+                    "State lock failed on execute: {}",
+                    err
+                ))
+            })?
+            .execute(transaction_pair, _context_id, on_done);
+
+        Ok(())
     }
 
-    fn stop(self: Box<Self>) -> bool {
-        true
+    fn stop(self: Box<Self>) -> Result<(), ExecutionOperationError> {
+        Ok(())
     }
 }
 
@@ -151,7 +164,9 @@ mod tests {
         let transaction_pair1 = make_transaction();
         let transaction_pair2 = make_transaction();
 
-        noop_adapter.start(Box::new(registry.clone()));
+        noop_adapter
+            .start(Box::new(registry.clone()))
+            .expect("Unable to start test adapter");
 
         noop_adapter.register("test", "1.0");
 
@@ -181,7 +196,9 @@ mod tests {
             },
         );
 
-        noop_adapter.execute(transaction_pair1, context_id.clone(), on_done);
+        noop_adapter
+            .execute(transaction_pair1, context_id.clone(), on_done)
+            .expect("Unable to execute transaction with test adapter");
 
         let on_done_error = Box::new(
             move |notification: Result<
@@ -202,7 +219,9 @@ mod tests {
             "The noop adapter is unregistered",
         );
 
-        noop_adapter.execute(transaction_pair2, context_id, on_done_error);
+        noop_adapter
+            .execute(transaction_pair2, context_id, on_done_error)
+            .expect("Unable to execute transaction with test adapter");
     }
 
     fn make_transaction() -> TransactionPair {

@@ -177,10 +177,13 @@ impl ExecuterThread {
                 let (sender, adapter_receiver) = channel();
                 let ee_sender = NamedExecutionEventSender::new(sender, index);
 
-                execution_adapter.start(Box::new(InternalRegistry {
+                if let Err(err) = execution_adapter.start(Box::new(InternalRegistry {
                     event_sender: ee_sender,
                     registry_sender: registry_sender.clone(),
-                }));
+                })) {
+                    warn!("Unable to start execution adapter: {}", err);
+                    return Err(ExecuterThreadError::ResourcesUnavailable);
+                }
 
                 match Self::start_execution_adapter_thread(
                     Arc::clone(&self.stop),
@@ -290,15 +293,23 @@ impl ExecuterThread {
                                     }
                                 }
                             });
-                            execution_adapter.execute(pair, context_id, callback);
+                            if let Err(err) = execution_adapter.execute(pair, context_id, callback)
+                            {
+                                error!("Unable to execute on adapter {}: {}", index, err);
+                                break;
+                            }
                         }
                         ExecutionCommand::Sentinel => {
-                            execution_adapter.stop();
+                            if let Err(err) = execution_adapter.stop() {
+                                error!("Unable to cleanly stop adapter {}: {}", index, err);
+                            }
                             break;
                         }
                     }
                 } else if stop.load(Ordering::Relaxed) {
-                    execution_adapter.stop();
+                    if let Err(err) = execution_adapter.stop() {
+                        error!("Unable to cleanly stop adapter {}: {}", index, err);
+                    }
                     break;
                 }
             })

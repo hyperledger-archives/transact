@@ -24,7 +24,7 @@ use std::thread;
 use crate::context::manager::sync::ContextManager;
 use crate::context::manager::ContextManagerError;
 use crate::context::ContextId;
-use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
+use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionOperationError};
 use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::handler::{ApplyError, ContextError, TransactionContext, TransactionHandler};
 use crate::protocol::receipt::Event;
@@ -153,13 +153,18 @@ fn register_handlers(
 }
 
 impl ExecutionAdapter for StaticExecutionAdapter {
-    fn start(&mut self, execution_registry: Box<dyn ExecutionRegistry>) {
-        if let Err(err) = self
-            .sender
+    fn start(
+        &mut self,
+        execution_registry: Box<dyn ExecutionRegistry>,
+    ) -> Result<(), ExecutionOperationError> {
+        self.sender
             .send(StaticAdapterCommand::Start(execution_registry))
-        {
-            error!("Unable to submit start signal: {}", err);
-        }
+            .map_err(|err| {
+                ExecutionOperationError::StartError(format!(
+                    "Unable to start static execution adapter: {}",
+                    err
+                ))
+            })
     }
 
     fn execute(
@@ -167,29 +172,33 @@ impl ExecutionAdapter for StaticExecutionAdapter {
         transaction_pair: TransactionPair,
         context_id: ContextId,
         on_done: OnDoneCallback,
-    ) {
-        if let Err(err) = self.sender.send(StaticAdapterCommand::Execute(Box::new((
-            transaction_pair,
-            context_id,
-            on_done,
-        )))) {
-            error!("Unable to submit transaction for execution: {}", err);
-        }
+    ) -> Result<(), ExecutionOperationError> {
+        self.sender
+            .send(StaticAdapterCommand::Execute(Box::new((
+                transaction_pair,
+                context_id,
+                on_done,
+            ))))
+            .map_err(|err| {
+                ExecutionOperationError::ExecuteError(format!(
+                    "Unable to send transaction for static execution: {}",
+                    err
+                ))
+            })
     }
 
-    fn stop(self: Box<Self>) -> bool {
-        if let Err(err) = self.sender.send(StaticAdapterCommand::Stop) {
-            error!("Unable to signal stop to static execution adapter: {}", err);
-            return false;
-        }
+    fn stop(self: Box<Self>) -> Result<(), ExecutionOperationError> {
+        self.sender
+            .send(StaticAdapterCommand::Stop)
+            .map_err(|err| {
+                ExecutionOperationError::StopError(format!("Unable to send stop command: {}", err))
+            })?;
 
-        match self.join_handle.join() {
-            Ok(stopped) => stopped,
-            Err(_) => {
-                error!("Unable to stop static execution adapter");
-                false
-            }
-        }
+        self.join_handle.join().map_err(|_| {
+            ExecutionOperationError::StopError("Unable to join internal thread.".into())
+        })?;
+
+        Ok(())
     }
 }
 
@@ -309,7 +318,7 @@ mod test {
             StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
                 .expect("Could not create adapter");
 
-        static_adapter.start(Box::new(registry.clone()));
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a simple transaction
         let txn_pair = make_command_transaction(&[Command::Set {
@@ -319,13 +328,15 @@ mod test {
         let context_id = context_manager.create_context(&[], &state_id);
 
         let (send, recv) = std::sync::mpsc::channel();
-        static_adapter.execute(
-            txn_pair,
-            context_id.clone(),
-            Box::new(move |res| {
-                send.send(res).expect("Unable to send result");
-            }),
-        );
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
         let result = recv.recv().unwrap();
 
         assert_eq!(
@@ -339,7 +350,7 @@ mod test {
                 .unwrap()
         );
 
-        assert_eq!(true, Box::new(static_adapter).stop());
+        assert!(Box::new(static_adapter).stop().is_ok());
     }
 
     /// Apply the static adapter with a failing transaction
@@ -358,7 +369,7 @@ mod test {
             StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
                 .expect("Could not create adapter");
 
-        static_adapter.start(Box::new(registry.clone()));
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a failing transaction.
         let txn_pair = make_command_transaction(&[
@@ -374,13 +385,15 @@ mod test {
         let context_id = context_manager.create_context(&[], &state_id);
 
         let (send, recv) = std::sync::mpsc::channel();
-        static_adapter.execute(
-            txn_pair,
-            context_id.clone(),
-            Box::new(move |res| {
-                send.send(res).expect("Unable to send result");
-            }),
-        );
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
         let result = recv.recv().unwrap();
 
         assert_eq!(
@@ -395,7 +408,7 @@ mod test {
             result.unwrap()
         );
 
-        assert_eq!(true, Box::new(static_adapter).stop());
+        assert!(Box::new(static_adapter).stop().is_ok());
     }
 
     #[derive(Clone, Default)]
