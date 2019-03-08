@@ -622,7 +622,6 @@ mod benchmarks {
     static BYTES2: [u8; 4] = [0x05, 0x06, 0x07, 0x08];
     static BYTES3: [u8; 4] = [0x09, 0x0a, 0x0b, 0x0c];
     static EVENT_TYPE1: &str = "sawtooth/block-commit";
-    static EVENT_TYPE2: &str = "sawtooth/state-delta";
     static ATTR1: (&str, &str) = (
         "block_id",
         "f40b90d06b4a9074af2ab09e0187223da7466be75ec0f472 \
