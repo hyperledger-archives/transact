@@ -31,7 +31,7 @@ pub enum ExecutionAdapterError {
     /// to the `ExecutionAdapter`.
     RoutingError(Box<TransactionPair>),
 
-    GeneralExecutionError(Box<dyn Error>),
+    GeneralExecutionError(Box<dyn Error + Send>),
 }
 
 impl Error for ExecutionAdapterError {
