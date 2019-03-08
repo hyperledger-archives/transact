@@ -22,7 +22,7 @@ pub type ContextId = [u8; 16];
 pub mod manager;
 
 use crate::context::manager::ContextManagerError;
-use crate::receipts::{Event, StateChange, TransactionReceipt};
+use crate::protocol::receipt::{Event, StateChange, TransactionReceipt};
 use std::mem;
 use uuid::Uuid;
 
@@ -164,7 +164,7 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::receipts::StateChange;
+    use crate::protocol::receipt::StateChange;
 
     static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
     static KEY2: &str = "222222222222222222222222222222222222222222222222222222222222222222";

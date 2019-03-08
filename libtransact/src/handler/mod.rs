@@ -18,7 +18,7 @@
 mod error;
 
 pub use crate::handler::error::{ApplyError, ContextError};
-use crate::transaction::TransactionPair;
+use crate::protocol::transaction::TransactionPair;
 
 pub trait TransactionContext {
     /// get_state_entry queries the validator state for data at the

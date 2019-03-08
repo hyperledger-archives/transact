@@ -436,9 +436,9 @@ impl ExecuterThread {
 mod tests {
     use super::*;
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
+    use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTaskCompletionNotification;
     use crate::signing::{hash::HashSigner, Signer};
-    use crate::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use std::{self, collections::HashSet, sync::mpsc::channel};
 
     static FAMILY_NAME: &str = "test";

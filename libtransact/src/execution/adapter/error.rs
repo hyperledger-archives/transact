@@ -16,7 +16,7 @@
  * -----------------------------------------------------------------------------
  */
 
-use crate::transaction::TransactionPair;
+use crate::protocol::transaction::TransactionPair;
 use std::{error::Error, fmt};
 
 /// During processing of the Transaction, something unexpected happened.

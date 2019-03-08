@@ -1,10 +1,10 @@
-use crate::batch::BatchBuilder;
-use crate::batch::BatchPair;
+use crate::protocol::batch::BatchBuilder;
+use crate::protocol::batch::BatchPair;
+use crate::protocol::transaction::HashMethod;
+use crate::protocol::transaction::TransactionBuilder;
+use crate::protocol::transaction::TransactionPair;
 use crate::signing::hash::HashSigner;
 use crate::signing::Signer;
-use crate::transaction::HashMethod;
-use crate::transaction::TransactionBuilder;
-use crate::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 use crate::workload::BatchWorkload;
 use crate::workload::TransactionWorkload;

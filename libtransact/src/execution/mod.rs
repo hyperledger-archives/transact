@@ -22,7 +22,7 @@ pub mod adapter;
 pub mod executer;
 mod executer_internal;
 
-use crate::transaction::TransactionPair;
+use crate::protocol::transaction::TransactionPair;
 
 /// A Transaction Family Descriptor
 #[derive(Eq, PartialEq, Debug, Hash, Clone)]

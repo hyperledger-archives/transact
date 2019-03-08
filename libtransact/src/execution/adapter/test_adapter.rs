@@ -18,8 +18,8 @@
 use crate::context::ContextId;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
 use crate::execution::{ExecutionRegistry, TransactionFamily};
+use crate::protocol::transaction::TransactionPair;
 use crate::scheduler::ExecutionTaskCompletionNotification;
-use crate::transaction::TransactionPair;
 use std::sync::{Arc, Mutex};
 
 struct TestExecutionAdapterState {
@@ -130,8 +130,8 @@ impl Default for TestExecutionAdapter {
 mod tests {
 
     use super::*;
+    use crate::protocol::transaction::{HashMethod, TransactionBuilder};
     use crate::signing::hash::HashSigner;
-    use crate::transaction::{HashMethod, TransactionBuilder};
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,

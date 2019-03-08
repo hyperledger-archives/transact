@@ -26,8 +26,8 @@ pub use crate::execution::adapter::error::ExecutionAdapterError;
 
 use crate::context::ContextId;
 use crate::execution::ExecutionRegistry;
+use crate::protocol::transaction::TransactionPair;
 use crate::scheduler::ExecutionTaskCompletionNotification;
-use crate::transaction::TransactionPair;
 
 /// Implementers of this trait proxy the transaction to the correct component to execute
 /// the transaction.

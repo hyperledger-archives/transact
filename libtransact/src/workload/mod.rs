@@ -1,8 +1,8 @@
 pub mod error;
 pub mod xo;
 
-use crate::batch::BatchPair;
-use crate::transaction::TransactionPair;
+use crate::protocol::batch::BatchPair;
+use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 
 pub trait TransactionWorkload {

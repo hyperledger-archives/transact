@@ -1,8 +1,8 @@
 use std;
 use std::error::Error as StdError;
 
-use crate::batch::BatchBuildError;
-use crate::transaction::TransactionBuildError;
+use crate::protocol::batch::BatchBuildError;
+use crate::protocol::transaction::TransactionBuildError;
 
 #[derive(Debug)]
 pub enum WorkloadError {

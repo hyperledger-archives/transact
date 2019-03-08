@@ -22,7 +22,7 @@ use std::error::Error as StdError;
 use std::str;
 
 use crate::context::{Context, ContextId, ContextLifecycle};
-use crate::receipts::{
+use crate::protocol::receipt::{
     Event, StateChange, TransactionReceipt, TransactionReceiptBuilder,
     TransactionReceiptBuilderError,
 };
@@ -411,7 +411,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    use crate::receipts::EventBuilder;
+    use crate::protocol::receipt::EventBuilder;
     use crate::state;
     use crate::state::hashmap::HashMapState;
     use crate::state::Write;

@@ -29,10 +29,10 @@
 
 pub mod parallel;
 
-use crate::batch::BatchPair;
 use crate::context::ContextId;
-use crate::receipts::TransactionReceipt;
-use crate::transaction::TransactionPair;
+use crate::protocol::batch::BatchPair;
+use crate::protocol::receipt::TransactionReceipt;
+use crate::protocol::transaction::TransactionPair;
 
 /// A transation and associated information required to execute it.
 pub struct ExecutionTask {

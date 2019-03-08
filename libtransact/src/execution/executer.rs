@@ -217,11 +217,11 @@ mod tests {
 
     use super::*;
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
+    use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTask;
     use crate::scheduler::ExecutionTaskCompletionNotification;
     use crate::scheduler::ExecutionTaskCompletionNotifier;
     use crate::signing::{hash::HashSigner, Signer};
-    use crate::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use std::collections::VecDeque;
     use std::time::Duration;
 

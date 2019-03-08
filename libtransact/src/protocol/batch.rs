@@ -3,11 +3,11 @@ use protobuf::Message;
 use std;
 use std::error::Error as StdError;
 
+use crate::protos;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
 use crate::signing;
-use crate::transaction::Transaction;
 
-use super::protos;
+use super::transaction::Transaction;
 
 #[derive(Clone)]
 pub struct BatchHeader {

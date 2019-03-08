@@ -407,10 +407,12 @@ impl TransactionBuilder {
 
 #[cfg(test)]
 mod tests {
-    use super::super::protos;
     use super::*;
+
+    use crate::protos;
     use crate::signing::hash::HashSigner;
     use crate::signing::Signer;
+
     use protobuf::Message;
     use sawtooth_sdk;
 
@@ -660,10 +662,10 @@ mod tests {
 #[cfg(all(feature = "nightly", test))]
 mod benchmarks {
     extern crate test;
-    use super::super::protos;
     use super::*;
     use test::Bencher;
 
+    use crate::protos;
     use crate::signing::hash::HashSigner;
 
     static FAMILY_NAME: &str = "test_family";
