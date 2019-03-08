@@ -16,6 +16,7 @@
  * -----------------------------------------------------------------------------
  */
 pub mod sync;
+pub mod thread;
 
 use std::collections::HashMap;
 use std::collections::VecDeque;
