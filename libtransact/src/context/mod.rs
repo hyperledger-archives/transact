@@ -21,11 +21,10 @@ pub type ContextId = [u8; 16];
 
 pub mod manager;
 
-use crate::receipts::Event;
+use crate::context::manager::ContextManagerError;
+use crate::receipts::{Event, StateChange, TransactionReceipt};
 use std::mem;
 use uuid::Uuid;
-
-use crate::receipts::StateChange;
 
 /// ContextManager functionality used by the Scheduler.
 pub trait ContextLifecycle: Send {
@@ -33,6 +32,12 @@ pub trait ContextLifecycle: Send {
     fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId;
 
     fn drop_context(&mut self, context_id: ContextId);
+
+    fn get_transaction_receipt(
+        &self,
+        context_id: &ContextId,
+        transaction_id: &str,
+    ) -> Result<TransactionReceipt, ContextManagerError>;
 }
 
 #[derive(Debug, Clone, Default)]

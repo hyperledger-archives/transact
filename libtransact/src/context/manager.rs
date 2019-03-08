@@ -90,6 +90,22 @@ impl ContextLifecycle for ContextManager {
     fn drop_context(&mut self, _context_id: ContextId) {
         unimplemented!();
     }
+
+    /// Creates a TransactionReceipt based on the information available within the specified Context.
+    fn get_transaction_receipt(
+        &self,
+        context_id: &ContextId,
+        transaction_id: &str,
+    ) -> Result<TransactionReceipt, ContextManagerError> {
+        let context = self.get_context(context_id)?;
+        let new_transaction_receipt = TransactionReceiptBuilder::new()
+            .with_state_changes(context.state_changes().to_vec())
+            .with_events(context.events().to_vec())
+            .with_data(context.data().to_vec())
+            .with_transaction_id(transaction_id.to_string())
+            .build()?;
+        Ok(new_transaction_receipt)
+    }
 }
 
 impl ContextManager {
@@ -254,22 +270,6 @@ impl ContextManager {
         context.add_data(data);
         Ok(())
     }
-
-    /// Creates a TransactionReceipt based on the information available within the specified Context.
-    pub fn get_transaction_receipt(
-        &self,
-        context_id: &ContextId,
-        transaction_id: &str,
-    ) -> Result<TransactionReceipt, ContextManagerError> {
-        let context = self.get_context(context_id)?;
-        let new_transaction_receipt = TransactionReceiptBuilder::new()
-            .with_state_changes(context.state_changes().to_vec())
-            .with_events(context.events().to_vec())
-            .with_data(context.data().to_vec())
-            .with_transaction_id(transaction_id.to_string())
-            .build()?;
-        Ok(new_transaction_receipt)
-    }
 }
 
 pub mod sync {
@@ -305,6 +305,17 @@ pub mod sync {
                 .lock()
                 .expect("Lock in drop_context was poisoned")
                 .drop_context(context_id)
+        }
+
+        fn get_transaction_receipt(
+            &self,
+            context_id: &ContextId,
+            transaction_id: &str,
+        ) -> Result<TransactionReceipt, ContextManagerError> {
+            self.internal_manager
+                .lock()
+                .expect("Lock in get_transaction_receipt was poisoned")
+                .get_transaction_receipt(context_id, transaction_id)
         }
     }
 
@@ -390,17 +401,6 @@ pub mod sync {
                 .lock()
                 .expect("Lock in add_data was poisoned")
                 .add_data(context_id, data)
-        }
-
-        pub fn get_transaction_receipt(
-            &self,
-            context_id: &ContextId,
-            transaction_id: &str,
-        ) -> Result<TransactionReceipt, ContextManagerError> {
-            self.internal_manager
-                .lock()
-                .expect("Lock in get_transaction_receipt was poisoned")
-                .get_transaction_receipt(context_id, transaction_id)
         }
     }
 
