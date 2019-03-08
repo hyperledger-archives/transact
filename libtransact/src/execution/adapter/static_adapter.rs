@@ -277,3 +277,139 @@ impl From<ContextManagerError> for ContextError {
         ContextError::SendError(Box::new(err))
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use std::collections::HashMap;
+    use std::sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    };
+
+    use crate::context::ContextLifecycle;
+    use crate::scheduler::{ExecutionTaskCompletionNotification, InvalidTransactionResult};
+    use crate::state::hashmap::HashMapState;
+    use crate::workload::command::{make_command_transaction, Command, CommandTransactionHandler};
+
+    /// Apply the static adapter with a simple transaction that sets a value successfully.
+    #[test]
+    fn apply_static_adapter_simple_set() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        static_adapter.start(Box::new(registry.clone()));
+
+        // Create and execute a simple transaction
+        let txn_pair = make_command_transaction(&[Command::Set {
+            address: "abc".into(),
+            value: b"abc".to_vec(),
+        }]);
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        static_adapter.execute(
+            txn_pair,
+            context_id.clone(),
+            Box::new(move |res| {
+                send.send(res).expect("Unable to send result");
+            }),
+        );
+        let result = recv.recv().unwrap();
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone()),
+            result.unwrap()
+        );
+        assert_eq!(
+            vec![("abc".to_owned(), b"abc".to_vec())],
+            context_manager
+                .get(&context_id, &["abc".to_owned()])
+                .unwrap()
+        );
+
+        assert_eq!(true, Box::new(static_adapter).stop());
+    }
+
+    /// Apply the static adapter with a failing transaction
+    #[test]
+    fn apply_static_adapter_invalid_txn() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        static_adapter.start(Box::new(registry.clone()));
+
+        // Create and execute a failing transaction.
+        let txn_pair = make_command_transaction(&[
+            Command::Get {
+                address: "abc".into(),
+            },
+            Command::Fail {
+                error_msg: "Test Fail Succeeded".into(),
+            },
+        ]);
+
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        static_adapter.execute(
+            txn_pair,
+            context_id.clone(),
+            Box::new(move |res| {
+                send.send(res).expect("Unable to send result");
+            }),
+        );
+        let result = recv.recv().unwrap();
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Invalid(
+                context_id,
+                InvalidTransactionResult {
+                    transaction_id: txn_id,
+                    error_message: "Test Fail Succeeded".into(),
+                    error_data: vec![],
+                }
+            ),
+            result.unwrap()
+        );
+
+        assert_eq!(true, Box::new(static_adapter).stop());
+    }
+
+    #[derive(Clone, Default)]
+    struct MockRegistry {
+        registered: Arc<AtomicBool>,
+    }
+
+    impl ExecutionRegistry for MockRegistry {
+        fn register_transaction_family(&mut self, _family: TransactionFamily) {
+            self.registered.store(true, Ordering::Relaxed);
+        }
+
+        fn unregister_transaction_family(&mut self, _family: &TransactionFamily) {
+            self.registered.store(false, Ordering::Relaxed);
+        }
+    }
+}
