@@ -16,5 +16,10 @@
  */
 
 //! This module provides a threaded ContextManager.
-
 mod core;
+mod error;
+
+pub use crate::context::manager::thread::core::{
+    ContextOperationMessage, ContextOperationResponse,
+};
+pub use crate::context::manager::thread::error::ContextManagerCoreError;
