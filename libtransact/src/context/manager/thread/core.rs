@@ -19,7 +19,7 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
 pub use crate::context::manager::thread::ContextManagerCoreError;
-use crate::context::{manager::ContextManager, ContextId};
+use crate::context::{manager::ContextManager, ContextId, ContextLifecycle};
 use crate::protocol::receipt::{Event, TransactionReceipt};
 use crate::state::Read;
 
@@ -93,7 +93,7 @@ pub enum ContextOperationResult {
 
 struct ContextManagerCore {
     /// Internal ContextManager owned by the threaded version.
-    _manager: ContextManager,
+    manager: ContextManager,
 
     /// Receiver for all messages to the ContextManagerCore.
     core_receiver: Receiver<ContextOperationMessage>,
@@ -106,40 +106,127 @@ impl ContextManagerCore {
     ) -> Self {
         let internal_manager = ContextManager::new(database);
         ContextManagerCore {
-            _manager: internal_manager,
+            manager: internal_manager,
             core_receiver,
         }
     }
 
     fn run(&mut self) -> Result<(), ContextManagerCoreError> {
         loop {
-            match self.core_receiver.recv() {
-                Ok(ContextOperationMessage::GetTransactionReceipt { .. }) => {
-                    unimplemented!();
+            match self.core_receiver.recv()? {
+                ContextOperationMessage::GetTransactionReceipt {
+                    context_id,
+                    transaction_id,
+                    handler_sender,
+                } => {
+                    match self
+                        .manager
+                        .get_transaction_receipt(&context_id, &transaction_id)
+                    {
+                        Ok(txn_receipt) => {
+                            handler_sender.send(ContextOperationResponse::ValidResult {
+                                result: Some(ContextOperationResult::GetTransactionReceipt {
+                                    transaction_receipt: txn_receipt,
+                                }),
+                            })?;
+                        }
+                        Err(err) => {
+                            handler_sender.send(ContextOperationResponse::InvalidResult {
+                                error_message: err.to_string(),
+                            })?;
+                        }
+                    }
                 }
-                Ok(ContextOperationMessage::CreateContext { .. }) => {
-                    unimplemented!();
+                ContextOperationMessage::CreateContext {
+                    dependent_contexts,
+                    state_id,
+                    handler_sender,
+                } => {
+                    let context_id = self.manager.create_context(&dependent_contexts, &state_id);
+                    handler_sender.send(ContextOperationResponse::ValidResult {
+                        result: Some(ContextOperationResult::CreateContext { context_id }),
+                    })?;
                 }
-                Ok(ContextOperationMessage::Get { .. }) => {
-                    unimplemented!();
-                }
-                Ok(ContextOperationMessage::SetState { .. }) => {
-                    unimplemented!();
-                }
-                Ok(ContextOperationMessage::DeleteState { .. }) => {
-                    unimplemented!();
-                }
-                Ok(ContextOperationMessage::AddEvent { .. }) => {
-                    unimplemented!();
-                }
-                Ok(ContextOperationMessage::AddData { .. }) => {
-                    unimplemented!();
-                }
-                Ok(ContextOperationMessage::Shutdown) => {
+                ContextOperationMessage::Get {
+                    context_id,
+                    keys,
+                    handler_sender,
+                } => match self.manager.get(&context_id, &keys) {
+                    Ok(values) => {
+                        handler_sender.send(ContextOperationResponse::ValidResult {
+                            result: Some(ContextOperationResult::Get { values }),
+                        })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::SetState {
+                    context_id,
+                    key,
+                    value,
+                    handler_sender,
+                } => match self.manager.set_state(&context_id, key, value) {
+                    Ok(()) => {
+                        handler_sender
+                            .send(ContextOperationResponse::ValidResult { result: None })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::DeleteState {
+                    context_id,
+                    key,
+                    handler_sender,
+                } => match self.manager.delete_state(&context_id, &key) {
+                    Ok(value) => {
+                        handler_sender.send(ContextOperationResponse::ValidResult {
+                            result: Some(ContextOperationResult::DeleteState { value }),
+                        })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::AddEvent {
+                    context_id,
+                    event,
+                    handler_sender,
+                } => match self.manager.add_event(&context_id, event) {
+                    Ok(()) => {
+                        handler_sender
+                            .send(ContextOperationResponse::ValidResult { result: None })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::AddData {
+                    context_id,
+                    data,
+                    handler_sender,
+                } => match self.manager.add_data(&context_id, data) {
+                    Ok(()) => {
+                        handler_sender
+                            .send(ContextOperationResponse::ValidResult { result: None })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::Shutdown => {
                     break;
-                }
-                Err(err) => {
-                    return Err(ContextManagerCoreError::CoreReceiveError(err));
                 }
             }
         }
