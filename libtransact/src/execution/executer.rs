@@ -212,6 +212,22 @@ pub enum ExecuterError {
     ResourcesUnavailable(String),
 }
 
+impl std::error::Error for ExecuterError {}
+
+impl std::fmt::Display for ExecuterError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ExecuterError::NotStarted => f.write_str("Executer not started"),
+            ExecuterError::AlreadyStarted(ref msg) => {
+                write!(f, "Executer already started: {}", msg)
+            }
+            ExecuterError::ResourcesUnavailable(ref msg) => {
+                write!(f, "Resource Unavailable: {}", msg)
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
 
