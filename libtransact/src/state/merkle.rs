@@ -50,6 +50,12 @@ pub struct MerkleState {
     db: LmdbDatabase,
 }
 
+impl MerkleState {
+    pub fn new(db: LmdbDatabase) -> Self {
+        MerkleState { db }
+    }
+}
+
 impl Write for MerkleState {
     type StateId = String;
     type Key = String;
