@@ -80,6 +80,19 @@ impl Batch {
     pub fn trace(&self) -> bool {
         self.trace
     }
+
+    pub fn into_pair(self) -> Result<BatchPair, BatchBuildError> {
+        let header_proto: protos::batch::BatchHeader = protobuf::parse_from_bytes(&self.header)
+            .map_err(|e| BatchBuildError::DeserializationError(e.to_string()))?;
+        let header = header_proto
+            .into_native()
+            .map_err(|err| BatchBuildError::DeserializationError(err.to_string()))?;
+
+        Ok(BatchPair {
+            batch: self,
+            header,
+        })
+    }
 }
 
 pub struct BatchPair {
@@ -121,6 +134,7 @@ impl From<protos::batch::Batch> for Batch {
 pub enum BatchBuildError {
     MissingField(String),
     SerializationError(String),
+    DeserializationError(String),
     SigningError(String),
 }
 
@@ -129,15 +143,8 @@ impl StdError for BatchBuildError {
         match *self {
             BatchBuildError::MissingField(ref msg) => msg,
             BatchBuildError::SerializationError(ref msg) => msg,
+            BatchBuildError::DeserializationError(ref msg) => msg,
             BatchBuildError::SigningError(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            BatchBuildError::MissingField(_) => None,
-            BatchBuildError::SerializationError(_) => None,
-            BatchBuildError::SigningError(_) => None,
         }
     }
 }
@@ -147,6 +154,9 @@ impl std::fmt::Display for BatchBuildError {
         match *self {
             BatchBuildError::MissingField(ref s) => write!(f, "MissingField: {}", s),
             BatchBuildError::SerializationError(ref s) => write!(f, "SerializationError: {}", s),
+            BatchBuildError::DeserializationError(ref s) => {
+                write!(f, "DeserializationError: {}", s)
+            }
             BatchBuildError::SigningError(ref s) => write!(f, "SigningError: {}", s),
         }
     }
