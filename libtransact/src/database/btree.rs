@@ -16,11 +16,13 @@
  */
 
 use crate::database::error::DatabaseError;
-use crate::database::{DatabaseCursor, DatabaseReader, DatabaseReaderCursor};
+use crate::database::{
+    Database, DatabaseCursor, DatabaseReader, DatabaseReaderCursor, DatabaseWriter,
+};
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::ops::Bound::{Excluded, Included};
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
 #[derive(Clone)]
 pub struct BTreeDatabase {
@@ -110,6 +112,142 @@ impl<'a> DatabaseReader for BTreeReader<'a> {
             .get(index)
             .ok_or_else(|| DatabaseError::ReaderError(format!("Not an index: {}", index)))?
             .len())
+    }
+}
+
+pub struct BTreeWriter<'a> {
+    db: RwLockWriteGuard<'a, BTreeDbInternal>,
+    transactions: Vec<WriterTransaction>,
+}
+
+impl<'a> BTreeWriter<'a> {
+    pub fn new(db: RwLockWriteGuard<'a, BTreeDbInternal>) -> BTreeWriter {
+        BTreeWriter {
+            db,
+            transactions: vec![],
+        }
+    }
+}
+
+enum WriterTransaction {
+    Put {
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
+    IndexPut {
+        index: String,
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
+    Delete {
+        key: Vec<u8>,
+    },
+    IndexDelete {
+        index: String,
+        key: Vec<u8>,
+    },
+    Overwrite {
+        key: Vec<u8>,
+        value: Vec<u8>,
+    },
+}
+
+impl<'a> DatabaseWriter for BTreeWriter<'a> {
+    fn put(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
+        if self.db.main.contains_key(key) {
+            return Err(DatabaseError::DuplicateEntry);
+        }
+        self.transactions.push(WriterTransaction::Put {
+            key: key.to_vec(),
+            value: value.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn overwrite(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
+        self.transactions.push(WriterTransaction::Overwrite {
+            key: key.to_vec(),
+            value: value.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn index_put(&mut self, index: &str, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
+        if !self.db.indexes.contains_key(index) {
+            return Err(DatabaseError::WriterError(format!(
+                "Not an index: {}",
+                index
+            )));
+        }
+
+        self.transactions.push(WriterTransaction::IndexPut {
+            index: index.to_string(),
+            key: key.to_vec(),
+            value: value.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn delete(&mut self, key: &[u8]) -> Result<(), DatabaseError> {
+        if !self.db.main.contains_key(key) {
+            return Err(DatabaseError::WriterError("Key not found".to_string()));
+        }
+        self.transactions
+            .push(WriterTransaction::Delete { key: key.to_vec() });
+        Ok(())
+    }
+
+    fn index_delete(&mut self, index: &str, key: &[u8]) -> Result<(), DatabaseError> {
+        if !self
+            .db
+            .indexes
+            .get_mut(index)
+            .ok_or_else(|| DatabaseError::WriterError(format!("Not an index: {}", index)))?
+            .contains_key(key)
+        {
+            return Err(DatabaseError::WriterError("Key not found".to_string()));
+        }
+        self.transactions.push(WriterTransaction::IndexDelete {
+            index: index.to_string(),
+            key: key.to_vec(),
+        });
+        Ok(())
+    }
+
+    fn commit(self: Box<Self>) -> Result<(), DatabaseError> {
+        BTreeWriter::commit(self.db, self.transactions)
+    }
+
+    fn as_reader(&self) -> &dyn DatabaseReader {
+        self
+    }
+}
+
+impl<'a> BTreeWriter<'a> {
+    fn commit(
+        mut db: RwLockWriteGuard<'a, BTreeDbInternal>,
+        transactions: Vec<WriterTransaction>,
+    ) -> Result<(), DatabaseError> {
+        for transaction in transactions {
+            match transaction {
+                WriterTransaction::Put { key, value } => {
+                    db.main.insert(key, value);
+                }
+                WriterTransaction::IndexPut { index, key, value } => {
+                    db.indexes.get_mut(&index).unwrap().insert(key, value);
+                }
+                WriterTransaction::Delete { key } => {
+                    db.main.remove(&key);
+                }
+                WriterTransaction::IndexDelete { index, key } => {
+                    db.indexes.get_mut(&index).unwrap().remove(&key);
+                }
+                WriterTransaction::Overwrite { key, value } => {
+                    db.main.insert(key, value);
+                }
+            }
+        }
+        Ok(())
     }
 }
 
