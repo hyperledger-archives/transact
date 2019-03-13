@@ -56,6 +56,24 @@ impl BTreeDbInternal {
     }
 }
 
+impl Database for BTreeDatabase {
+    fn get_reader<'a>(&'a self) -> Result<Box<dyn DatabaseReader + 'a>, DatabaseError> {
+        Ok(Box::new(BTreeReader {
+            db: self.btree.read().expect("Failed to get reader"),
+        }))
+    }
+
+    fn get_writer<'a>(&'a self) -> Result<Box<dyn DatabaseWriter + 'a>, DatabaseError> {
+        Ok(Box::new(BTreeWriter::new(
+            self.btree.write().expect("Failed to get writer"),
+        )))
+    }
+
+    fn clone_box(&self) -> Box<Database> {
+        Box::new(Clone::clone(self))
+    }
+}
+
 pub struct BTreeReader<'a> {
     db: RwLockReadGuard<'a, BTreeDbInternal>,
 }
