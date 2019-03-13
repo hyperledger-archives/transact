@@ -27,18 +27,18 @@ use std::sync::{
 };
 use std::thread::{self, JoinHandle};
 
-/// The `IteratorAdapter` sends all of the `Item`s from an `Iterator` along a single channel.
+/// The `ExecutionTaskReader` sends all of the `Item`s from an `Iterator` along a single channel.
 ///
-/// In the normal course of an executor there will be many `IteratorAdaptor`s, one for each `Scheduler`.
-pub struct IteratorAdapter {
+/// In the normal course of an executor there will be many `ExecutionTaskReader`s, one for each `Scheduler`.
+pub struct ExecutionTaskReader {
     id: usize,
     threads: Option<(JoinHandle<()>, JoinHandle<()>)>,
     stop: Arc<AtomicBool>,
 }
 
-impl IteratorAdapter {
+impl ExecutionTaskReader {
     pub fn new(id: usize) -> Self {
-        IteratorAdapter {
+        ExecutionTaskReader {
             id,
             threads: None,
             stop: Arc::new(AtomicBool::new(false)),
@@ -60,7 +60,7 @@ impl IteratorAdapter {
             let (sender, receiver) = channel();
 
             let join_handle = thread::Builder::new()
-                .name(format!("iterator_adapter_{}", self.id))
+                .name(format!("ExecutionTaskReader-{}", self.id))
                 .spawn(move || {
                     for execution_task in task_iterator {
                         if stop.load(Ordering::Relaxed) {
@@ -81,7 +81,7 @@ impl IteratorAdapter {
             let id = self.id;
 
             let join_handle_receive = thread::Builder::new()
-                .name(format!("iterator_adapter_receive_thread_{}", self.id))
+                .name(format!("ExecutionTaskReader-receive_thread-{}", self.id))
                 .spawn(move || loop {
                     while let Ok(notification) = receiver.recv() {
                         notifier.notify(notification);
@@ -108,7 +108,7 @@ impl IteratorAdapter {
 
     fn shutdown(join_handle: JoinHandle<()>) {
         if let Err(err) = join_handle.join() {
-            warn!("Error joining with IteratorAdapter thread: {:?}", err);
+            warn!("Error joining with ExecutionTaskReader thread: {:?}", err);
         }
     }
 }

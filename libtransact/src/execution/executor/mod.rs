@@ -19,7 +19,7 @@ mod internal;
 mod reader;
 
 use internal::ExecutorThread;
-use reader::IteratorAdapter;
+use reader::ExecutionTaskReader;
 
 use crate::execution::adapter::ExecutionAdapter;
 use crate::scheduler::ExecutionTask;
@@ -30,7 +30,7 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 pub struct Executor {
-    schedulers: Arc<Mutex<HashMap<usize, IteratorAdapter>>>,
+    schedulers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
     executor_thread: ExecutorThread,
 }
 
@@ -50,7 +50,7 @@ impl Executor {
                 .cloned()
                 .unwrap_or(0);
 
-            let mut iterator_adapter = IteratorAdapter::new(index);
+            let mut reader = ExecutionTaskReader::new(index);
 
             let schedulers = Arc::clone(&self.schedulers);
 
@@ -62,11 +62,11 @@ impl Executor {
 
                 schedulers
                     .lock()
-                    .expect("The IteratorAdapter mutex is poisoned")
+                    .expect("The ExecutionTaskReader mutex is poisoned")
                     .remove(&index);
             });
 
-            iterator_adapter
+            reader
                 .start(task_iterator, notifier, sender, done_callback)
                 .map_err(|err| {
                     ExecutorError::ResourcesUnavailable(err.description().to_string())
@@ -79,7 +79,7 @@ impl Executor {
                 .lock()
                 .expect("The iterator adapter map lock is poisoned");
 
-            schedulers.insert(index, iterator_adapter);
+            schedulers.insert(index, reader);
 
             Ok(())
         } else {
@@ -97,7 +97,7 @@ impl Executor {
         for sched in self
             .schedulers
             .lock()
-            .expect("The IteratorAdapter mutex is poisoned")
+            .expect("The ExecutionTaskReader mutex is poisoned")
             .drain()
         {
             sched.1.stop();
