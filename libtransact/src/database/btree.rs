@@ -506,3 +506,232 @@ impl Iterator for BTreeDatabaseCursor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::database::Database;
+
+    /// Asserts that there are COUNT many objects in DB.
+    fn assert_database_count<'a>(count: usize, reader: &'a dyn DatabaseReader) {
+        assert_eq!(reader.count().unwrap(), count,);
+    }
+
+    /// Asserts that there are are COUNT many objects in DB's INDEX.
+    fn assert_index_count<'a>(index: &str, count: usize, reader: &'a dyn DatabaseReader) {
+        assert_eq!(reader.index_count(index).unwrap(), count,);
+    }
+
+    /// Asserts that KEY is associated with VAL in DB.
+    fn assert_key_value<'a>(key: u8, val: u8, reader: &'a dyn DatabaseReader) {
+        assert_eq!(reader.get(&[key]).unwrap(), [val],);
+    }
+
+    /// Asserts that KEY is associated with VAL in DB's INDEX.
+    fn assert_index_key_value<'a>(index: &str, key: u8, val: u8, reader: &'a dyn DatabaseReader) {
+        assert_eq!(reader.index_get(index, &[key]).unwrap().unwrap(), [val],);
+    }
+
+    /// Asserts that KEY is not in DB.
+    fn assert_not_in_database<'a>(key: u8, reader: &'a dyn DatabaseReader) {
+        assert!(reader.get(&[key]).is_none());
+    }
+
+    /// Asserts that KEY is not in DB's INDEX.
+    fn assert_not_in_index<'a>(index: &str, key: u8, reader: &'a dyn DatabaseReader) {
+        assert!(reader.index_get(index, &[key]).unwrap().is_none());
+    }
+
+    #[test]
+    fn test_btree_database() {
+        let database = BTreeDatabase::new(&["a", "b"]);
+        assert_database_count(0, database.get_reader().unwrap().as_ref());
+        assert_not_in_database(3, database.get_reader().unwrap().as_ref());
+        assert_not_in_database(5, database.get_reader().unwrap().as_ref());
+
+        // Add {3: 4}
+        let mut writer = database.get_writer().unwrap();
+        writer.put(&[3], &[4]).unwrap();
+
+        // Check db before commit using writer as reader
+        assert_database_count(1, writer.as_reader());
+        assert_key_value(3, 4, writer.as_reader());
+
+        writer.commit().unwrap();
+
+        // Check db after commit using new reader
+        assert_database_count(1, database.get_reader().unwrap().as_ref());
+        assert_key_value(3, 4, database.get_reader().unwrap().as_ref());
+
+        // //Add {5: 6}
+        let mut writer = database.get_writer().unwrap();
+        writer.put(&[5], &[6]).unwrap();
+        writer.commit().unwrap();
+
+        assert_database_count(2, database.get_reader().unwrap().as_ref());
+        assert_key_value(5, 6, database.get_reader().unwrap().as_ref());
+        assert_key_value(3, 4, database.get_reader().unwrap().as_ref());
+
+        // Delete {3: 4}
+        let mut writer = database.get_writer().unwrap();
+        writer.delete(&[3]).unwrap();
+
+        // Check db before commit using writer as reader
+        assert_database_count(1, writer.as_reader());
+        assert_key_value(5, 6, writer.as_reader());
+        assert_not_in_database(3, writer.as_reader());
+
+        writer.commit().unwrap();
+
+        // Check db after commit using new reader
+        assert_database_count(1, database.get_reader().unwrap().as_ref());
+        assert_key_value(5, 6, database.get_reader().unwrap().as_ref());
+        assert_not_in_database(3, database.get_reader().unwrap().as_ref());
+
+        // Add {55: 5} in "a"
+        assert_index_count("a", 0, database.get_reader().unwrap().as_ref());
+        assert_index_count("b", 0, database.get_reader().unwrap().as_ref());
+        assert_not_in_index("a", 5, database.get_reader().unwrap().as_ref());
+        assert_not_in_index("b", 5, database.get_reader().unwrap().as_ref());
+
+        let mut writer = database.get_writer().unwrap();
+        writer.index_put("a", &[55], &[5]).unwrap();
+
+        // Check db before commit using writer as reader
+        assert_index_count("a", 1, writer.as_reader());
+        assert_index_count("b", 0, writer.as_reader());
+        assert_index_key_value("a", 55, 5, writer.as_reader());
+        assert_not_in_index("b", 5, writer.as_reader());
+        assert_database_count(1, writer.as_reader());
+        assert_key_value(5, 6, writer.as_reader());
+        assert_not_in_database(3, writer.as_reader());
+
+        writer.commit().unwrap();
+
+        // Check db after commit using new reader
+        assert_index_count("a", 1, database.get_reader().unwrap().as_ref());
+        assert_index_count("b", 0, database.get_reader().unwrap().as_ref());
+        assert_index_key_value("a", 55, 5, database.get_reader().unwrap().as_ref());
+        assert_not_in_index("b", 5, database.get_reader().unwrap().as_ref());
+        assert_database_count(1, database.get_reader().unwrap().as_ref());
+        assert_key_value(5, 6, database.get_reader().unwrap().as_ref());
+        assert_not_in_database(3, database.get_reader().unwrap().as_ref());
+
+        // Delete {55: 5} in "a"
+        let mut writer = database.get_writer().unwrap();
+        writer.index_delete("a", &[55]).unwrap();
+
+        assert_index_count("a", 0, writer.as_reader());
+        assert_index_count("b", 0, writer.as_reader());
+        assert_not_in_index("a", 5, writer.as_reader());
+        assert_not_in_index("b", 5, writer.as_reader());
+        assert_database_count(1, writer.as_reader());
+        assert_key_value(5, 6, writer.as_reader());
+        assert_not_in_database(3, writer.as_reader());
+
+        writer.commit().unwrap();
+
+        assert_index_count("a", 0, database.get_reader().unwrap().as_ref());
+        assert_index_count("b", 0, database.get_reader().unwrap().as_ref());
+        assert_not_in_index("a", 5, database.get_reader().unwrap().as_ref());
+        assert_not_in_index("b", 5, database.get_reader().unwrap().as_ref());
+        assert_database_count(1, database.get_reader().unwrap().as_ref());
+        assert_key_value(5, 6, database.get_reader().unwrap().as_ref());
+        assert_not_in_database(3, database.get_reader().unwrap().as_ref());
+    }
+
+    #[test]
+    /// Tests the implementation of btree database cursor from a database reader
+    fn test_btree_reader_database_cursor() {
+        let database = BTreeDatabase::new(&["a", "b"]);
+        let mut writer = database.get_writer().unwrap();
+        writer.put(&[3], &[4]).unwrap();
+        writer.put(&[10], &[1]).unwrap();
+        writer.put(&[4], &[12]).unwrap();
+
+        writer.commit().unwrap();
+        {
+            let reader = database.get_reader().unwrap();
+
+            let mut cursor = reader.cursor().unwrap();
+
+            // assert cursor.next() returns the key/value pairs in the expected order
+            assert_eq!(Some((vec!(3), vec!(4))), cursor.next());
+            assert_eq!(Some((vec!(4), vec!(12))), cursor.next());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.next());
+            assert_eq!(None, cursor.next());
+            assert_eq!(None, cursor.last());
+
+            cursor = reader.cursor().unwrap();
+
+            // assert cursor.first() and cursor.last() returns expected key/value pairs
+            assert_eq!(Some((vec!(3), vec!(4))), cursor.first());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.last());
+        }
+
+        let mut writer = database.get_writer().unwrap();
+        writer.index_put("a", &[5], &[2]).unwrap();
+        writer.index_put("a", &[11], &[12]).unwrap();
+        writer.index_put("a", &[2], &[22]).unwrap();
+        writer.commit().unwrap();
+
+        let reader = database.get_reader().unwrap();
+        let mut cursor = reader.index_cursor("a").unwrap();
+
+        assert_eq!(Some((vec!(2), vec!(22))), cursor.next());
+        assert_eq!(Some((vec!(5), vec!(2))), cursor.next());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.next());
+        assert_eq!(None, cursor.next());
+        assert_eq!(None, cursor.last());
+
+        cursor = reader.index_cursor("a").unwrap();
+
+        assert_eq!(Some((vec!(2), vec!(22))), cursor.first());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.last());
+    }
+
+    #[test]
+    /// Tests the implementation of btree database cursor from a database writer
+    fn test_btree_writer_database_cursor() {
+        let database = BTreeDatabase::new(&["a", "b"]);
+        let mut writer = database.get_writer().unwrap();
+        writer.put(&[3], &[4]).unwrap();
+        writer.put(&[10], &[1]).unwrap();
+        writer.put(&[4], &[12]).unwrap();
+
+        let mut cursor = writer.cursor().unwrap();
+
+        // assert cursor.next() returns the key/value pairs in the expected order
+        assert_eq!(Some((vec!(3), vec!(4))), cursor.next());
+        assert_eq!(Some((vec!(4), vec!(12))), cursor.next());
+        assert_eq!(Some((vec!(10), vec!(1))), cursor.next());
+        assert_eq!(None, cursor.next());
+        assert_eq!(None, cursor.last());
+
+        cursor = writer.cursor().unwrap();
+
+        // assert cursor.first() and cursor.last() returns expected key/value pairs
+        assert_eq!(Some((vec!(3), vec!(4))), cursor.first());
+        assert_eq!(Some((vec!(10), vec!(1))), cursor.last());
+
+        writer.commit().unwrap();
+        let mut writer = database.get_writer().unwrap();
+        writer.index_put("a", &[5], &[2]).unwrap();
+        writer.index_put("a", &[11], &[12]).unwrap();
+        writer.index_put("a", &[2], &[22]).unwrap();
+
+        let mut cursor = writer.index_cursor("a").unwrap();
+
+        assert_eq!(Some((vec!(2), vec!(22))), cursor.next());
+        assert_eq!(Some((vec!(5), vec!(2))), cursor.next());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.next());
+        assert_eq!(None, cursor.next());
+        assert_eq!(None, cursor.last());
+
+        cursor = writer.index_cursor("a").unwrap();
+
+        assert_eq!(Some((vec!(2), vec!(22))), cursor.first());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.last());
+    }
+
+}
