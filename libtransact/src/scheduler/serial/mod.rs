@@ -69,6 +69,22 @@ impl SerialScheduler {
             ))),
         }
     }
+
+    pub fn shutdown(mut self) {
+        match self.core_tx.send(core::CoreMessage::Shutdown) {
+            Ok(_) => {
+                if let Some(join_handle) = self.core_handle.take() {
+                    join_handle.join().expect("failed to join scheduler thread");
+                }
+            }
+            Err(err) => {
+                error!(
+                    "failed to send to send to scheduler thread during drop: {}",
+                    err
+                );
+            }
+        }
+    }
 }
 
 impl Scheduler for SerialScheduler {
@@ -133,24 +149,6 @@ impl Scheduler for SerialScheduler {
     }
 }
 
-impl Drop for SerialScheduler {
-    fn drop(&mut self) {
-        match self.core_tx.send(core::CoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().expect("failed to join scheduler thread");
-                }
-            }
-            Err(err) => {
-                error!(
-                    "failed to send to send to scheduler thread during drop: {}",
-                    err
-                );
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,7 +193,7 @@ mod tests {
     fn test_scheduler_thread_cleanup() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let _ = SerialScheduler::new(context_lifecycle, state_id);
+        SerialScheduler::new(context_lifecycle, state_id).shutdown();
     }
 
     #[test]
@@ -204,6 +202,7 @@ mod tests {
         let context_lifecycle = Box::new(MockContextLifecycle::new());
         let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
         test_scheduler(&mut scheduler);
+        scheduler.shutdown();
     }
 
     #[test]
@@ -212,6 +211,7 @@ mod tests {
         let context_lifecycle = Box::new(MockContextLifecycle::new());
         let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
         test_scheduler_cancel(&mut scheduler);
+        scheduler.shutdown();
     }
 
     #[test]
@@ -220,5 +220,6 @@ mod tests {
         let context_lifecycle = Box::new(MockContextLifecycle::new());
         let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
         test_scheduler_flow_with_one_transaction(&mut scheduler);
+        scheduler.shutdown();
     }
 }
