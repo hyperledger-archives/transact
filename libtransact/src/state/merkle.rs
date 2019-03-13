@@ -28,7 +28,9 @@ use cbor::value::{Bytes, Key, Text, Value};
 use openssl;
 
 use crate::database::error::DatabaseError;
-use crate::database::lmdb::{DatabaseReader, LmdbDatabase, LmdbDatabaseWriter};
+use crate::database::{DatabaseReader, DatabaseWriter};
+
+use crate::database::lmdb::{LmdbDatabase, LmdbDatabaseWriter};
 
 use super::change_log::{ChangeLogEntry, Successor};
 use super::error::{StatePruneError, StateReadError, StateWriteError};

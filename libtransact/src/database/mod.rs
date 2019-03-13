@@ -17,3 +17,73 @@
 
 pub mod error;
 pub mod lmdb;
+
+use crate::database::error::DatabaseError;
+
+pub type DatabaseCursor<'a> = Box<dyn DatabaseReaderCursor<Item = (Vec<u8>, Vec<u8>)> + 'a>;
+
+pub trait Database: Sync + Send {
+    fn get_reader<'a>(&'a self) -> Result<Box<dyn DatabaseReader + 'a>, DatabaseError>;
+    fn get_writer<'a>(&'a self) -> Result<Box<dyn DatabaseWriter + 'a>, DatabaseError>;
+    fn clone_box(&self) -> Box<Database>;
+}
+
+impl Clone for Box<Database> {
+    fn clone(&self) -> Box<Database> {
+        self.clone_box()
+    }
+}
+
+/// A DatabaseReader provides read access to a database instance.
+pub trait DatabaseReader {
+    /// Returns the bytes stored at the given key, if found.
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+
+    /// Returns the bytes stored at the given key on a specified index, if found.
+    fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError>;
+
+    /// Returns a cursor against the main database. The cursor iterates over
+    /// the entries in the natural key order.
+    fn cursor(&self) -> Result<DatabaseCursor, DatabaseError>;
+
+    /// Returns a cursor against the given index. The cursor iterates over
+    /// the entries in the index's natural key order.
+    fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError>;
+
+    /// Returns the number of entries in the main database.
+    fn count(&self) -> Result<usize, DatabaseError>;
+
+    /// Returns the number of entries in the given index.
+    fn index_count(&self, index: &str) -> Result<usize, DatabaseError>;
+}
+
+/// A DatabaseReader provides read access to a database instance.
+pub trait DatabaseWriter: DatabaseReader {
+    /// Writes the given key/value pair. If the key/value pair already exists,
+    /// it will return a DatabaseError::DuplicateEntry.
+    fn put(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError>;
+
+    /// Writes the given key/value pair. If the key/value pair already exists,
+    /// it overwrites the old value
+    fn overwrite(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError>;
+
+    /// Deletes the given key/value pair. If the key does exist, it returns an error,
+    fn delete(&mut self, key: &[u8]) -> Result<(), DatabaseError>;
+
+    /// Writes the given key/value pair at index.
+    fn index_put(&mut self, index: &str, key: &[u8], value: &[u8]) -> Result<(), DatabaseError>;
+
+    /// Deletes the given key/value pair at index.
+    fn index_delete(&mut self, index: &str, key: &[u8]) -> Result<(), DatabaseError>;
+
+    // Commit changes to database
+    fn commit(self: Box<Self>) -> Result<(), DatabaseError>;
+
+    // Use writer as reader
+    fn as_reader(&self) -> &dyn DatabaseReader;
+}
+
+pub trait DatabaseReaderCursor: Iterator {
+    fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+    fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+}

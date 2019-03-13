@@ -15,6 +15,9 @@
  * ------------------------------------------------------------------------------
  */
 
+use crate::database::{
+    Database, DatabaseCursor, DatabaseReader, DatabaseReaderCursor, DatabaseWriter,
+};
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -103,38 +106,35 @@ impl LmdbDatabase {
         let txn = lmdb::ReadTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::ReaderError(format!("Failed to create reader: {}", err))
         })?;
-        Ok(LmdbDatabaseReader { db: self, txn })
+        Ok(LmdbDatabaseReader { db: &self, txn })
     }
 
     pub fn writer(&self) -> Result<LmdbDatabaseWriter, DatabaseError> {
         let txn = lmdb::WriteTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::WriterError(format!("Failed to create writer: {}", err))
         })?;
-        Ok(LmdbDatabaseWriter { db: self, txn })
+        Ok(LmdbDatabaseWriter { db: &self, txn })
     }
 }
 
-/// A DatabaseReader provides read access to a database instance.
-pub trait DatabaseReader {
-    /// Returns the bytes stored at the given key, if found.
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+impl Database for LmdbDatabase {
+    fn get_reader<'a>(&'a self) -> Result<Box<dyn DatabaseReader + 'a>, DatabaseError> {
+        let txn = lmdb::ReadTransaction::new(self.ctx.env.clone()).map_err(|err| {
+            DatabaseError::ReaderError(format!("Failed to create reader: {}", err))
+        })?;
+        Ok(Box::new(LmdbDatabaseReader { db: &self, txn }))
+    }
 
-    /// Returns the bytes stored at the given key on a specified index, if found.
-    fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError>;
+    fn get_writer<'a>(&'a self) -> Result<Box<dyn DatabaseWriter + 'a>, DatabaseError> {
+        let txn = lmdb::WriteTransaction::new(self.ctx.env.clone()).map_err(|err| {
+            DatabaseError::WriterError(format!("Failed to create writer: {}", err))
+        })?;
+        Ok(Box::new(LmdbDatabaseWriter { db: &self, txn }))
+    }
 
-    /// Returns a cursor against the main database. The cursor iterates over
-    /// the entries in the natural key order.
-    fn cursor(&self) -> Result<LmdbDatabaseReaderCursor, DatabaseError>;
-
-    /// Returns a cursor against the given index. The cursor iterates over
-    /// the entries in the index's natural key order.
-    fn index_cursor(&self, index: &str) -> Result<LmdbDatabaseReaderCursor, DatabaseError>;
-
-    /// Returns the number of entries in the main database.
-    fn count(&self) -> Result<usize, DatabaseError>;
-
-    /// Returns the number of entries in the given index.
-    fn index_count(&self, index: &str) -> Result<usize, DatabaseError>;
+    fn clone_box(&self) -> Box<Database> {
+        Box::new(Clone::clone(self))
+    }
 }
 
 pub struct LmdbDatabaseReader<'a> {
@@ -160,16 +160,16 @@ impl<'a> DatabaseReader for LmdbDatabaseReader<'a> {
         Ok(val.ok().map(Vec::from))
     }
 
-    fn cursor(&self) -> Result<LmdbDatabaseReaderCursor, DatabaseError> {
+    fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
         let cursor = self
             .txn
             .cursor(self.db.main.clone())
             .map_err(|err| DatabaseError::ReaderError(format!("{}", err)))?;
         let access = self.txn.access();
-        Ok(LmdbDatabaseReaderCursor { access, cursor })
+        Ok(Box::new(LmdbDatabaseReaderCursor { access, cursor }))
     }
 
-    fn index_cursor(&self, index: &str) -> Result<LmdbDatabaseReaderCursor, DatabaseError> {
+    fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError> {
         let index = self
             .db
             .indexes
@@ -180,7 +180,7 @@ impl<'a> DatabaseReader for LmdbDatabaseReader<'a> {
             .cursor(index)
             .map_err(|err| DatabaseError::ReaderError(format!("{}", err)))?;
         let access = self.txn.access();
-        Ok(LmdbDatabaseReaderCursor { access, cursor })
+        Ok(Box::new(LmdbDatabaseReaderCursor { access, cursor }))
     }
 
     fn count(&self) -> Result<usize, DatabaseError> {
@@ -212,15 +212,15 @@ pub struct LmdbDatabaseReaderCursor<'a> {
     cursor: lmdb::Cursor<'a, 'a>,
 }
 
-impl<'a> LmdbDatabaseReaderCursor<'a> {
-    pub fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+impl<'a> DatabaseReaderCursor for LmdbDatabaseReaderCursor<'a> {
+    fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.cursor
             .first(&self.access)
             .ok()
             .map(|(key, value): (&[u8], &[u8])| (Vec::from(key), Vec::from(value)))
     }
 
-    pub fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+    fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
         self.cursor
             .last(&self.access)
             .ok()
@@ -244,10 +244,10 @@ pub struct LmdbDatabaseWriter<'a> {
     txn: lmdb::WriteTransaction<'a>,
 }
 
-impl<'a> LmdbDatabaseWriter<'a> {
+impl<'a> DatabaseWriter for LmdbDatabaseWriter<'a> {
     /// Writes the given key/value pair. If the key/value pair already exists,
     /// it will return a DatabaseError::DuplicateEntry.
-    pub fn put(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
+    fn put(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         self.txn
             .access()
             .put(&self.db.main, key, value, lmdb::put::NOOVERWRITE)
@@ -257,26 +257,21 @@ impl<'a> LmdbDatabaseWriter<'a> {
             })
     }
 
-    pub fn overwrite(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
+    fn overwrite(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         self.txn
             .access()
             .put(&self.db.main, key, value, lmdb::put::Flags::empty())
             .map_err(|err| DatabaseError::WriterError(format!("{}", err)))
     }
 
-    pub fn delete(&mut self, key: &[u8]) -> Result<(), DatabaseError> {
+    fn delete(&mut self, key: &[u8]) -> Result<(), DatabaseError> {
         self.txn
             .access()
             .del_key(&self.db.main, key)
             .map_err(|err| DatabaseError::WriterError(format!("{}", err)))
     }
 
-    pub fn index_put(
-        &mut self,
-        index: &str,
-        key: &[u8],
-        value: &[u8],
-    ) -> Result<(), DatabaseError> {
+    fn index_put(&mut self, index: &str, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         let index = self
             .db
             .indexes
@@ -288,7 +283,7 @@ impl<'a> LmdbDatabaseWriter<'a> {
             .map_err(|err| DatabaseError::WriterError(format!("{}", err)))
     }
 
-    pub fn index_delete(&mut self, index: &str, key: &[u8]) -> Result<(), DatabaseError> {
+    fn index_delete(&mut self, index: &str, key: &[u8]) -> Result<(), DatabaseError> {
         let index = self
             .db
             .indexes
@@ -300,10 +295,14 @@ impl<'a> LmdbDatabaseWriter<'a> {
             .map_err(|err| DatabaseError::WriterError(format!("{}", err)))
     }
 
-    pub fn commit(self) -> Result<(), DatabaseError> {
+    fn commit(self: Box<Self>) -> Result<(), DatabaseError> {
         self.txn
             .commit()
             .map_err(|err| DatabaseError::WriterError(format!("{}", err)))
+    }
+
+    fn as_reader(&self) -> &dyn DatabaseReader {
+        self
     }
 }
 
@@ -325,16 +324,16 @@ impl<'a> DatabaseReader for LmdbDatabaseWriter<'a> {
         Ok(val.ok().map(Vec::from))
     }
 
-    fn cursor(&self) -> Result<LmdbDatabaseReaderCursor, DatabaseError> {
+    fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
         let cursor = self
             .txn
             .cursor(self.db.main.clone())
             .map_err(|err| DatabaseError::ReaderError(format!("{}", err)))?;
         let access = (*self.txn).access();
-        Ok(LmdbDatabaseReaderCursor { access, cursor })
+        Ok(Box::new(LmdbDatabaseReaderCursor { access, cursor }))
     }
 
-    fn index_cursor(&self, index: &str) -> Result<LmdbDatabaseReaderCursor, DatabaseError> {
+    fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError> {
         let index = self
             .db
             .indexes
@@ -345,7 +344,7 @@ impl<'a> DatabaseReader for LmdbDatabaseWriter<'a> {
             .cursor(index)
             .map_err(|err| DatabaseError::ReaderError(format!("{}", err)))?;
         let access = (*self.txn).access();
-        Ok(LmdbDatabaseReaderCursor { access, cursor })
+        Ok(Box::new(LmdbDatabaseReaderCursor { access, cursor }))
     }
 
     fn count(&self) -> Result<usize, DatabaseError> {
@@ -442,7 +441,7 @@ mod tests {
             assert_not_in_database(5, &database);
 
             // Add {3: 4}
-            let mut writer = database.writer().unwrap();
+            let mut writer = database.get_writer().unwrap();
             writer.put(&[3], &[4]).unwrap();
 
             assert_database_count(0, &database);
@@ -454,7 +453,7 @@ mod tests {
             assert_key_value(3, 4, &database);
 
             // Add {5: 6}
-            let mut writer = database.writer().unwrap();
+            let mut writer = database.get_writer().unwrap();
             writer.put(&[5], &[6]).unwrap();
             writer.commit().unwrap();
 
@@ -463,7 +462,7 @@ mod tests {
             assert_key_value(3, 4, &database);
 
             // Delete {3: 4}
-            let mut writer = database.writer().unwrap();
+            let mut writer = database.get_writer().unwrap();
             writer.delete(&[3]).unwrap();
 
             assert_database_count(2, &database);
@@ -480,7 +479,7 @@ mod tests {
             assert_not_in_index("a", 5, &database);
             assert_not_in_index("b", 5, &database);
 
-            let mut writer = database.writer().unwrap();
+            let mut writer = database.get_writer().unwrap();
             writer.index_put("a", &[55], &[5]).unwrap();
 
             assert_index_count("a", 0, &database);
@@ -499,7 +498,7 @@ mod tests {
             assert_not_in_database(3, &database);
 
             // Delete {55: 5} in "a"
-            let mut writer = database.writer().unwrap();
+            let mut writer = database.get_writer().unwrap();
             writer.index_delete("a", &[55]).unwrap();
 
             assert_index_count("a", 1, &database);
