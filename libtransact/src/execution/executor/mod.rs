@@ -15,10 +15,11 @@
  * -----------------------------------------------------------------------------
  */
 
+mod internal;
+
+use internal::{ExecuterThread, RegistrationExecutionEvent, RegistrationExecutionEventSender};
+
 use crate::execution::adapter::ExecutionAdapter;
-use crate::execution::executer_internal::{
-    ExecuterThread, RegistrationExecutionEvent, RegistrationExecutionEventSender,
-};
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;

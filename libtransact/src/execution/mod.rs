@@ -19,8 +19,7 @@
 //! and return a `execution::adapter::ExecutionResult`.
 
 pub mod adapter;
-pub mod executer;
-mod executer_internal;
+pub mod executor;
 
 use crate::protocol::transaction::TransactionPair;
 
