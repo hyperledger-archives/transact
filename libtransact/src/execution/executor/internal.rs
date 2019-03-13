@@ -15,7 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Contains the internal types and functionality of the Executer.
+//! Contains the internal types and functionality of the Executor.
 //                                                                                                 -------- ExecutionAdapter
 // ---- Iterator<Item = ExecutionTask> ----\        | Single thread that                         /
 //                                           \      | listens for RegistrationChanges and       /
@@ -60,7 +60,7 @@ pub enum RegistrationChange {
 }
 
 /// One of either a `RegistrationChange` or an `ExecutionEvent`.
-/// The single internal thread in the Executer is listening for these.
+/// The single internal thread in the Executor is listening for these.
 pub enum RegistrationExecutionEvent {
     RegistrationChange(RegistrationChange),
     Execution(Box<ExecutionEvent>),
@@ -113,40 +113,40 @@ impl PartialEq for NamedExecutionEventSender {
 impl Eq for NamedExecutionEventSender {}
 
 #[derive(Debug)]
-pub enum ExecuterThreadError {
+pub enum ExecutorThreadError {
     InvalidState,
     ResourcesUnavailable,
 }
 
-impl std::error::Error for ExecuterThreadError {
+impl std::error::Error for ExecutorThreadError {
     fn cause(&self) -> Option<&std::error::Error> {
         None
     }
 
     fn description(&self) -> &str {
         match *self {
-            ExecuterThreadError::InvalidState => {
-                "ExecuterThread in an invalid state when 'start' was called"
+            ExecutorThreadError::InvalidState => {
+                "ExecutorThread in an invalid state when 'start' was called"
             }
-            ExecuterThreadError::ResourcesUnavailable => {
-                "ExecuterThread unable to access a resource needed for operation"
+            ExecutorThreadError::ResourcesUnavailable => {
+                "ExecutorThread unable to access a resource needed for operation"
             }
         }
     }
 }
 
-impl std::fmt::Display for ExecuterThreadError {
+impl std::fmt::Display for ExecutorThreadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ExecuterThreadError::InvalidState => write!(f, "Invalid State: {}", self.description()),
-            ExecuterThreadError::ResourcesUnavailable => {
+            ExecutorThreadError::InvalidState => write!(f, "Invalid State: {}", self.description()),
+            ExecutorThreadError::ResourcesUnavailable => {
                 write!(f, "ResourcesUnavailable: {}", self.description())
             }
         }
     }
 }
 
-pub struct ExecuterThread {
+pub struct ExecutorThread {
     execution_adapters: Vec<Box<ExecutionAdapter>>,
     join_handles: Vec<JoinHandle<()>>,
     internal_thread: Option<JoinHandle<()>>,
@@ -154,9 +154,9 @@ pub struct ExecuterThread {
     stop: Arc<AtomicBool>,
 }
 
-impl ExecuterThread {
+impl ExecutorThread {
     pub fn new(execution_adapters: Vec<Box<ExecutionAdapter>>) -> Self {
-        ExecuterThread {
+        ExecutorThread {
             execution_adapters,
             join_handles: vec![],
             internal_thread: None,
@@ -169,7 +169,7 @@ impl ExecuterThread {
         self.sender.as_ref().cloned()
     }
 
-    pub fn start(&mut self) -> Result<(), ExecuterThreadError> {
+    pub fn start(&mut self) -> Result<(), ExecutorThreadError> {
         if self.sender.is_none() {
             let (registry_sender, receiver) = channel();
 
@@ -182,7 +182,7 @@ impl ExecuterThread {
                     registry_sender: registry_sender.clone(),
                 })) {
                     warn!("Unable to start execution adapter: {}", err);
-                    return Err(ExecuterThreadError::ResourcesUnavailable);
+                    return Err(ExecutorThreadError::ResourcesUnavailable);
                 }
 
                 match Self::start_execution_adapter_thread(
@@ -197,7 +197,7 @@ impl ExecuterThread {
                     }
                     Err(err) => {
                         warn!("Unable to start thread for execution adapter: {}", err);
-                        return Err(ExecuterThreadError::ResourcesUnavailable);
+                        return Err(ExecutorThreadError::ResourcesUnavailable);
                     }
                 }
             }
@@ -208,14 +208,14 @@ impl ExecuterThread {
                     self.internal_thread = Some(join_handle);
                 }
                 Err(err) => {
-                    warn!("unable to start internal executer thread: {}", err);
-                    return Err(ExecuterThreadError::ResourcesUnavailable);
+                    warn!("unable to start internal executor thread: {}", err);
+                    return Err(ExecutorThreadError::ResourcesUnavailable);
                 }
             }
 
             Ok(())
         } else {
-            Err(ExecuterThreadError::InvalidState)
+            Err(ExecutorThreadError::InvalidState)
         }
     }
 
@@ -223,7 +223,7 @@ impl ExecuterThread {
         self.stop.store(true, Ordering::Relaxed);
         if let Some(internal) = self.internal_thread {
             if let Err(err) = internal.join() {
-                warn!("During stop of executer thread: {:?}", err);
+                warn!("During stop of executor thread: {:?}", err);
             }
         }
     }
@@ -321,7 +321,7 @@ impl ExecuterThread {
     ) -> Result<JoinHandle<()>, std::io::Error> {
         let stop = Arc::clone(&self.stop);
         std::thread::Builder::new()
-            .name("internal_executer_thread".to_string())
+            .name("internal_executor_thread".to_string())
             .spawn(move || {
                 let mut fanout_threads: HashMap<
                     TransactionFamily,
@@ -392,7 +392,7 @@ impl ExecuterThread {
                                 })
                         {
                             if let Err(err) = sender.sender.send(ExecutionCommand::Sentinel) {
-                                warn!("During stop of ExecuterThread internal thread: {}", err);
+                                warn!("During stop of ExecutorThread internal thread: {}", err);
                             }
                         }
 
@@ -469,7 +469,7 @@ mod tests {
     /// Walks sequentially through the multiplexing of ExecutionEvents and RegistrationChanges on the
     /// same channel, processing the ExecutionTasks in the ExecutionEvents and returning the result.
     #[test]
-    fn test_executer_internal() {
+    fn test_executor_internal() {
         // Create the three channels with their associated Senders and Receivers.
 
         let (sender, notification_receiver) = channel::<ExecutionTaskCompletionNotification>();
@@ -511,7 +511,7 @@ mod tests {
         let mut named_senders: HashMap<TransactionFamily, HashSet<NamedExecutionEventSender>> =
             HashMap::new();
 
-        // Main Executer loop
+        // Main Executor loop
 
         while let Ok(event) = internal_receiver.try_recv() {
             match event {
@@ -618,18 +618,18 @@ mod tests {
     }
 
     #[test]
-    fn test_executer_thread() {
+    fn test_executor_thread() {
         let noop_adapter = TestExecutionAdapter::new();
 
         let adapter = noop_adapter.clone();
 
-        let mut executer_thread: ExecuterThread = ExecuterThread::new(vec![Box::new(noop_adapter)]);
+        let mut executor_thread: ExecutorThread = ExecutorThread::new(vec![Box::new(noop_adapter)]);
 
-        executer_thread
+        executor_thread
             .start()
             .expect("Start can only be called once");
 
-        let sender = executer_thread
+        let sender = executor_thread
             .sender()
             .expect("Sender is some after start is called");
 
@@ -665,7 +665,7 @@ mod tests {
             "Incorrect number of results received",
         );
 
-        executer_thread.stop();
+        executor_thread.stop();
     }
 
     fn create_txn(signer: &Signer) -> TransactionPair {

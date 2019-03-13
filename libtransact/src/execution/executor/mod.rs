@@ -17,7 +17,7 @@
 
 mod internal;
 
-use internal::{ExecuterThread, RegistrationExecutionEvent, RegistrationExecutionEventSender};
+use internal::{ExecutorThread, RegistrationExecutionEvent, RegistrationExecutionEventSender};
 
 use crate::execution::adapter::ExecutionAdapter;
 use crate::scheduler::ExecutionTask;
@@ -35,7 +35,7 @@ use std::thread::{self, JoinHandle};
 
 /// The `IteratorAdapter` sends all of the `Item`s from an `Iterator` along a single channel.
 ///
-/// In the normal course of an executer there will be many `IteratorAdaptor`s, one for each `Scheduler`.
+/// In the normal course of an executor there will be many `IteratorAdaptor`s, one for each `Scheduler`.
 struct IteratorAdapter {
     id: usize,
     threads: Option<(JoinHandle<()>, JoinHandle<()>)>,
@@ -78,7 +78,7 @@ impl IteratorAdapter {
                             RegistrationExecutionEvent::Execution(Box::new(execution_event));
 
                         if let Err(err) = internal.send(event) {
-                            warn!("During sending on the internal executer channel: {}", err)
+                            warn!("During sending on the internal executor channel: {}", err)
                         }
                     }
                 })?;
@@ -119,18 +119,18 @@ impl IteratorAdapter {
     }
 }
 
-pub struct Executer {
+pub struct Executor {
     schedulers: Arc<Mutex<HashMap<usize, IteratorAdapter>>>,
-    executer_thread: ExecuterThread,
+    executor_thread: ExecutorThread,
 }
 
-impl Executer {
+impl Executor {
     pub fn execute(
         &self,
         task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
         notifier: Box<ExecutionTaskCompletionNotifier>,
-    ) -> Result<(), ExecuterError> {
-        if let Some(sender) = self.executer_thread.sender() {
+    ) -> Result<(), ExecutorError> {
+        if let Some(sender) = self.executor_thread.sender() {
             let index = self
                 .schedulers
                 .lock()
@@ -159,7 +159,7 @@ impl Executer {
             iterator_adapter
                 .start(task_iterator, notifier, sender, done_callback)
                 .map_err(|err| {
-                    ExecuterError::ResourcesUnavailable(err.description().to_string())
+                    ExecutorError::ResourcesUnavailable(err.description().to_string())
                 })?;
 
             debug!("Execute called, creating execution adapter {}", index);
@@ -173,13 +173,13 @@ impl Executer {
 
             Ok(())
         } else {
-            Err(ExecuterError::NotStarted)
+            Err(ExecutorError::NotStarted)
         }
     }
 
-    pub fn start(&mut self) -> Result<(), ExecuterError> {
-        self.executer_thread.start().map_err(|_| {
-            ExecuterError::AlreadyStarted("The Executer has already had start called.".to_string())
+    pub fn start(&mut self) -> Result<(), ExecutorError> {
+        self.executor_thread.start().map_err(|_| {
+            ExecutorError::AlreadyStarted("The Executor has already had start called.".to_string())
         })
     }
 
@@ -192,37 +192,37 @@ impl Executer {
         {
             sched.1.stop();
         }
-        self.executer_thread.stop();
+        self.executor_thread.stop();
     }
 
     pub fn new(execution_adapters: Vec<Box<ExecutionAdapter>>) -> Self {
-        Executer {
+        Executor {
             schedulers: Arc::new(Mutex::new(HashMap::new())),
-            executer_thread: ExecuterThread::new(execution_adapters),
+            executor_thread: ExecutorThread::new(execution_adapters),
         }
     }
 }
 
 #[derive(Debug)]
-pub enum ExecuterError {
-    // The Executer has not been started, and so calling `execute` will return an error.
+pub enum ExecutorError {
+    // The Executor has not been started, and so calling `execute` will return an error.
     NotStarted,
-    // The Executer has had start called more than once.
+    // The Executor has had start called more than once.
     AlreadyStarted(String),
 
     ResourcesUnavailable(String),
 }
 
-impl std::error::Error for ExecuterError {}
+impl std::error::Error for ExecutorError {}
 
-impl std::fmt::Display for ExecuterError {
+impl std::fmt::Display for ExecutorError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            ExecuterError::NotStarted => f.write_str("Executer not started"),
-            ExecuterError::AlreadyStarted(ref msg) => {
-                write!(f, "Executer already started: {}", msg)
+            ExecutorError::NotStarted => f.write_str("Executor not started"),
+            ExecutorError::AlreadyStarted(ref msg) => {
+                write!(f, "Executor already started: {}", msg)
             }
-            ExecuterError::ResourcesUnavailable(ref msg) => {
+            ExecutorError::ResourcesUnavailable(ref msg) => {
                 write!(f, "Resource Unavailable: {}", msg)
             }
         }
@@ -258,7 +258,7 @@ mod tests {
     static NUMBER_OF_TRANSACTIONS: usize = 20;
 
     #[test]
-    fn test_executer() {
+    fn test_executor() {
         let test_execution_adapter1 = TestExecutionAdapter::new();
 
         let adapter1 = test_execution_adapter1.clone();
@@ -267,12 +267,12 @@ mod tests {
 
         let adapter2 = test_execution_adapter2.clone();
 
-        let mut executer = Executer::new(vec![
+        let mut executor = Executor::new(vec![
             Box::new(test_execution_adapter1),
             Box::new(test_execution_adapter2),
         ]);
 
-        executer.start().expect("Executer did not correctly start");
+        executor.start().expect("Executor did not correctly start");
 
         let iterator1 = MockTaskExecutionIterator::new();
         let notifier1 = MockExecutionTaskCompletionNotifier::new();
@@ -280,13 +280,13 @@ mod tests {
         let iterator2 = MockTaskExecutionIterator::new();
         let notifier2 = MockExecutionTaskCompletionNotifier::new();
 
-        executer
+        executor
             .execute(Box::new(iterator1), Box::new(notifier1.clone()))
-            .expect("Start has been called so the executer can execute");
+            .expect("Start has been called so the executor can execute");
 
-        executer
+        executor
             .execute(Box::new(iterator2), Box::new(notifier2.clone()))
-            .expect("Start has been called so the executer can execute");
+            .expect("Start has been called so the executor can execute");
 
         adapter1.register("test1", "1.0");
         adapter2.register("test2", "1.0");
