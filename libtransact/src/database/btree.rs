@@ -251,6 +251,180 @@ impl<'a> BTreeWriter<'a> {
     }
 }
 
+impl<'a> DatabaseReader for BTreeWriter<'a> {
+    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+        let key_to_find = key.to_vec();
+        for transaction in self.transactions.iter().rev() {
+            match transaction {
+                WriterTransaction::Put { key, value } => {
+                    if &key_to_find == key {
+                        return Some(value.clone());
+                    }
+                }
+                WriterTransaction::Delete { key } => {
+                    if &key_to_find == key {
+                        return None;
+                    }
+                }
+                WriterTransaction::Overwrite { key, value } => {
+                    if &key_to_find == key {
+                        return Some(value.clone());
+                    }
+                }
+                _ => (),
+            };
+        }
+
+        match self.db.main.get(key) {
+            Some(value) => Some(value.to_vec()),
+            None => None,
+        }
+    }
+
+    fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let key_to_find = key.to_vec();
+        let index_to_find = index.to_string();
+
+        for transaction in self.transactions.iter().rev() {
+            match transaction {
+                WriterTransaction::IndexPut { index, key, value } => {
+                    if &key_to_find == key && &index_to_find == index {
+                        return Ok(Some(value.clone()));
+                    }
+                }
+                WriterTransaction::IndexDelete { index, key } => {
+                    if &key_to_find == key && &index_to_find == index {
+                        return Ok(None);
+                    }
+                }
+                _ => (),
+            };
+        }
+        match self
+            .db
+            .indexes
+            .get(index)
+            .ok_or_else(|| DatabaseError::ReaderError(format!("Not an index: {}", index)))?
+            .get(key)
+        {
+            Some(value) => Ok(Some(value.to_vec())),
+            None => Ok(None),
+        }
+    }
+
+    /// Returns a cursor against the main database. The cursor iterates over
+    /// the entries in the natural key order.
+    fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
+        let mut db = self.db.main.clone();
+        for transaction in self.transactions.iter() {
+            match transaction {
+                WriterTransaction::Put { key, value } => {
+                    db.insert(key.to_vec(), value.to_vec());
+                }
+                WriterTransaction::Delete { key } => {
+                    db.remove(key);
+                }
+                WriterTransaction::Overwrite { key, value } => {
+                    db.insert(key.to_vec(), value.to_vec());
+                }
+                _ => (),
+            }
+        }
+
+        Ok(Box::new(BTreeDatabaseCursor::new(db)))
+    }
+
+    /// Returns a cursor against the given index. The cursor iterates over
+    /// the entries in the index's natural key order.
+    fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError> {
+        let mut index_db = self
+            .db
+            .indexes
+            .get(index)
+            .ok_or_else(|| DatabaseError::ReaderError(format!("Not an index: {}", index)))?
+            .clone();
+
+        for transaction in self.transactions.iter() {
+            match transaction {
+                WriterTransaction::IndexPut {
+                    index: transaction_index,
+                    key,
+                    value,
+                } => {
+                    if index == transaction_index {
+                        index_db.insert(key.to_vec(), value.to_vec());
+                    }
+                }
+                WriterTransaction::IndexDelete {
+                    index: transaction_index,
+                    key,
+                } => {
+                    if index == transaction_index {
+                        index_db.remove(key);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        Ok(Box::new(BTreeDatabaseCursor::new(index_db)))
+    }
+
+    /// Returns the number of entries in the main database.
+    fn count(&self) -> Result<usize, DatabaseError> {
+        let count = self
+            .transactions
+            .iter()
+            .fold(0_i32, |acc, transaction| match transaction {
+                WriterTransaction::Put { .. } => acc + 1,
+                WriterTransaction::Delete { .. } => acc - 1,
+                _ => acc,
+            });
+        let total = self.db.main.len() as i32 + count;
+
+        Ok(total as usize)
+    }
+
+    /// Returns the number of entries in the given index
+    fn index_count(&self, index: &str) -> Result<usize, DatabaseError> {
+        let count = self
+            .transactions
+            .iter()
+            .fold(0_i32, |acc, transaction| match transaction {
+                WriterTransaction::IndexPut {
+                    index: transaction_index,
+                    ..
+                } => {
+                    if index == transaction_index {
+                        acc + 1
+                    } else {
+                        acc
+                    }
+                }
+                WriterTransaction::IndexDelete {
+                    index: transaction_index,
+                    ..
+                } => {
+                    if index == transaction_index {
+                        acc - 1
+                    } else {
+                        acc
+                    }
+                }
+                _ => acc,
+            });
+        let total = self
+            .db
+            .indexes
+            .get(index)
+            .ok_or_else(|| DatabaseError::ReaderError(format!("Not an index: {}", index)))?
+            .len() as i32
+            + count;
+
+        Ok(total as usize)
+    }
+}
+
 pub struct BTreeDatabaseCursor {
     db: BTreeMap<Vec<u8>, Vec<u8>>,
     current_key: Option<Vec<u8>>,
