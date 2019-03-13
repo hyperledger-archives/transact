@@ -16,108 +16,18 @@
  */
 
 mod internal;
+mod reader;
 
-use internal::{ExecutorThread, RegistrationExecutionEvent, RegistrationExecutionEventSender};
+use internal::ExecutorThread;
+use reader::IteratorAdapter;
 
 use crate::execution::adapter::ExecutionAdapter;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
-use log::warn;
 use std::collections::HashMap;
 use std::error::Error;
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    mpsc::channel,
-    Arc, Mutex,
-};
-use std::thread::{self, JoinHandle};
-
-/// The `IteratorAdapter` sends all of the `Item`s from an `Iterator` along a single channel.
-///
-/// In the normal course of an executor there will be many `IteratorAdaptor`s, one for each `Scheduler`.
-struct IteratorAdapter {
-    id: usize,
-    threads: Option<(JoinHandle<()>, JoinHandle<()>)>,
-    stop: Arc<AtomicBool>,
-}
-
-impl IteratorAdapter {
-    fn new(id: usize) -> Self {
-        IteratorAdapter {
-            id,
-            threads: None,
-            stop: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    fn start(
-        &mut self,
-        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-        notifier: Box<ExecutionTaskCompletionNotifier>,
-        internal: RegistrationExecutionEventSender,
-        done_callback: Box<FnMut(usize) + Send>,
-    ) -> Result<(), std::io::Error> {
-        let stop = Arc::clone(&self.stop);
-
-        let mut done_callback = done_callback;
-
-        if self.threads.is_none() {
-            let (sender, receiver) = channel();
-
-            let join_handle = thread::Builder::new()
-                .name(format!("iterator_adapter_{}", self.id))
-                .spawn(move || {
-                    for execution_task in task_iterator {
-                        if stop.load(Ordering::Relaxed) {
-                            break;
-                        }
-
-                        let execution_event = (sender.clone(), execution_task);
-                        let event =
-                            RegistrationExecutionEvent::Execution(Box::new(execution_event));
-
-                        if let Err(err) = internal.send(event) {
-                            warn!("During sending on the internal executor channel: {}", err)
-                        }
-                    }
-                })?;
-
-            let stop = Arc::clone(&self.stop);
-            let id = self.id;
-
-            let join_handle_receive = thread::Builder::new()
-                .name(format!("iterator_adapter_receive_thread_{}", self.id))
-                .spawn(move || loop {
-                    while let Ok(notification) = receiver.recv() {
-                        notifier.notify(notification);
-
-                        if stop.load(Ordering::Relaxed) {
-                            done_callback(id);
-                            break;
-                        }
-                    }
-                })?;
-
-            self.threads = Some((join_handle, join_handle_receive));
-        }
-        Ok(())
-    }
-
-    fn stop(self) {
-        self.stop.store(true, Ordering::Relaxed);
-        if let Some((send, receive)) = self.threads {
-            Self::shutdown(send);
-            Self::shutdown(receive);
-        }
-    }
-
-    fn shutdown(join_handle: JoinHandle<()>) {
-        if let Err(err) = join_handle.join() {
-            warn!("Error joining with IteratorAdapter thread: {:?}", err);
-        }
-    }
-}
+use std::sync::{Arc, Mutex};
 
 pub struct Executor {
     schedulers: Arc<Mutex<HashMap<usize, IteratorAdapter>>>,
