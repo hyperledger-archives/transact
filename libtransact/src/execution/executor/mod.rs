@@ -30,7 +30,7 @@ use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 pub struct Executor {
-    schedulers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
+    readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
     executor_thread: ExecutorThread,
 }
 
@@ -42,7 +42,7 @@ impl Executor {
     ) -> Result<(), ExecutorError> {
         if let Some(sender) = self.executor_thread.sender() {
             let index = self
-                .schedulers
+                .readers
                 .lock()
                 .expect("The iterator adapters map lock is poisoned")
                 .keys()
@@ -52,7 +52,7 @@ impl Executor {
 
             let mut reader = ExecutionTaskReader::new(index);
 
-            let schedulers = Arc::clone(&self.schedulers);
+            let readers = Arc::clone(&self.readers);
 
             let done_callback = Box::new(move |index| {
                 debug!(
@@ -60,7 +60,7 @@ impl Executor {
                     index
                 );
 
-                schedulers
+                readers
                     .lock()
                     .expect("The ExecutionTaskReader mutex is poisoned")
                     .remove(&index);
@@ -74,12 +74,12 @@ impl Executor {
 
             debug!("Execute called, creating execution adapter {}", index);
 
-            let mut schedulers = self
-                .schedulers
+            let mut readers = self
+                .readers
                 .lock()
                 .expect("The iterator adapter map lock is poisoned");
 
-            schedulers.insert(index, reader);
+            readers.insert(index, reader);
 
             Ok(())
         } else {
@@ -94,20 +94,20 @@ impl Executor {
     }
 
     pub fn stop(self) {
-        for sched in self
-            .schedulers
+        for reader in self
+            .readers
             .lock()
             .expect("The ExecutionTaskReader mutex is poisoned")
             .drain()
         {
-            sched.1.stop();
+            reader.1.stop();
         }
         self.executor_thread.stop();
     }
 
     pub fn new(execution_adapters: Vec<Box<ExecutionAdapter>>) -> Self {
         Executor {
-            schedulers: Arc::new(Mutex::new(HashMap::new())),
+            readers: Arc::new(Mutex::new(HashMap::new())),
             executor_thread: ExecutorThread::new(execution_adapters),
         }
     }
