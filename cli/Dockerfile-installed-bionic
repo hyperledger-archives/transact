@@ -12,19 +12,25 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM ubuntu:bionic
+# docker build -f cli/Dockerfile-installed-bionic -t sawtooth-sabre-cli .
+
+# -------------=== sabre cli build ===-------------
+
+FROM ubuntu:bionic as sabre-cli-builder
+
+ENV VERSION=AUTO_STRICT
 
 RUN apt-get update \
- && apt-get install -y -q \
+  && apt-get install gnupg -y
+
+RUN apt-get update \
+ && apt-get install -y \
  curl \
  gcc \
- libpq-dev \
  libssl-dev \
  libzmq3-dev \
  pkg-config \
- unzip \
- && apt-get clean \
- && rm -rf /var/lib/apt/lists/*
+ unzip
 
 # For Building Protobufs
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
@@ -32,6 +38,23 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
  && unzip protoc-3.5.1-linux-x86_64.zip -d protoc3 \
  && rm protoc-3.5.1-linux-x86_64.zip
 
-WORKDIR /project/contracts/sawtooth-pike/state_delta_export
+ENV PATH=$PATH:/protoc3/bin
+RUN /root/.cargo/bin/cargo install cargo-deb
 
-ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/contracts/sawtooth-pike/state_delta_export/target/debug/
+COPY . /project
+
+WORKDIR /project/cli
+
+RUN /root/.cargo/bin/cargo deb
+
+# -------------=== sabre cli docker build ===-------------
+
+FROM hyperledger/sawtooth-shell:nightly
+
+COPY --from=sabre-cli-builder /project/cli/target/debian/sabre-cli*.deb /tmp
+
+RUN apt-get update \
+ && dpkg -i /tmp/sabre-cli_*.deb || true \
+ && apt-get -f -y install
+
+ENTRYPOINT ["tail", "-f", "/dev/null"]

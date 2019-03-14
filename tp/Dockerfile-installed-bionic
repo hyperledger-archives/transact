@@ -12,23 +12,24 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# docker build -f cli/Dockerfile-installed -t sawtooth-sabre-cli .
+# docker build -f tp/Dockerfile-installed-bionic -t sawtooth-sabre-tp .
 
-# -------------=== sabre cli build ===-------------
+# -------------=== sabre tp build ===-------------
 
-FROM ubuntu:xenial as sabre-cli-builder
+FROM ubuntu:bionic as sabre-tp-builder
 
 ENV VERSION=AUTO_STRICT
+
+RUN apt-get update \
+  && apt-get install gnupg -y
 
 RUN apt-get update \
  && apt-get install -y \
  curl \
  gcc \
- git \
  libssl-dev \
  libzmq3-dev \
  pkg-config \
- python3 \
  unzip
 
 # For Building Protobufs
@@ -42,19 +43,16 @@ RUN /root/.cargo/bin/cargo install cargo-deb
 
 COPY . /project
 
-WORKDIR /project/cli
+WORKDIR /project/tp
 
-RUN sed -i -e s/version.*$/version\ =\ \"$(../bin/get_version)\"/ Cargo.toml
 RUN /root/.cargo/bin/cargo deb
 
-# -------------=== sabre cli docker build ===-------------
+# -------------=== sabre tp build ===-------------
 
-FROM hyperledger/sawtooth-all:1.0
+FROM ubuntu:bionic
 
-COPY --from=sabre-cli-builder /project/cli/target/debian/sabre-cli*.deb /tmp
+COPY --from=sabre-tp-builder /project/tp/target/debian/sawtooth-sabre_*.deb /tmp
 
 RUN apt-get update \
- && dpkg -i /tmp/sabre-cli_*.deb || true \
+ && dpkg -i /tmp/sawtooth-sabre_*.deb || true \
  && apt-get -f -y install
-
-ENTRYPOINT ["tail", "-f", "/dev/null"]
