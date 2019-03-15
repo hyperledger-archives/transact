@@ -25,11 +25,6 @@
 //                                                                                                --------- ExecutionAdapter
 //
 
-use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
-use crate::execution::{ExecutionRegistry, TransactionFamily};
-use crate::scheduler::ExecutionTask;
-use crate::scheduler::ExecutionTaskCompletionNotification;
-use log::warn;
 use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::hash::{Hash, Hasher};
@@ -40,6 +35,13 @@ use std::sync::{
 };
 use std::thread::JoinHandle;
 use std::time::Duration;
+
+use log::warn;
+
+use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
+use crate::scheduler::ExecutionTask;
+use crate::scheduler::ExecutionTaskCompletionNotification;
+use crate::execution::{ExecutionRegistry, TransactionFamily};
 
 /// The `TransactionPair` and `ContextId` along with where to send
 /// results.
