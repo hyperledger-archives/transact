@@ -855,6 +855,7 @@ fn hash(input: &[u8]) -> Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::database::btree::BTreeDatabase;
     use crate::database::error::DatabaseError;
     use crate::database::lmdb::{LmdbContext, LmdbDatabase};
 
@@ -1741,6 +1742,73 @@ mod tests {
                 leaf_iter.next().unwrap().unwrap()
             );
             assert!(leaf_iter.next().is_none(), "Iterator should be Exhausted");
+        })
+    }
+
+    /// Verifies that a state tree backed by lmdb and btree give the same root hashes
+    #[test]
+    fn test_btree_lmdb() {
+        run_test(|merkle_path| {
+            let lmdb = make_lmdb(merkle_path);
+            let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+
+            let mut merkle_lmdb = MerkleRadixTree::new(lmdb.clone(), None).unwrap();
+            let mut merkle_btree = MerkleRadixTree::new(btree_db.clone(), None).unwrap();
+
+            let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+
+            updates.push(StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "0002".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff00".to_string(),
+                value: "0003".as_bytes().to_vec(),
+            });
+            updates.push(StateChange::Set {
+                key: "abff01".to_string(),
+                value: "0004".as_bytes().to_vec(),
+            });
+
+            let merkle_lmdb_root = merkle_lmdb.update(&updates, false).unwrap();
+            let merkle_btree_root = merkle_btree.update(&updates, false).unwrap();
+
+            assert_eq!(merkle_lmdb_root, merkle_btree_root);
+
+            merkle_lmdb
+                .set_merkle_root(merkle_lmdb_root.clone())
+                .unwrap();
+            merkle_btree
+                .set_merkle_root(merkle_btree_root.clone())
+                .unwrap();
+
+            let state_change_delete = StateChange::Delete {
+                key: "abff01".to_string(),
+            };
+
+            let merkle_lmdb_root_del = merkle_lmdb
+                .update(&[state_change_delete.clone()], false)
+                .unwrap();
+            let merkle_btree_root_del = merkle_btree
+                .update(&[state_change_delete.clone()], false)
+                .unwrap();
+
+            assert_eq!(merkle_lmdb_root_del, merkle_btree_root_del);
+
+            let mut prune_result_lmdb = MerkleRadixTree::prune(&*lmdb, &merkle_lmdb_root)
+                .expect("Prune should have no errors");
+
+            let mut prune_result_btree = MerkleRadixTree::prune(&*btree_db, &merkle_btree_root)
+                .expect("Prune should have no errors");
+
+            assert_eq!(
+                prune_result_lmdb.sort_unstable(),
+                prune_result_btree.sort_unstable()
+            );
         })
     }
 
