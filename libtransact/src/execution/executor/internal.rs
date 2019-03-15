@@ -39,13 +39,12 @@ use std::time::Duration;
 use log::warn;
 
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
-use crate::scheduler::ExecutionTask;
-use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::execution::{ExecutionRegistry, TransactionFamily};
+use crate::scheduler::{ExecutionTask, ExecutionTaskCompletionNotifier};
 
 /// The `TransactionPair` and `ContextId` along with where to send
 /// results.
-pub type ExecutionEvent = (Sender<ExecutionTaskCompletionNotification>, ExecutionTask);
+pub type ExecutionEvent = (Box<dyn ExecutionTaskCompletionNotifier>, ExecutionTask);
 
 /// The type that gets sent to the `ExecutionAdapter`.
 pub enum ExecutionCommand {
@@ -242,32 +241,25 @@ impl ExecutorThread {
         std::thread::Builder::new()
             .name(format!("execution_adapter_thread_{}", index))
             .spawn(move || loop {
-                let sender = sender.clone();
                 if let Ok(execution_command) = receiver.recv_timeout(Duration::from_millis(200)) {
                     match execution_command {
                         ExecutionCommand::Event(execution_event) => {
-                            let (results_sender, task) = *execution_event;
+                            let sender = sender.clone();
+                            let (completion_notifier, task) = *execution_event;
                             let (pair, context_id) = task.take();
 
                             let callback = Box::new(move |result| {
                                 // Without this line, the function is considered a FnOnce, instead
                                 // of an Fn.  This seems to be a strange quirk of the compiler
-                                let res_sender = results_sender.clone();
+                                let completion_notifier = completion_notifier.clone();
                                 match result {
                                     Ok(tp_processing_result) => {
-                                        if let Err(err) = res_sender.send(tp_processing_result) {
-                                            warn!(
-                                            "Sending TransactionProcessingResult on channel: {}",
-                                            err
-                                        );
-                                        }
+                                        completion_notifier.notify(tp_processing_result);
                                     }
                                     Err(ExecutionAdapterError::TimeoutError(transaction_pair)) => {
-                                        let sender = sender.clone();
-
                                         let execution_task =
                                             ExecutionTask::new(*transaction_pair, context_id);
-                                        let execution_event = (res_sender, execution_task);
+                                        let execution_event = (completion_notifier, execution_task);
                                         if let Err(err) =
                                             sender.send(RegistrationExecutionEvent::Execution(
                                                 Box::new(execution_event),
@@ -277,11 +269,9 @@ impl ExecutorThread {
                                         }
                                     }
                                     Err(ExecutionAdapterError::RoutingError(transaction_pair)) => {
-                                        let sender = sender.clone();
-
                                         let execution_task =
                                             ExecutionTask::new(*transaction_pair, context_id);
-                                        let execution_event = (res_sender, execution_task);
+                                        let execution_event = (completion_notifier, execution_task);
                                         if let Err(err) =
                                             sender.send(RegistrationExecutionEvent::Execution(
                                                 Box::new(execution_event),
@@ -476,6 +466,9 @@ mod tests {
 
         let (sender, notification_receiver) = channel::<ExecutionTaskCompletionNotification>();
 
+        let notifier: Box<dyn ExecutionTaskCompletionNotifier> =
+            Box::new(ChannelExecutionTaskCompletionNotifier { tx: sender });
+
         let (registration_execution_event_sender, internal_receiver): (
             RegistrationExecutionEventSender,
             RegistrationExecutionEventReceiver,
@@ -500,7 +493,7 @@ mod tests {
         // Send the ExecutionEvents on the multiplexing channel.
 
         for reg_ex_event in execution_tasks
-            .map(|execution_task| (sender.clone(), execution_task))
+            .map(|execution_task| (notifier.clone(), execution_task))
             .map(|execution_event| RegistrationExecutionEvent::Execution(Box::new(execution_event)))
         {
             registration_execution_event_sender
@@ -595,12 +588,10 @@ mod tests {
 
         while let Ok(event) = receiver.try_recv() {
             if let ExecutionCommand::Event(execution_event) = event {
-                let (result_sender, task) = *execution_event;
+                let (notifier, task) = *execution_event;
 
                 let notification = ExecutionTaskCompletionNotification::Valid(*task.context_id());
-                result_sender
-                    .send(notification)
-                    .expect("The receiver has been dropped");
+                notifier.notify(notification);
             }
         }
 
@@ -637,10 +628,12 @@ mod tests {
 
         let execution_tasks = create_iterator();
 
-        let (s, receiver) = channel();
+        let (tx, receiver) = channel();
+        let notifier: Box<dyn ExecutionTaskCompletionNotifier> =
+            Box::new(ChannelExecutionTaskCompletionNotifier { tx });
 
         for reg_ex_event in execution_tasks
-            .map(|execution_task| (s.clone(), execution_task))
+            .map(|execution_task| (notifier.clone(), execution_task))
             .map(|execution_event| RegistrationExecutionEvent::Execution(Box::new(execution_event)))
         {
             sender
@@ -698,6 +691,23 @@ mod tests {
         (0..NUMBER_OF_TRANSACTIONS)
             .map(move |_| create_txn(&signer))
             .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
+    }
+
+    #[derive(Clone)]
+    struct ChannelExecutionTaskCompletionNotifier {
+        tx: Sender<ExecutionTaskCompletionNotification>,
+    }
+
+    impl ExecutionTaskCompletionNotifier for ChannelExecutionTaskCompletionNotifier {
+        fn notify(&self, notification: ExecutionTaskCompletionNotification) {
+            self.tx
+                .send(notification)
+                .expect("Unable to send the notification");
+        }
+
+        fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier> {
+            Box::new(self.clone())
+        }
     }
 }
 

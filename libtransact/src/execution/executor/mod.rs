@@ -52,22 +52,8 @@ impl Executor {
 
             let mut reader = ExecutionTaskReader::new(index);
 
-            let readers = Arc::clone(&self.readers);
-
-            let done_callback = Box::new(move |index| {
-                debug!(
-                    "Callback called removing iterator adapter {} for SchedulerExecutionInterface",
-                    index
-                );
-
-                readers
-                    .lock()
-                    .expect("The ExecutionTaskReader mutex is poisoned")
-                    .remove(&index);
-            });
-
             reader
-                .start(task_iterator, notifier, sender, done_callback)
+                .start(task_iterator, notifier, sender)
                 .map_err(|err| {
                     ExecutorError::ResourcesUnavailable(err.description().to_string())
                 })?;
