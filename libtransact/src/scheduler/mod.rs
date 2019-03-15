@@ -140,6 +140,14 @@ pub trait Scheduler {
 pub trait ExecutionTaskCompletionNotifier: Send {
     /// Sends a notification to the scheduler.
     fn notify(&self, notification: ExecutionTaskCompletionNotification);
+
+    fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier>;
+}
+
+impl Clone for Box<ExecutionTaskCompletionNotifier> {
+    fn clone(&self) -> Self {
+        self.clone_box()
+    }
 }
 
 #[cfg(test)]

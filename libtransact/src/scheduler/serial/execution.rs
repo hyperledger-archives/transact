@@ -65,6 +65,7 @@ impl Iterator for SerialExecutionTaskIterator {
     }
 }
 
+#[derive(Clone)]
 pub struct SerialExecutionTaskCompletionNotifier {
     tx: Sender<CoreMessage>,
 }
@@ -80,5 +81,9 @@ impl ExecutionTaskCompletionNotifier for SerialExecutionTaskCompletionNotifier {
         self.tx
             .send(CoreMessage::ExecutionResult(notification))
             .unwrap();
+    }
+
+    fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier> {
+        Box::new(self.clone())
     }
 }

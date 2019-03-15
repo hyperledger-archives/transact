@@ -298,5 +298,9 @@ mod tests {
                 .expect("The MockScheduler lock is poisoned")
                 .push(notification);
         }
+
+        fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier> {
+            Box::new(self.clone())
+        }
     }
 }
