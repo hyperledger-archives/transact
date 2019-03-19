@@ -15,7 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
-use super::internal::{RegistrationExecutionEvent, RegistrationExecutionEventSender};
+use super::internal::{ExecutorCommand, ExecutorCommandSender};
 
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
@@ -48,7 +48,7 @@ impl ExecutionTaskReader {
         &mut self,
         task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
         notifier: Box<ExecutionTaskCompletionNotifier>,
-        internal: RegistrationExecutionEventSender,
+        internal: ExecutorCommandSender,
     ) -> Result<(), std::io::Error> {
         let stop = Arc::clone(&self.stop);
 
@@ -62,8 +62,7 @@ impl ExecutionTaskReader {
                         }
 
                         let execution_event = (notifier.clone(), execution_task);
-                        let event =
-                            RegistrationExecutionEvent::Execution(Box::new(execution_event));
+                        let event = ExecutorCommand::Execution(Box::new(execution_event));
 
                         if let Err(err) = internal.send(event) {
                             warn!("During sending on the internal executor channel: {}", err)
