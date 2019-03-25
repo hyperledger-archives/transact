@@ -4,7 +4,9 @@ use std;
 use std::error::Error as StdError;
 
 use crate::protos;
-use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use crate::protos::{
+    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+};
 use crate::signing;
 
 use super::transaction::Transaction;
@@ -54,6 +56,30 @@ impl FromNative<BatchHeader> for protos::batch::BatchHeader {
     }
 }
 
+impl FromBytes<BatchHeader> for BatchHeader {
+    fn from_bytes(bytes: &[u8]) -> Result<BatchHeader, ProtoConversionError> {
+        let proto: protos::batch::BatchHeader =
+            protobuf::parse_from_bytes(bytes).map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get BatchHeader from bytes".to_string(),
+                )
+            })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for BatchHeader {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get bytes from BatchHeader".to_string(),
+            )
+        })?;
+        Ok(bytes)
+    }
+}
+
 impl IntoProto<protos::batch::BatchHeader> for BatchHeader {}
 impl IntoNative<BatchHeader> for protos::batch::BatchHeader {}
 
@@ -82,11 +108,7 @@ impl Batch {
     }
 
     pub fn into_pair(self) -> Result<BatchPair, BatchBuildError> {
-        let header_proto: protos::batch::BatchHeader = protobuf::parse_from_bytes(&self.header)
-            .map_err(|e| BatchBuildError::DeserializationError(e.to_string()))?;
-        let header = header_proto
-            .into_native()
-            .map_err(|err| BatchBuildError::DeserializationError(err.to_string()))?;
+        let header = BatchHeader::from_bytes(&self.header)?;
 
         Ok(BatchPair {
             batch: self,
@@ -159,6 +181,12 @@ impl std::fmt::Display for BatchBuildError {
             }
             BatchBuildError::SigningError(ref s) => write!(f, "SigningError: {}", s),
         }
+    }
+}
+
+impl From<ProtoConversionError> for BatchBuildError {
+    fn from(e: ProtoConversionError) -> Self {
+        BatchBuildError::DeserializationError(format!("{}", e))
     }
 }
 
@@ -341,6 +369,24 @@ mod tests {
             vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap(),],
             header.transaction_ids()
         );
+    }
+
+    #[test]
+    // test that the batch header can be converted into bytes and back correctly
+    fn batch_header_bytes() {
+        let original = BatchHeader {
+            signer_public_key: hex::decode(KEY1).unwrap(),
+            transaction_ids: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+        };
+
+        let header_bytes = original.clone().into_bytes().unwrap();
+        let header = BatchHeader::from_bytes(&header_bytes).unwrap();
+
+        assert_eq!(
+            hex::encode(original.signer_public_key()),
+            hex::encode(header.signer_public_key())
+        );
+        assert_eq!(original.transaction_ids(), header.transaction_ids());
     }
 
     #[test]
