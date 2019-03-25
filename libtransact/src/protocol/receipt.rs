@@ -16,9 +16,12 @@
  */
 //! The `receipts` module contains structs that supply information on the processing
 //! of `Transaction`s
+use protobuf::Message;
 
 use crate::protos;
-use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use crate::protos::{
+    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+};
 use std::error::Error as StdError;
 
 /// A change to be applied to state, in terms of keys and values.
@@ -102,6 +105,30 @@ impl FromNative<StateChange> for protos::transaction_receipt::StateChange {
     }
 }
 
+impl FromBytes<StateChange> for StateChange {
+    fn from_bytes(bytes: &[u8]) -> Result<StateChange, ProtoConversionError> {
+        let proto: protos::transaction_receipt::StateChange = protobuf::parse_from_bytes(bytes)
+            .map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get StateChange from bytes".to_string(),
+                )
+            })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for StateChange {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get bytes from StateChanger".to_string(),
+            )
+        })?;
+        Ok(bytes)
+    }
+}
+
 impl IntoProto<protos::transaction_receipt::StateChange> for StateChange {}
 impl IntoNative<StateChange> for protos::transaction_receipt::StateChange {}
 
@@ -165,6 +192,30 @@ impl FromNative<TransactionReceipt> for protos::transaction_receipt::Transaction
     }
 }
 
+impl FromBytes<TransactionReceipt> for TransactionReceipt {
+    fn from_bytes(bytes: &[u8]) -> Result<TransactionReceipt, ProtoConversionError> {
+        let proto: protos::transaction_receipt::TransactionReceipt =
+            protobuf::parse_from_bytes(bytes).map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get TransactionReceipt from bytes".to_string(),
+                )
+            })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for TransactionReceipt {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get bytes from TransactionReceipt".to_string(),
+            )
+        })?;
+        Ok(bytes)
+    }
+}
+
 impl IntoProto<protos::transaction_receipt::TransactionReceipt> for TransactionReceipt {}
 impl IntoNative<TransactionReceipt> for protos::transaction_receipt::TransactionReceipt {}
 
@@ -215,6 +266,27 @@ impl FromNative<Event> for protos::events::Event {
         );
         proto_event.set_data(event.data);
         Ok(proto_event)
+    }
+}
+
+impl FromBytes<Event> for Event {
+    fn from_bytes(bytes: &[u8]) -> Result<Event, ProtoConversionError> {
+        let proto: protos::events::Event = protobuf::parse_from_bytes(bytes).map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get TransactionReceipt from bytes".to_string(),
+            )
+        })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for Event {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError("Unable to get bytes from Event".to_string())
+        })?;
+        Ok(bytes)
     }
 }
 
@@ -474,6 +546,31 @@ mod tests {
         check_transaction_receipt(transaction_receipt)
     }
 
+    #[test]
+    // test that the transaction receipts can be converted into bytes and back correctly
+    fn transaction_receipt_bytes() {
+        let original = TransactionReceipt {
+            state_changes: vec![
+                StateChange::Set {
+                    key: ADDRESS.to_string(),
+                    value: BYTES1.to_vec(),
+                },
+                StateChange::Delete {
+                    key: ADDRESS.to_string(),
+                },
+            ],
+            events: vec![make_event_1(), make_event_2()],
+            data: vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()],
+            transaction_id: TRANSACTION_ID.to_string(),
+        };
+
+        let receipt_bytes = original.clone().into_bytes().unwrap();
+        let receipt = TransactionReceipt::from_bytes(&receipt_bytes).unwrap();
+
+        check_transaction_receipt(receipt.clone());
+        assert_eq!(original.transaction_id, receipt.transaction_id);
+    }
+
     fn check_transaction_receipt(transaction_receipt: TransactionReceipt) {
         for state_change in transaction_receipt.state_changes {
             check_state_change(state_change)
@@ -592,6 +689,24 @@ mod tests {
             .build()
             .unwrap();
 
+        check_event(event);
+    }
+
+    #[test]
+    // test that the transaction receipts can be converted into bytes and back correctly
+    fn event_builder_chain_bytes() {
+        let original = EventBuilder::new()
+            .with_event_type(EVENT_TYPE1.to_string())
+            .with_attributes(vec![
+                (ATTR1.0.to_string(), ATTR1.1.to_string()),
+                (ATTR2.0.to_string(), ATTR2.1.to_string()),
+            ])
+            .with_data(BYTES2.to_vec())
+            .build()
+            .unwrap();
+
+        let event_bytes = original.clone().into_bytes().unwrap();
+        let event = Event::from_bytes(&event_bytes).unwrap();
         check_event(event);
     }
 
