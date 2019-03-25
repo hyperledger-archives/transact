@@ -8,7 +8,9 @@ use rand::distributions::Alphanumeric;
 use rand::Rng;
 
 use crate::protos;
-use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
+use crate::protos::{
+    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+};
 use crate::signing;
 
 static DEFAULT_NONCE_SIZE: usize = 32;
@@ -120,13 +122,40 @@ impl FromProto<protos::transaction::TransactionHeader> for TransactionHeader {
 impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
     fn from_native(header: TransactionHeader) -> Result<Self, ProtoConversionError> {
         let mut proto_header = protos::transaction::TransactionHeader::new();
+        proto_header.set_family_name(header.family_name().to_string());
         proto_header.set_family_version(header.family_version().to_string());
         proto_header.set_batcher_public_key(hex::encode(header.batcher_public_key()));
         proto_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
         proto_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
         proto_header.set_nonce(String::from_utf8(header.nonce().to_vec())?);
         proto_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
+        proto_header.set_payload_sha512(hex::encode(header.payload_hash()));
+        proto_header.set_signer_public_key(hex::encode(header.signer_public_key()));
         Ok(proto_header)
+    }
+}
+
+impl FromBytes<TransactionHeader> for TransactionHeader {
+    fn from_bytes(bytes: &[u8]) -> Result<TransactionHeader, ProtoConversionError> {
+        let proto: protos::transaction::TransactionHeader = protobuf::parse_from_bytes(bytes)
+            .map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get TransactionHeader from bytes".to_string(),
+                )
+            })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for TransactionHeader {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get bytes from TransactionHeader".to_string(),
+            )
+        })?;
+        Ok(bytes)
     }
 }
 
@@ -162,12 +191,7 @@ impl Transaction {
     }
 
     pub fn into_pair(self) -> Result<TransactionPair, TransactionBuildError> {
-        let header_proto: protos::transaction::TransactionHeader =
-            protobuf::parse_from_bytes(&self.header)
-                .map_err(|e| TransactionBuildError::DeserializationError(format!("{}", e)))?;
-        let header: TransactionHeader = header_proto
-            .into_native()
-            .map_err(|e| TransactionBuildError::DeserializationError(format!("{}", e)))?;
+        let header = TransactionHeader::from_bytes(&self.header)?;
 
         Ok(TransactionPair {
             transaction: self,
@@ -246,6 +270,12 @@ impl std::fmt::Display for TransactionBuildError {
             }
             TransactionBuildError::SigningError(ref s) => write!(f, "SigningError: {}", s),
         }
+    }
+}
+
+impl From<ProtoConversionError> for TransactionBuildError {
+    fn from(e: ProtoConversionError) -> Self {
+        TransactionBuildError::DeserializationError(format!("{}", e))
     }
 }
 
@@ -564,6 +594,54 @@ mod tests {
         assert_eq!(HASH, hex::encode(header.payload_hash()));
         assert_eq!(HashMethod::SHA512, *header.payload_hash_method());
         assert_eq!(KEY8, hex::encode(header.signer_public_key()));
+    }
+
+    #[test]
+    // test that the transaction header can be converted into bytes and back correctly
+    fn transaction_header_bytes() {
+        let original = TransactionHeader {
+            batcher_public_key: hex::decode(KEY1).unwrap(),
+            dependencies: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            family_name: FAMILY_NAME.to_string(),
+            family_version: FAMILY_VERSION.to_string(),
+            inputs: vec![
+                hex::decode(KEY4).unwrap(),
+                hex::decode(&KEY5[0..4]).unwrap(),
+            ],
+            nonce: NONCE.to_string().into_bytes(),
+            outputs: vec![
+                hex::decode(KEY6).unwrap(),
+                hex::decode(&KEY7[0..4]).unwrap(),
+            ],
+            payload_hash: hex::decode(HASH).unwrap(),
+            payload_hash_method: HashMethod::SHA512,
+            signer_public_key: hex::decode(KEY8).unwrap(),
+        };
+
+        let header_bytes = original.clone().into_bytes().unwrap();
+        let header = TransactionHeader::from_bytes(&header_bytes).unwrap();
+
+        assert_eq!(
+            hex::encode(original.batcher_public_key()),
+            hex::encode(header.batcher_public_key())
+        );
+        assert_eq!(original.dependencies(), header.dependencies());
+        assert_eq!(original.family_name(), header.family_name());
+        assert_eq!(original.family_version(), header.family_version());
+        assert_eq!(original.inputs(), header.inputs());
+        assert_eq!(original.outputs(), header.outputs());
+        assert_eq!(
+            hex::encode(original.payload_hash()),
+            hex::encode(header.payload_hash())
+        );
+        assert_eq!(
+            *original.payload_hash_method(),
+            *header.payload_hash_method()
+        );
+        assert_eq!(
+            hex::encode(original.signer_public_key()),
+            hex::encode(header.signer_public_key())
+        );
     }
 
     #[test]
