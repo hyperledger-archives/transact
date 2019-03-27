@@ -15,28 +15,42 @@
 // limitations under the License.
 // ------------------------------------------------------------------------------
 
-// Discard old builds after 31 days
-properties([[$class: 'BuildDiscarderProperty', strategy:
-        [$class: 'LogRotator', artifactDaysToKeepStr: '',
-        artifactNumToKeepStr: '', daysToKeepStr: '31', numToKeepStr: '']]]);
+pipeline {
+    agent {
+        node {
+            label 'master'
+            customWorkspace "workspace/${env.BUILD_TAG}"
+        }
+    }
 
-node ('master') {
-    timestamps {
-        // Create a unique workspace so Jenkins doesn't reuse an existing one
-        ws("workspace/${env.BUILD_TAG}") {
-            stage("Clone Repo") {
-                checkout scm
-                sh 'git fetch --tags'
+    triggers {
+        cron(env.BRANCH_NAME == 'master' ? 'H 3 * * *' : '')
+    }
+
+    options {
+        timestamps()
+        buildDiscarder(logRotator(daysToKeepStr: '31'))
+    }
+
+    environment {
+        ISOLATION_ID = sh(returnStdout: true, script: 'printf $BUILD_TAG | sha256sum | cut -c1-64').trim()
+    }
+
+    stages {
+        stage('Check Whitelist') {
+            steps {
+                readTrusted 'bin/whitelist'
+                sh './bin/whitelist "$CHANGE_AUTHOR" /etc/jenkins-authorized-builders'
             }
-
-            if (!(env.BRANCH_NAME == 'master' && env.JOB_BASE_NAME == 'master')) {
-                stage("Check Whitelist") {
-                    readTrusted 'bin/whitelist'
-                    sh './bin/whitelist "$CHANGE_AUTHOR" /etc/jenkins-authorized-builders'
+            when {
+                not {
+                    branch 'master'
                 }
             }
+        }
 
-            stage("Check for Signed-Off Commits") {
+        stage('Check for Signed-Off Commits') {
+            steps {
                 sh '''#!/bin/bash -l
                     if [ -v CHANGE_URL ] ;
                     then
@@ -58,24 +72,29 @@ node ('master') {
                     fi
                 '''
             }
+        }
 
-            // Set the ISOLATION_ID environment variable for the whole pipeline
-            env.ISOLATION_ID = sh(returnStdout: true, script: 'printf $BUILD_TAG | sha256sum | cut -c1-64').trim()
-            env.COMPOSE_PROJECT_NAME = sh(returnStdout: true, script: 'printf $BUILD_TAG | sha256sum | cut -c1-64').trim()
+        stage('Fetch Tags') {
+            steps {
+                sh 'git fetch --tag'
+            }
+        }
 
-            // Use a docker container to build and protogen, so that the Jenkins
-            // environment doesn't need all the dependencies.
-
-            stage("Build Sabre") {
+        stage('Build Sabre') {
+            steps {
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-cli'
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
             }
+        }
 
-            stage("Test Sabre") {
+        stage('Test Sabre') {
+            steps {
                 sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml up --build --abort-on-container-exit --exit-code-from test_sabre'
             }
+        }
 
-            stage("Create git archive") {
+        stage('Create Git Archive') {
+            steps {
                 sh '''
                     REPO=$(git remote show -n origin | grep Fetch | awk -F'[/.]' '{print $6}')
                     VERSION=`git describe --dirty`
@@ -83,20 +102,36 @@ node ('master') {
                     git archive HEAD --format=tgz -9 --output=$REPO-$VERSION.tgz
                 '''
             }
+        }
 
-            stage ("Build documentation") {
+        stage ('Build Documentation') {
+            steps {
                 sh 'docker-compose -f docs/docker-compose.yaml up'
                 sh 'docker-compose -f docs/docker-compose.yaml down'
             }
+        }
 
-            stage("Archive Build artifacts") {
+        stage('Build Archive Artifacts') {
+            steps {
                 sh 'mkdir -p build/debs'
                 sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-cli:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
                 sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-tp:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
-                archiveArtifacts artifacts: '*.tgz, *.zip'
-                archiveArtifacts artifacts: 'build/debs/*.deb'
-                archiveArtifacts artifacts: 'docs/build/html/**'
             }
+        }
+    }
+    post {
+        always {
+            sh 'docker-compose -f docker-compose.yaml down'
+            sh 'docker-compose -f docs/docker-compose.yaml down'
+        }
+        success {
+            archiveArtifacts artifacts: '*.tgz, *.zip, build/debs/*.deb, docs/build/html/**'
+        }
+        aborted {
+            error "Aborted, exiting now"
+        }
+        failure {
+            error "Failed, exiting now"
         }
     }
 }
