@@ -20,7 +20,6 @@ use std::collections::HashMap;
 
 use hex::{decode, encode_upper};
 
-
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         use sabre_sdk::ApplyError;
@@ -54,7 +53,6 @@ const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
 
 #[cfg(target_arch = "wasm32")]
 const PIKE_ORG_PREFIX: &'static str = "cad11d01";
-
 
 fn get_intkey_prefix() -> String {
     let mut sha = Sha512::new();
@@ -98,33 +96,33 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
     // First two characters should be A followed by the number of elements.
     // Only check for A as this will be a map with 15 or less elements
     // It is unlikely that an address will have that many hash collisions.
-    let data_type = hex_string.get(..1)
+    let data_type = hex_string
+        .get(..1)
         .ok_or_else(|| ApplyError::InvalidTransaction("Unable to get data type".into()))?;
     if data_type != "A" {
         return Err(ApplyError::InvalidTransaction(String::from(
             "Cbor is not a map.",
-        )))
+        )));
     };
 
-    let entries_hex = hex_string.get(1..2)
-        .ok_or_else(|| ApplyError::InvalidTransaction(
-            "Unable to get number of entries in the map".into()))?;
+    let entries_hex = hex_string.get(1..2).ok_or_else(|| {
+        ApplyError::InvalidTransaction("Unable to get number of entries in the map".into())
+    })?;
 
-    let entries  = u32::from_str_radix(entries_hex, 16)
-        .map_err(|err| ApplyError::InvalidTransaction(
-            format!("Unable to decode cbor: {}", err)))?;
+    let entries = u32::from_str_radix(entries_hex, 16)
+        .map_err(|err| ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err)))?;
 
     let mut start = 2;
 
     // For each entry get the Name and Value
     for _n in 0..entries {
-        let string_hex = hex_string.get(start..start+2)
-            .ok_or_else(|| ApplyError::InvalidTransaction(
-                "Unable to hex for the string data".into()))?;
+        let string_hex = hex_string.get(start..start + 2).ok_or_else(|| {
+            ApplyError::InvalidTransaction("Unable to hex for the string data".into())
+        })?;
 
-        let string_type = usize::from_str_radix(string_hex, 16)
-            .map_err(|err| ApplyError::InvalidTransaction(
-                format!("Unable to decode cbor: {}", err)))?;
+        let string_type = usize::from_str_radix(string_hex, 16).map_err(|err| {
+            ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+        })?;
 
         // String starts at hex 60 plus the length of the string.
         // For Names it should range from hex 61 (decimal 97) to 74 (decimal 116) because a name
@@ -132,29 +130,29 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         if string_type < 97 || string_type > 116 {
             return Err(ApplyError::InvalidTransaction(String::from(
                 "Name is either too long, too short, or not a string.",
-            )))
+            )));
         }
         start = start + 2;
         let length = (string_type - 96) * 2;
-        let name_hex = hex_string.get(start..start+length)
-            .ok_or_else(|| ApplyError::InvalidTransaction(
-                "Unable to hex for the Name".into()))?;
+        let name_hex = hex_string
+            .get(start..start + length)
+            .ok_or_else(|| ApplyError::InvalidTransaction("Unable to hex for the Name".into()))?;
 
-        let name_bytes = decode(name_hex.to_string())
-            .map_err(|err| ApplyError::InvalidTransaction(
-                format!("Unable to decode cbor: {}", err)))?;
+        let name_bytes = decode(name_hex.to_string()).map_err(|err| {
+            ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+        })?;
 
-        let name = String::from_utf8(name_bytes)
-            .map_err(|err| ApplyError::InvalidTransaction(
-                format!("Unable to decode cbor: {}", err)))?;
-        start = start+length;
-        let number_type = hex_string.get(start..start+2)
-            .ok_or_else(|| ApplyError::InvalidTransaction(
-                "Unable to get hex for Value data".into()))?;
+        let name = String::from_utf8(name_bytes).map_err(|err| {
+            ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+        })?;
+        start = start + length;
+        let number_type = hex_string.get(start..start + 2).ok_or_else(|| {
+            ApplyError::InvalidTransaction("Unable to get hex for Value data".into())
+        })?;
 
-        let mut number = usize::from_str_radix(number_type, 16)
-            .map_err(|err| ApplyError::InvalidTransaction(
-                format!("Unable to decode cbor: {}", err)))?;
+        let mut number = usize::from_str_radix(number_type, 16).map_err(|err| {
+            ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+        })?;
 
         start = start + 2;
         // For number less than 23 (decimal) the first two bytes represent the number. If it is
@@ -165,41 +163,43 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
             let mut value = match number {
                 // two bytes
                 1 => {
-                        let value = hex_string.get(start..start+2)
-                            .ok_or_else(|| ApplyError::InvalidTransaction(
-                                "Unable to get number data".into()))?;
-                        start = start + 2;
-                        value
+                    let value = hex_string.get(start..start + 2).ok_or_else(|| {
+                        ApplyError::InvalidTransaction("Unable to get number data".into())
+                    })?;
+                    start = start + 2;
+                    value
                 }
                 // 4 bytes
                 2 => {
-                    let value = hex_string.get(start..start+4)
-                        .ok_or_else(|| ApplyError::InvalidTransaction(
-                            "Unable to get number data".into()))?;
+                    let value = hex_string.get(start..start + 4).ok_or_else(|| {
+                        ApplyError::InvalidTransaction("Unable to get number data".into())
+                    })?;
                     start = start + 4;
                     value
                 }
                 // 8 bytes
                 3 => {
-                    let value = hex_string.get(start..start+8)
-                        .ok_or_else(|| ApplyError::InvalidTransaction(
-                            "Unable to get number data".into()))?;
+                    let value = hex_string.get(start..start + 8).ok_or_else(|| {
+                        ApplyError::InvalidTransaction("Unable to get number data".into())
+                    })?;
                     start = start + 8;
                     value
                 }
                 // Anymore than 8 bytes is not a u32 and is invalid.
-                _ => return Err(ApplyError::InvalidTransaction(String::from(
+                _ => {
+                    return Err(ApplyError::InvalidTransaction(String::from(
                         "Value is too large",
-                )))
+                    )));
+                }
             };
-            let int_value = u32::from_str_radix(value, 16)
-                .map_err(|err| ApplyError::InvalidTransaction(
-                    format!("Unable to decode cbor: {}", err)))?;
+            let int_value = u32::from_str_radix(value, 16).map_err(|err| {
+                ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+            })?;
             output.insert(name, int_value);
         } else {
-            let int_value = u32::from_str_radix(number_type, 16)
-                .map_err(|err| ApplyError::InvalidTransaction(
-                    format!("Unable to decode cbor: {}", err)))?;
+            let int_value = u32::from_str_radix(number_type, 16).map_err(|err| {
+                ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
+            })?;
             output.insert(name, int_value);
         }
     }
@@ -214,14 +214,14 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
     let map_length = map.len() as u32;
     hex_string = hex_string + &format!("{:X}", map_length);
 
-    let keys: Vec<_>  = map.keys().cloned().collect();
+    let keys: Vec<_> = map.keys().cloned().collect();
     for key in keys {
         // Keys need to have a length between 1 and 20
         let key_length = key.len();
         if key_length < 1 || key_length > 20 {
             return Err(ApplyError::InvalidTransaction(String::from(
-                    "Key must be at least 1 character and no more than 20",
-            )))
+                "Key must be at least 1 character and no more than 20",
+            )));
         }
 
         // 96 is equal to 60 hex and is the starting byte for strings.
@@ -231,9 +231,10 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
         // If the value is more then 23 the first two bytes start at hex 18 and increment
         // for more bytes. 18 = 2, 19 = 4, 1A = 8. Should not exeed 8 bytes.
         let encoded_key = encode_upper(key.clone());
-        let raw_value = map.get(&key)
+        let raw_value = map
+            .get(&key)
             .ok_or_else(|| ApplyError::InvalidTransaction("Value from map".into()))?;
-        if raw_value > &(23 as u32 ) {
+        if raw_value > &(23 as u32) {
             let mut value = format!("{:02X}", raw_value);
             if value.len() % 2 == 1 {
                 value = "0".to_string() + &value.clone();
@@ -243,16 +244,20 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
                 2 => "18",
                 4 => "19",
                 8 => "1A",
-                _ => return Err(ApplyError::InvalidTransaction(String::from(
+                _ => {
+                    return Err(ApplyError::InvalidTransaction(String::from(
                         "Value is too large",
-                )))
+                    )));
+                }
             };
-            hex_string = hex_string + &format!("{:X}", length) + &encoded_key +
-                &value_length + &value;
+            hex_string =
+                hex_string + &format!("{:X}", length) + &encoded_key + &value_length + &value;
         } else {
-            hex_string = hex_string + &format!("{:X}", length) + &encoded_key+ &format!("{:02X}", raw_value);
+            hex_string = hex_string
+                + &format!("{:X}", length)
+                + &encoded_key
+                + &format!("{:02X}", raw_value);
         }
-
     }
     Ok(hex_string)
 }
@@ -260,7 +265,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
 struct IntkeyPayload {
     name_a: String,
     name_b: String,
-    name_c: String
+    name_c: String,
 }
 
 impl IntkeyPayload {
@@ -276,7 +281,7 @@ impl IntkeyPayload {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Name A must be a string",
-                )))
+                )));
             }
             Some(name_a_raw) => name_a_raw.clone().into(),
         };
@@ -291,7 +296,7 @@ impl IntkeyPayload {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Name B must be a string",
-                )))
+                )));
             }
             Some(name_b_raw) => name_b_raw.clone().into(),
         };
@@ -306,7 +311,7 @@ impl IntkeyPayload {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Name C must be a string",
-                )))
+                )));
             }
             Some(name_c_raw) => name_c_raw.clone().into(),
         };
@@ -377,7 +382,8 @@ impl<'a> IntkeyState<'a> {
     }
 
     pub fn set(&mut self, name: &str, value: u32) -> Result<(), ApplyError> {
-        let mut map: BTreeMap<String, u32> = match self.get_cache
+        let mut map: BTreeMap<String, u32> = match self
+            .get_cache
             .get_mut(&IntkeyState::calculate_address(name))
         {
             Some(m) => m.clone(),
@@ -386,8 +392,8 @@ impl<'a> IntkeyState<'a> {
         map.insert(name.into(), value);
 
         let encoded = encode_intkey(map)?;
-        let packed = decode(encoded)
-            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
+        let packed =
+            decode(encoded).map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
 
         let mut sets = HashMap::new();
         sets.insert(IntkeyState::calculate_address(name), packed);
@@ -410,7 +416,7 @@ impl<'a> IntkeyState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize record container: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
 
@@ -437,7 +443,7 @@ impl<'a> IntkeyState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize organization list: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
 
@@ -469,7 +475,7 @@ impl<'a> IntkeyState<'a> {
                             return Err(ApplyError::InternalError(format!(
                                 "Cannot deserialize smart permission list: {:?}",
                                 err,
-                            )))
+                            )));
                         }
                     };
 
@@ -484,7 +490,6 @@ impl<'a> IntkeyState<'a> {
         }
     }
 }
-
 
 pub struct IntkeyMultiplyTransactionHandler {
     family_name: String,
@@ -530,7 +535,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Request must contain a payload",
-                )))
+                )));
             }
         };
         let mut state = IntkeyState::new(context);
@@ -547,30 +552,34 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         let signer = request.get_header().get_signer_public_key();
 
         #[cfg(target_arch = "wasm32")]
-        let result = run_smart_permisson(
-            &mut state,
-            signer,
-            request.get_payload())
-            .map_err(|err| ApplyError::InvalidTransaction(
-                format!("Unable to run smart permission: {}", err)));
+        let result =
+            run_smart_permisson(&mut state, signer, request.get_payload()).map_err(|err| {
+                ApplyError::InvalidTransaction(format!("Unable to run smart permission: {}", err))
+            });
 
         #[cfg(target_arch = "wasm32")]
         match result {
             Ok(1) => (),
-            Ok(0) => return Err(ApplyError::InvalidTransaction(format!(
-                "Agent does not have permission: {}", signer
-            ))),
-            _ => return Err(ApplyError::InvalidTransaction(
-                "Something went wrong".into()
-            ))
+            Ok(0) => {
+                return Err(ApplyError::InvalidTransaction(format!(
+                    "Agent does not have permission: {}",
+                    signer
+                )));
+            }
+            _ => {
+                return Err(ApplyError::InvalidTransaction(
+                    "Something went wrong".into(),
+                ));
+            }
         }
 
         match state.get(payload.get_name_a()) {
             Ok(None) => (),
             Ok(Some(_)) => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "{} is already set", payload.get_name_a()
-                )))
+                    "{} is already set",
+                    payload.get_name_a()
+                )));
             }
             Err(err) => return Err(err),
         };
@@ -580,7 +589,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_b",
-                )))
+                )));
             }
             Err(err) => return Err(err),
         };
@@ -590,26 +599,34 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_c",
-                )))
+                )));
             }
             Err(err) => return Err(err),
         };
         let new_value = orig_value_b * orig_value_c;
         if new_value > (MAX_VALUE as u64) {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Multiplied value is larger then max allowed: {}", new_value
-            )))
+                "Multiplied value is larger then max allowed: {}",
+                new_value
+            )));
         };
         state.set(&payload.get_name_a(), new_value as u32)
     }
 }
 #[cfg(target_arch = "wasm32")]
-fn run_smart_permisson(state: &mut IntkeyState, signer: &str, payload: &[u8]) -> Result<i32, ApplyError> {
+fn run_smart_permisson(
+    state: &mut IntkeyState,
+    signer: &str,
+    payload: &[u8],
+) -> Result<i32, ApplyError> {
     let agent = match state.get_agent(signer)? {
         Some(agent) => agent,
-        None => return Err(ApplyError::InvalidTransaction(format!(
-            "Signer is not an agent: {}", signer
-        )))
+        None => {
+            return Err(ApplyError::InvalidTransaction(format!(
+                "Signer is not an agent: {}",
+                signer
+            )));
+        }
     };
 
     let org_id = agent.get_org_id();
@@ -622,23 +639,21 @@ fn run_smart_permisson(state: &mut IntkeyState, signer: &str, payload: &[u8]) ->
         agent.get_roles().to_vec(),
         org_id.to_string(),
         signer.to_string(),
-        payload).map_err(|err| ApplyError::InvalidTransaction(
-            format!("Unable to run smart permission: {}", err)))
+        payload,
+    )
+    .map_err(|err| {
+        ApplyError::InvalidTransaction(format!("Unable to run smart permission: {}", err))
+    })
 }
 
 #[cfg(target_arch = "wasm32")]
 // Sabre apply must return a bool
-fn apply(
-    request: &TpProcessRequest,
-    context: &mut TransactionContext,
-) -> Result<bool, ApplyError> {
-
+fn apply(request: &TpProcessRequest, context: &mut TransactionContext) -> Result<bool, ApplyError> {
     let handler = IntkeyMultiplyTransactionHandler::new();
     match handler.apply(request, context) {
         Ok(_) => Ok(true),
-        Err(err) => Err(err)
+        Err(err) => Err(err),
     }
-
 }
 
 #[cfg(target_arch = "wasm32")]

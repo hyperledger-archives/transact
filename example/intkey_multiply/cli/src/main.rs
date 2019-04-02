@@ -51,7 +51,8 @@ fn run() -> Result<(), error::CliError> {
             (@arg key: -k --key +takes_value "Signing key name")
             (@arg url: --url +takes_value "URL to the Sawtooth REST API")
         )
-    ).get_matches();
+    )
+    .get_matches();
 
     if let Some(multiply_matches) = matches.subcommand_matches("multiply") {
         let name_a = multiply_matches.value_of("name_a").unwrap();

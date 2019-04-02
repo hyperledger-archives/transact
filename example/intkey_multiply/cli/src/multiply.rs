@@ -19,11 +19,10 @@ use sawtooth_sdk::signing;
 use error::CliError;
 use key;
 
-use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 use submit::submit_batch_list;
+use transaction::{create_batch, create_batch_list_from_one, create_transaction};
 
-
-pub fn do_multiply (
+pub fn do_multiply(
     name_a: &str,
     name_b: &str,
     name_c: &str,
@@ -36,7 +35,7 @@ pub fn do_multiply (
     let public_key = context.get_public_key(&private_key)?.as_hex();
     let factory = signing::CryptoFactory::new(&*context);
     let signer = factory.new_signer(&private_key);
-    let payload = vec!(name_a, name_b, name_c).join(",");
+    let payload = vec![name_a, name_b, name_c].join(",");
     let txn_payload = payload.as_bytes();
 
     if output.is_empty() {
@@ -46,10 +45,12 @@ pub fn do_multiply (
 
         submit_batch_list(url, &batch_list)?;
 
-        return Ok(())
+        return Ok(());
     }
 
     let mut buffer = File::create(output)?;
-    buffer.write_all(&txn_payload).map_err(|err| CliError::IoError(err))?;
+    buffer
+        .write_all(&txn_payload)
+        .map_err(|err| CliError::IoError(err))?;
     Ok(())
 }

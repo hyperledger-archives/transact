@@ -70,7 +70,6 @@ fn compute_intkey_address(name: &str) -> String {
     String::from(INTKEY_PREFIX) + &sha.result_str()[64..].to_string()
 }
 
-
 /// Returns a Transaction for the given Payload and Signer
 ///
 /// # Arguments
@@ -154,9 +153,9 @@ pub fn create_batch(
     let mut batch = Batch::new();
     let mut batch_header = BatchHeader::new();
 
-    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![
-        txn.header_signature.clone(),
-    ]));
+    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![txn
+        .header_signature
+        .clone()]));
     batch_header.set_signer_public_key(public_key.clone());
     batch.set_transactions(protobuf::RepeatedField::from_vec(vec![txn]));
 
