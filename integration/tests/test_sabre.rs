@@ -19,20 +19,19 @@
     The test is order dependent so the tests are written as one test to ensure ordering.
 */
 
-extern crate subprocess;
 extern crate serde_json;
+extern crate subprocess;
 
 use serde_json::Value;
-use subprocess::Exec;
-use std::io::{BufReader, BufRead};
 use std::error::Error as StdError;
 use std::fs::File;
 use std::io::Read;
+use std::io::{BufRead, BufReader};
+use subprocess::Exec;
 
-const INTKEY_MULTIPLY_DEF: &str =
-    "/project/example/intkey_multiply/intkey_multiply.yaml";
+const INTKEY_MULTIPLY_DEF: &str = "/project/example/intkey_multiply/intkey_multiply.yaml";
 
-const PIKE_DEF: &str = "/project/contracts/sawtooth-pike/pike.yaml"; 
+const PIKE_DEF: &str = "/project/contracts/sawtooth-pike/pike.yaml";
 
 const INTKEY_SMART_PERMISSION: &str =
     "/project/contracts/sawtooth-pike/examples/intkey/target/wasm32-unknown-unknown/release/intkey.wasm";
@@ -71,7 +70,7 @@ impl StdError for TestError {
 impl std::fmt::Display for TestError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            TestError::TestError (ref s) => write!(f, "Error: {}", s),
+            TestError::TestError(ref s) => write!(f, "Error: {}", s),
         }
     }
 }
@@ -81,31 +80,33 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
     let mut command_vec = command.split(" ").collect::<Vec<&str>>();
 
     if !command_vec.contains(&"--url") {
-        command_vec.append(&mut vec!("--url", "http://rest-api:9708"));
+        command_vec.append(&mut vec!["--url", "http://rest-api:9708"]);
     }
 
     if !command_vec.contains(&"--wait") {
-        command_vec.append(&mut vec!("--wait", "300"));
+        command_vec.append(&mut vec!["--wait", "300"]);
     }
 
     println!("command {}", command);
 
-    let x = Exec::cmd("sabre").args(&command_vec).stream_stdout()
+    let x = Exec::cmd("sabre")
+        .args(&command_vec)
+        .stream_stdout()
         .map_err(|err| TestError::TestError(err.to_string()))?;
     let br = BufReader::new(x);
     for line in br.lines() {
         let response_string = line.map_err(|err| TestError::TestError(err.to_string()))?;
         if response_string.starts_with("StatusResponse ") {
-            let json_string = match response_string.get(15..){
+            let json_string = match response_string.get(15..) {
                 Some(x) => x,
-                None => return Err(TestError::TestError("Unable to get response".into()))
+                None => return Err(TestError::TestError("Unable to get response".into())),
             };
             let json: Value = serde_json::from_str(&json_string)
                 .map_err(|err| TestError::TestError(err.to_string()))?;;
-            return Ok(json)
+            return Ok(json);
         }
     }
-    return Err(TestError::TestError("No response received".into()))
+    return Err(TestError::TestError("No response received".into()));
 }
 
 fn pike_setup(signer: &str) -> Result<(), TestError> {
@@ -119,7 +120,7 @@ fn pike_setup(signer: &str) -> Result<(), TestError> {
     // 6) Add read and write perms for cad11d for intkey_multiply
     // 7) Add read and write perms for 00ec03 for intkey_multiply
     // 8) Create foo organization
-    
+
     println!("Creating Pike name registry");
     let response = sabre_cli(format!("cr --create pike --owner {}", signer))?;
     assert!(response["data"][0]["status"] == "COMMITTED");
@@ -131,7 +132,7 @@ fn pike_setup(signer: &str) -> Result<(), TestError> {
     println!("Creating Pike namespace");
     let response = sabre_cli("ns --create cad11d --owner test_owner".to_string())?;
     assert!(response["data"][0]["status"] == "COMMITTED");
-    
+
     println!("Configuring pike permissions");
     let response = sabre_cli("perm cad11d pike --read --write".to_string())?;
     assert!(response["data"][0]["status"] == "COMMITTED");
@@ -169,12 +170,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
     // Result: Invalid Transaction, Contract does not exist
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="INVALID");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &GOOD_PAYLOAD
+            + " --inputs 1cf126 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("Contract does not exist"));
@@ -189,11 +193,11 @@ fn test_sabre() {
     //      contract: The compiled intkey_multiply wasm contract.
     //
     // Result: Invalid Transaction, The Contract Registry does not exist
-    let response = match sabre_cli("upload -f ".to_string() + &INTKEY_MULTIPLY_DEF){
+    let response = match sabre_cli("upload -f ".to_string() + &INTKEY_MULTIPLY_DEF) {
         Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err))
+        Err(err) => panic!(format!("No Response {}", err)),
     };
-    assert!(response["data"][0]["status"]=="INVALID");
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("The Contract Registry does not exist"));
@@ -205,12 +209,11 @@ fn test_sabre() {
     //      Owners: signing key
     //
     // Result: Committed.
-    let response = match sabre_cli("cr --create intkey_multiply --owner ".to_string() +
-        &signer) {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
+    let response = match sabre_cli("cr --create intkey_multiply --owner ".to_string() + &signer) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
     };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will set a Contract.
     //
@@ -222,12 +225,11 @@ fn test_sabre() {
     //      Contract: The compiled intkey_multiply wasm contract.
     //
     // Result: Committed.
-    let response = match sabre_cli("upload -f ".to_string() + &INTKEY_MULTIPLY_DEF){
+    let response = match sabre_cli("upload -f ".to_string() + &INTKEY_MULTIPLY_DEF) {
         Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err))
+        Err(err) => panic!(format!("No Response {}", err)),
     };
-    assert!(response["data"][0]["status"]=="COMMITTED");
-
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will return an invalid transaction when the NamespaceRegistry does not
     // exist
@@ -240,12 +242,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
     // Result: Invalid Transaction, Namespace Registry does not exist
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="INVALID");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &GOOD_PAYLOAD
+            + " --inputs 1cf126 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("Namespace Registry does not exist"));
@@ -259,9 +264,9 @@ fn test_sabre() {
     // Result: Committed
     let response = match sabre_cli("ns --create 1cf126 --owner ".to_string() + &signer) {
         Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err))
+        Err(err) => panic!(format!("No Response {}", err)),
     };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will set a new Namespace Registry.
     //
@@ -270,12 +275,11 @@ fn test_sabre() {
     //      Owner: test_owner
     //
     // Result: Committed
-    let response = match sabre_cli("ns --create 00ec03 --owner test_owner".to_string()){
+    let response = match sabre_cli("ns --create 00ec03 --owner test_owner".to_string()) {
         Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err))
+        Err(err) => panic!(format!("No Response {}", err)),
     };
-    assert!(response["data"][0]["status"]=="COMMITTED");
-
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will return an invalid transaction when the Contract does not
     // have permissions to access the namespace.
@@ -288,12 +292,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
     // Result: Invalid Transaction, Contract does not have permission
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="INVALID");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &GOOD_PAYLOAD
+            + " --inputs 1cf126 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("Contract does not have permission"));
@@ -309,10 +316,10 @@ fn test_sabre() {
     //
     // Result: Committed
     let response = match sabre_cli("perm 1cf126 intkey_multiply --read --write".to_string()) {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
     // Multiply read and write permissions.
@@ -325,10 +332,10 @@ fn test_sabre() {
     //
     // Result: Committed
     let response = match sabre_cli("perm cad11d intkey_multiply --read --write".to_string()) {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
     // Multiply read and write permissions.
@@ -341,31 +348,35 @@ fn test_sabre() {
     //
     // Result: Committed
     let response = match sabre_cli("perm 00ec03 intkey_multiply --read --write".to_string()) {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="COMMITTED");
-
-    let response = match sabre_cli(format!(
-            "exec --contract pike:1.0 --payload {} --inputs cad11d --outputs cad11d",
-            CREATE_ORG_PAYLOAD)) {
         Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err))
+        Err(err) => panic!(format!("No Response {}", err)),
     };
     assert!(response["data"][0]["status"] == "COMMITTED");
 
-    // Test that Sabre will add a smart permission 
+    let response = match sabre_cli(format!(
+        "exec --contract pike:1.0 --payload {} --inputs cad11d --outputs cad11d",
+        CREATE_ORG_PAYLOAD
+    )) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "COMMITTED");
+
+    // Test that Sabre will add a smart permission
     //
     // Send CreateSmartPermissionAction with the following:
-    //      name: test 
+    //      name: test
     //      org_id: FooOrg000
     //
     // Result: Committed
-    let response = match sabre_cli(format!("sp --url http://rest-api:9708 --wait 300 create FooOrg000 test --filename {}", INTKEY_SMART_PERMISSION)) {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+    let response = match sabre_cli(format!(
+        "sp --url http://rest-api:9708 --wait 300 create FooOrg000 test --filename {}",
+        INTKEY_SMART_PERMISSION
+    )) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will successfully execute the contract.
     //
@@ -377,12 +388,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
     // Result: Committed. Set Inktey State.
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="COMMITTED");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &GOOD_PAYLOAD
+            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "COMMITTED");
 
     // Test that Sabre will successfully try to execute the contract but the smart contract will
     // return an invalid transaction because A has already been state.
@@ -395,12 +409,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply B and C together and set in A.
     //
     // Result: Invalid Transaction, Wasm contract returned invalid transaction
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &GOOD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="INVALID");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &GOOD_PAYLOAD
+            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("Wasm contract returned invalid transaction"));
@@ -416,12 +433,15 @@ fn test_sabre() {
     //      Payload: A payload that tries to multiply Bad and C together and set in A.
     //
     // Result: Invalid Transaction, Wasm contract returned invalid transaction
-    let response = match sabre_cli("exec --contract intkey_multiply:1.0 --payload ".to_string() +
-        &BAD_PAYLOAD + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126") {
-            Ok(x) => x,
-            Err(err) => panic!(format!("No Response {}", err))
-        };
-    assert!(response["data"][0]["status"]=="INVALID");
+    let response = match sabre_cli(
+        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+            + &BAD_PAYLOAD
+            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+    ) {
+        Ok(x) => x,
+        Err(err) => panic!(format!("No Response {}", err)),
+    };
+    assert!(response["data"][0]["status"] == "INVALID");
     let message: String = response["data"][0]["invalid_transactions"][0]["message"].to_string();
     println!("{}", message);
     assert!(message.contains("Wasm contract returned invalid transaction"));
