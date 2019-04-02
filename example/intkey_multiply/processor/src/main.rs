@@ -40,7 +40,6 @@ extern crate protobuf;
 pub mod handler;
 mod protos;
 
-
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
     let matches = clap_app!(intkey =>
@@ -50,7 +49,7 @@ fn main() {
          "connection endpoint for validator")
         (@arg verbose: -v --verbose +multiple
          "increase output verbosity"))
-        .get_matches();
+    .get_matches();
 
     let endpoint = matches
         .value_of("connect")
@@ -93,5 +92,4 @@ fn main() {
 }
 
 #[cfg(target_arch = "wasm32")]
-fn main() {
-}
+fn main() {}

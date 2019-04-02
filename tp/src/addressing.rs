@@ -13,8 +13,8 @@
 // limitations under the License.
 
 use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use crypto::sha2::Sha256;
+use crypto::sha2::Sha512;
 
 use sawtooth_sdk::processor::handler::ApplyError;
 
@@ -46,7 +46,7 @@ pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Cannot hash {} to Sha512 and return String with len {}",
                 to_hash, num
-            )))
+            )));
         }
     };
     Ok(hash.into())
@@ -74,7 +74,7 @@ pub fn hash_256(to_hash: &str, num: usize) -> Result<String, ApplyError> {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Cannot hash {} to Sha256 and return String with len {}",
                 to_hash, num
-            )))
+            )));
         }
     };
     Ok(hash.into())
@@ -95,17 +95,18 @@ pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyE
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace must be at least 6 characters long: {}",
                 namespace
-            )))
+            )));
         }
     };
     Ok(NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)?)
 }
 
 pub fn get_sawtooth_admins_address() -> Result<String, ApplyError> {
-    Ok(
-        SETTING_PREFIX.to_string() + &hash_256("sawtooth", 16)? + &hash_256("swa", 16)?
-            + &hash_256("administrators", 16)? + &hash_256("", 16)?,
-    )
+    Ok(SETTING_PREFIX.to_string()
+        + &hash_256("sawtooth", 16)?
+        + &hash_256("swa", 16)?
+        + &hash_256("administrators", 16)?
+        + &hash_256("", 16)?)
 }
 
 /// Returns a state address for a smart permission

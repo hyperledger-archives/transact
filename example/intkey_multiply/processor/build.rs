@@ -23,12 +23,11 @@ fn main() {
     fs::create_dir_all("src/protos").unwrap();
     protoc_rust::run(protoc_rust::Args {
         out_dir: "src/protos",
-        input: &[
-            "../../../protos/smart_permission.proto",
-        ],
+        input: &["../../../protos/smart_permission.proto"],
         includes: &["../../../protos"],
         customize: Customize::default(),
-    }).expect("protoc");
+    })
+    .expect("protoc");
 
     let mut file = File::create("src/protos/mod.rs").unwrap();
     file.write_all(b"pub mod smart_permission;\n").unwrap();

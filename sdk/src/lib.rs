@@ -15,10 +15,10 @@ extern crate protobuf;
 
 mod externs;
 
+pub use externs::{WasmPtr, WasmPtrList};
+use std::collections::HashMap;
 use std::error::Error;
 use std::string::FromUtf8Error;
-use std::collections::HashMap;
-pub use externs::{WasmPtr, WasmPtrList};
 
 pub struct Header {
     signer: String,
@@ -37,12 +37,16 @@ impl Header {
 pub struct TpProcessRequest<'a> {
     payload: Vec<u8>,
     header: &'a mut Header,
-    signature: String
+    signature: String,
 }
 
 impl<'a> TpProcessRequest<'a> {
     pub fn new(payload: Vec<u8>, header: &'a mut Header, signature: String) -> TpProcessRequest {
-        TpProcessRequest { payload, header, signature }
+        TpProcessRequest {
+            payload,
+            header,
+            signature,
+        }
     }
 
     pub fn get_payload(&self) -> &[u8] {
@@ -54,7 +58,7 @@ impl<'a> TpProcessRequest<'a> {
     }
 
     pub fn get_signature(&self) -> String {
-        return self.signature.to_string()
+        return self.signature.to_string();
     }
 }
 
@@ -66,7 +70,7 @@ impl TransactionContext {
     }
     pub fn get_state(&self, addresses: Vec<String>) -> Result<Option<Vec<u8>>, WasmSdkError> {
         unsafe {
-            if addresses.is_empty(){
+            if addresses.is_empty() {
                 return Err(WasmSdkError::InvalidTransaction(
                     "No address to delete".into(),
                 ));
@@ -78,13 +82,15 @@ impl TransactionContext {
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
                 externs::add_to_collection(
-                    header_address_buffer.into_raw(), wasm_buffer.into_raw());
-            };
+                    header_address_buffer.into_raw(),
+                    wasm_buffer.into_raw(),
+                );
+            }
             ptr_to_vec(externs::get_state(header_address_buffer.into_raw()))
         }
     }
 
-    pub fn set_state(&self,  entries: HashMap<String, Vec<u8>>) -> Result<(), WasmSdkError> {
+    pub fn set_state(&self, entries: HashMap<String, Vec<u8>>) -> Result<(), WasmSdkError> {
         for (address, state) in entries.iter() {
             unsafe {
                 let wasm_address_buffer = WasmBuffer::new(address.to_string().as_bytes())?;
@@ -104,9 +110,12 @@ impl TransactionContext {
         Ok(())
     }
 
-    pub fn delete_state(&self, addresses: Vec<String>) -> Result<Option<Vec<String>>, WasmSdkError> {
+    pub fn delete_state(
+        &self,
+        addresses: Vec<String>,
+    ) -> Result<Option<Vec<String>>, WasmSdkError> {
         unsafe {
-            if addresses.is_empty(){
+            if addresses.is_empty() {
                 return Err(WasmSdkError::InvalidTransaction(
                     "No address to delete".into(),
                 ));
@@ -118,10 +127,12 @@ impl TransactionContext {
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
                 externs::add_to_collection(
-                    header_address_buffer.into_raw(), wasm_buffer.into_raw());
-            };
-            let result = WasmBuffer::from_list(
-                    externs::delete_state(header_address_buffer.into_raw()))?;
+                    header_address_buffer.into_raw(),
+                    wasm_buffer.into_raw(),
+                );
+            }
+            let result =
+                WasmBuffer::from_list(externs::delete_state(header_address_buffer.into_raw()))?;
             let mut result_vec = Vec::new();
             for i in result {
                 let addr = String::from_utf8(i.data)?;
@@ -150,12 +161,11 @@ pub fn invoke_smart_permission(
     roles: Vec<String>,
     org_id: String,
     public_key: String,
-    payload: &[u8]) -> Result<i32, WasmSdkError> {
+    payload: &[u8],
+) -> Result<i32, WasmSdkError> {
     unsafe {
-        if roles.is_empty(){
-            return Err(WasmSdkError::InvalidTransaction(
-                "No roles ".into(),
-            ));
+        if roles.is_empty() {
+            return Err(WasmSdkError::InvalidTransaction("No roles ".into()));
         }
         let head = &roles[0];
         let header_role_buffer = WasmBuffer::new(head.as_bytes())?;
@@ -163,8 +173,7 @@ pub fn invoke_smart_permission(
 
         for role in roles[1..].iter() {
             let wasm_buffer = WasmBuffer::new(role.as_bytes())?;
-            externs::add_to_collection(
-                header_role_buffer.into_raw(), wasm_buffer.into_raw());
+            externs::add_to_collection(header_role_buffer.into_raw(), wasm_buffer.into_raw());
         }
         let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
         let name_buffer = WasmBuffer::new(name.as_bytes())?;
@@ -178,7 +187,7 @@ pub fn invoke_smart_permission(
             header_role_buffer.into_raw(),
             org_id_buffer.into_raw(),
             public_key_buffer.into_raw(),
-            payload_buffer.into_raw()
+            payload_buffer.into_raw(),
         ))
     }
 }
@@ -187,7 +196,12 @@ pub fn invoke_smart_permission(
 /// -2: Failed to deserialize signer
 /// -3: apply returned InvalidTransaction
 /// -4: apply returned InternalError
-pub unsafe fn execute_entrypoint<F>(payload_ptr: WasmPtr, signer_ptr: WasmPtr, signature_ptr: WasmPtr, apply: F) -> i32
+pub unsafe fn execute_entrypoint<F>(
+    payload_ptr: WasmPtr,
+    signer_ptr: WasmPtr,
+    signature_ptr: WasmPtr,
+    apply: F,
+) -> i32
 where
     F: Fn(&TpProcessRequest, &mut TransactionContext) -> Result<bool, ApplyError>,
 {
@@ -220,11 +234,13 @@ where
         &TpProcessRequest::new(payload, &mut header, signature),
         &mut TransactionContext::new(),
     ) {
-        Ok(r) => if r {
-            1
-        } else {
-            0
-        },
+        Ok(r) => {
+            if r {
+                1
+            } else {
+                0
+            }
+        }
         Err(ApplyError::InvalidTransaction(_)) => -3,
         Err(ApplyError::InternalError(_)) => -4,
     }
@@ -234,7 +250,7 @@ pub struct Request {
     roles: Vec<String>,
     org_id: String,
     public_key: String,
-    payload: Vec<u8>
+    payload: Vec<u8>,
 }
 
 impl Request {
@@ -242,13 +258,13 @@ impl Request {
         roles: Vec<String>,
         org_id: String,
         public_key: String,
-        payload: Vec<u8>
+        payload: Vec<u8>,
     ) -> Request {
         Request {
             roles,
             org_id,
             public_key,
-            payload
+            payload,
         }
     }
 
@@ -294,24 +310,20 @@ pub unsafe fn execute_smart_permission_entrypoint<F>(
     org_id_ptr: WasmPtr,
     public_key_ptr: WasmPtr,
     payload_ptr: WasmPtr,
-    has_permission: F
+    has_permission: F,
 ) -> i32
-where F: Fn(Request) -> Result<bool, WasmSdkError> {
+where
+    F: Fn(Request) -> Result<bool, WasmSdkError>,
+{
     let roles = if let Ok(i) = WasmBuffer::from_list(roles_ptr) {
-        let results: Vec<Result<String, WasmSdkError>> = i
-            .iter()
-            .map(|x| x.into_string())
-            .collect();
+        let results: Vec<Result<String, WasmSdkError>> =
+            i.iter().map(|x| x.into_string()).collect();
 
         if results.iter().any(|x| x.is_err()) {
             return -1;
         } else {
-            results
-                .into_iter()
-                .map(|x| x.unwrap())
-                .collect()
+            results.into_iter().map(|x| x.unwrap()).collect()
         }
-
     } else {
         return -1;
     };
@@ -345,11 +357,13 @@ where F: Fn(Request) -> Result<bool, WasmSdkError> {
     };
 
     match has_permission(Request::new(roles, org_id, public_key, payload)) {
-        Ok(r) => if r {
-            1
-        } else {
-            0
-        },
+        Ok(r) => {
+            if r {
+                1
+            } else {
+                0
+            }
+        }
         Err(WasmSdkError::StateSetError(_)) => -5,
         Err(WasmSdkError::AllocError(_)) => -6,
         Err(WasmSdkError::MemoryWriteError(_)) => -7,
@@ -496,8 +510,7 @@ impl std::fmt::Display for ApplyError {
 impl From<WasmSdkError> for ApplyError {
     fn from(e: WasmSdkError) -> Self {
         match e {
-            WasmSdkError::InternalError(..) =>
-                ApplyError::InternalError(format!("{}", e)),
+            WasmSdkError::InternalError(..) => ApplyError::InternalError(format!("{}", e)),
             _ => ApplyError::InvalidTransaction(format!("{}", e)),
         }
     }

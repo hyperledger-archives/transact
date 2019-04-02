@@ -21,14 +21,14 @@ extern crate protobuf;
 extern crate sawtooth_sdk;
 extern crate simple_logger;
 
-mod wasm_executor;
 mod addressing;
 mod handler;
 mod protos;
+mod wasm_executor;
 
+use handler::SabreTransactionHandler;
 use log::LogLevel;
 use sawtooth_sdk::processor::TransactionProcessor;
-use handler::SabreTransactionHandler;
 
 fn main() {
     let matches = clap_app!(wasm_store_tp =>
@@ -38,7 +38,7 @@ fn main() {
          "connection endpoint for validator")
         (@arg verbose: -v --verbose +multiple
          "increase output verbosity"))
-        .get_matches();
+    .get_matches();
 
     let logger = match matches.occurrences_of("verbose") {
         1 => simple_logger::init_with_level(LogLevel::Info),

@@ -12,7 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 // Unused main file required to run tests.
-fn main() {
-}
+fn main() {}

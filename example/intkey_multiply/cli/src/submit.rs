@@ -14,13 +14,13 @@
 
 //! Contains functions which assist with batch submission to a REST API
 
-use hyper;
-use hyper::Method;
-use hyper::client::{Client, Request};
-use std::str;
-use hyper::header::{ContentLength, ContentType};
-use futures::{future, Future};
 use futures::Stream;
+use futures::{future, Future};
+use hyper;
+use hyper::client::{Client, Request};
+use hyper::header::{ContentLength, ContentType};
+use hyper::Method;
+use std::str;
 use tokio_core;
 
 use sawtooth_sdk::messages::batch::BatchList;
