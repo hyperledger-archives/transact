@@ -13,20 +13,21 @@
 // limitations under the License.
 
 use std::collections::HashMap;
-use std::string::FromUtf8Error;
 use std::error::Error as StdError;
 use std::fmt;
+use std::string::FromUtf8Error;
 
 use std::time::Instant;
 
-use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
-use wasm_executor::wasmi::{Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor,
-                           MemoryInstance, MemoryRef, ModuleImportResolver, RuntimeArgs,
-                           RuntimeValue, Signature, Trap, TrapKind, ValueType, Module,
-                           ModuleInstance, ImportsBuilder};
-use wasm_executor::wasmi::memory_units::Pages;
 use protobuf;
 use protos::smart_permission::{SmartPermission, SmartPermissionList};
+use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
+use wasm_executor::wasmi::memory_units::Pages;
+use wasm_executor::wasmi::{
+    Error, Externals, FuncInstance, FuncRef, HostError, ImportsBuilder, MemoryDescriptor,
+    MemoryInstance, MemoryRef, Module, ModuleImportResolver, ModuleInstance, RuntimeArgs,
+    RuntimeValue, Signature, Trap, TrapKind, ValueType,
+};
 
 // External function indices
 
@@ -133,8 +134,8 @@ const CREATE_COLLECTION: usize = 10;
 const ADD_TO_COLLECTION: usize = 11;
 
 /// Args
-/// 
-/// 1) Smart permissions full address 
+///
+/// 1) Smart permissions full address
 /// 2) Name of smart permission
 /// 3) Smart permission roles
 /// 4) Organization ID
@@ -234,7 +235,9 @@ impl WasmExternals {
             self.ptr_collections.insert(raw_ptrs[0], raw_ptrs.clone());
             Ok(raw_ptrs[0])
         } else {
-            Err(ExternalsError::from("Attempting to create a ptr collection with nonexistant pointers"))
+            Err(ExternalsError::from(
+                "Attempting to create a ptr collection with nonexistant pointers",
+            ))
         }
     }
 
@@ -244,7 +247,9 @@ impl WasmExternals {
             x.push(raw_ptr);
             Ok(head)
         } else {
-            Err(ExternalsError::from("Attempting to add a ptr to nonexistant collecttion"))
+            Err(ExternalsError::from(
+                "Attempting to add a ptr to nonexistant collecttion",
+            ))
         }
     }
 
@@ -268,8 +273,10 @@ impl WasmExternals {
                         Err(err) => {
                             return Err(ExternalsError {
                                 message: format!(
-                                    "Cannot deserialize smart permission list: {:?}", err)
-                            })
+                                    "Cannot deserialize smart permission list: {:?}",
+                                    err
+                                ),
+                            });
                         }
                     };
 
@@ -297,7 +304,7 @@ impl Externals for WasmExternals {
                 let head_ptr: u32 = args.nth(0);
                 let addresses = match self.ptr_collections.get(&head_ptr) {
                     Some(addresses) => addresses.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                    None => return Ok(Some(RuntimeValue::I32(-1))),
                 };
                 let mut addr_vec = Vec::new();
                 for addr in addresses {
@@ -307,16 +314,19 @@ impl Externals for WasmExternals {
 
                 info!("Attempting to get state, addresses: {:?}", addr_vec);
 
-                let state = self.context
+                let state = self
+                    .context
                     .get_state(addr_vec)
                     .map_err(ExternalsError::from)?
                     .unwrap_or(Vec::new());
 
                 let raw_ptr = self.write_data(state)?;
 
-
-                info!("GET_STATE Execution time: {} secs {} ms",
-                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+                info!(
+                    "GET_STATE Execution time: {} secs {} ms",
+                    timer.elapsed().as_secs(),
+                    timer.elapsed().subsec_millis()
+                );
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
@@ -333,14 +343,20 @@ impl Externals for WasmExternals {
 
                 match self.context.set_state(sets) {
                     Ok(()) => {
-                    info!("SET_STATE Execution time: {} secs {} ms",
-                          timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+                        info!(
+                            "SET_STATE Execution time: {} secs {} ms",
+                            timer.elapsed().as_secs(),
+                            timer.elapsed().subsec_millis()
+                        );
                         Ok(Some(RuntimeValue::I32(1)))
-                    },
+                    }
                     Err(err) => {
                         info!("Set Error: {}", err);
-                        info!("SET_STATE Execution time: {} secs {} ms",
-                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+                        info!(
+                            "SET_STATE Execution time: {} secs {} ms",
+                            timer.elapsed().as_secs(),
+                            timer.elapsed().subsec_millis()
+                        );
                         Ok(Some(RuntimeValue::I32(0)))
                     }
                 }
@@ -350,7 +366,7 @@ impl Externals for WasmExternals {
 
                 let addresses = match self.ptr_collections.get(&head_ptr) {
                     Some(addresses) => addresses.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                    None => return Ok(Some(RuntimeValue::I32(-1))),
                 };
                 let mut addr_vec = Vec::new();
                 for addr in addresses {
@@ -358,13 +374,14 @@ impl Externals for WasmExternals {
                     addr_vec.push(address);
                 }
                 info!("Attempting to delete state, addresses: {:?}", addr_vec);
-                let result = self.context
+                let result = self
+                    .context
                     .delete_state(addr_vec)
                     .map_err(ExternalsError::from)?
                     .unwrap_or(Vec::new());
 
                 let mut ptr_vec = Vec::new();
-                for addr in result{
+                for addr in result {
                     let raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
                     ptr_vec.push(raw_ptr);
                 }
@@ -372,7 +389,6 @@ impl Externals for WasmExternals {
                 let raw_ptr = self.collect_ptrs(ptr_vec)?;
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
-
             }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
@@ -396,14 +412,18 @@ impl Externals for WasmExternals {
                 let len: i32 = args.nth(0);
 
                 let raw_ptr = self.write_data(vec![0; len as usize])?;
-                info!("ALLOC Execution time: {} secs {} ms",
-                      timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+                info!(
+                    "ALLOC Execution time: {} secs {} ms",
+                    timer.elapsed().as_secs(),
+                    timer.elapsed().subsec_millis()
+                );
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
             READ_BYTE_IDX => {
                 let offset: i32 = args.nth(0);
-                let byte = self.get_memory_ref()
+                let byte = self
+                    .get_memory_ref()
                     .get(offset as u32, 1)
                     .map_err(ExternalsError::from)?[0];
                 Ok(Some(RuntimeValue::I32(byte as i32)))
@@ -476,7 +496,7 @@ impl Externals for WasmExternals {
 
                 let roles = match self.ptr_collections.get(&roles_head_ptr) {
                     Some(roles) => roles.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1)))
+                    None => return Ok(Some(RuntimeValue::I32(-1))),
                 };
                 let mut role_vec = Vec::new();
                 for role in roles {
@@ -492,27 +512,29 @@ impl Externals for WasmExternals {
                 let cloned_context = self.context.clone();
 
                 let contract = if let Some(sp) = self.get_smart_permission(contract_addr, name)? {
-                        sp
-                    } else {
-                        return Ok(Some(RuntimeValue::I32(-2)))
+                    sp
+                } else {
+                    return Ok(Some(RuntimeValue::I32(-2)));
                 };
 
                 // Invoke Smart Permission
 
-                let module =
-                    SmartPermissionModule::new(contract.get_function(), cloned_context)
-                        .expect("Failed to create can_add module");
+                let module = SmartPermissionModule::new(contract.get_function(), cloned_context)
+                    .expect("Failed to create can_add module");
                 let result = module
                     .entrypoint(role_vec, org_id, public_key, payload.to_vec())
                     .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
 
                 match result {
                     Some(x) => {
-                        info!("SMART_PERMISSION Execution time: {} secs {} ms",
-                              timer.elapsed().as_secs(), timer.elapsed().subsec_millis());
+                        info!(
+                            "SMART_PERMISSION Execution time: {} secs {} ms",
+                            timer.elapsed().as_secs(),
+                            timer.elapsed().subsec_millis()
+                        );
                         Ok(Some(RuntimeValue::I32(x)))
                     }
-                    None =>Err(ExternalsError::to_trap("No result returned".into()))
+                    None => Err(ExternalsError::to_trap("No result returned".into())),
                 }
             }
             _ => Err(ExternalsError::to_trap("Function does not exist".into())),
@@ -537,12 +559,16 @@ impl ModuleImportResolver for WasmExternals {
             )),
             "invoke_smart_permission" => Ok(FuncInstance::alloc_host(
                 Signature::new(
-                    &[ValueType::I32,
-                    ValueType::I32,
-                    ValueType::I32,
-                    ValueType::I32,
-                    ValueType::I32,
-                    ValueType::I32][..], Some(ValueType::I32)),
+                    &[
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                        ValueType::I32,
+                    ][..],
+                    Some(ValueType::I32),
+                ),
                 SMART_PERMISSION,
             )),
             "get_ptr_len" => Ok(FuncInstance::alloc_host(
@@ -683,11 +709,14 @@ impl From<ContextError> for ExternalsError {
 
 struct SmartPermissionModule {
     context: TransactionContext,
-    module: Module
+    module: Module,
 }
 
 impl SmartPermissionModule {
-    pub fn new(wasm: &[u8], context: TransactionContext) -> Result<SmartPermissionModule, ExternalsError> {
+    pub fn new(
+        wasm: &[u8],
+        context: TransactionContext,
+    ) -> Result<SmartPermissionModule, ExternalsError> {
         let module = Module::from_buffer(wasm)?;
         Ok(SmartPermissionModule { context, module })
     }
@@ -697,12 +726,15 @@ impl SmartPermissionModule {
         roles: Vec<String>,
         org_id: String,
         public_key: String,
-        payload: Vec<u8>
+        payload: Vec<u8>,
     ) -> Result<Option<i32>, ExternalsError> {
-        let mut env =  WasmExternals::new(None, self.context.clone())?;
+        let mut env = WasmExternals::new(None, self.context.clone())?;
 
-        let instance = ModuleInstance::new(&self.module, &ImportsBuilder::new().with_resolver("env", &env))?
-            .assert_no_start();
+        let instance = ModuleInstance::new(
+            &self.module,
+            &ImportsBuilder::new().with_resolver("env", &env),
+        )?
+        .assert_no_start();
 
         info!("Writing roles to memory");
 
@@ -737,17 +769,16 @@ impl SmartPermissionModule {
         let payload_ptr = env.write_data(payload)? as i32;
         info!("Payload written to memory");
 
-        let result = instance
-            .invoke_export(
-                "entrypoint",
-                &vec![
-                    RuntimeValue::I32(role_list_ptr),
-                    RuntimeValue::I32(org_id_ptr),
-                    RuntimeValue::I32(public_key_ptr),
-                    RuntimeValue::I32(payload_ptr)
-                ],
-                &mut env
-            )?;
+        let result = instance.invoke_export(
+            "entrypoint",
+            &vec![
+                RuntimeValue::I32(role_list_ptr),
+                RuntimeValue::I32(org_id_ptr),
+                RuntimeValue::I32(public_key_ptr),
+                RuntimeValue::I32(payload_ptr),
+            ],
+            &mut env,
+        )?;
 
         if let Some(RuntimeValue::I32(i)) = result {
             Ok(Some(i))

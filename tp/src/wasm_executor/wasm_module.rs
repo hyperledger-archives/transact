@@ -13,9 +13,9 @@
 // limitations under the License.
 extern crate wasmi;
 
-use wasm_executor::wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
-use wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
 use sawtooth_sdk::processor::handler::TransactionContext;
+use wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
+use wasm_executor::wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
 
 pub struct WasmModule {
     context: TransactionContext,
@@ -39,7 +39,8 @@ impl WasmModule {
         let instance = ModuleInstance::new(
             &self.module,
             &ImportsBuilder::new().with_resolver("env", &env),
-        )?.assert_no_start();
+        )?
+        .assert_no_start();
 
         let payload_ptr = env.write_data(payload)? as i32;
         info!("Payload written to memory");

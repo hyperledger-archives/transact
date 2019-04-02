@@ -22,35 +22,34 @@ use crypto::sha2::Sha512;
 
 use wasm_executor::wasm_module::WasmModule;
 
+use sawtooth_sdk::messages::processor::TpProcessRequest;
+use sawtooth_sdk::messages::setting::Setting;
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
-use sawtooth_sdk::messages::processor::TpProcessRequest;
-use sawtooth_sdk::messages::setting::Setting;
 
-use addressing::{get_sawtooth_admins_address, make_contract_address,
-                 make_contract_registry_address, make_namespace_registry_address,
-                 compute_agent_address, compute_org_address, compute_smart_permission_address};
+use addressing::{
+    compute_agent_address, compute_org_address, compute_smart_permission_address,
+    get_sawtooth_admins_address, make_contract_address, make_contract_registry_address,
+    make_namespace_registry_address,
+};
 
 use protos::contract::{Contract, ContractList};
 use protos::contract_registry::{ContractRegistry, ContractRegistryList, ContractRegistry_Version};
-use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList,
-                                 NamespaceRegistry_Permission};
-use protos::smart_permission::{
-    Agent,
-    AgentList,
-    Organization,
-    OrganizationList,
-    SmartPermission,
-    SmartPermissionList
+use protos::namespace_registry::{
+    NamespaceRegistry, NamespaceRegistryList, NamespaceRegistry_Permission,
 };
-use protos::payload::{CreateContractAction, CreateContractRegistryAction,
-                      CreateNamespaceRegistryAction, CreateNamespaceRegistryPermissionAction,
-                      DeleteContractAction, DeleteContractRegistryAction,
-                      DeleteNamespaceRegistryAction, DeleteNamespaceRegistryPermissionAction,
-                      ExecuteContractAction, SabrePayload, SabrePayload_Action,
-                      UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
-                      CreateSmartPermissionAction, UpdateSmartPermissionAction, DeleteSmartPermissionAction};
+use protos::payload::{
+    CreateContractAction, CreateContractRegistryAction, CreateNamespaceRegistryAction,
+    CreateNamespaceRegistryPermissionAction, CreateSmartPermissionAction, DeleteContractAction,
+    DeleteContractRegistryAction, DeleteNamespaceRegistryAction,
+    DeleteNamespaceRegistryPermissionAction, DeleteSmartPermissionAction, ExecuteContractAction,
+    SabrePayload, SabrePayload_Action, UpdateContractRegistryOwnersAction,
+    UpdateNamespaceRegistryOwnersAction, UpdateSmartPermissionAction,
+};
+use protos::smart_permission::{
+    Agent, AgentList, Organization, OrganizationList, SmartPermission, SmartPermissionList,
+};
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
@@ -76,7 +75,7 @@ enum Action {
     DeleteNamespaceRegistryPermission(DeleteNamespaceRegistryPermissionAction),
     CreateSmartPermission(CreateSmartPermissionAction),
     UpdateSmartPermission(UpdateSmartPermissionAction),
-    DeleteSmartPermission(DeleteSmartPermissionAction)
+    DeleteSmartPermission(DeleteSmartPermissionAction),
 }
 
 impl std::fmt::Display for Action {
@@ -87,15 +86,23 @@ impl std::fmt::Display for Action {
             Action::ExecuteContract(_) => write!(f, "Action: Execute Contract"),
             Action::CreateContractRegistry(_) => write!(f, "Action: Create Contract Registry"),
             Action::DeleteContractRegistry(_) => write!(f, "Action: Delete Contract Registry"),
-            Action::UpdateContractRegistryOwners(_) => write!(f, "Action: Update Contract Registry Owners"),
+            Action::UpdateContractRegistryOwners(_) => {
+                write!(f, "Action: Update Contract Registry Owners")
+            }
             Action::CreateNamespaceRegistry(_) => write!(f, "Action: Create Namespace Registry"),
             Action::DeleteNamespaceRegistry(_) => write!(f, "Action: Delete Namespace Registry"),
-            Action::UpdateNamespaceRegistryOwners(_) => write!(f, "Action: Update Namespace Registry Owners"),
-            Action::CreateNamespaceRegistryPermission(_) => write!(f, "Create Namespace Registry Permission"),
-            Action::DeleteNamespaceRegistryPermission(_) => write!(f, "Delete Namespace Registry Permission"),
+            Action::UpdateNamespaceRegistryOwners(_) => {
+                write!(f, "Action: Update Namespace Registry Owners")
+            }
+            Action::CreateNamespaceRegistryPermission(_) => {
+                write!(f, "Create Namespace Registry Permission")
+            }
+            Action::DeleteNamespaceRegistryPermission(_) => {
+                write!(f, "Delete Namespace Registry Permission")
+            }
             Action::CreateSmartPermission(_) => write!(f, "Create smart permission"),
             Action::UpdateSmartPermission(_) => write!(f, "Update smart permission"),
-            Action::DeleteSmartPermission(_) => write!(f, "Delete smart permission")
+            Action::DeleteSmartPermission(_) => write!(f, "Delete smart permission"),
         }
     }
 }
@@ -111,7 +118,7 @@ impl SabreRequestPayload {
             Err(_) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Cannot deserialize payload",
-                )))
+                )));
             }
         };
 
@@ -313,16 +320,22 @@ impl SabreRequestPayload {
             SabrePayload_Action::CREATE_SMART_PERMISSION => {
                 let action = payload.get_create_smart_permission();
 
-                if  action.get_org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                if action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction(
+                        "Organization ID required".into(),
+                    ));
                 }
 
                 if action.get_name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                    return Err(ApplyError::InvalidTransaction(
+                        "Smart permission name required".into(),
+                    ));
                 }
 
                 if action.get_function().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Function body required".into()));
+                    return Err(ApplyError::InvalidTransaction(
+                        "Function body required".into(),
+                    ));
                 }
 
                 Action::CreateSmartPermission(action.clone())
@@ -330,16 +343,22 @@ impl SabreRequestPayload {
             SabrePayload_Action::UPDATE_SMART_PERMISSION => {
                 let action = payload.get_update_smart_permission();
 
-                if  action.get_org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                if action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction(
+                        "Organization ID required".into(),
+                    ));
                 }
 
                 if action.get_name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                    return Err(ApplyError::InvalidTransaction(
+                        "Smart permission name required".into(),
+                    ));
                 }
 
                 if action.get_function().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Function body required".into()));
+                    return Err(ApplyError::InvalidTransaction(
+                        "Function body required".into(),
+                    ));
                 }
 
                 Action::UpdateSmartPermission(action.clone())
@@ -347,12 +366,16 @@ impl SabreRequestPayload {
             SabrePayload_Action::DELETE_SMART_PERMISSION => {
                 let action = payload.get_delete_smart_permission();
 
-                if  action.get_org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Organization ID required".into()));
+                if action.get_org_id().is_empty() {
+                    return Err(ApplyError::InvalidTransaction(
+                        "Organization ID required".into(),
+                    ));
                 }
 
                 if action.get_name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction("Smart permission name required".into()));
+                    return Err(ApplyError::InvalidTransaction(
+                        "Smart permission name required".into(),
+                    ));
                 }
 
                 Action::DeleteSmartPermission(action.clone())
@@ -391,7 +414,7 @@ impl<'a> SabreState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize setting: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
                 Ok(Some(setting))
@@ -415,7 +438,7 @@ impl<'a> SabreState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize contract list: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
 
@@ -445,7 +468,7 @@ impl<'a> SabreState<'a> {
                     return Err(ApplyError::InternalError(format!(
                         "Cannot deserialize contract list: {}",
                         err,
-                    )))
+                    )));
                 }
             },
             None => ContractList::new(),
@@ -475,7 +498,7 @@ impl<'a> SabreState<'a> {
             Err(_) => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot serialize contract list",
-                )))
+                )));
             }
         };
         let mut sets = HashMap::new();
@@ -494,7 +517,7 @@ impl<'a> SabreState<'a> {
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete contract",
-                )))
+                )));
             }
         };
         if !deleted.contains(&address) {
@@ -520,7 +543,7 @@ impl<'a> SabreState<'a> {
                             return Err(ApplyError::InternalError(format!(
                                 "Cannot deserialize contract registry list: {:?}",
                                 err,
-                            )))
+                            )));
                         }
                     };
 
@@ -549,7 +572,7 @@ impl<'a> SabreState<'a> {
                     return Err(ApplyError::InternalError(format!(
                         "Cannot deserialize contract registry list: {}",
                         err,
-                    )))
+                    )));
                 }
             },
             None => ContractRegistryList::new(),
@@ -583,7 +606,7 @@ impl<'a> SabreState<'a> {
             Err(_) => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot serialize contract registry list",
-                )))
+                )));
             }
         };
         let mut sets = HashMap::new();
@@ -602,7 +625,7 @@ impl<'a> SabreState<'a> {
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete contract registry",
-                )))
+                )));
             }
         };
         if !deleted.contains(&address) {
@@ -628,7 +651,7 @@ impl<'a> SabreState<'a> {
                             return Err(ApplyError::InternalError(format!(
                                 "Cannot deserialize namespace registry list: {:?}",
                                 err,
-                            )))
+                            )));
                         }
                     };
 
@@ -658,7 +681,7 @@ impl<'a> SabreState<'a> {
                             return Err(ApplyError::InternalError(format!(
                                 "Cannot deserialize namespace registry list: {:?}",
                                 err,
-                            )))
+                            )));
                         }
                     };
                 Ok(Some(namespace_registries))
@@ -681,7 +704,7 @@ impl<'a> SabreState<'a> {
                     return Err(ApplyError::InternalError(format!(
                         "Cannot deserialize namespace registry list: {}",
                         err,
-                    )))
+                    )));
                 }
             },
             None => NamespaceRegistryList::new(),
@@ -715,7 +738,7 @@ impl<'a> SabreState<'a> {
             Err(_) => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot serialize namespace registry list",
-                )))
+                )));
             }
         };
         let mut sets = HashMap::new();
@@ -734,7 +757,7 @@ impl<'a> SabreState<'a> {
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete namespace registry",
-                )))
+                )));
             }
         };
         if !deleted.contains(&address) {
@@ -761,7 +784,7 @@ impl<'a> SabreState<'a> {
                             return Err(ApplyError::InternalError(format!(
                                 "Cannot deserialize smart permission list: {:?}",
                                 err,
-                            )))
+                            )));
                         }
                     };
 
@@ -791,7 +814,7 @@ impl<'a> SabreState<'a> {
                     return Err(ApplyError::InternalError(format!(
                         "Cannot deserialize smart permission list: {}",
                         err,
-                    )))
+                    )));
                 }
             },
             None => SmartPermissionList::new(),
@@ -825,7 +848,7 @@ impl<'a> SabreState<'a> {
             Err(_) => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot serialize smart permission list",
-                )))
+                )));
             }
         };
         let mut sets = HashMap::new();
@@ -844,7 +867,7 @@ impl<'a> SabreState<'a> {
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete smart_permission",
-                )))
+                )));
             }
         };
         if !deleted.contains(&address) {
@@ -866,7 +889,7 @@ impl<'a> SabreState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize organization list: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
 
@@ -892,7 +915,7 @@ impl<'a> SabreState<'a> {
                         return Err(ApplyError::InternalError(format!(
                             "Cannot deserialize record container: {:?}",
                             err,
-                        )))
+                        )));
                     }
                 };
 
@@ -957,7 +980,7 @@ impl TransactionHandler for SabreTransactionHandler {
             None => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Request must contain a payload",
-                )))
+                )));
             }
         };
 
@@ -979,9 +1002,13 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::DeleteContract(delete_contract_payload) => {
                 delete_contract(delete_contract_payload, signer, &mut state)
             }
-            Action::ExecuteContract(execute_contract_payload) => {
-                execute_contract(execute_contract_payload, signer, request.get_signature(), &mut state, context_clone)
-            }
+            Action::ExecuteContract(execute_contract_payload) => execute_contract(
+                execute_contract_payload,
+                signer,
+                request.get_signature(),
+                &mut state,
+                context_clone,
+            ),
             Action::CreateContractRegistry(create_contract_registry_payload) => {
                 create_contract_registry(create_contract_registry_payload, signer, &mut state)
             }
@@ -1022,21 +1049,15 @@ impl TransactionHandler for SabreTransactionHandler {
                 signer,
                 &mut state,
             ),
-           Action::CreateSmartPermission(payload) => create_smart_permission(
-               payload,
-               signer,
-               &mut state
-            ),
-           Action::UpdateSmartPermission(payload) => update_smart_permission(
-               payload,
-               signer,
-               &mut state
-            ),
-           Action::DeleteSmartPermission(payload) => delete_smart_permission(
-               payload,
-               signer,
-               &mut state
-            ),
+            Action::CreateSmartPermission(payload) => {
+                create_smart_permission(payload, signer, &mut state)
+            }
+            Action::UpdateSmartPermission(payload) => {
+                update_smart_permission(payload, signer, &mut state)
+            }
+            Action::DeleteSmartPermission(payload) => {
+                delete_smart_permission(payload, signer, &mut state)
+            }
         }
     }
 }
@@ -1054,29 +1075,30 @@ fn create_contract(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract already exists: {}, {}",
                 name, version,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
     // update or create the contract registry for the contract
     let mut contract_registry = match state.get_contract_registry(name) {
-        Ok(None) =>
+        Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "The Contract Registry does not exist: {}",
                 name,
-            ))),
+            )));
+        }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1084,7 +1106,7 @@ fn create_contract(
         return Err(ApplyError::InvalidTransaction(format!(
             "Only owners can submit new versions of contracts: {}",
             signer,
-        )))
+        )));
     }
 
     let mut contract = Contract::new();
@@ -1123,13 +1145,13 @@ fn delete_contract(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract does not exist: {}, {}",
                 name, version,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1139,14 +1161,14 @@ fn delete_contract(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract Registry does not exist {}",
                 name,
-            )))
+            )));
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1183,13 +1205,13 @@ fn execute_contract(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract does not exist: {}, {}",
                 name, version,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1200,7 +1222,7 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Input must have at least 6 characters: {}",
                     input,
-                )))
+                )));
             }
         };
         let registries = match state.get_namespace_registries(namespace) {
@@ -1209,13 +1231,13 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Namespace Registry does not exist: {}",
                     namespace,
-                )))
+                )));
             }
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Unable to check state: {}",
                     err,
-                )))
+                )));
             }
         };
 
@@ -1246,7 +1268,7 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "No namespace registry exists for namespace: {} input: {}",
                     namespace, input
-                )))
+                )));
             }
         }
     }
@@ -1258,7 +1280,7 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Output must have at least 6 characters: {}",
                     output,
-                )))
+                )));
             }
         };
         let registries = match state.get_namespace_registries(namespace) {
@@ -1267,13 +1289,13 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Namespace Registry does not exist: {}",
                     namespace,
-                )))
+                )));
             }
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Unable to check state: {}",
                     err,
-                )))
+                )));
             }
         };
 
@@ -1303,7 +1325,7 @@ fn execute_contract(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "No namespace registry exists for namespace: {} output: {}",
                     namespace, output
-                )))
+                )));
             }
         }
     }
@@ -1312,7 +1334,11 @@ fn execute_contract(
         WasmModule::new(contract.get_contract(), context).expect("Failed to create can_add module");
 
     let result = module
-        .entrypoint(payload.get_payload().to_vec(), signer.into(), signature.into())
+        .entrypoint(
+            payload.get_payload().to_vec(),
+            signer.into(),
+            signature.into(),
+        )
         .map_err(|e| ApplyError::InvalidTransaction(format!("{:?}", e)))?;
 
     match result {
@@ -1320,20 +1346,20 @@ fn execute_contract(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Wasm contract did not return a result: {}, {}",
                 name, version,
-            )))
+            )));
         }
         Some(1) => Ok(()),
         Some(-3) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Wasm contract returned invalid transaction: {}, {}",
                 name, version,
-            )))
+            )));
         }
         Some(num) => {
             return Err(ApplyError::InternalError(format!(
                 "Wasm contract returned internal error: {}",
                 num
-            )))
+            )));
         }
     }
 }
@@ -1351,13 +1377,13 @@ fn create_contract_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract Registry already exists: {}",
                 name,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1367,13 +1393,13 @@ fn create_contract_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Only admins can create a contract registry: {}",
                 signer,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1408,23 +1434,23 @@ fn delete_contract_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract Registry does not exist: {}",
                 name,
-            )))
+            )));
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
     if contract_registry.versions.len() != 0 {
         return Err(ApplyError::InvalidTransaction(format!(
-             "Contract Registry can only be deleted if there are no versions: {}",
-             name,
-         )));
-     }
+            "Contract Registry can only be deleted if there are no versions: {}",
+            name,
+        )));
+    }
     // Check if signer is an owner or an admin
     can_update_contract_registry(contract_registry.clone(), signer, state)?;
 
@@ -1442,14 +1468,14 @@ fn update_contract_registry_owners(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Contract Registry does not exist: {}",
                 name,
-            )))
+            )));
         }
         Ok(Some(contract_registry)) => contract_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1480,13 +1506,13 @@ fn create_namespace_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry already exists: {}",
                 namespace,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     }
 
@@ -1496,13 +1522,13 @@ fn create_namespace_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Only admins can create a namespace registry: {}",
                 signer,
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1538,14 +1564,14 @@ fn delete_namespace_registry(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry does not exist: {}",
                 namespace,
-            )))
+            )));
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
     can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
@@ -1571,14 +1597,14 @@ fn update_namespace_registry_owners(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry does not exist: {}",
                 namespace,
-            )))
+            )));
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1601,14 +1627,14 @@ fn create_namespace_registry_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry does not exist: {}",
                 namespace,
-            )))
+            )));
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
     // Check if signer is an owner or an admin
@@ -1654,14 +1680,14 @@ fn delete_namespace_registry_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry does not exist: {}",
                 namespace,
-            )))
+            )));
         }
         Ok(Some(namespace_registry)) => namespace_registry,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Unable to check state: {}",
                 err,
-            )))
+            )));
         }
     };
     // Check if signer is an owner or an admin
@@ -1687,7 +1713,7 @@ fn delete_namespace_registry_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Namespace Registry does not have a permission for : {}",
                 contract_name,
-            )))
+            )));
         }
     };
     state.set_namespace_registry(namespace, namespace_registry)
@@ -1699,14 +1725,14 @@ pub fn is_admin(signer: &str, org_id: &str, state: &mut SabreState) -> Result<()
             return Err(ApplyError::InvalidTransaction(format!(
                 "Signer is not an agent: {}",
                 signer,
-            )))
+            )));
         }
         Ok(Some(admin)) => admin,
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Failed to retrieve state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1735,9 +1761,8 @@ pub fn is_admin(signer: &str, org_id: &str, state: &mut SabreState) -> Result<()
 fn create_smart_permission(
     payload: CreateSmartPermissionAction,
     signer: &str,
-    state: &mut SabreState
+    state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-
     // verify the signer of the transaction is authorized to create smart permissions
     is_admin(signer, payload.get_org_id(), state)?;
 
@@ -1748,13 +1773,13 @@ fn create_smart_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Smart Permission already exists: {} ",
                 payload.get_name(),
-            )))
+            )));
         }
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Failed to retrieve state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1764,14 +1789,14 @@ fn create_smart_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Organization does not exist exists: {}",
                 payload.get_org_id(),
-            )))
+            )));
         }
         Ok(Some(_)) => (),
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Failed to retrieve state: {}",
                 err,
-            )))
+            )));
         }
     };
 
@@ -1785,9 +1810,8 @@ fn create_smart_permission(
 fn update_smart_permission(
     payload: UpdateSmartPermissionAction,
     signer: &str,
-    state: &mut SabreState
+    state: &mut SabreState,
 ) -> Result<(), ApplyError> {
-
     // verify the signer of the transaction is authorized to update smart permissions
     is_admin(signer, payload.get_org_id(), state)?;
 
@@ -1798,14 +1822,14 @@ fn update_smart_permission(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Smart Permission does not exists: {} ",
                     payload.get_name(),
-                )))
+                )));
             }
             Ok(Some(smart_permission)) => smart_permission,
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Failed to retrieve state: {}",
                     err,
-                )))
+                )));
             }
         };
 
@@ -1816,7 +1840,7 @@ fn update_smart_permission(
 fn delete_smart_permission(
     payload: DeleteSmartPermissionAction,
     signer: &str,
-    state: &mut SabreState
+    state: &mut SabreState,
 ) -> Result<(), ApplyError> {
     // verify the signer of the transaction is authorized to delete smart permissions
     is_admin(signer, payload.get_org_id(), state)?;
@@ -1827,20 +1851,19 @@ fn delete_smart_permission(
             return Err(ApplyError::InvalidTransaction(format!(
                 "Smart Permission does not exists: {} ",
                 payload.get_name(),
-            )))
+            )));
         }
         Ok(Some(_)) => (),
         Err(err) => {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Failed to retrieve state: {}",
                 err,
-            )))
+            )));
         }
     };
 
     state.delete_smart_permission(payload.get_org_id(), payload.get_name())
 }
-
 
 // helper function to check if the signer is allowed to update a namespace_registry
 fn can_update_namespace_registry(
@@ -1855,13 +1878,13 @@ fn can_update_namespace_registry(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Only owners or admins can update or delete a namespace registry: {}",
                     signer,
-                )))
+                )));
             }
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Unable to check state: {}",
                     err,
-                )))
+                )));
             }
         };
 
@@ -1894,13 +1917,13 @@ fn can_update_contract_registry(
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Only owners or admins can update or delete a contract registry: {}",
                     signer,
-                )))
+                )));
             }
             Err(err) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Unable to check state: {}",
                     err,
-                )))
+                )));
             }
         };
 
