@@ -76,7 +76,7 @@ services:
     stop_signal: SIGKILL
 
   sabre-tp:
-    image: sabre-tp
+    image: sabre-tp:${ISOLATION_ID}
     container_name: sabre-tp
     entrypoint: "bash -c \"\
         cd /project/tp/ && \
@@ -89,7 +89,7 @@ services:
       context: tp
 
   sabre-cli:
-    image: sabre-cli
+    image: sabre-cli:${ISOLATION_ID}
     container_name: sabre-cli
     volumes:
       - .:/project

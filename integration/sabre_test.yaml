@@ -33,7 +33,7 @@ services:
         \""
 
   build_intkey_multiply:
-    image:  build_intkey_multiply
+    image:  build_intkey_multiply:${ISOLATION_ID}
     container_name: build_intkey_multiply
     volumes:
       - .:/project
@@ -45,7 +45,7 @@ services:
       context: integration
 
   build_pike:
-    image:  build_pike
+    image:  build_pike:${ISOLATION_ID}
     container_name: build_pike
     volumes:
       - .:/project
@@ -58,7 +58,7 @@ services:
       context: integration
 
   build_intkey:
-    image:  build_intkey
+    image:  build_intkey:${ISOLATION_ID}
     container_name: build_intkey
     volumes:
       - .:/project
@@ -72,7 +72,7 @@ services:
 
 
   test_sabre:
-    image: test_sabre:ISOLATION_ID
+    image: test_sabre:${ISOLATION_ID}
     container_name: test_sabre
     depends_on:
       - rest-api

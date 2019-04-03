@@ -16,7 +16,7 @@ version: "2.1"
 
 services:
   sabre-docs:
-    image: sabre-docs
+    image: sabre-docs:${ISOLATION_ID}
     container_name: sabre-docs
     volumes:
       - ..:/project
