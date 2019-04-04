@@ -364,7 +364,7 @@ impl<'a> IntkeyState<'a> {
 
     pub fn get(&mut self, name: &str) -> Result<Option<u32>, ApplyError> {
         let address = IntkeyState::calculate_address(name);
-        let d = self.context.get_state(vec![address.to_string()])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let hex_vec: Vec<String> = packed.iter().map(|b| format!("{:02X}", b)).collect();
@@ -395,10 +395,8 @@ impl<'a> IntkeyState<'a> {
         let packed =
             decode(encoded).map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
 
-        let mut sets = HashMap::new();
-        sets.insert(IntkeyState::calculate_address(name), packed);
         self.context
-            .set_state(sets)
+            .set_state_entry(IntkeyState::calculate_address(name), packed)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
 
         Ok(())
@@ -407,7 +405,7 @@ impl<'a> IntkeyState<'a> {
     #[cfg(target_arch = "wasm32")]
     pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
         let address = compute_agent_address(public_key);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -434,7 +432,7 @@ impl<'a> IntkeyState<'a> {
     #[cfg(target_arch = "wasm32")]
     pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
         let address = compute_org_address(id);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -465,7 +463,7 @@ impl<'a> IntkeyState<'a> {
         name: &str,
     ) -> Result<Option<SmartPermission>, ApplyError> {
         let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let smart_permissions: SmartPermissionList =
@@ -523,7 +521,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
     fn apply(
         &self,
         request: &TpProcessRequest,
-        context: &mut TransactionContext,
+        context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
         let payload = IntkeyPayload::new(request.get_payload());
         let payload = match payload {
@@ -648,7 +646,10 @@ fn run_smart_permisson(
 
 #[cfg(target_arch = "wasm32")]
 // Sabre apply must return a bool
-fn apply(request: &TpProcessRequest, context: &mut TransactionContext) -> Result<bool, ApplyError> {
+fn apply(
+    request: &TpProcessRequest,
+    context: &mut dyn TransactionContext,
+) -> Result<bool, ApplyError> {
     let handler = IntkeyMultiplyTransactionHandler::new();
     match handler.apply(request, context) {
         Ok(_) => Ok(true),
