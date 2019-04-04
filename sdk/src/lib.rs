@@ -670,19 +670,6 @@ impl From<WasmSdkError> for ApplyError {
     }
 }
 
-unsafe fn set_state(address: String, state: &[u8]) -> Result<(), WasmSdkError> {
-    let addr_ptr = WasmBuffer::new(address.as_bytes())?.into_raw();
-    let state_ptr = WasmBuffer::new(state)?.into_raw();
-
-    let result = externs::set_state(addr_ptr, state_ptr);
-
-    if result == 1 {
-        Ok(())
-    } else {
-        Err(WasmSdkError::StateSetError("New state was not set".into()))
-    }
-}
-
 unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
     let mut vec = Vec::new();
 
