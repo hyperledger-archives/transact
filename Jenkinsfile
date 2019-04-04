@@ -122,7 +122,7 @@ pipeline {
     }
     post {
         always {
-            sh 'docker-compose -f docker-compose.yaml down'
+            sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml down'
             sh 'docker-compose -f docs/docker-compose.yaml down'
         }
         success {
