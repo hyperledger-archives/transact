@@ -19,7 +19,7 @@ authors = ["Cargill"]
 build = "build.rs"
 
 [dependencies]
-sawtooth-sdk = "^0.2"
+sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
 pike_db = { path = "../db/pike_db/" }
 addresser = { path = "../addresser/" }
 log = "0.3.8"
