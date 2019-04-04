@@ -62,18 +62,138 @@ impl<'a> TpProcessRequest<'a> {
     }
 }
 
-pub struct TransactionContext {}
-
-impl TransactionContext {
-    pub fn new() -> TransactionContext {
-        TransactionContext {}
+pub trait TransactionContext {
+    #[deprecated(
+        since = "0.2.0",
+        note = "please use `get_state_entry` or `get_state_entries` instead"
+    )]
+    /// get_state queries the validator state for data at each of the
+    /// addresses in the given list. The addresses that have been set
+    /// are returned. get_state is deprecated, please use get_state_entry or get_state_entries
+    /// instead
+    ///
+    /// # Arguments
+    ///
+    /// * `addresses` - the addresses to fetch
+    fn get_state(&self, addresses: &[String]) -> Result<Vec<(String, Vec<u8>)>, WasmSdkError> {
+        self.get_state_entries(addresses)
     }
-    pub fn get_state(&self, addresses: Vec<String>) -> Result<Option<Vec<u8>>, WasmSdkError> {
+    /// get_state_entry queries the validator state for data at the
+    /// address given. If the address is set, the data is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - the address to fetch
+    fn get_state_entry(&self, address: &str) -> Result<Option<Vec<u8>>, WasmSdkError> {
+        Ok(self
+            .get_state_entries(&[address.to_string()])?
+            .into_iter()
+            .map(|(_, val)| val)
+            .next())
+    }
+
+    /// get_state_entries queries the validator state for data at each of the
+    /// addresses in the given list. The addresses that have been set
+    /// are returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `addresses` - the addresses to fetch
+    fn get_state_entries(
+        &self,
+        addresses: &[String],
+    ) -> Result<Vec<(String, Vec<u8>)>, WasmSdkError>;
+
+    #[deprecated(
+        since = "0.2.0",
+        note = "please use `set_state_entry` or `set_state_entries` instead"
+    )]
+    /// set_state requests that each address in the provided map be
+    /// set in validator state to its corresponding value. set_state is deprecated, please use
+    /// set_state_entry to set_state_entries instead
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - entries are a hashmap where the key is an address and value is the data
+    fn set_state(&self, entries: HashMap<String, Vec<u8>>) -> Result<(), WasmSdkError> {
+        let state_entries: Vec<(String, Vec<u8>)> = entries.into_iter().collect();
+        self.set_state_entries(state_entries)
+    }
+
+    /// set_state_entry requests that the provided address is set in the validator state to its
+    /// corresponding value.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - address of where to store the data
+    /// * `data` - payload is the data to store at the address
+    fn set_state_entry(&self, address: String, data: Vec<u8>) -> Result<(), WasmSdkError> {
+        self.set_state_entries(vec![(address, data)])
+    }
+
+    /// set_state_entries requests that each address in the provided map be
+    /// set in validator state to its corresponding value.
+    ///
+    /// # Arguments
+    ///
+    /// * `entries` - entries are a hashmap where the key is an address and value is the data
+    fn set_state_entries(&self, entries: Vec<(String, Vec<u8>)>) -> Result<(), WasmSdkError>;
+
+    /// delete_state requests that each of the provided addresses be unset
+    /// in validator state. A list of successfully deleted addresses is returned.
+    /// delete_state is deprecated, please use delete_state_entry to delete_state_entries instead
+    ///
+    /// # Arguments
+    ///
+    /// * `addresses` - the addresses to delete
+    #[deprecated(
+        since = "0.2.0",
+        note = "please use `delete_state_entry` or `delete_state_entries` instead"
+    )]
+    fn delete_state(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError> {
+        self.delete_state_entries(addresses)
+    }
+
+    /// delete_state_entry requests that the provided address be unset
+    /// in validator state. A list of successfully deleted addresses
+    /// is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - the address to delete
+    fn delete_state_entry(&self, address: &str) -> Result<Option<String>, WasmSdkError> {
+        Ok(self
+            .delete_state_entries(&[address.to_string()])?
+            .into_iter()
+            .next())
+    }
+
+    /// delete_state_entries requests that each of the provided addresses be unset
+    /// in validator state. A list of successfully deleted addresses
+    /// is returned.
+    ///
+    /// # Arguments
+    ///
+    /// * `addresses` - the addresses to delete
+    fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError>;
+}
+
+pub struct SabreTransactionContext {}
+
+impl SabreTransactionContext {
+    pub fn new() -> SabreTransactionContext {
+        SabreTransactionContext {}
+    }
+}
+
+impl TransactionContext for SabreTransactionContext {
+    fn get_state_entries(
+        &self,
+        addresses: &[String],
+    ) -> Result<Vec<(String, Vec<u8>)>, WasmSdkError> {
         unsafe {
             if addresses.is_empty() {
-                return Err(WasmSdkError::InvalidTransaction(
-                    "No address to delete".into(),
-                ));
+                return Err(WasmSdkError::InvalidTransaction("No address to get".into()));
             }
             let head = &addresses[0];
             let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
@@ -86,34 +206,68 @@ impl TransactionContext {
                     wasm_buffer.into_raw(),
                 );
             }
-            ptr_to_vec(externs::get_state(header_address_buffer.into_raw()))
+
+            let results =
+                WasmBuffer::from_list(externs::get_state(header_address_buffer.into_raw()))?;
+            let mut result_vec = Vec::new();
+
+            if (result_vec.len() % 2) != 0 {
+                return Err(WasmSdkError::InvalidTransaction(
+                    "Get state returned incorrect data fmt".into(),
+                ));
+            }
+
+            for result in results.chunks(2) {
+                let addr = String::from_utf8(result[0].into_bytes())?;
+                result_vec.push((addr, result[1].into_bytes()))
+            }
+            Ok(result_vec)
         }
     }
 
-    pub fn set_state(&self, entries: HashMap<String, Vec<u8>>) -> Result<(), WasmSdkError> {
-        for (address, state) in entries.iter() {
-            unsafe {
-                let wasm_address_buffer = WasmBuffer::new(address.to_string().as_bytes())?;
-                let wasm_state_buffer = WasmBuffer::new(&state)?;
-                let result = externs::set_state(
-                    wasm_address_buffer.into_raw(),
-                    wasm_state_buffer.into_raw(),
+    fn set_state_entries(&self, entries: Vec<(String, Vec<u8>)>) -> Result<(), WasmSdkError> {
+        unsafe {
+            let mut entries_iter = entries.iter();
+            let (head, head_data) = match entries_iter.next() {
+                Some((addr, data)) => (addr, data),
+                None => return Err(WasmSdkError::InvalidTransaction("No entries to set".into())),
+            };
+
+            let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
+            externs::create_collection(header_address_buffer.into_raw());
+
+            let wasm_head_data_buffer = WasmBuffer::new(head_data)?;
+            externs::add_to_collection(
+                header_address_buffer.into_raw(),
+                wasm_head_data_buffer.into_raw(),
+            );
+
+            for (address, data) in entries_iter {
+                let wasm_addr_buffer = WasmBuffer::new(address.as_bytes())?;
+                externs::add_to_collection(
+                    header_address_buffer.into_raw(),
+                    wasm_addr_buffer.into_raw(),
                 );
 
-                if result == 0 {
-                    return Err(WasmSdkError::InvalidTransaction(
-                        "Unable to set state".into(),
-                    ));
-                }
+                let wasm_data_buffer = WasmBuffer::new(data)?;
+                externs::add_to_collection(
+                    header_address_buffer.into_raw(),
+                    wasm_data_buffer.into_raw(),
+                );
+            }
+
+            let result = externs::set_state(header_address_buffer.into_raw());
+
+            if result == 0 {
+                return Err(WasmSdkError::InvalidTransaction(
+                    "Unable to set state".into(),
+                ));
             }
         }
         Ok(())
     }
 
-    pub fn delete_state(
-        &self,
-        addresses: Vec<String>,
-    ) -> Result<Option<Vec<String>>, WasmSdkError> {
+    fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError> {
         unsafe {
             if addresses.is_empty() {
                 return Err(WasmSdkError::InvalidTransaction(
@@ -138,7 +292,7 @@ impl TransactionContext {
                 let addr = String::from_utf8(i.data)?;
                 result_vec.push(addr);
             }
-            Ok(Some(result_vec))
+            Ok(result_vec)
         }
     }
 }
@@ -151,7 +305,7 @@ pub trait TransactionHandler {
     fn apply(
         &self,
         request: &TpProcessRequest,
-        context: &mut TransactionContext,
+        context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError>;
 }
 
@@ -203,7 +357,7 @@ pub unsafe fn execute_entrypoint<F>(
     apply: F,
 ) -> i32
 where
-    F: Fn(&TpProcessRequest, &mut TransactionContext) -> Result<bool, ApplyError>,
+    F: Fn(&TpProcessRequest, &mut dyn TransactionContext) -> Result<bool, ApplyError>,
 {
     let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
         i.into_bytes()
@@ -232,7 +386,7 @@ where
     let mut header = Header::new(signer);
     match apply(
         &TpProcessRequest::new(payload, &mut header, signature),
-        &mut TransactionContext::new(),
+        &mut SabreTransactionContext::new(),
     ) {
         Ok(r) => {
             if r {
