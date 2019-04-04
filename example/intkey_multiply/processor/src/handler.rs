@@ -41,9 +41,6 @@ cfg_if! {
 const MAX_VALUE: u32 = 4294967295;
 const MAX_NAME_LEN: usize = 20;
 
-#[cfg(target_arch = "wasm32")]
-const PIKE_NAMESPACE: &'static str = "cad11d";
-
 /// The smart permission prefix for global state (00ec03)
 #[cfg(target_arch = "wasm32")]
 const SMART_PERMISSION_PREFIX: &'static str = "00ec03";
@@ -547,13 +544,23 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             request.get_header().get_outputs()[0]
         );
 
+        #[cfg(target_arch = "wasm32")]
         let signer = request.get_header().get_signer_public_key();
 
         #[cfg(target_arch = "wasm32")]
-        let result =
-            run_smart_permisson(&mut state, signer, request.get_payload()).map_err(|err| {
-                ApplyError::InvalidTransaction(format!("Unable to run smart permission: {}", err))
-            });
+        let result = match state.get_agent(signer)? {
+            Some(agent) => {
+                run_smart_permisson(signer, request.get_payload(), agent)
+                    .map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
+                            "Unable to run smart permission: {}",
+                            err
+                        ))
+                    })
+            }
+            // If the signer is not an agent, return okay.
+            None => Ok(1),
+        };
 
         #[cfg(target_arch = "wasm32")]
         match result {
@@ -613,22 +620,11 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
 }
 #[cfg(target_arch = "wasm32")]
 fn run_smart_permisson(
-    state: &mut IntkeyState,
     signer: &str,
     payload: &[u8],
+    agent: Agent,
 ) -> Result<i32, ApplyError> {
-    let agent = match state.get_agent(signer)? {
-        Some(agent) => agent,
-        None => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Signer is not an agent: {}",
-                signer
-            )));
-        }
-    };
-
     let org_id = agent.get_org_id();
-
     let smart_permission_addr = compute_smart_permission_address(org_id, "test");
 
     invoke_smart_permission(
