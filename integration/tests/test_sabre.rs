@@ -305,7 +305,7 @@ fn test_sabre() {
     println!("{}", message);
     assert!(message.contains("Contract does not have permission"));
 
-    // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
+    // Test that Sabre will add a permission to the intkey namespace registry to give Intkey
     // Multiply read and write permissions.
     //
     // Send CreateNamespaceRegistryPermissionAction with the following:
@@ -321,7 +321,7 @@ fn test_sabre() {
     };
     assert!(response["data"][0]["status"] == "COMMITTED");
 
-    // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
+    // Test that Sabre will add a permission to the intkey namespace registry to give Intkey
     // Multiply read and write permissions.
     //
     // Send CreateNamespaceRegistryPermissionAction with the following:
@@ -337,7 +337,7 @@ fn test_sabre() {
     };
     assert!(response["data"][0]["status"] == "COMMITTED");
 
-    // Test that Sabre will add a permission to the inktey namespace registry to give Intkey
+    // Test that Sabre will add a permission to the intkey namespace registry to give Intkey
     // Multiply read and write permissions.
     //
     // Send CreateNamespaceRegistryPermissionAction with the following:

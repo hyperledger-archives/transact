@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::boxed::Box;
 use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt;
@@ -148,18 +149,18 @@ const ADD_TO_COLLECTION: usize = 11;
 ///
 const SMART_PERMISSION: usize = 12;
 
-pub struct WasmExternals {
+pub struct WasmExternals<'a> {
     pub memory_ref: MemoryRef,
-    context: TransactionContext,
+    context: &'a mut dyn TransactionContext,
     ptrs: HashMap<u32, Pointer>,
     ptr_collections: HashMap<u32, Vec<u32>>,
     memory_write_offset: u32,
 }
 
-impl WasmExternals {
+impl<'a> WasmExternals<'a> {
     pub fn new(
         memory_ref: Option<MemoryRef>,
-        context: TransactionContext,
+        context: &'a mut dyn TransactionContext,
     ) -> Result<WasmExternals, ExternalsError> {
         let m_ref = if let Some(m) = memory_ref {
             m
@@ -261,10 +262,10 @@ impl WasmExternals {
 
     pub fn get_smart_permission(
         &mut self,
-        address: String,
-        name: String,
+        address: &str,
+        name: &str,
     ) -> Result<Option<SmartPermission>, ExternalsError> {
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(address)?;
         match d {
             Some(packed) => {
                 let smart_permissions: SmartPermissionList =
@@ -292,7 +293,7 @@ impl WasmExternals {
     }
 }
 
-impl Externals for WasmExternals {
+impl<'a> Externals for WasmExternals<'a> {
     fn invoke_index(
         &mut self,
         index: usize,
@@ -316,11 +317,24 @@ impl Externals for WasmExternals {
 
                 let state = self
                     .context
-                    .get_state(addr_vec)
-                    .map_err(ExternalsError::from)?
-                    .unwrap_or(Vec::new());
+                    .get_state_entries(&addr_vec)
+                    .map_err(ExternalsError::from)?;
 
-                let raw_ptr = self.write_data(state)?;
+                let mut ptr_vec = Vec::new();
+                for (addr, data) in state {
+                    let addr_raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
+                    ptr_vec.push(addr_raw_ptr);
+
+                    let data_raw_ptr = self.write_data(data)?;
+                    ptr_vec.push(data_raw_ptr);
+                }
+
+                // collect ptrs or return empty vec
+                let raw_ptr = if ptr_vec.is_empty() {
+                    self.write_data(Vec::new())?
+                } else {
+                    self.collect_ptrs(ptr_vec)?
+                };
 
                 info!(
                     "GET_STATE Execution time: {} secs {} ms",
@@ -331,17 +345,27 @@ impl Externals for WasmExternals {
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
             SET_STATE_IDX => {
-                let addr_ptr: i32 = args.nth(0);
-                let state_ptr: i32 = args.nth(1);
+                let head_ptr: u32 = args.nth(0);
+                let addr_state = match self.ptr_collections.get(&head_ptr) {
+                    Some(addresses) => addresses.clone(),
+                    None => return Ok(Some(RuntimeValue::I32(-1))),
+                };
 
-                let addr = self.ptr_to_string(addr_ptr as u32)?;
-                info!("Attempting to set state, address: {}", addr);
+                // if the length is not even return deserialization error
+                if (addr_state.len() % 2) != 0 {
+                    return Ok(Some(RuntimeValue::I32(-1)));
+                }
 
-                let state = self.ptr_to_vec(state_ptr as u32)?;
-                let mut sets = HashMap::new();
-                sets.insert(addr, state);
+                let mut entries = Vec::new();
+                for entry in addr_state.chunks(2) {
+                    let address = self.ptr_to_string(entry[0]).map_err(ExternalsError::from)?;
+                    let data = self.ptr_to_vec(entry[1])?;
+                    entries.push((address, data));
+                }
 
-                match self.context.set_state(sets) {
+                info!("Attempting to set state, entries: {:?}", entries);
+
+                match self.context.set_state_entries(entries) {
                     Ok(()) => {
                         info!(
                             "SET_STATE Execution time: {} secs {} ms",
@@ -376,9 +400,8 @@ impl Externals for WasmExternals {
                 info!("Attempting to delete state, addresses: {:?}", addr_vec);
                 let result = self
                     .context
-                    .delete_state(addr_vec)
-                    .map_err(ExternalsError::from)?
-                    .unwrap_or(Vec::new());
+                    .delete_state_entries(&addr_vec)
+                    .map_err(ExternalsError::from)?;
 
                 let mut ptr_vec = Vec::new();
                 for addr in result {
@@ -386,7 +409,12 @@ impl Externals for WasmExternals {
                     ptr_vec.push(raw_ptr);
                 }
 
-                let raw_ptr = self.collect_ptrs(ptr_vec)?;
+                // collect ptrs or return empty vec
+                let raw_ptr = if ptr_vec.is_empty() {
+                    self.write_data(Vec::new())?
+                } else {
+                    self.collect_ptrs(ptr_vec)?
+                };
 
                 Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
             }
@@ -509,17 +537,14 @@ impl Externals for WasmExternals {
                 let name = self.ptr_to_string(name as u32)?;
                 let contract_addr = self.ptr_to_string(contract_addr_ptr as u32)?;
 
-                let cloned_context = self.context.clone();
-
-                let contract = if let Some(sp) = self.get_smart_permission(contract_addr, name)? {
+                let contract = if let Some(sp) = self.get_smart_permission(&contract_addr, &name)? {
                     sp
                 } else {
                     return Ok(Some(RuntimeValue::I32(-2)));
                 };
 
                 // Invoke Smart Permission
-
-                let module = SmartPermissionModule::new(contract.get_function(), cloned_context)
+                let mut module = SmartPermissionModule::new(contract.get_function(), self.context)
                     .expect("Failed to create can_add module");
                 let result = module
                     .entrypoint(role_vec, org_id, public_key, payload.to_vec())
@@ -542,7 +567,7 @@ impl Externals for WasmExternals {
     }
 }
 
-impl ModuleImportResolver for WasmExternals {
+impl<'a> ModuleImportResolver for WasmExternals<'a> {
     fn resolve_func(&self, field_name: &str, _signature: &Signature) -> Result<FuncRef, Error> {
         match field_name {
             "get_state" => Ok(FuncInstance::alloc_host(
@@ -550,7 +575,7 @@ impl ModuleImportResolver for WasmExternals {
                 GET_STATE_IDX,
             )),
             "set_state" => Ok(FuncInstance::alloc_host(
-                Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
+                Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
                 SET_STATE_IDX,
             )),
             "delete_state" => Ok(FuncInstance::alloc_host(
@@ -707,28 +732,28 @@ impl From<ContextError> for ExternalsError {
     }
 }
 
-struct SmartPermissionModule {
-    context: TransactionContext,
+struct SmartPermissionModule<'a> {
+    context: &'a mut dyn TransactionContext,
     module: Module,
 }
 
-impl SmartPermissionModule {
+impl<'a> SmartPermissionModule<'a> {
     pub fn new(
         wasm: &[u8],
-        context: TransactionContext,
-    ) -> Result<SmartPermissionModule, ExternalsError> {
+        context: &'a mut dyn TransactionContext,
+    ) -> Result<SmartPermissionModule<'a>, ExternalsError> {
         let module = Module::from_buffer(wasm)?;
         Ok(SmartPermissionModule { context, module })
     }
 
     pub fn entrypoint(
-        &self,
+        &mut self,
         roles: Vec<String>,
         org_id: String,
         public_key: String,
         payload: Vec<u8>,
     ) -> Result<Option<i32>, ExternalsError> {
-        let mut env = WasmExternals::new(None, self.context.clone())?;
+        let mut env = WasmExternals::new(None, self.context)?;
 
         let instance = ModuleInstance::new(
             &self.module,

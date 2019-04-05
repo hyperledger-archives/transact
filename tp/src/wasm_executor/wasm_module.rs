@@ -17,24 +17,27 @@ use sawtooth_sdk::processor::handler::TransactionContext;
 use wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
 use wasm_executor::wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
 
-pub struct WasmModule {
-    context: TransactionContext,
+pub struct WasmModule<'a> {
+    context: &'a mut dyn TransactionContext,
     module: Module,
 }
 
-impl WasmModule {
-    pub fn new(wasm: &[u8], context: TransactionContext) -> Result<WasmModule, ExternalsError> {
+impl<'a> WasmModule<'a> {
+    pub fn new(
+        wasm: &[u8],
+        context: &'a mut dyn TransactionContext,
+    ) -> Result<WasmModule<'a>, ExternalsError> {
         let module = Module::from_buffer(wasm)?;
         Ok(WasmModule { context, module })
     }
 
     pub fn entrypoint(
-        &self,
+        &mut self,
         payload: Vec<u8>,
         signer: String,
         signature: String,
     ) -> Result<Option<i32>, ExternalsError> {
-        let mut env = WasmExternals::new(None, self.context.clone())?;
+        let mut env = WasmExternals::new(None, self.context)?;
 
         let instance = ModuleInstance::new(
             &self.module,

@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 use std;
-use std::collections::HashMap;
 
 use protobuf;
 use protobuf::RepeatedField;
@@ -395,17 +394,21 @@ impl SabreRequestPayload {
 }
 
 pub struct SabreState<'a> {
-    context: &'a mut TransactionContext,
+    context: &'a mut dyn TransactionContext,
 }
 
 impl<'a> SabreState<'a> {
-    pub fn new(context: &'a mut TransactionContext) -> SabreState {
+    pub fn new(context: &'a mut dyn TransactionContext) -> SabreState {
         SabreState { context: context }
+    }
+
+    pub fn context(&mut self) -> &mut dyn TransactionContext {
+        self.context
     }
 
     pub fn get_admin_setting(&mut self) -> Result<Option<Setting>, ApplyError> {
         let address = get_sawtooth_admins_address()?;
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let setting: Setting = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -429,7 +432,7 @@ impl<'a> SabreState<'a> {
         version: &str,
     ) -> Result<Option<Contract>, ApplyError> {
         let address = make_contract_address(name, version)?;
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let contracts: ContractList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -460,7 +463,7 @@ impl<'a> SabreState<'a> {
         new_contract: Contract,
     ) -> Result<(), ApplyError> {
         let address = make_contract_address(name, version)?;
-        let d = self.context.get_state(vec![address.to_string()])?;
+        let d = self.context.get_state_entry(&address)?;
         let mut contract_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(contracts) => contracts,
@@ -501,26 +504,24 @@ impl<'a> SabreState<'a> {
                 )));
             }
         };
-        let mut sets = HashMap::new();
-        sets.insert(address, serialized);
         self.context
-            .set_state(sets)
+            .set_state_entry(address, serialized)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
 
     pub fn delete_contract(&mut self, name: &str, version: &str) -> Result<(), ApplyError> {
         let address = make_contract_address(name, version)?;
-        let d = self.context.delete_state(vec![address.clone()])?;
-        let deleted: Vec<String> = match d {
-            Some(deleted) => deleted.to_vec(),
+        let d = self.context.delete_state_entry(&address)?;
+        let deleted = match d {
+            Some(deleted) => deleted,
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete contract",
                 )));
             }
         };
-        if !deleted.contains(&address) {
+        if deleted != address {
             return Err(ApplyError::InternalError(String::from(
                 "Cannot delete contract",
             )));
@@ -533,7 +534,7 @@ impl<'a> SabreState<'a> {
         name: &str,
     ) -> Result<Option<ContractRegistry>, ApplyError> {
         let address = make_contract_registry_address(name)?;
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let contract_registries: ContractRegistryList =
@@ -564,7 +565,7 @@ impl<'a> SabreState<'a> {
         new_contract_registry: ContractRegistry,
     ) -> Result<(), ApplyError> {
         let address = make_contract_registry_address(name)?;
-        let d = self.context.get_state(vec![address.to_string()])?;
+        let d = self.context.get_state_entry(&address)?;
         let mut contract_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(contract_registries) => contract_registries,
@@ -609,26 +610,24 @@ impl<'a> SabreState<'a> {
                 )));
             }
         };
-        let mut sets = HashMap::new();
-        sets.insert(address, serialized);
         self.context
-            .set_state(sets)
+            .set_state_entry(address, serialized)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
 
     pub fn delete_contract_registry(&mut self, name: &str) -> Result<(), ApplyError> {
         let address = make_contract_registry_address(name)?;
-        let d = self.context.delete_state(vec![address.clone()])?;
-        let deleted: Vec<String> = match d {
-            Some(deleted) => deleted.to_vec(),
+        let d = self.context.delete_state_entry(&address)?;
+        let deleted = match d {
+            Some(deleted) => deleted,
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete contract registry",
                 )));
             }
         };
-        if !deleted.contains(&address) {
+        if deleted != address {
             return Err(ApplyError::InternalError(String::from(
                 "Cannot delete contract registry",
             )));
@@ -641,7 +640,7 @@ impl<'a> SabreState<'a> {
         namespace: &str,
     ) -> Result<Option<NamespaceRegistry>, ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let namespace_registries: NamespaceRegistryList =
@@ -671,7 +670,7 @@ impl<'a> SabreState<'a> {
         namespace: &str,
     ) -> Result<Option<NamespaceRegistryList>, ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let namespace_registries: NamespaceRegistryList =
@@ -696,7 +695,7 @@ impl<'a> SabreState<'a> {
         new_namespace_registry: NamespaceRegistry,
     ) -> Result<(), ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.get_state(vec![address.to_string()])?;
+        let d = self.context.get_state_entry(&address)?;
         let mut namespace_registry_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(namespace_registries) => namespace_registries,
@@ -741,26 +740,24 @@ impl<'a> SabreState<'a> {
                 )));
             }
         };
-        let mut sets = HashMap::new();
-        sets.insert(address, serialized);
         self.context
-            .set_state(sets)
+            .set_state_entry(address, serialized)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
 
     pub fn delete_namespace_registry(&mut self, namespace: &str) -> Result<(), ApplyError> {
         let address = make_namespace_registry_address(namespace)?;
-        let d = self.context.delete_state(vec![address.clone()])?;
-        let deleted: Vec<String> = match d {
-            Some(deleted) => deleted.to_vec(),
+        let d = self.context.delete_state_entry(&address)?;
+        let deleted = match d {
+            Some(deleted) => deleted,
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete namespace registry",
                 )));
             }
         };
-        if !deleted.contains(&address) {
+        if deleted != address {
             return Err(ApplyError::InternalError(String::from(
                 "Cannot delete namespace registry",
             )));
@@ -774,7 +771,7 @@ impl<'a> SabreState<'a> {
         name: &str,
     ) -> Result<Option<SmartPermission>, ApplyError> {
         let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let smart_permissions: SmartPermissionList =
@@ -806,7 +803,7 @@ impl<'a> SabreState<'a> {
         new_smart_permission: SmartPermission,
     ) -> Result<(), ApplyError> {
         let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.get_state(vec![address.clone()])?;
+        let d = self.context.get_state_entry(&address)?;
         let mut smart_permission_list = match d {
             Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
                 Ok(smart_permissions) => smart_permissions,
@@ -851,26 +848,24 @@ impl<'a> SabreState<'a> {
                 )));
             }
         };
-        let mut sets = HashMap::new();
-        sets.insert(address, serialized);
         self.context
-            .set_state(sets)
+            .set_state_entry(address, serialized)
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
         Ok(())
     }
 
     pub fn delete_smart_permission(&mut self, org_id: &str, name: &str) -> Result<(), ApplyError> {
         let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.delete_state(vec![address.clone()])?;
-        let deleted: Vec<String> = match d {
-            Some(deleted) => deleted.to_vec(),
+        let d = self.context.delete_state_entry(&address.clone())?;
+        let deleted = match d {
+            Some(deleted) => deleted,
             None => {
                 return Err(ApplyError::InternalError(String::from(
                     "Cannot delete smart_permission",
                 )));
             }
         };
-        if !deleted.contains(&address) {
+        if deleted != address {
             return Err(ApplyError::InternalError(String::from(
                 "Cannot delete smart_permission",
             )));
@@ -880,7 +875,7 @@ impl<'a> SabreState<'a> {
 
     pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
         let address = compute_org_address(id);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -906,7 +901,7 @@ impl<'a> SabreState<'a> {
 
     pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
         let address = compute_agent_address(public_key);
-        let d = self.context.get_state(vec![address])?;
+        let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
                 let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
@@ -967,7 +962,7 @@ impl TransactionHandler for SabreTransactionHandler {
     fn apply(
         &self,
         request: &TpProcessRequest,
-        context: &mut TransactionContext,
+        context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
         let payload = SabreRequestPayload::new(request.get_payload());
 
@@ -985,7 +980,6 @@ impl TransactionHandler for SabreTransactionHandler {
         };
 
         let signer = request.get_header().get_signer_public_key();
-        let context_clone = context.clone();
         let mut state = SabreState::new(context);
 
         info!(
@@ -1007,7 +1001,6 @@ impl TransactionHandler for SabreTransactionHandler {
                 signer,
                 request.get_signature(),
                 &mut state,
-                context_clone,
             ),
             Action::CreateContractRegistry(create_contract_registry_payload) => {
                 create_contract_registry(create_contract_registry_payload, signer, &mut state)
@@ -1189,12 +1182,11 @@ fn delete_contract(
     state.delete_contract(name, version)
 }
 
-fn execute_contract(
+fn execute_contract<'a>(
     payload: ExecuteContractAction,
     signer: &str,
     signature: &str,
     state: &mut SabreState,
-    context: TransactionContext,
 ) -> Result<(), ApplyError> {
     let name = payload.get_name();
     let version = payload.get_version();
@@ -1330,8 +1322,8 @@ fn execute_contract(
         }
     }
 
-    let module =
-        WasmModule::new(contract.get_contract(), context).expect("Failed to create can_add module");
+    let mut module = WasmModule::new(contract.get_contract(), state.context())
+        .expect("Failed to create can_add module");
 
     let result = module
         .entrypoint(

@@ -31,7 +31,7 @@ Include the Sabre SDK in the dependencies list of the Cargo.toml file.
 .. code-block:: none
 
   [dependencies]
-  sabre-sdk = "^0.1"
+  sabre-sdk = {git = "https://github.com/hyperledger/sawtooth-sabre"}
 
 The Sabre SDK the provides the following required structs needed to write
 a smart contract.
@@ -71,7 +71,7 @@ The apply method should have the following signature.
 
   fn apply(
       request: &TpProcessRequest,
-      context: &mut TransactionContext,
+      context: &mut dyn TransactionContext,
   ) -> Result<bool, ApplyError>
 
 The main function can be empty if you are only writing the smart contract to
@@ -117,11 +117,11 @@ The following is an example for intkey-multiply
 
   [target.'cfg(unix)'.dependencies]
   rust-crypto = "0.2.36"
-  sawtooth_sdk = { git = "https://github.com/hyperledger/sawtooth-core.git" }
+  sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
   rustc-serialize = "0.3.22"
   log = "0.3.0"
   log4rs = "0.7.0"
-  zmq = { git = "https://github.com/erickt/rust-zmq", branch = "release/v0.8" }
+  sawtooth-zmq = "0.8.2-dev5"
 
 
 The main.rs file for the transaction processor should separate out the
@@ -154,6 +154,7 @@ the handler a public module and add an empty main function.
       }
   }
 
+  // Make sure this is here, otherwise the entrypoint is not reachable
   pub mod handler;
 
   #[cfg(target_arch = "wasm32")]
@@ -189,7 +190,7 @@ decorator, so they will only be compiled when compiling into Wasm.
   // Sabre apply must return a bool
   fn apply(
       request: &TpProcessRequest,
-      context: &mut TransactionContext,
+      context: &mut dyn TransactionContext,
   ) -> Result<bool, ApplyError> {
 
       let handler = IntkeyMultiplyTransactionHandler::new();
@@ -566,6 +567,28 @@ explicit namespace read and write permissions to the contract.
    the intkey namespace (``1cf126``). For more information on command options,
    run ``sabre perm --help``.
 
+#. Use ``sabre ns`` to create the namespace registry for pike. Replace
+  ``{owner-key}`` with your public key.
+
+  .. code-block:: console
+
+     # sabre ns --create cad11d --owner {owner-key} --url http://rest-api:9708
+
+  This command specifies the pike namespace prefix (``cad11d``) and defines
+  root as the namespace registry owner.
+  For more information on command options, run ``sabre ns --help``.
+
+#. Use ``sabre perm`` to grant the appropriate namespace permissions for your
+  smart contract.
+
+  .. code-block:: console
+
+     # sabre perm cad11d intkey_multiply --read --url http://rest-api:9708
+
+  This command gives ``intkey-multiply`` read permissions for the pike
+  namespace (``cad11d ``). For more information on command options,
+  run ``sabre perm --help``.
+
 
 Step 7. Execute the Smart Contract
 ----------------------------------
@@ -598,7 +621,8 @@ to check the results.
 
       # sabre exec --contract intkey_multiply:1.0 \
         --payload /project/example/intkey_multiply/cli/payload  \
-        --inputs  1cf126 --outputs  1cf126 --url http://rest-api:9708
+        --inputs  1cf126 --inputs cad11d --outputs  1cf126 \
+        --url http://rest-api:9708
 
    This command submits a transaction to execute the ``intkey_multiply`` smart
    contract, version 1.0, with the specified payload file. The contract's inputs

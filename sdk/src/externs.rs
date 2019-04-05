@@ -17,11 +17,10 @@ pub type WasmPtrList = i32;
 
 #[no_mangle]
 extern "C" {
-    pub fn get_state(addr: WasmPtr) -> WasmPtr;
-    pub fn set_state(addr: WasmPtr, state: WasmPtr) -> i32;
+    pub fn get_state(addresses: WasmPtrList) -> WasmPtrList;
+    pub fn set_state(addr_data: WasmPtrList) -> i32;
     pub fn delete_state(addresses: WasmPtrList) -> WasmPtrList;
     pub fn get_ptr_len(ptr: WasmPtr) -> isize;
-    pub fn get_capacity_len(ptr: WasmPtr) -> isize;
     pub fn alloc(len: usize) -> WasmPtr;
     pub fn read_byte(offset: isize) -> u8;
     pub fn write_byte(ptr: WasmPtr, offset: u32, byte: u8) -> i32;
