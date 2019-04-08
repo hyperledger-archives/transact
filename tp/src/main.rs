@@ -23,7 +23,9 @@ extern crate simple_logger;
 
 mod addressing;
 mod handler;
+mod payload;
 mod protos;
+mod state;
 mod wasm_executor;
 
 use handler::SabreTransactionHandler;
