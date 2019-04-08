@@ -568,27 +568,26 @@ explicit namespace read and write permissions to the contract.
    run ``sabre perm --help``.
 
 #. Use ``sabre ns`` to create the namespace registry for pike. Replace
-  ``{owner-key}`` with your public key.
+   ``{owner-key}`` with your public key.
 
-  .. code-block:: console
+   .. code-block:: console
 
-     # sabre ns --create cad11d --owner {owner-key} --url http://rest-api:9708
+      # sabre ns --create cad11d --owner {owner-key} --url http://rest-api:9708
 
-  This command specifies the pike namespace prefix (``cad11d``) and defines
-  root as the namespace registry owner.
-  For more information on command options, run ``sabre ns --help``.
+   This command specifies the pike namespace prefix (``cad11d``) and defines
+   root as the namespace registry owner.
+   For more information on command options, run ``sabre ns --help``.
 
 #. Use ``sabre perm`` to grant the appropriate namespace permissions for your
-  smart contract.
+   smart contract.
 
-  .. code-block:: console
+   .. code-block:: console
 
      # sabre perm cad11d intkey_multiply --read --url http://rest-api:9708
 
-  This command gives ``intkey-multiply`` read permissions for the pike
-  namespace (``cad11d ``). For more information on command options,
-  run ``sabre perm --help``.
-
+   This command gives ``intkey-multiply`` read permissions for the pike
+   namespace (``cad11d``). For more information on command options,
+   run ``sabre perm --help``.
 
 Step 7. Execute the Smart Contract
 ----------------------------------
