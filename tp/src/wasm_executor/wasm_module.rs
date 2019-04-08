@@ -11,11 +11,11 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-extern crate wasmi;
 
 use sawtooth_sdk::processor::handler::TransactionContext;
-use wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
-use wasm_executor::wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
+use wasmi::{ImportsBuilder, Module, ModuleInstance, RuntimeValue};
+
+use crate::wasm_executor::wasm_externals::{ExternalsError, WasmExternals};
 
 pub struct WasmModule<'a> {
     context: &'a mut dyn TransactionContext,

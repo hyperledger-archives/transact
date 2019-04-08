@@ -12,24 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf::RepeatedField;
-
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
-
-use wasm_executor::wasm_module::WasmModule;
-
+use protobuf::RepeatedField;
 use sawtooth_sdk::messages::processor::TpProcessRequest;
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
 
-use protos::contract::Contract;
-use protos::contract_registry::{ContractRegistry, ContractRegistry_Version};
-use protos::namespace_registry::{
-    NamespaceRegistry, NamespaceRegistry_Permission,
-};
-use protos::payload::{
+use crate::payload::{Action, SabreRequestPayload};
+use crate::protos::contract::Contract;
+use crate::protos::contract_registry::{ContractRegistry, ContractRegistry_Version};
+use crate::protos::namespace_registry::{NamespaceRegistry, NamespaceRegistry_Permission};
+use crate::protos::payload::{
     CreateContractAction, CreateContractRegistryAction, CreateNamespaceRegistryAction,
     CreateNamespaceRegistryPermissionAction, CreateSmartPermissionAction, DeleteContractAction,
     DeleteContractRegistryAction, DeleteNamespaceRegistryAction,
@@ -37,9 +32,9 @@ use protos::payload::{
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
     UpdateSmartPermissionAction,
 };
-use protos::smart_permission::SmartPermission;
-use state::SabreState;
-use payload::{Action, SabreRequestPayload};
+use crate::protos::smart_permission::SmartPermission;
+use crate::state::SabreState;
+use crate::wasm_executor::wasm_module::WasmModule;
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";

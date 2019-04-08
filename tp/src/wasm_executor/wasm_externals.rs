@@ -17,18 +17,18 @@ use std::collections::HashMap;
 use std::error::Error as StdError;
 use std::fmt;
 use std::string::FromUtf8Error;
-
 use std::time::Instant;
 
 use protobuf;
-use protos::smart_permission::{SmartPermission, SmartPermissionList};
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
-use wasm_executor::wasmi::memory_units::Pages;
-use wasm_executor::wasmi::{
+use wasmi::memory_units::Pages;
+use wasmi::{
     Error, Externals, FuncInstance, FuncRef, HostError, ImportsBuilder, MemoryDescriptor,
     MemoryInstance, MemoryRef, Module, ModuleImportResolver, ModuleInstance, RuntimeArgs,
     RuntimeValue, Signature, Trap, TrapKind, ValueType,
 };
+
+use crate::protos::smart_permission::{SmartPermission, SmartPermissionList};
 
 // External function indices
 

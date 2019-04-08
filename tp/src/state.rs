@@ -15,16 +15,15 @@ use sawtooth_sdk::messages::setting::Setting;
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 
-use addressing::{
+use crate::addressing::{
     compute_agent_address, compute_org_address, compute_smart_permission_address,
     get_sawtooth_admins_address, make_contract_address, make_contract_registry_address,
     make_namespace_registry_address,
 };
-
-use protos::contract::{Contract, ContractList};
-use protos::contract_registry::{ContractRegistry, ContractRegistryList};
-use protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList};
-use protos::smart_permission::{
+use crate::protos::contract::{Contract, ContractList};
+use crate::protos::contract_registry::{ContractRegistry, ContractRegistryList};
+use crate::protos::namespace_registry::{NamespaceRegistry, NamespaceRegistryList};
+use crate::protos::smart_permission::{
     Agent, AgentList, Organization, OrganizationList, SmartPermission, SmartPermissionList,
 };
 

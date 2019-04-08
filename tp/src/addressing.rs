@@ -15,7 +15,6 @@
 use crypto::digest::Digest;
 use crypto::sha2::Sha256;
 use crypto::sha2::Sha512;
-
 use sawtooth_sdk::processor::handler::ApplyError;
 
 /// The namespace registry prefix for global state (00ec00)

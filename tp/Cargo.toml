@@ -4,7 +4,8 @@ version = "0.2.0"
 description = "Sawtooth Sabre Transaction Processor"
 authors = ["Cargill Incorporated"]
 build = "build.rs"
-license="Apache-2.0"
+license = "Apache-2.0"
+edition = "2018"
 
 [package.metadata.deb]
 extended-description= """\

@@ -13,7 +13,7 @@
 // limitations under the License.
 use sawtooth_sdk::processor::handler::ApplyError;
 
-use protos::payload::{
+use crate::protos::payload::{
     CreateContractAction, CreateContractRegistryAction, CreateNamespaceRegistryAction,
     CreateNamespaceRegistryPermissionAction, CreateSmartPermissionAction, DeleteContractAction,
     DeleteContractRegistryAction, DeleteNamespaceRegistryAction,
