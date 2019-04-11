@@ -14,16 +14,14 @@
 
 #[macro_use]
 extern crate clap;
-extern crate crypto;
 #[macro_use]
 extern crate log;
-extern crate protobuf;
-extern crate sawtooth_sdk;
-extern crate simple_logger;
 
 mod addressing;
 mod handler;
+mod payload;
 mod protos;
+mod state;
 mod wasm_executor;
 
 use handler::SabreTransactionHandler;
