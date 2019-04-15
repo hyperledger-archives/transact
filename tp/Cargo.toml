@@ -25,6 +25,14 @@ conf-files = [
     "/etc/default/sawtooth-sabre"
 ]
 
+[lib]
+name = "sawtooth_sabre"
+path = "src/lib.rs"
+
+[[bin]]
+name = "sawtooth-sabre"
+path = "src/main.rs"
+
 [dependencies]
 sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
 log = "0.3.8"
