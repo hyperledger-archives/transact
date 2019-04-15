@@ -830,7 +830,11 @@ fn delete_namespace_registry_permission(
     state.set_namespace_registry(namespace, namespace_registry)
 }
 
-pub fn is_admin(signer: &str, org_id: &str, state: &mut SabreState) -> Result<(), ApplyError> {
+pub(crate) fn is_admin(
+    signer: &str,
+    org_id: &str,
+    state: &mut SabreState,
+) -> Result<(), ApplyError> {
     let admin = match state.get_agent(signer) {
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
