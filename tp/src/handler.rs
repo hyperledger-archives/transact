@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+//! Provides a Sawtooth Transaction Handler for executing Sabre transactions.
+
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 use protobuf::RepeatedField;
@@ -45,6 +47,15 @@ const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &'static str = "00ec02";
 
+/// Handles Sabre Transactions
+///
+/// This handler implements the Sawtooth TransactionHandler trait, in order to execute Sabre
+/// transaction payloads.  These payloads include on-chain smart contracts executed in a
+/// WebAssembly virtual machine.
+///
+/// WebAssembly (Wasm) is a stack-based virtual machine newly implemented in major browsers. It is
+/// well-suited for the purposes of smart contract execution due to its sandboxed design, growing
+/// popularity, and tool support.
 pub struct SabreTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
@@ -52,6 +63,7 @@ pub struct SabreTransactionHandler {
 }
 
 impl SabreTransactionHandler {
+    /// Constructs a new SabreTransactionHandler
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
