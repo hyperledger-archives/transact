@@ -14,18 +14,10 @@
 
 #[macro_use]
 extern crate clap;
-#[macro_use]
-extern crate log;
 
-mod addressing;
-mod handler;
-mod payload;
-mod protos;
-mod state;
-mod wasm_executor;
-
-use handler::SabreTransactionHandler;
 use log::LogLevel;
+
+use sawtooth_sabre::handler::SabreTransactionHandler;
 use sawtooth_sdk::processor::TransactionProcessor;
 
 fn main() {
