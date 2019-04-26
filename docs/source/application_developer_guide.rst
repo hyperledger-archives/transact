@@ -94,7 +94,7 @@ dependencies for the smart contract, and dependencies used by both.
 Dependencies used by both should remain under ``[dependencies]``, while smart
 contract dependencies should go under the
 ``[target.'cfg(target_arch = "wasm32")'.dependencies]`` and transaction processors
-dependencies should go under ``[target.'cfg(unix)'.dependencies]``.
+dependencies should go under ``[target.'cfg(not(target_arch = "wasm32"))'.dependencies]``.
 
 The following is an example for intkey-multiply
 
@@ -115,7 +115,7 @@ The following is an example for intkey-multiply
   rust_crypto = {git = "https://github.com/agunde406/rust-crypto", branch="wasm_sha2"}
   sabre-sdk = {path = "../../../sdk"}
 
-  [target.'cfg(unix)'.dependencies]
+  [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
   rust-crypto = "0.2.36"
   sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
   rustc-serialize = "0.3.22"
