@@ -11,6 +11,7 @@ Welcome to Sabre's documentation!
     application_developer_guide.rst
     sabre_cli.rst
     smart_permissions.rst
+    version_compatibility.rst
 
 .. Licensed under Creative Commons Attribution 4.0 International License
 .. https://creativecommons.org/licenses/by/4.0/
