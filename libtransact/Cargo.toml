@@ -24,7 +24,7 @@ openssl = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
 
 [dev-dependencies]
-sawtooth-sdk = "0.1"
+sawtooth-sdk = { git = "https://github.com/hyperledger/sawtooth-sdk-rust" }
 rand_hc = "0.1"
 
 [build-dependencies]
