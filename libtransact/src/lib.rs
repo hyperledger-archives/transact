@@ -23,6 +23,8 @@ pub mod handler;
 pub mod protocol;
 #[allow(renamed_and_removed_lints)]
 pub mod protos;
+#[cfg(feature = "sawtooth-compat")]
+pub mod sawtooth;
 pub mod scheduler;
 pub mod signing;
 pub mod state;
