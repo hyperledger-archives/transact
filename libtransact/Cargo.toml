@@ -3,6 +3,12 @@ name = "transact"
 version = "0.1.0"
 authors = ["Bitwise IO, Inc."]
 edition = "2018"
+license = "Apache-2.0"
+description = """\
+    Transact is a transaction execution platform designed to be used as \
+    a library or component when implementing distributed ledgers, including \
+    blockchains.
+"""
 
 [dependencies]
 hex = "0.3"
