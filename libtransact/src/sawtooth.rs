@@ -226,3 +226,175 @@ fn to_context_error(err: ContextError) -> SawtoothContextError {
     SawtoothContextError::ReceiveError(Box::new(err))
 }
 
+#[cfg(test)]
+mod xo_compat_test {
+    use std::panic;
+    use std::sync::{Arc, Mutex};
+
+    use sawtooth_xo::handler::XoTransactionHandler;
+    use sha2::{Digest, Sha512};
+
+    use crate::context::manager::sync::ContextManager;
+    use crate::database::{btree::BTreeDatabase, Database};
+    use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
+    use crate::protocol::{
+        batch::BatchBuilder,
+        receipt::StateChange,
+        transaction::{HashMethod, TransactionBuilder, TransactionPair},
+    };
+    use crate::scheduler::{serial::SerialScheduler, Scheduler, TransactionExecutionResult};
+    use crate::signing::{hash::HashSigner, Signer};
+    use crate::state::merkle::{self, MerkleRadixTree, MerkleState};
+
+    use super::*;
+
+    static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
+
+    /// Test that the compatibility handler executes a create game transaction.
+    ///
+    /// #. Configure an executor with the XoTransactionHandler
+    /// #. Create a scheduler and add a single transaction to create an XO game
+    /// #. Wait until the result is returned
+    /// #. Verify that the result is a) valid and b) has the appropriate state changes
+    #[test]
+    fn execute_create_xo_game() {
+        let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
+        let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+
+        let executor = create_executor(&context_manager);
+        start_executor(&executor);
+
+        let test_executor = executor.clone();
+
+        let panic_check = panic::catch_unwind(move || {
+            let signer = HashSigner::new();
+
+            let txn_pair = create_txn(&signer, "my_game", "my_game,create,");
+
+            let state_root = initial_db_root(&*db);
+
+            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
+
+            let mut batch_result = {
+                let (result_tx, result_rx) = std::sync::mpsc::channel();
+                scheduler.set_result_callback(Box::new(move |batch_result| {
+                    result_tx
+                        .send(batch_result)
+                        .expect("Unable to send batch result")
+                }));
+
+                let batch_pair = BatchBuilder::new()
+                    .with_transactions(vec![txn_pair.take().0])
+                    .build_pair(&signer)
+                    .expect("Unable to build batch apair");
+
+                scheduler.add_batch(batch_pair);
+                scheduler.finalize();
+
+                run_schedule(&test_executor, &mut scheduler);
+
+                let batch_result = result_rx
+                    .recv()
+                    .expect("Unable to receive result from executor");
+
+                scheduler.shutdown();
+
+                batch_result.expect("Should not have received None from the executor")
+            };
+
+            assert_eq!(1, batch_result.results.len());
+
+            let txn_result = batch_result
+                .results
+                .pop()
+                .expect("Lenght 1, but no first element");
+            let receipt = match txn_result {
+                TransactionExecutionResult::Valid(receipt) => receipt,
+                TransactionExecutionResult::Invalid(invalid_result) => {
+                    panic!("Transaction failed: {:?}", invalid_result)
+                }
+            };
+
+            assert_eq!(
+                vec![StateChange::Set {
+                    key: calculate_game_address("my_game"),
+                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec()
+                }],
+                receipt.state_changes
+            );
+        });
+
+        stop_executor(&executor);
+
+        assert!(panic_check.is_ok());
+    }
+
+    fn create_txn(signer: &Signer, game_name: &str, payload: &str) -> TransactionPair {
+        let game_address = calculate_game_address(game_name);
+        TransactionBuilder::new()
+            .with_batcher_public_key(hex::decode(KEY1).unwrap())
+            .with_family_name("xo".to_string())
+            .with_family_version("1.0".to_string())
+            .with_inputs(vec![hex::decode(&game_address).unwrap()])
+            .with_nonce("test_nonce".as_bytes().to_vec())
+            .with_outputs(vec![hex::decode(&game_address).unwrap()])
+            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload(payload.as_bytes().to_vec())
+            .build_pair(signer)
+            .expect("The TransactionBuilder was not given the correct items")
+    }
+
+    fn create_executor(context_manager: &ContextManager) -> Arc<Mutex<Option<Executor>>> {
+        Arc::new(Mutex::new(Some(Executor::new(vec![Box::new(
+            StaticExecutionAdapter::new_adapter(
+                vec![Box::new(SawtoothToTransactHandlerAdapter::new(
+                    XoTransactionHandler::new(),
+                ))],
+                context_manager.clone(),
+            )
+            .expect("Unable to create static execution adapter"),
+        )]))))
+    }
+
+    fn start_executor(executor: &Arc<Mutex<Option<Executor>>>) {
+        executor
+            .lock()
+            .expect("Should not have poisoned the lock")
+            .as_mut()
+            .expect("Should not be None")
+            .start()
+            .expect("Start should not have failed");
+    }
+
+    fn run_schedule(executor: &Arc<Mutex<Option<Executor>>>, scheduler: &mut dyn Scheduler) {
+        executor
+            .lock()
+            .expect("Should not have poisoned the lock")
+            .as_ref()
+            .expect("Should not be None")
+            .execute(scheduler.take_task_iterator(), scheduler.new_notifier())
+            .expect("Failed to execute schedule");
+    }
+
+    fn stop_executor(executor: &Arc<Mutex<Option<Executor>>>) {
+        let stoppable = executor
+            .lock()
+            .expect("Should not have poisoned the lock")
+            .take()
+            .expect("Should not be None");
+        stoppable.stop();
+    }
+
+    fn calculate_game_address<S: AsRef<[u8]>>(name: S) -> String {
+        let mut sha = Sha512::default();
+        sha.input(name);
+        "5b7349".to_owned() + &hex::encode(&sha.result())[..64]
+    }
+
+    fn initial_db_root(db: &dyn Database) -> String {
+        let merkle_db =
+            MerkleRadixTree::new(db.clone_box(), None).expect("Cannot initialize merkle database");
+
+        merkle_db.get_merkle_root()
+    }
+}

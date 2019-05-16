@@ -26,6 +26,7 @@ sawtooth-sdk = { git = "https://github.com/hyperledger/sawtooth-sdk-rust", optio
 
 [dev-dependencies]
 rand_hc = "0.1"
+sawtooth-xo = { git = "https://github.com/hyperledger/sawtooth-sdk-rust" }
 
 [build-dependencies]
 protoc-rust = "2"
