@@ -29,7 +29,7 @@ use std::error::Error as StdError;
 /// A `StateChange` represents the basic level of changes that can be applied to
 /// values in state.  This covers the setting of a key/value pair, or the
 /// deletion of a key.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StateChange {
     Set { key: String, value: Vec<u8> },
     Delete { key: String },
