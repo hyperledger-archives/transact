@@ -265,7 +265,10 @@ mod tests {
     use super::*;
     use crate::signing::hash::HashSigner;
     use crate::signing::Signer;
+    #[cfg(feature = "sawtooth-compat")]
     use protobuf::Message;
+
+    #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
     static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
@@ -389,6 +392,7 @@ mod tests {
         assert_eq!(original.transaction_ids(), header.transaction_ids());
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn batch_header_sawtooth10_compatibility() {
         // Create protobuf bytes using the Sawtooth SDK
@@ -438,6 +442,7 @@ mod tests {
         assert_eq!(true, batch.trace());
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn batch_sawtooth10_compatibility() {}
 }
