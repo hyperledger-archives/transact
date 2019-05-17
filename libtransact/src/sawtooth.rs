@@ -238,17 +238,17 @@ mod xo_compat_test {
     use crate::database::{btree::BTreeDatabase, Database};
     use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
     use crate::protocol::{
-        batch::BatchBuilder,
+        batch::{BatchBuilder, BatchPair},
         receipt::StateChange,
-        transaction::{HashMethod, TransactionBuilder, TransactionPair},
+        transaction::{HashMethod, TransactionBuilder},
     };
-    use crate::scheduler::{serial::SerialScheduler, Scheduler, TransactionExecutionResult};
+    use crate::scheduler::{
+        serial::SerialScheduler, BatchExecutionResult, Scheduler, TransactionExecutionResult,
+    };
     use crate::signing::{hash::HashSigner, Signer};
     use crate::state::merkle::{self, MerkleRadixTree, MerkleState};
 
     use super::*;
-
-    static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
 
     /// Test that the compatibility handler executes a create game transaction.
     ///
@@ -269,58 +269,37 @@ mod xo_compat_test {
         let panic_check = panic::catch_unwind(move || {
             let signer = HashSigner::new();
 
-            let txn_pair = create_txn(&signer, "my_game", "my_game,create,");
+            let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
 
             let state_root = initial_db_root(&*db);
 
             let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
 
-            let mut batch_result = {
-                let (result_tx, result_rx) = std::sync::mpsc::channel();
-                scheduler.set_result_callback(Box::new(move |batch_result| {
-                    result_tx
-                        .send(batch_result)
-                        .expect("Unable to send batch result")
-                }));
+            let (result_tx, result_rx) = std::sync::mpsc::channel();
+            scheduler.set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }));
 
-                let batch_pair = BatchBuilder::new()
-                    .with_transactions(vec![txn_pair.take().0])
-                    .build_pair(&signer)
-                    .expect("Unable to build batch apair");
+            scheduler.add_batch(batch_pair);
+            scheduler.finalize();
 
-                scheduler.add_batch(batch_pair);
-                scheduler.finalize();
+            run_schedule(&test_executor, &mut scheduler);
 
-                run_schedule(&test_executor, &mut scheduler);
+            let batch_result = result_rx
+                .recv()
+                .expect("Unable to receive result from executor")
+                .expect("Should not have received None from the executor");
 
-                let batch_result = result_rx
-                    .recv()
-                    .expect("Unable to receive result from executor");
+            scheduler.shutdown();
 
-                scheduler.shutdown();
-
-                batch_result.expect("Should not have received None from the executor")
-            };
-
-            assert_eq!(1, batch_result.results.len());
-
-            let txn_result = batch_result
-                .results
-                .pop()
-                .expect("Lenght 1, but no first element");
-            let receipt = match txn_result {
-                TransactionExecutionResult::Valid(receipt) => receipt,
-                TransactionExecutionResult::Invalid(invalid_result) => {
-                    panic!("Transaction failed: {:?}", invalid_result)
-                }
-            };
-
-            assert_eq!(
+            assert_state_changes(
                 vec![StateChange::Set {
                     key: calculate_game_address("my_game"),
-                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec()
+                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
                 }],
-                receipt.state_changes
+                batch_result,
             );
         });
 
@@ -329,10 +308,111 @@ mod xo_compat_test {
         assert!(panic_check.is_ok());
     }
 
-    fn create_txn(signer: &Signer, game_name: &str, payload: &str) -> TransactionPair {
+    ///
+    /// Test that the compatibility handler executes multiple transactions and returns the correct
+    /// receipts with the expected state changes.
+    ///
+    /// #. Configure an executor with the XoTransactionHandler
+    /// #. Create a scheduler and add transactions to create an XO game and take a space
+    /// #. Wait until the result is returned
+    /// #. Verify that the result is a) valid and b) has the appropriate state changes
+    #[test]
+    fn execute_multiple_xo_transactions() {
+        let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
+        let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+
+        let executor = create_executor(&context_manager);
+        start_executor(&executor);
+
+        let test_executor = executor.clone();
+
+        let panic_check = panic::catch_unwind(move || {
+            let signer = HashSigner::new();
+
+            let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+            let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
+
+            let state_root = initial_db_root(&*db);
+
+            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
+
+            let (result_tx, result_rx) = std::sync::mpsc::channel();
+            scheduler.set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }));
+
+            scheduler.add_batch(create_batch_pair);
+            scheduler.add_batch(take_batch_pair);
+            scheduler.finalize();
+
+            run_schedule(&test_executor, &mut scheduler);
+
+            let create_batch_result = result_rx
+                .recv()
+                .expect("Unable to receive result from executor")
+                .expect("Should not have received None from the executor");
+
+            let take_batch_result = result_rx
+                .recv()
+                .expect("Unable to receive result from executor")
+                .expect("Should not have received None from the executor");
+
+            scheduler.shutdown();
+
+            assert_state_changes(
+                vec![StateChange::Set {
+                    key: calculate_game_address("my_game"),
+                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
+                }],
+                create_batch_result,
+            );
+
+            assert_state_changes(
+                vec![StateChange::Set {
+                    key: calculate_game_address("my_game"),
+                    value: format!(
+                        "my_game,X--------,P2-NEXT,{},",
+                        hex::encode(signer.public_key())
+                    )
+                    .into_bytes(),
+                }],
+                take_batch_result,
+            );
+        });
+
+        stop_executor(&executor);
+
+        assert!(panic_check.is_ok());
+    }
+
+    fn assert_state_changes(
+        expected_state_changes: Vec<StateChange>,
+        batch_result: BatchExecutionResult,
+    ) {
+        assert_eq!(1, batch_result.results.len());
+
+        let mut batch_result = batch_result;
+
+        let txn_result = batch_result
+            .results
+            .pop()
+            .expect("Length 1, but no first element");
+        let receipt = match txn_result {
+            TransactionExecutionResult::Valid(receipt) => receipt,
+            TransactionExecutionResult::Invalid(invalid_result) => {
+                panic!("Transaction failed: {:?}", invalid_result)
+            }
+        };
+
+        assert_eq!(expected_state_changes, receipt.state_changes);
+    }
+
+    fn create_batch(signer: &Signer, game_name: &str, payload: &str) -> BatchPair {
         let game_address = calculate_game_address(game_name);
-        TransactionBuilder::new()
-            .with_batcher_public_key(hex::decode(KEY1).unwrap())
+        let txn_pair = TransactionBuilder::new()
+            .with_batcher_public_key(signer.public_key().to_vec())
             .with_family_name("xo".to_string())
             .with_family_version("1.0".to_string())
             .with_inputs(vec![hex::decode(&game_address).unwrap()])
@@ -341,7 +421,12 @@ mod xo_compat_test {
             .with_payload_hash_method(HashMethod::SHA512)
             .with_payload(payload.as_bytes().to_vec())
             .build_pair(signer)
-            .expect("The TransactionBuilder was not given the correct items")
+            .expect("The TransactionBuilder was not given the correct items");
+
+        BatchBuilder::new()
+            .with_transactions(vec![txn_pair.take().0])
+            .build_pair(signer)
+            .expect("Unable to build batch a pair")
     }
 
     fn create_executor(context_manager: &ContextManager) -> Arc<Mutex<Option<Executor>>> {
