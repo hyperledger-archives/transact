@@ -14,6 +14,7 @@
 extern crate protobuf;
 
 mod externs;
+pub mod log;
 
 pub use externs::{WasmPtr, WasmPtrList};
 use std::collections::HashMap;
