@@ -157,7 +157,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         // calculate the value followed by the actual bytes for the number.
         if number > 23 {
             number = number - 23;
-            let mut value = match number {
+            let value = match number {
                 // two bytes
                 1 => {
                     let value = hex_string.get(start..start + 2).ok_or_else(|| {
