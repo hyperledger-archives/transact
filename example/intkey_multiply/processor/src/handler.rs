@@ -549,13 +549,12 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         #[cfg(target_arch = "wasm32")]
         let result = match state.get_agent(signer)? {
             Some(agent) => {
-                run_smart_permisson(signer, request.get_payload(), agent)
-                    .map_err(|err| {
-                        ApplyError::InvalidTransaction(format!(
-                            "Unable to run smart permission: {}",
-                            err
-                        ))
-                    })
+                run_smart_permisson(signer, request.get_payload(), agent).map_err(|err| {
+                    ApplyError::InvalidTransaction(format!(
+                        "Unable to run smart permission: {}",
+                        err
+                    ))
+                })
             }
             // If the signer is not an agent, return okay.
             None => Ok(1),
@@ -618,11 +617,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
     }
 }
 #[cfg(target_arch = "wasm32")]
-fn run_smart_permisson(
-    signer: &str,
-    payload: &[u8],
-    agent: Agent,
-) -> Result<i32, ApplyError> {
+fn run_smart_permisson(signer: &str, payload: &[u8], agent: Agent) -> Result<i32, ApplyError> {
     let org_id = agent.get_org_id();
     let smart_permission_addr = compute_smart_permission_address(org_id, "test");
 
