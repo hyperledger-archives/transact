@@ -121,7 +121,6 @@ The following is an example for intkey-multiply
   rustc-serialize = "0.3.22"
   log = "0.3.0"
   log4rs = "0.7.0"
-  sawtooth-zmq = "0.8.2-dev5"
 
 
 The main.rs file for the transaction processor should separate out the
