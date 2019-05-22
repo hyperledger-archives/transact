@@ -16,6 +16,7 @@ extern crate cfg_if;
 extern crate hex;
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
+        #[macro_use]
         extern crate sabre_sdk;
     } else {
         #[macro_use]

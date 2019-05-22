@@ -534,7 +534,6 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             }
         };
         let mut state = IntkeyState::new(context);
-        #[cfg(not(target_arch = "wasm32"))]
         info!(
             "payload: {} {} {} {} {}",
             payload.get_name_a(),
