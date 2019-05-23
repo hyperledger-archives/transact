@@ -121,7 +121,6 @@ The following is an example for intkey-multiply
   rustc-serialize = "0.3.22"
   log = "0.3.0"
   log4rs = "0.7.0"
-  sawtooth-zmq = "0.8.2-dev5"
 
 
 The main.rs file for the transaction processor should separate out the
@@ -135,6 +134,7 @@ the handler a public module and add an empty main function.
 
   cfg_if! {
       if #[cfg(target_arch = "wasm32")] {
+          #[macro_use]
           extern crate sabre_sdk;
       } else {
           #[macro_use]

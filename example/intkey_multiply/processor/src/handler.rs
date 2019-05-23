@@ -157,7 +157,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         // calculate the value followed by the actual bytes for the number.
         if number > 23 {
             number = number - 23;
-            let mut value = match number {
+            let value = match number {
                 // two bytes
                 1 => {
                     let value = hex_string.get(start..start + 2).ok_or_else(|| {
@@ -534,7 +534,6 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             }
         };
         let mut state = IntkeyState::new(context);
-        #[cfg(not(target_arch = "wasm32"))]
         info!(
             "payload: {} {} {} {} {}",
             payload.get_name_a(),
@@ -550,13 +549,12 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         #[cfg(target_arch = "wasm32")]
         let result = match state.get_agent(signer)? {
             Some(agent) => {
-                run_smart_permisson(signer, request.get_payload(), agent)
-                    .map_err(|err| {
-                        ApplyError::InvalidTransaction(format!(
-                            "Unable to run smart permission: {}",
-                            err
-                        ))
-                    })
+                run_smart_permisson(signer, request.get_payload(), agent).map_err(|err| {
+                    ApplyError::InvalidTransaction(format!(
+                        "Unable to run smart permission: {}",
+                        err
+                    ))
+                })
             }
             // If the signer is not an agent, return okay.
             None => Ok(1),
@@ -619,11 +617,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
     }
 }
 #[cfg(target_arch = "wasm32")]
-fn run_smart_permisson(
-    signer: &str,
-    payload: &[u8],
-    agent: Agent,
-) -> Result<i32, ApplyError> {
+fn run_smart_permisson(signer: &str, payload: &[u8], agent: Agent) -> Result<i32, ApplyError> {
     let org_id = agent.get_org_id();
     let smart_permission_addr = compute_smart_permission_address(org_id, "test");
 
