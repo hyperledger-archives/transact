@@ -21,7 +21,7 @@
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
-use crate::context::manager::sync::ContextManager;
+use crate::context::manager::thread::ContextManager;
 use crate::context::manager::ContextManagerError;
 use crate::context::ContextId;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionOperationError};
@@ -231,7 +231,7 @@ impl<'a, 'b> TransactionContext for StaticContext<'a, 'b> {
         addresses: &[String],
     ) -> Result<Vec<(String, Vec<u8>)>, ContextError> {
         self.context_manager
-            .get(self.context_id, addresses)
+            .get_state(self.context_id, addresses)
             .map_err(ContextError::from)
     }
 
@@ -301,7 +301,7 @@ mod test {
     };
     use std::time;
 
-    use crate::context::ContextLifecycle;
+    use crate::context::manager::thread::ContextManagerJoinHandle;
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
@@ -325,7 +325,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -340,7 +340,9 @@ mod test {
             create_bytes_entry(vec![("abc".into(), b"abc".to_vec())]),
         ))]);
         let txn_id = txn_pair.transaction().header_signature().into();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to create Context");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -361,10 +363,10 @@ mod test {
         assert_eq!(
             vec![("abc".to_owned(), b"abc".to_vec())],
             context_manager
-                .get(&context_id, &["abc".to_owned()])
-                .unwrap()
+                .get_state(&context_id, &["abc".to_owned()])
+                .expect("Unable to get state")
         );
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -375,8 +377,7 @@ mod test {
 
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
-
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -393,7 +394,9 @@ mod test {
         ]);
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to create Context");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -419,6 +422,7 @@ mod test {
             result.unwrap()
         );
 
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -430,7 +434,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -448,7 +452,9 @@ mod test {
             )),
         ]);
 
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to get Context ID");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -463,7 +469,7 @@ mod test {
         let result = recv.recv().unwrap();
 
         assert!(result.is_err());
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -475,7 +481,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -495,7 +501,9 @@ mod test {
             Command::DeleteState(DeleteState::new(vec!["abc".into()])),
         ]);
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to get Context ID");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -515,11 +523,11 @@ mod test {
         );
         assert_eq!(
             context_manager
-                .get(&context_id, &["abc".to_owned()])
-                .unwrap(),
+                .get_state(&context_id, &["abc".to_owned()])
+                .expect("UNable to get state"),
             vec![],
         );
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -531,7 +539,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -545,7 +553,9 @@ mod test {
         let txn_pair =
             make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::BusyWait))]);
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to get Context ID");
 
         let time_before_execution = time::Instant::now();
 
@@ -568,7 +578,7 @@ mod test {
             ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
             result.unwrap()
         );
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -580,7 +590,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -594,7 +604,9 @@ mod test {
         let txn_pair =
             make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::Wait))]);
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to get Context ID");
 
         let time_before_execution = time::Instant::now();
 
@@ -617,7 +629,7 @@ mod test {
             ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
             result.unwrap()
         );
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -630,7 +642,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -656,7 +668,9 @@ mod test {
             )]))),
         ]);
 
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to create Context");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -674,16 +688,16 @@ mod test {
         assert_eq!(
             vec![("abc".to_owned(), b"abc".to_vec())],
             context_manager
-                .get(&context_id, &["abc".to_owned()])
-                .unwrap(),
+                .get_state(&context_id, &["abc".to_owned()])
+                .expect("Unable to get state"),
         );
         assert_eq!(
             context_manager
-                .get(&context_id, &["def".to_owned()])
-                .unwrap(),
+                .get_state(&context_id, &["def".to_owned()])
+                .expect("Unable to get state"),
             vec![],
         );
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -695,7 +709,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -725,7 +739,9 @@ mod test {
             )),
         ]);
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to get create Context");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -746,7 +762,7 @@ mod test {
 
         let txn_receipt = context_manager
             .get_transaction_receipt(&context_id, &txn_id)
-            .unwrap();
+            .expect("Unable to create transaction receipt");
         let events = txn_receipt.events;
         let first_event = events.first().unwrap();
         assert_eq!(first_event.event_type, "First event".to_string());
@@ -769,7 +785,7 @@ mod test {
             ]
         );
         assert_eq!(second_event.data, b"def".to_vec());
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
@@ -781,7 +797,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -798,7 +814,9 @@ mod test {
         ]);
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
-        let context_id = context_manager.create_context(&[], &state_id);
+        let context_id = context_manager
+            .create_context(&[], &state_id)
+            .expect("Unable to create Context");
 
         let (send, recv) = std::sync::mpsc::channel();
         assert!(static_adapter
@@ -819,11 +837,11 @@ mod test {
 
         let txn_receipt = context_manager
             .get_transaction_receipt(&context_id, &txn_id)
-            .unwrap();
+            .expect("Unable to create transaction receipt");
         let receipt_data = txn_receipt.data;
         assert_eq!(receipt_data.first().unwrap(), &b"abc".to_vec());
         assert_eq!(receipt_data.last().unwrap(), &b"def".to_vec());
-
+        assert!(join_handle.shutdown().is_ok());
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
