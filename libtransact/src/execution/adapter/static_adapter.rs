@@ -301,7 +301,7 @@ mod test {
     };
     use std::time;
 
-    use crate::context::manager::thread::ContextManagerJoinHandle;
+    use crate::context::{manager::thread::ContextManagerJoinHandle, ContextLifecycle};
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,

@@ -28,7 +28,8 @@ use std::sync::mpsc;
 use std::sync::mpsc::{RecvError, Sender};
 
 use crate::context::error::ContextManagerError;
-use crate::context::{manager::thread::core::ContextOperationResult, ContextId};
+use crate::context::manager::thread::core::ContextOperationResult;
+use crate::context::{ContextId, ContextLifecycle};
 use crate::protocol::receipt::{Event, TransactionReceipt};
 
 /// A ContextManager which interacts with a threaded version of the ContextManager operations.
@@ -42,80 +43,6 @@ impl ContextManager {
     fn new(sender: Sender<ContextOperationMessage>) -> Self {
         ContextManager {
             core_sender: sender,
-        }
-    }
-
-    /// Returns a ContextId of the newly created Context.
-    pub fn create_context(
-        &mut self,
-        dependent_contexts: &[ContextId],
-        state_id: &str,
-    ) -> Result<ContextId, ContextManagerError> {
-        let (handler_sender, handler_receiver) = mpsc::channel();
-
-        match self
-            .core_sender
-            .send(ContextOperationMessage::CreateContext {
-                dependent_contexts: dependent_contexts.to_vec(),
-                state_id: state_id.to_string(),
-                handler_sender,
-            }) {
-            Ok(_) => {
-                if let ContextOperationResponse::ValidResult {
-                    result: Some(ContextOperationResult::CreateContext { context_id }),
-                } = handler_receiver.recv()?
-                {
-                    Ok(context_id)
-                } else {
-                    Err(ContextManagerError::InternalError(Box::new(
-                        ContextManagerCoreError::CoreReceiveError(RecvError),
-                    )))
-                }
-            }
-            Err(err) => Err(ContextManagerError::InternalError(Box::new(
-                ContextManagerCoreError::HandlerSendError(err),
-            ))),
-        }
-    }
-
-    /// Drops the specified context from the ContextManager.
-    pub fn drop_context(&mut self, _context_id: ContextId) {
-        unimplemented!();
-    }
-
-    /// Returns a TransactionReceipt based on the specified context.
-    pub fn get_transaction_receipt(
-        &self,
-        context_id: &ContextId,
-        transaction_id: &str,
-    ) -> Result<TransactionReceipt, ContextManagerError> {
-        let (handler_sender, handler_receiver) = mpsc::channel();
-
-        match self
-            .core_sender
-            .send(ContextOperationMessage::GetTransactionReceipt {
-                context_id: *context_id,
-                transaction_id: transaction_id.to_string(),
-                handler_sender,
-            }) {
-            Ok(_) => {
-                if let ContextOperationResponse::ValidResult {
-                    result:
-                        Some(ContextOperationResult::GetTransactionReceipt {
-                            transaction_receipt,
-                        }),
-                } = handler_receiver.recv()?
-                {
-                    Ok(transaction_receipt)
-                } else {
-                    Err(ContextManagerError::InternalError(Box::new(
-                        ContextManagerCoreError::CoreReceiveError(RecvError),
-                    )))
-                }
-            }
-            Err(err) => Err(ContextManagerError::InternalError(Box::new(
-                ContextManagerCoreError::HandlerSendError(err),
-            ))),
         }
     }
 
@@ -261,6 +188,82 @@ impl ContextManager {
                     handler_receiver.recv()?
                 {
                     Ok(())
+                } else {
+                    Err(ContextManagerError::InternalError(Box::new(
+                        ContextManagerCoreError::CoreReceiveError(RecvError),
+                    )))
+                }
+            }
+            Err(err) => Err(ContextManagerError::InternalError(Box::new(
+                ContextManagerCoreError::HandlerSendError(err),
+            ))),
+        }
+    }
+}
+
+impl ContextLifecycle for ContextManager {
+    /// Creates a new context, returning the resulting ContextId.
+    fn create_context(
+        &mut self,
+        dependent_contexts: &[ContextId],
+        state_id: &str,
+    ) -> Result<ContextId, ContextManagerError> {
+        let (handler_sender, handler_receiver) = mpsc::channel();
+
+        match self
+            .core_sender
+            .send(ContextOperationMessage::CreateContext {
+                dependent_contexts: dependent_contexts.to_vec(),
+                state_id: state_id.to_string(),
+                handler_sender,
+            }) {
+            Ok(_) => {
+                if let ContextOperationResponse::ValidResult {
+                    result: Some(ContextOperationResult::CreateContext { context_id }),
+                } = handler_receiver.recv()?
+                {
+                    Ok(context_id)
+                } else {
+                    Err(ContextManagerError::InternalError(Box::new(
+                        ContextManagerCoreError::CoreReceiveError(RecvError),
+                    )))
+                }
+            }
+            Err(err) => Err(ContextManagerError::InternalError(Box::new(
+                ContextManagerCoreError::HandlerSendError(err),
+            ))),
+        }
+    }
+
+    /// Drops the specified context from the ContextManager.
+    fn drop_context(&mut self, _context_id: ContextId) {
+        unimplemented!();
+    }
+
+    ///Creates a TransactionReceipt based on the information available within the specified Context.
+    fn get_transaction_receipt(
+        &self,
+        context_id: &ContextId,
+        transaction_id: &str,
+    ) -> Result<TransactionReceipt, ContextManagerError> {
+        let (handler_sender, handler_receiver) = mpsc::channel();
+
+        match self
+            .core_sender
+            .send(ContextOperationMessage::GetTransactionReceipt {
+                context_id: *context_id,
+                transaction_id: transaction_id.to_string(),
+                handler_sender,
+            }) {
+            Ok(_) => {
+                if let ContextOperationResponse::ValidResult {
+                    result:
+                        Some(ContextOperationResult::GetTransactionReceipt {
+                            transaction_receipt,
+                        }),
+                } = handler_receiver.recv()?
+                {
+                    Ok(transaction_receipt)
                 } else {
                     Err(ContextManagerError::InternalError(Box::new(
                         ContextManagerCoreError::CoreReceiveError(RecvError),
