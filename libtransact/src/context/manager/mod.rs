@@ -34,10 +34,14 @@ pub struct ContextManager {
 
 impl ContextLifecycle for ContextManager {
     /// Creates a Context, and returns the resulting ContextId.
-    fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId {
+    fn create_context(
+        &mut self,
+        dependent_contexts: &[ContextId],
+        state_id: &str,
+    ) -> Result<ContextId, ContextManagerError> {
         let new_context = Context::new(state_id, dependent_contexts.to_vec());
         self.contexts.insert(*new_context.id(), new_context.clone());
-        *new_context.id()
+        Ok(*new_context.id())
     }
 
     fn drop_context(&mut self, _context_id: ContextId) {
@@ -287,11 +291,11 @@ mod tests {
     #[test]
     fn create_contexts() {
         let (mut manager, state_id) = make_manager(None);
-        let first_context_id = manager.create_context(&[], &state_id);
+        let first_context_id = manager.create_context(&[], &state_id).unwrap();
         assert!(!manager.contexts.is_empty());
         assert!(manager.contexts.get(&first_context_id).is_some());
 
-        let second_context_id = manager.create_context(&[], &state_id);
+        let second_context_id = manager.create_context(&[], &state_id).unwrap();
         let second_context = manager.get_context(&second_context_id).unwrap();
         assert_eq!(&second_context_id, second_context.id());
         assert_eq!(manager.contexts.len(), 2);
@@ -300,7 +304,7 @@ mod tests {
     #[test]
     fn add_context_event() {
         let (mut manager, state_id) = make_manager(None);
-        let context_id = manager.create_context(&[], &state_id);
+        let context_id = manager.create_context(&[], &state_id).unwrap();
         let event = EventBuilder::new()
             .with_event_type(EVENT_TYPE1.to_string())
             .with_attributes(vec![
@@ -319,7 +323,7 @@ mod tests {
     #[test]
     fn add_context_data() {
         let (mut manager, state_id) = make_manager(None);
-        let context_id = manager.create_context(&[], &state_id);
+        let context_id = manager.create_context(&[], &state_id).unwrap();
 
         let data_add_result = manager.add_data(&context_id, BYTES2.to_vec());
         let context = manager.get_context(&context_id).unwrap();
@@ -331,7 +335,7 @@ mod tests {
     fn create_transaction_receipt() {
         let (mut manager, state_id) = make_manager(None);
 
-        let context_id = manager.create_context(&[], &state_id);
+        let context_id = manager.create_context(&[], &state_id).unwrap();
         let mut context = manager.get_context(&context_id).unwrap();
         assert_eq!(&context_id, context.id());
 
@@ -370,7 +374,7 @@ mod tests {
     fn add_set_state_change() {
         let (mut manager, state_id) = make_manager(None);
 
-        let context_id = manager.create_context(&[], &state_id);
+        let context_id = manager.create_context(&[], &state_id).unwrap();
 
         let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
         assert!(set_result.is_ok());
@@ -390,13 +394,15 @@ mod tests {
             value: BYTES1.to_vec(),
         }];
         let (mut manager, state_id) = make_manager(Some(state_changes));
-        let ancestor_context = manager.create_context(&[], &state_id);
+        let ancestor_context = manager.create_context(&[], &state_id).unwrap();
 
         assert!(manager
             .set_state(&ancestor_context, KEY2.to_string(), BYTES2.to_vec())
             .is_ok());
 
-        let current_context_id = manager.create_context(&[ancestor_context], &state_id);
+        let current_context_id = manager
+            .create_context(&[ancestor_context], &state_id)
+            .unwrap();
         assert!(manager
             .set_state(&current_context_id, KEY3.to_string(), BYTES3.to_vec())
             .is_ok());
@@ -430,11 +436,13 @@ mod tests {
             value: BYTES1.to_vec(),
         }];
         let (mut manager, state_id) = make_manager(Some(state_changes));
-        let ancestor_context = manager.create_context(&[], &state_id);
+        let ancestor_context = manager.create_context(&[], &state_id).unwrap();
         let add_result = manager.set_state(&ancestor_context, KEY2.to_string(), BYTES2.to_vec());
         assert!(add_result.is_ok());
 
-        let context_id = manager.create_context(&[ancestor_context], &state_id);
+        let context_id = manager
+            .create_context(&[ancestor_context], &state_id)
+            .unwrap();
 
         // Validates the result from adding the state change to the Context within the ContextManager.
         assert!(manager

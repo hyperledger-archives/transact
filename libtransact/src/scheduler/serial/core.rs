@@ -236,8 +236,8 @@ impl SchedulerCore {
         let context_id = match self.previous_context {
             Some(previous_context_id) => self
                 .context_lifecycle
-                .create_context(&[previous_context_id], &self.state_id),
-            None => self.context_lifecycle.create_context(&[], &self.state_id),
+                .create_context(&[previous_context_id], &self.state_id)?,
+            None => self.context_lifecycle.create_context(&[], &self.state_id)?,
         };
 
         self.current_txn = Some(transaction_pair.transaction().header_signature().into());

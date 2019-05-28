@@ -146,12 +146,18 @@ impl ContextManagerCore {
                     dependent_contexts,
                     state_id,
                     handler_sender,
-                } => {
-                    let context_id = self.manager.create_context(&dependent_contexts, &state_id);
-                    handler_sender.send(ContextOperationResponse::ValidResult {
-                        result: Some(ContextOperationResult::CreateContext { context_id }),
-                    })?;
-                }
+                } => match self.manager.create_context(&dependent_contexts, &state_id) {
+                    Ok(context_id) => {
+                        handler_sender.send(ContextOperationResponse::ValidResult {
+                            result: Some(ContextOperationResult::CreateContext { context_id }),
+                        })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
                 ContextOperationMessage::Get {
                     context_id,
                     keys,

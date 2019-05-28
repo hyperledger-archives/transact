@@ -325,7 +325,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -377,7 +377,7 @@ mod test {
 
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -434,7 +434,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -481,7 +481,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -539,7 +539,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -590,7 +590,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -642,7 +642,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -709,7 +709,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 
@@ -797,7 +797,7 @@ mod test {
         let state = HashMapState::new();
         let state_id = HashMapState::state_id(&HashMap::new());
 
-        let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(state));
+        let (join_handle, mut context_manager) = ContextManagerJoinHandle::new(Box::new(state));
 
         let handler = CommandTransactionHandler::new();
 

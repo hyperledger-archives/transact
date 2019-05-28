@@ -318,11 +318,11 @@ mod tests {
             &mut self,
             _dependent_contexts: &[ContextId],
             _state_id: &str,
-        ) -> ContextId {
-            [
+        ) -> Result<ContextId, ContextManagerError> {
+            Ok([
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x01,
-            ]
+            ])
         }
 
         fn get_transaction_receipt(

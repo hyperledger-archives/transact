@@ -115,7 +115,11 @@ impl ContextManager {
 
 impl ContextLifecycle for ContextManager {
     /// Creates a Context, and returns the resulting ContextId.
-    fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId {
+    fn create_context(
+        &mut self,
+        dependent_contexts: &[ContextId],
+        state_id: &str,
+    ) -> Result<ContextId, ContextManagerError> {
         self.internal_manager
             .lock()
             .expect("Lock in create_context was poisoned")
