@@ -1,6 +1,6 @@
 [package]
 name = "sawtooth-sabre"
-version = "0.2.0"
+version = "0.3.0"
 description = "Sawtooth Sabre Transaction Processor"
 authors = ["Cargill Incorporated"]
 license = "Apache-2.0"
