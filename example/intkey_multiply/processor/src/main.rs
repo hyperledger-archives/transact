@@ -39,7 +39,6 @@ cfg_if! {
 extern crate crypto;
 extern crate protobuf;
 pub mod handler;
-mod protos;
 
 #[cfg(not(target_arch = "wasm32"))]
 fn main() {
