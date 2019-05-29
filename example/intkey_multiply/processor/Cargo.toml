@@ -15,7 +15,6 @@
 name = "intkey-multiply"
 version = "0.2.0"
 authors = ["Cargill Incorporated"]
-build = "build.rs"
 
 [dependencies]
 clap = "2"
