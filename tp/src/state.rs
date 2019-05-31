@@ -46,15 +46,14 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let setting: Setting = match protobuf::parse_from_bytes(packed.as_slice()) {
-                    Ok(setting) => setting,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
+                let setting: Setting =
+                    protobuf::parse_from_bytes(packed.as_slice()).map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
                             "Cannot deserialize setting: {:?}",
                             err,
-                        )));
-                    }
-                };
+                        ))
+                    })?;
+
                 Ok(Some(setting))
             }
             None => Ok(None),
@@ -70,22 +69,17 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let contracts = match ContractList::from_bytes(packed.as_slice()) {
-                    Ok(contracts) => contracts,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize contract list: {:?}",
-                            err,
-                        )));
-                    }
-                };
-
-                for contract in contracts.contracts() {
-                    if contract.name() == name {
-                        return Ok(Some(contract.clone()));
-                    }
-                }
-                Ok(None)
+                let contracts = ContractList::from_bytes(packed.as_slice()).map_err(|err| {
+                    ApplyError::InvalidTransaction(format!(
+                        "Cannot deserialize contract list: {:?}",
+                        err,
+                    ))
+                })?;
+                return Ok(contracts
+                    .contracts()
+                    .iter()
+                    .find(|c| c.name() == name)
+                    .cloned());
             }
             None => Ok(None),
         }
@@ -101,9 +95,17 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         let mut contracts = match d {
             Some(packed) => match ContractList::from_bytes(packed.as_slice()) {
-                Ok(contracts) => contracts.contracts().to_vec(),
+                Ok(contracts) => {
+                    // remove old contract if it exists
+                    contracts
+                        .contracts()
+                        .iter()
+                        .filter(|c| c.name() != name)
+                        .cloned()
+                        .collect::<Vec<Contract>>()
+                }
                 Err(err) => {
-                    return Err(ApplyError::InternalError(format!(
+                    return Err(ApplyError::InvalidTransaction(format!(
                         "Cannot deserialize contract list: {}",
                         err,
                     )));
@@ -111,20 +113,8 @@ impl<'a> SabreState<'a> {
             },
             None => vec![],
         };
-        // remove old contract if it exists and sort the contracts by name
-        let mut index = None;
-        for (count, contract) in contracts.iter().enumerate() {
-            if contract.name() == name {
-                index = Some(count);
-                break;
-            }
-        }
-
-        if let Some(x) = index {
-            contracts.remove(x);
-        }
-
         contracts.push(new_contract);
+        // sort the contracts by name
         contracts.sort_by_key(|c| c.name().to_string());
 
         // build new ContractList and set in state
@@ -135,17 +125,12 @@ impl<'a> SabreState<'a> {
                 ApplyError::InvalidTransaction(String::from("Cannot build contract list"))
             })?;
 
-        let serialized = match contract_list.into_bytes() {
-            Ok(serialized) => serialized,
-            Err(_) => {
-                return Err(ApplyError::InternalError(String::from(
-                    "Cannot serialize contract list",
-                )));
-            }
-        };
+        let serialized = contract_list.into_bytes().map_err(|err| {
+            ApplyError::InvalidTransaction(format!("Cannot serialize contract list: {:?}", err,))
+        })?;
         self.context
             .set_state_entry(address, serialized)
-            .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
         Ok(())
     }
 
@@ -155,13 +140,13 @@ impl<'a> SabreState<'a> {
         let deleted = match d {
             Some(deleted) => deleted,
             None => {
-                return Err(ApplyError::InternalError(String::from(
+                return Err(ApplyError::InvalidTransaction(String::from(
                     "Cannot delete contract",
                 )));
             }
         };
         if deleted != address {
-            return Err(ApplyError::InternalError(String::from(
+            return Err(ApplyError::InvalidTransaction(String::from(
                 "Cannot delete contract",
             )));
         };
@@ -176,23 +161,19 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let contract_registries = match ContractRegistryList::from_bytes(packed.as_slice())
-                {
-                    Ok(contract_registries) => contract_registries,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
+                let contract_registries = ContractRegistryList::from_bytes(packed.as_slice())
+                    .map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
                             "Cannot deserialize contract registry list: {:?}",
                             err,
-                        )));
-                    }
-                };
+                        ))
+                    })?;
 
-                for contract_registry in contract_registries.registries() {
-                    if contract_registry.name() == name {
-                        return Ok(Some(contract_registry.clone()));
-                    }
-                }
-                Ok(None)
+                return Ok(contract_registries
+                    .registries()
+                    .iter()
+                    .find(|reg| reg.name() == name)
+                    .cloned());
             }
             None => Ok(None),
         }
@@ -207,9 +188,17 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         let mut contract_registries = match d {
             Some(packed) => match ContractRegistryList::from_bytes(packed.as_slice()) {
-                Ok(contract_registries) => contract_registries.registries().to_vec(),
+                Ok(contract_registries) => {
+                    // remove old contract_registry if it exists
+                    contract_registries
+                        .registries()
+                        .iter()
+                        .filter(|c| c.name() != name)
+                        .cloned()
+                        .collect::<Vec<ContractRegistry>>()
+                }
                 Err(err) => {
-                    return Err(ApplyError::InternalError(format!(
+                    return Err(ApplyError::InvalidTransaction(format!(
                         "Cannot deserialize contract registry list: {}",
                         err,
                     )));
@@ -217,20 +206,9 @@ impl<'a> SabreState<'a> {
             },
             None => vec![],
         };
-        // remove old contract_registry if it exists and sort the contract regisitries by name
-        let mut index = None;
-        for (count, contract_registry) in contract_registries.iter().enumerate() {
-            if contract_registry.name() == name {
-                index = Some(count);
-                break;
-            }
-        }
-
-        if let Some(x) = index {
-            contract_registries.remove(x);
-        }
 
         contract_registries.push(new_contract_registry);
+        // sort the contract regisitries by name
         contract_registries.sort_by_key(|c| c.name().to_string());
         let contract_registry_list = ContractRegistryListBuilder::new()
             .with_registries(contract_registries)
@@ -239,17 +217,15 @@ impl<'a> SabreState<'a> {
                 ApplyError::InvalidTransaction(String::from("Cannot build contract registry list"))
             })?;
 
-        let serialized = match contract_registry_list.into_bytes() {
-            Ok(serialized) => serialized,
-            Err(_) => {
-                return Err(ApplyError::InternalError(String::from(
-                    "Cannot serialize contract registry list",
-                )));
-            }
-        };
+        let serialized = contract_registry_list.into_bytes().map_err(|err| {
+            ApplyError::InvalidTransaction(format!(
+                "Cannot serialize contract registry list: {:?}",
+                err,
+            ))
+        })?;
         self.context
             .set_state_entry(address, serialized)
-            .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
         Ok(())
     }
 
@@ -259,13 +235,13 @@ impl<'a> SabreState<'a> {
         let deleted = match d {
             Some(deleted) => deleted,
             None => {
-                return Err(ApplyError::InternalError(String::from(
+                return Err(ApplyError::InvalidTransaction(String::from(
                     "Cannot delete contract registry",
                 )));
             }
         };
         if deleted != address {
-            return Err(ApplyError::InternalError(String::from(
+            return Err(ApplyError::InvalidTransaction(String::from(
                 "Cannot delete contract registry",
             )));
         };
@@ -280,23 +256,19 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let namespace_registries =
-                    match NamespaceRegistryList::from_bytes(packed.as_slice()) {
-                        Ok(namespace_registries) => namespace_registries,
-                        Err(err) => {
-                            return Err(ApplyError::InternalError(format!(
-                                "Cannot deserialize namespace registry list: {:?}",
-                                err,
-                            )));
-                        }
-                    };
+                let namespace_registries = NamespaceRegistryList::from_bytes(packed.as_slice())
+                    .map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
+                            "Cannot deserialize namespace registry list: {:?}",
+                            err,
+                        ))
+                    })?;
 
-                for namespace_registry in namespace_registries.registries() {
-                    if namespace_registry.namespace() == namespace {
-                        return Ok(Some(namespace_registry.clone()));
-                    }
-                }
-                Ok(None)
+                return Ok(namespace_registries
+                    .registries()
+                    .iter()
+                    .find(|reg| reg.namespace() == namespace)
+                    .cloned());
             }
             None => Ok(None),
         }
@@ -310,16 +282,13 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let namespace_registries =
-                    match NamespaceRegistryList::from_bytes(packed.as_slice()) {
-                        Ok(namespace_registries) => namespace_registries,
-                        Err(err) => {
-                            return Err(ApplyError::InternalError(format!(
-                                "Cannot deserialize namespace registry list: {:?}",
-                                err,
-                            )));
-                        }
-                    };
+                let namespace_registries = NamespaceRegistryList::from_bytes(packed.as_slice())
+                    .map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
+                            "Cannot deserialize namespace registry list: {:?}",
+                            err,
+                        ))
+                    })?;
                 Ok(Some(namespace_registries))
             }
             None => Ok(None),
@@ -335,9 +304,17 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         let mut namespace_registries = match d {
             Some(packed) => match NamespaceRegistryList::from_bytes(packed.as_slice()) {
-                Ok(namespace_registries) => namespace_registries.registries().to_vec(),
+                Ok(namespace_registries) => {
+                    // remove old namespace rgistry if it exists
+                    namespace_registries
+                        .registries()
+                        .iter()
+                        .filter(|nr| nr.namespace() != namespace)
+                        .cloned()
+                        .collect::<Vec<NamespaceRegistry>>()
+                }
                 Err(err) => {
-                    return Err(ApplyError::InternalError(format!(
+                    return Err(ApplyError::InvalidTransaction(format!(
                         "Cannot deserialize namespace registry list: {}",
                         err,
                     )));
@@ -345,21 +322,8 @@ impl<'a> SabreState<'a> {
             },
             None => vec![],
         };
-        // remove old namespace_registry if it exists and sort the namespace regisitries by
-        // namespace
-        let mut index = None;
-        for (count, namespace_registry) in namespace_registries.iter().enumerate() {
-            if namespace_registry.namespace() == namespace {
-                index = Some(count);
-                break;
-            }
-        }
-
-        if let Some(x) = index {
-            namespace_registries.remove(x);
-        }
-
         namespace_registries.push(new_namespace_registry);
+        // sort the namespace registries by namespace
         namespace_registries.sort_by_key(|nr| nr.namespace().to_string());
         let namespace_registry_list = NamespaceRegistryListBuilder::new()
             .with_registries(namespace_registries)
@@ -368,17 +332,15 @@ impl<'a> SabreState<'a> {
                 ApplyError::InvalidTransaction(String::from("Cannot build namespace registry list"))
             })?;
 
-        let serialized = match namespace_registry_list.into_bytes() {
-            Ok(serialized) => serialized,
-            Err(_) => {
-                return Err(ApplyError::InternalError(String::from(
-                    "Cannot serialize namespace registry list",
-                )));
-            }
-        };
+        let serialized = namespace_registry_list.into_bytes().map_err(|err| {
+            ApplyError::InvalidTransaction(format!(
+                "Cannot serialize namespace registry list: {:?}",
+                err,
+            ))
+        })?;
         self.context
             .set_state_entry(address, serialized)
-            .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
         Ok(())
     }
 
@@ -388,13 +350,13 @@ impl<'a> SabreState<'a> {
         let deleted = match d {
             Some(deleted) => deleted,
             None => {
-                return Err(ApplyError::InternalError(String::from(
+                return Err(ApplyError::InvalidTransaction(String::from(
                     "Cannot delete namespace registry",
                 )));
             }
         };
         if deleted != address {
-            return Err(ApplyError::InternalError(String::from(
+            return Err(ApplyError::InvalidTransaction(String::from(
                 "Cannot delete namespace registry",
             )));
         };
@@ -410,22 +372,19 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let smart_permissions = match SmartPermissionList::from_bytes(packed.as_slice()) {
-                    Ok(smart_permissions) => smart_permissions,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize smart permission list: {:?}",
+                let smart_permissions = SmartPermissionList::from_bytes(packed.as_slice())
+                    .map_err(|err| {
+                        ApplyError::InvalidTransaction(format!(
+                            "Cannot deserialize smart permissions list: {:?}",
                             err,
-                        )));
-                    }
-                };
+                        ))
+                    })?;
 
-                for smart_permission in smart_permissions.smart_permissions() {
-                    if smart_permission.name() == name {
-                        return Ok(Some(smart_permission.clone()));
-                    }
-                }
-                Ok(None)
+                return Ok(smart_permissions
+                    .smart_permissions()
+                    .iter()
+                    .find(|sp| sp.name() == name)
+                    .cloned());
             }
             None => Ok(None),
         }
@@ -441,9 +400,17 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         let mut smart_permissions = match d {
             Some(packed) => match SmartPermissionList::from_bytes(packed.as_slice()) {
-                Ok(smart_permissions) => smart_permissions.smart_permissions().to_vec(),
+                Ok(smart_permissions) => {
+                    // remove old smart_permission if it exists
+                    smart_permissions
+                        .smart_permissions()
+                        .iter()
+                        .filter(|sp| sp.name() != name)
+                        .cloned()
+                        .collect::<Vec<SmartPermission>>()
+                }
                 Err(err) => {
-                    return Err(ApplyError::InternalError(format!(
+                    return Err(ApplyError::InvalidTransaction(format!(
                         "Cannot deserialize smart permission list: {}",
                         err,
                     )));
@@ -451,20 +418,9 @@ impl<'a> SabreState<'a> {
             },
             None => vec![],
         };
-        // remove old smart_permission if it exists and sort the smart_permission by name
-        let mut index = None;
-        for (count, smart_permission) in smart_permissions.iter().enumerate() {
-            if smart_permission.name() == name {
-                index = Some(count);
-                break;
-            }
-        }
-
-        if let Some(x) = index {
-            smart_permissions.remove(x);
-        }
 
         smart_permissions.push(new_smart_permission);
+        // sort the smart_permission by name
         smart_permissions.sort_by_key(|sp| sp.name().to_string());
 
         let smart_permission_list = SmartPermissionListBuilder::new()
@@ -474,17 +430,15 @@ impl<'a> SabreState<'a> {
                 ApplyError::InvalidTransaction(String::from("Cannot build smart permission list"))
             })?;
 
-        let serialized = match smart_permission_list.into_bytes() {
-            Ok(serialized) => serialized,
-            Err(_) => {
-                return Err(ApplyError::InternalError(String::from(
-                    "Cannot serialize smart permission list",
-                )));
-            }
-        };
+        let serialized = smart_permission_list.into_bytes().map_err(|err| {
+            ApplyError::InvalidTransaction(format!(
+                "Cannot serialize smart permission list: {:?}",
+                err,
+            ))
+        })?;
         self.context
             .set_state_entry(address, serialized)
-            .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
+            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
         Ok(())
     }
 
@@ -494,13 +448,13 @@ impl<'a> SabreState<'a> {
         let deleted = match d {
             Some(deleted) => deleted,
             None => {
-                return Err(ApplyError::InternalError(String::from(
+                return Err(ApplyError::InvalidTransaction(String::from(
                     "Cannot delete smart_permission",
                 )));
             }
         };
         if deleted != address {
-            return Err(ApplyError::InternalError(String::from(
+            return Err(ApplyError::InvalidTransaction(String::from(
                 "Cannot delete smart_permission",
             )));
         };
@@ -512,22 +466,18 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let orgs = match OrganizationList::from_bytes(packed.as_slice()) {
-                    Ok(orgs) => orgs,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize organization list: {:?}",
-                            err,
-                        )));
-                    }
-                };
+                let orgs = OrganizationList::from_bytes(packed.as_slice()).map_err(|err| {
+                    ApplyError::InvalidTransaction(format!(
+                        "Cannot deserialize organization list: {:?}",
+                        err,
+                    ))
+                })?;
 
-                for org in orgs.organizations() {
-                    if org.org_id() == id {
-                        return Ok(Some(org.clone()));
-                    }
-                }
-                Ok(None)
+                return Ok(orgs
+                    .organizations()
+                    .iter()
+                    .find(|org| org.org_id() == id)
+                    .cloned());
             }
             None => Ok(None),
         }
@@ -538,22 +488,18 @@ impl<'a> SabreState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let agents = match AgentList::from_bytes(packed.as_slice()) {
-                    Ok(agents) => agents,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize record container: {:?}",
-                            err,
-                        )));
-                    }
-                };
+                let agents = AgentList::from_bytes(packed.as_slice()).map_err(|err| {
+                    ApplyError::InvalidTransaction(format!(
+                        "Cannot deserialize agent list: {:?}",
+                        err,
+                    ))
+                })?;
 
-                for agent in agents.agents() {
-                    if agent.public_key() == public_key {
-                        return Ok(Some(agent.clone()));
-                    }
-                }
-                Ok(None)
+                return Ok(agents
+                    .agents()
+                    .iter()
+                    .find(|agent| agent.public_key() == public_key)
+                    .cloned());
             }
             None => Ok(None),
         }
