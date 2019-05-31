@@ -14,7 +14,7 @@
 
 [package]
 name = "sabre-sdk"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Cargill, Incorporated"]
 license = "Apache-2.0"
 description = """\
@@ -26,3 +26,7 @@ documentation = "https://sawtooth.hyperledger.org/docs/sabre/releases/latest/"
 
 [dependencies]
 protobuf = "2"
+
+[build-dependencies]
+protoc-rust = "2"
+glob = "0.2"

@@ -18,6 +18,5 @@ extern crate log;
 mod addressing;
 pub mod handler;
 mod payload;
-mod protos;
 mod state;
 mod wasm_executor;

@@ -27,9 +27,9 @@ cfg_if! {
         use sabre_sdk::TransactionHandler;
         use sabre_sdk::TpProcessRequest;
         use sabre_sdk::{WasmPtr, execute_entrypoint, invoke_smart_permission};
-        use protos::smart_permission::{Agent, AgentList, Organization, OrganizationList, SmartPermission,
-                            SmartPermissionList};
-        use protobuf;
+        use sabre_sdk::protos::FromBytes;
+        use sabre_sdk::protocol::state::{SmartPermission, SmartPermissionList};
+        use sabre_sdk::protocol::pike::state::{Agent, AgentList, Organization, OrganizationList};
     } else {
         use sawtooth_sdk::processor::handler::ApplyError;
         use sawtooth_sdk::processor::handler::TransactionContext;
@@ -405,7 +405,7 @@ impl<'a> IntkeyState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                let agents = match AgentList::from_bytes(packed.as_slice()) {
                     Ok(agents) => agents,
                     Err(err) => {
                         return Err(ApplyError::InternalError(format!(
@@ -415,8 +415,8 @@ impl<'a> IntkeyState<'a> {
                     }
                 };
 
-                for agent in agents.get_agents() {
-                    if agent.public_key == public_key {
+                for agent in agents.agents() {
+                    if agent.public_key() == public_key {
                         return Ok(Some(agent.clone()));
                     }
                 }
@@ -432,7 +432,7 @@ impl<'a> IntkeyState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                let orgs = match OrganizationList::from_bytes(packed.as_slice()) {
                     Ok(orgs) => orgs,
                     Err(err) => {
                         return Err(ApplyError::InternalError(format!(
@@ -442,8 +442,8 @@ impl<'a> IntkeyState<'a> {
                     }
                 };
 
-                for org in orgs.get_organizations() {
-                    if org.org_id == id {
+                for org in orgs.organizations() {
+                    if org.org_id() == id {
                         return Ok(Some(org.clone()));
                     }
                 }
@@ -463,19 +463,18 @@ impl<'a> IntkeyState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let smart_permissions: SmartPermissionList =
-                    match protobuf::parse_from_bytes(packed.as_slice()) {
-                        Ok(smart_permissions) => smart_permissions,
-                        Err(err) => {
-                            return Err(ApplyError::InternalError(format!(
-                                "Cannot deserialize smart permission list: {:?}",
-                                err,
-                            )));
-                        }
-                    };
+                let smart_permissions = match SmartPermissionList::from_bytes(packed.as_slice()) {
+                    Ok(smart_permissions) => smart_permissions,
+                    Err(err) => {
+                        return Err(ApplyError::InternalError(format!(
+                            "Cannot deserialize smart permission list: {:?}",
+                            err,
+                        )));
+                    }
+                };
 
-                for smart_permission in smart_permissions.get_smart_permissions() {
-                    if smart_permission.name == name {
+                for smart_permission in smart_permissions.smart_permissions() {
+                    if smart_permission.name() == name {
                         return Ok(Some(smart_permission.clone()));
                     }
                 }
@@ -618,13 +617,13 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
 }
 #[cfg(target_arch = "wasm32")]
 fn run_smart_permisson(signer: &str, payload: &[u8], agent: Agent) -> Result<i32, ApplyError> {
-    let org_id = agent.get_org_id();
+    let org_id = agent.org_id();
     let smart_permission_addr = compute_smart_permission_address(org_id, "test");
 
     invoke_smart_permission(
         smart_permission_addr,
         "test".to_string(),
-        agent.get_roles().to_vec(),
+        agent.roles().to_vec(),
         org_id.to_string(),
         signer.to_string(),
         payload,

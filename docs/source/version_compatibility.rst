@@ -37,3 +37,11 @@ the Sabre transaction processor image.
 |            |          |           |         |   corresponding functions for  |
 |            |          |           |         |   set and delete)              |
 +------------+----------+-----------+---------+--------------------------------+
+| 0.3        | 0.3      | 0.3       |  0.3    | - Adds native rust             |
+|            |          |           |         |   implementation of the proto  |
+|            |          |           |         |   messages to the Sabre SDK and|
+|            |          |           |         |   is used by the Sabre         |
+|            |          |           |         |   Transaction Processor.       |
+|            |          |           |         | - Adds no-op logging macros to |
+|            |          |           |         |   the Sabre SDK                |
++------------+----------+-----------+---------+--------------------------------+

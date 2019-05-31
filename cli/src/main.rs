@@ -17,9 +17,11 @@ extern crate clap;
 #[macro_use]
 extern crate serde_derive;
 extern crate crypto;
+extern crate dirs;
 extern crate futures;
 extern crate hyper;
 extern crate protobuf;
+extern crate sabre_sdk;
 extern crate sawtooth_sdk;
 extern crate serde;
 extern crate serde_json;
@@ -32,7 +34,6 @@ mod error;
 mod execute;
 mod key;
 mod namespace;
-mod protos;
 mod smart_permission;
 mod submit;
 mod transaction;
@@ -117,20 +118,17 @@ fn run() -> Result<(), error::CliError> {
                 (@arg name: +required "Name of the Smart Permission")
                 (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
                 (@arg key: -k --key +takes_value "Signing key name")
-                (@arg output: --output -o +takes_value "File name to write payload to.")
             )
             (@subcommand update =>
                 (@arg org_id: +required "Organization IDs")
                 (@arg name: +required "Name of the Smart Permission")
                 (@arg filename: -f --filename +required +takes_value "Path to smart_permission")
                 (@arg key: -k --key +takes_value "Signing key name")
-                (@arg output: --output -o +takes_value "File name to write payload to.")
             )
             (@subcommand delete =>
                 (@arg org_id: +required "Organization IDs")
                 (@arg name: +required "Name of the Smart Permission")
                 (@arg key: -k --key +takes_value "Signing key name")
-                (@arg output: --output -o +takes_value "File name to write payload to.")
             )
         )
     ).get_matches();
@@ -323,7 +321,6 @@ fn run() -> Result<(), error::CliError> {
                 m.value_of("name").unwrap(),
                 m.value_of("filename").unwrap(),
                 m.value_of("key"),
-                m.value_of("output"),
             )?,
             ("update", Some(m)) => smart_permission::do_update(
                 url,
@@ -331,14 +328,12 @@ fn run() -> Result<(), error::CliError> {
                 m.value_of("name").unwrap(),
                 m.value_of("filename").unwrap(),
                 m.value_of("key"),
-                m.value_of("output"),
             )?,
             ("delete", Some(m)) => smart_permission::do_delete(
                 url,
                 m.value_of("org_id").unwrap(),
                 m.value_of("name").unwrap(),
                 m.value_of("key"),
-                m.value_of("output"),
             )?,
             _ => {
                 return Err(error::CliError::UserError(

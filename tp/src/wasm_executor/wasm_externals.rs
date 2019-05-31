@@ -19,7 +19,8 @@ use std::fmt;
 use std::string::FromUtf8Error;
 use std::time::Instant;
 
-use protobuf;
+use sabre_sdk::protocol::state::{SmartPermission, SmartPermissionList};
+use sabre_sdk::protos::FromBytes;
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasmi::memory_units::Pages;
 use wasmi::{
@@ -27,8 +28,6 @@ use wasmi::{
     MemoryInstance, MemoryRef, Module, ModuleImportResolver, ModuleInstance, RuntimeArgs,
     RuntimeValue, Signature, Trap, TrapKind, ValueType,
 };
-
-use crate::protos::smart_permission::{SmartPermission, SmartPermissionList};
 
 // External function indices
 
@@ -268,21 +267,17 @@ impl<'a> WasmExternals<'a> {
         let d = self.context.get_state_entry(address)?;
         match d {
             Some(packed) => {
-                let smart_permissions: SmartPermissionList =
-                    match protobuf::parse_from_bytes(packed.as_slice()) {
-                        Ok(smart_permissions) => smart_permissions,
-                        Err(err) => {
-                            return Err(ExternalsError {
-                                message: format!(
-                                    "Cannot deserialize smart permission list: {:?}",
-                                    err
-                                ),
-                            });
-                        }
-                    };
+                let smart_permissions = match SmartPermissionList::from_bytes(packed.as_slice()) {
+                    Ok(smart_permissions) => smart_permissions,
+                    Err(err) => {
+                        return Err(ExternalsError {
+                            message: format!("Cannot deserialize smart permission list: {:?}", err),
+                        });
+                    }
+                };
 
-                for smart_permission in smart_permissions.get_smart_permissions() {
-                    if smart_permission.name == name {
+                for smart_permission in smart_permissions.smart_permissions() {
+                    if smart_permission.name() == name {
                         return Ok(Some(smart_permission.clone()));
                     }
                 }
@@ -544,7 +539,7 @@ impl<'a> Externals for WasmExternals<'a> {
                 };
 
                 // Invoke Smart Permission
-                let mut module = SmartPermissionModule::new(contract.get_function(), self.context)
+                let mut module = SmartPermissionModule::new(contract.function(), self.context)
                     .expect("Failed to create can_add module");
                 let result = module
                     .entrypoint(role_vec, org_id, public_key, payload.to_vec())

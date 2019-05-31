@@ -11,24 +11,34 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+// -----------------------------------------------------------------------------
 
-extern crate protoc_rust;
-use protoc_rust::Customize;
+syntax = "proto3";
 
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
+message Agent {
+  string org_id = 1;
+  string public_key = 2;
+  bool active = 3;
+  repeated string roles = 4;
+  repeated KeyValueEntry metadata = 5;
+}
 
-fn main() {
-    fs::create_dir_all("src/protos").unwrap();
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: "src/protos",
-        input: &["../../../protos/smart_permission.proto"],
-        includes: &["../../../protos"],
-        customize: Customize::default(),
-    })
-    .expect("protoc");
+message AgentList {
+  repeated Agent agents = 1;
+}
 
-    let mut file = File::create("src/protos/mod.rs").unwrap();
-    file.write_all(b"pub mod smart_permission;\n").unwrap();
+message KeyValueEntry {
+  string key = 1;
+  string value = 2;
+}
+
+message Organization {
+  string org_id = 1;
+  string name = 2;
+  string address = 3;
+  repeated KeyValueEntry metadata = 4;
+}
+
+message OrganizationList {
+  repeated Organization organizations = 1;
 }

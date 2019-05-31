@@ -1,4 +1,4 @@
-// Copyright 2018 Cargill Incorporated
+// Copyright 2019 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,23 +12,4 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-extern crate protoc_rust;
-use protoc_rust::Customize;
-
-use std::fs;
-use std::fs::File;
-use std::io::prelude::*;
-
-fn main() {
-    fs::create_dir_all("src/protos").unwrap();
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: "src/protos",
-        input: &["../protos/payload.proto"],
-        includes: &["../protos"],
-        customize: Customize::default(),
-    })
-    .expect("protoc");
-
-    let mut file = File::create("src/protos/mod.rs").unwrap();
-    file.write_all(b"pub mod payload;\n").unwrap();
-}
+pub mod state;
