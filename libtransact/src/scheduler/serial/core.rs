@@ -189,7 +189,8 @@ impl SchedulerCore {
 
             self.current_batch = Some(pair);
             self.execution_tx
-                .send(ExecutionTask::new(transaction, context_id))?
+                .send(ExecutionTask::new(transaction, context_id))?;
+            self.next_ready = false;
         }
 
         Ok(())
