@@ -202,12 +202,10 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let batch = match self.current_batch.take() {
-                        Some(batch) => batch,
-                        None => {
-                            panic!("received execution result but no current batch is executing")
-                        }
-                    };
+                    let batch = self
+                        .current_batch
+                        .take()
+                        .expect("received execution result but no current batch is executing");
 
                     let results = match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id) => {
