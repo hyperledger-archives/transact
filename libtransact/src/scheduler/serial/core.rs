@@ -24,6 +24,7 @@ use crate::protocol::transaction::Transaction;
 use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
+use crate::scheduler::InvalidTransactionResult;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
@@ -127,6 +128,9 @@ pub struct SchedulerCore {
     /// A queue of the current batch's transactions that have not been exeucted yet.
     txn_queue: Vec<Transaction>,
 
+    /// The results of the current batch's transactions that have already been executed.
+    txn_results: Vec<TransactionExecutionResult>,
+
     /// The interface for context creation and deletion.
     context_lifecycle: Box<ContextLifecycle>,
 
@@ -154,6 +158,7 @@ impl SchedulerCore {
             current_batch: None,
             current_txn: None,
             txn_queue: vec![],
+            txn_results: vec![],
             context_lifecycle,
             state_id,
             previous_context: None,
@@ -176,10 +181,6 @@ impl SchedulerCore {
                 .expect("scheduler shared lock is poisoned");
 
             if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
-                if unscheduled_batch.batch().transactions().len() != 1 {
-                    unimplemented!("can't handle more than one transaction per batch");
-                }
-
                 self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
                 self.current_batch = Some(unscheduled_batch);
             } else {
@@ -225,33 +226,95 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let batch = self
-                        .current_batch
-                        .take()
-                        .expect("received execution result but no current batch is executing");
-
-                    let results = match task_notification {
+                    match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id) => {
                             let transaction_id = self.current_txn.take().expect(
                                 "received execution result but no current transaction is executing",
                             );
                             self.previous_context = Some(context_id);
-                            vec![TransactionExecutionResult::Valid(
+                            self.txn_results.push(TransactionExecutionResult::Valid(
                                 self.context_lifecycle.get_transaction_receipt(
                                     &context_id,
                                     &hex::encode(transaction_id),
                                 )?,
-                            )]
+                            ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
+                            let current_batch_id = self
+                                .current_batch
+                                .as_ref()
+                                .expect(
+                                    "attemping to invalidate current batch but no current \
+                                     batch exists",
+                                )
+                                .batch()
+                                .header_signature();
+
+                            // Invalidate all previously executed transactions in the batch
+                            self.txn_results = self
+                                .txn_results
+                                .iter()
+                                .map(|existing_result| match existing_result {
+                                    TransactionExecutionResult::Valid(receipt) => {
+                                        TransactionExecutionResult::Invalid(
+                                            InvalidTransactionResult {
+                                                transaction_id: receipt.transaction_id.clone(),
+                                                error_message: format!(
+                                                    "containing batch ({}) is invalid",
+                                                    current_batch_id,
+                                                ),
+                                                error_data: vec![],
+                                            },
+                                        )
+                                    }
+                                    TransactionExecutionResult::Invalid(_) => {
+                                        // When an invalid transaction is encountered, the
+                                        // scheduler should fail-fast and invalidate the whole
+                                        // batch immediately; if an invalid result is in the
+                                        // previously executed transaction results, this did not
+                                        // happen.
+                                        panic!("should not already have an invalid result");
+                                    }
+                                })
+                                .collect();
+
                             self.current_txn = None;
-                            vec![TransactionExecutionResult::Invalid(result)]
+                            self.txn_results
+                                .push(TransactionExecutionResult::Invalid(result));
+
+                            // Invalidate all unexecuted transactions in the batch
+                            self.txn_results.append(
+                                &mut self
+                                    .txn_queue
+                                    .drain(..)
+                                    .map(|txn| {
+                                        TransactionExecutionResult::Invalid(
+                                            InvalidTransactionResult {
+                                                transaction_id: txn.header_signature().into(),
+                                                error_message: format!(
+                                                    "containing batch ({}) is invalid",
+                                                    current_batch_id,
+                                                ),
+                                                error_data: vec![],
+                                            },
+                                        )
+                                    })
+                                    .collect(),
+                            );
                         }
                     };
 
-                    let batch_result = BatchExecutionResult { batch, results };
+                    if self.txn_queue.is_empty() {
+                        let batch = self
+                            .current_batch
+                            .take()
+                            .expect("received execution result but no current batch is executing");
 
-                    {
+                        let mut results = vec![];
+                        std::mem::swap(&mut results, &mut self.txn_results);
+
+                        let batch_result = BatchExecutionResult { batch, results };
+
                         let shared = self
                             .shared_lock
                             .lock()
