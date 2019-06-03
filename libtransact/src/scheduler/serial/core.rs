@@ -120,6 +120,9 @@ pub struct SchedulerCore {
     /// The current batch which is being executed.
     current_batch: Option<BatchPair>,
 
+    /// The ID of the current transaction which is being executed (from the current batch).
+    current_txn: Option<String>,
+
     /// The interface for context creation and deletion.
     context_lifecycle: Box<ContextLifecycle>,
 
@@ -145,6 +148,7 @@ impl SchedulerCore {
             execution_tx,
             next_ready: false,
             current_batch: None,
+            current_txn: None,
             context_lifecycle,
             state_id,
             previous_context: None,
@@ -156,7 +160,7 @@ impl SchedulerCore {
             return Ok(());
         }
 
-        if self.current_batch.is_some() {
+        if self.current_txn.is_some() {
             return Ok(());
         }
 
@@ -165,12 +169,12 @@ impl SchedulerCore {
             .lock()
             .expect("scheduler shared lock is poisoned");
 
-        if let Some(pair) = shared.pop_unscheduled_batch() {
-            if pair.batch().transactions().len() != 1 {
+        if let Some(batch) = shared.pop_unscheduled_batch() {
+            if batch.batch().transactions().len() != 1 {
                 unimplemented!("can't handle more than one transaction per batch");
             }
 
-            let transaction = match pair.batch().transactions()[0].clone().into_pair() {
+            let transaction = match batch.batch().transactions()[0].clone().into_pair() {
                 Ok(transaction) => transaction,
                 Err(err) => {
                     // An error can occur here if the header of the
@@ -187,7 +191,8 @@ impl SchedulerCore {
                 None => self.context_lifecycle.create_context(&[], &self.state_id),
             };
 
-            self.current_batch = Some(pair);
+            self.current_batch = Some(batch);
+            self.current_txn = Some(transaction.transaction().header_signature().into());
             self.execution_tx
                 .send(ExecutionTask::new(transaction, context_id))?;
             self.next_ready = false;
@@ -210,15 +215,19 @@ impl SchedulerCore {
 
                     let results = match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id) => {
+                            let transaction_id = self.current_txn.take().expect(
+                                "received execution result but no current transaction is executing",
+                            );
                             self.previous_context = Some(context_id);
                             vec![TransactionExecutionResult::Valid(
                                 self.context_lifecycle.get_transaction_receipt(
                                     &context_id,
-                                    &hex::encode(&batch.header().transaction_ids()[0]),
+                                    &hex::encode(transaction_id),
                                 )?,
                             )]
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
+                            self.current_txn = None;
                             vec![TransactionExecutionResult::Invalid(result)]
                         }
                     };
