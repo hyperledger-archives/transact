@@ -20,6 +20,7 @@
 use crate::context::manager::ContextManagerError;
 use crate::context::{ContextId, ContextLifecycle};
 use crate::protocol::batch::BatchPair;
+use crate::protocol::transaction::Transaction;
 use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
@@ -123,6 +124,9 @@ pub struct SchedulerCore {
     /// The ID of the current transaction which is being executed (from the current batch).
     current_txn: Option<String>,
 
+    /// A queue of the current batch's transactions that have not been exeucted yet.
+    txn_queue: Vec<Transaction>,
+
     /// The interface for context creation and deletion.
     context_lifecycle: Box<ContextLifecycle>,
 
@@ -149,6 +153,7 @@ impl SchedulerCore {
             next_ready: false,
             current_batch: None,
             current_txn: None,
+            txn_queue: vec![],
             context_lifecycle,
             state_id,
             previous_context: None,
@@ -164,39 +169,51 @@ impl SchedulerCore {
             return Ok(());
         }
 
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
+        if self.current_batch.is_none() {
+            let mut shared = self
+                .shared_lock
+                .lock()
+                .expect("scheduler shared lock is poisoned");
 
-        if let Some(batch) = shared.pop_unscheduled_batch() {
-            if batch.batch().transactions().len() != 1 {
-                unimplemented!("can't handle more than one transaction per batch");
-            }
-
-            let transaction = match batch.batch().transactions()[0].clone().into_pair() {
-                Ok(transaction) => transaction,
-                Err(err) => {
-                    // An error can occur here if the header of the
-                    // transaction cannot be deserialized. If this occurs,
-                    // we panic as handling this is not currently implemented.
-                    unimplemented!("cannot handle ill-formed transaction: {}", err)
+            if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
+                if unscheduled_batch.batch().transactions().len() != 1 {
+                    unimplemented!("can't handle more than one transaction per batch");
                 }
-            };
 
-            let context_id = match self.previous_context {
-                Some(previous_context_id) => self
-                    .context_lifecycle
-                    .create_context(&[previous_context_id], &self.state_id),
-                None => self.context_lifecycle.create_context(&[], &self.state_id),
-            };
-
-            self.current_batch = Some(batch);
-            self.current_txn = Some(transaction.transaction().header_signature().into());
-            self.execution_tx
-                .send(ExecutionTask::new(transaction, context_id))?;
-            self.next_ready = false;
+                self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
+                self.current_batch = Some(unscheduled_batch);
+            } else {
+                return Ok(());
+            }
         }
+
+        let transaction = match self
+            .txn_queue
+            .pop()
+            .expect("There are no transactions left in the queue for the current batch")
+            .into_pair()
+        {
+            Ok(transaction) => transaction,
+            Err(err) => {
+                // An error can occur here if the header of the
+                // transaction cannot be deserialized. If this occurs,
+                // we panic as handling this is not currently
+                // implemented.
+                unimplemented!("cannot handle ill-formed transaction: {}", err)
+            }
+        };
+
+        let context_id = match self.previous_context {
+            Some(previous_context_id) => self
+                .context_lifecycle
+                .create_context(&[previous_context_id], &self.state_id),
+            None => self.context_lifecycle.create_context(&[], &self.state_id),
+        };
+
+        self.current_txn = Some(transaction.transaction().header_signature().into());
+        self.execution_tx
+            .send(ExecutionTask::new(transaction, context_id))?;
+        self.next_ready = false;
 
         Ok(())
     }
