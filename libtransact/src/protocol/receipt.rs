@@ -29,7 +29,7 @@ use std::error::Error as StdError;
 /// A `StateChange` represents the basic level of changes that can be applied to
 /// values in state.  This covers the setting of a key/value pair, or the
 /// deletion of a key.
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum StateChange {
     Set { key: String, value: Vec<u8> },
     Delete { key: String },
@@ -442,6 +442,8 @@ impl TransactionReceiptBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
     static ADDRESS: &str = "5b7349700e158b598043efd6d7610345a75a00b22ac14c9278db53f586179a92b72fbd";
@@ -585,6 +587,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn transaction_receipt_sawtooth10_compatibility() {
         let mut proto_transaction_receipt =

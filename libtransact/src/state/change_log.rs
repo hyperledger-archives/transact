@@ -112,7 +112,10 @@ impl ChangeLogEntry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(feature = "sawtooth-compat")]
     use crate::protos;
+
+    #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
     static BYTES1: [u8; 4] = [0x01, 0x02, 0x03, 0x04];
@@ -150,6 +153,7 @@ mod tests {
         )
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn change_log_entry_receipt_sawtooth10_compatibility() {
         let mut proto_entry = sawtooth_sdk::messages::merkle::ChangeLogEntry::new();

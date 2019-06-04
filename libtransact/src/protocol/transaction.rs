@@ -439,11 +439,15 @@ impl TransactionBuilder {
 mod tests {
     use super::*;
 
+    #[cfg(feature = "sawtooth-compat")]
     use crate::protos;
     use crate::signing::hash::HashSigner;
     use crate::signing::Signer;
 
+    #[cfg(feature = "sawtooth-compat")]
     use protobuf::Message;
+
+    #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
     static FAMILY_NAME: &str = "test_family";
@@ -644,6 +648,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn transaction_header_sawtooth10_compatibility() {
         // Create protobuf bytes using the Sawtooth SDK
@@ -715,6 +720,7 @@ mod tests {
         assert_eq!(BYTES2.to_vec(), transaction.payload());
     }
 
+    #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn transaction_sawtooth10_compatibility() {
         // Create protobuf bytes using the Sawtooth SDK

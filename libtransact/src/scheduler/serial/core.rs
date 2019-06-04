@@ -156,6 +156,10 @@ impl SchedulerCore {
             return Ok(());
         }
 
+        if self.current_batch.is_some() {
+            return Ok(());
+        }
+
         let mut shared = self
             .shared_lock
             .lock()
@@ -222,21 +226,25 @@ impl SchedulerCore {
 
                     let batch_result = BatchExecutionResult { batch, results };
 
-                    let shared = self
-                        .shared_lock
-                        .lock()
-                        .expect("scheduler shared lock is poisoned");
-                    match shared.result_callback() {
-                        Some(callback) => {
-                            callback(Some(batch_result));
-                        }
-                        None => {
-                            warn!(
-                                "dropped batch execution result: {}",
-                                batch_result.batch.batch().header_signature()
-                            );
+                    {
+                        let shared = self
+                            .shared_lock
+                            .lock()
+                            .expect("scheduler shared lock is poisoned");
+                        match shared.result_callback() {
+                            Some(callback) => {
+                                callback(Some(batch_result));
+                            }
+                            None => {
+                                warn!(
+                                    "dropped batch execution result: {}",
+                                    batch_result.batch.batch().header_signature()
+                                );
+                            }
                         }
                     }
+
+                    self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::Next) => {
                     self.next_ready = true;

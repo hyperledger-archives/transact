@@ -22,13 +22,16 @@ cbor-codec = "0.7"
 libc = ">=0.2.35"
 openssl = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
+sawtooth-sdk = { git = "https://github.com/hyperledger/sawtooth-sdk-rust", optional = true }
 
 [dev-dependencies]
-sawtooth-sdk = "0.1"
 rand_hc = "0.1"
+sawtooth-xo = { git = "https://github.com/hyperledger/sawtooth-sdk-rust" }
 
 [build-dependencies]
 protoc-rust = "2"
 
 [features]
+default = []
 nightly = []
+sawtooth-compat = ["sawtooth-sdk"]
