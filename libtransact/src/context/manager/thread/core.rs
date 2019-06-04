@@ -15,11 +15,16 @@
  * -----------------------------------------------------------------------------
  */
 
+use std::sync::mpsc;
 use std::sync::mpsc::{Receiver, Sender};
 use std::thread;
 
-pub use crate::context::manager::thread::ContextManagerCoreError;
-use crate::context::{manager::ContextManager, ContextId, ContextLifecycle};
+use crate::context::{
+    error::ContextManagerError,
+    manager::thread::{ContextManager, ContextManagerCoreError},
+    manager::ContextManager as InternalManager,
+    ContextId, ContextLifecycle,
+};
 use crate::protocol::receipt::{Event, TransactionReceipt};
 use crate::state::Read;
 
@@ -93,7 +98,7 @@ pub enum ContextOperationResult {
 
 struct ContextManagerCore {
     /// Internal ContextManager owned by the threaded version.
-    manager: ContextManager,
+    manager: InternalManager,
 
     /// Receiver for all messages to the ContextManagerCore.
     core_receiver: Receiver<ContextOperationMessage>,
@@ -104,7 +109,7 @@ impl ContextManagerCore {
         database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
         core_receiver: Receiver<ContextOperationMessage>,
     ) -> Self {
-        let internal_manager = ContextManager::new(database);
+        let internal_manager = InternalManager::new(database);
         ContextManagerCore {
             manager: internal_manager,
             core_receiver,
@@ -242,5 +247,53 @@ impl ContextManagerCore {
                 }
             })
             .expect("Could not build a thread for Context Manager")
+    }
+}
+
+/// Used to spawn and shutdown a ContextManager thread.
+pub struct ContextManagerJoinHandle {
+    // Handle to the Context Manager Core
+    core_handle: Option<thread::JoinHandle<()>>,
+
+    // Used to send ContextOperationMessage to the Context Manager core.
+    // Dealt to individual ContextManagers to communicate with the ContextManagerCore.
+    core_sender: Sender<ContextOperationMessage>,
+}
+
+impl ContextManagerJoinHandle {
+    /// Creates a new ContextManager and ContextManager thread.
+    pub fn new(
+        database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
+    ) -> (Self, ContextManager) {
+        let (core_sender, core_receiver) = mpsc::channel();
+        let handle = ContextManagerCore::new(database, core_receiver).start();
+        let context_manager = ContextManager::new(core_sender.clone());
+        (
+            ContextManagerJoinHandle {
+                core_handle: Some(handle),
+                core_sender,
+            },
+            context_manager,
+        )
+    }
+
+    /// Used to shutdown a ContextManager thread if the thread has not already been joined.
+    /// Returns an error if the thread has otherwise shutdown.
+    pub fn shutdown(mut self) -> Result<(), ContextManagerError> {
+        match self.core_sender.send(ContextOperationMessage::Shutdown) {
+            Ok(_) => {
+                if let Some(join_handle) = self.core_handle.take() {
+                    join_handle
+                        .join()
+                        .expect("Failed to join Context Manager core");
+                }
+            }
+            Err(err) => {
+                return Err(ContextManagerError::InternalError(Box::new(
+                    ContextManagerCoreError::HandlerSendError(err),
+                )));
+            }
+        }
+        Ok(())
     }
 }

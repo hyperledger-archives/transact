@@ -20,7 +20,7 @@ mod core;
 mod error;
 
 pub use crate::context::manager::thread::core::{
-    ContextOperationMessage, ContextOperationResponse,
+    ContextManagerJoinHandle, ContextOperationMessage, ContextOperationResponse,
 };
 pub use crate::context::manager::thread::error::ContextManagerCoreError;
 
