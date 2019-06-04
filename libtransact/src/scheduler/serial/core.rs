@@ -188,19 +188,21 @@ impl SchedulerCore {
             }
         }
 
-        let transaction = match self
+        let transaction = self
             .txn_queue
             .pop()
-            .expect("There are no transactions left in the queue for the current batch")
-            .into_pair()
-        {
-            Ok(transaction) => transaction,
+            .expect("There are no transactions left in the queue for the current batch");
+        let transaction_id = transaction.header_signature().into();
+        let transaction_pair = match transaction.into_pair() {
+            Ok(pair) => pair,
             Err(err) => {
-                // An error can occur here if the header of the
-                // transaction cannot be deserialized. If this occurs,
-                // we panic as handling this is not currently
-                // implemented.
-                unimplemented!("cannot handle ill-formed transaction: {}", err)
+                self.invalidate_current_batch(InvalidTransactionResult {
+                    transaction_id,
+                    error_message: format!("ill-formed transaction: {}", err),
+                    error_data: vec![],
+                });
+                self.send_batch_result();
+                return Ok(());
             }
         };
 
@@ -211,12 +213,94 @@ impl SchedulerCore {
             None => self.context_lifecycle.create_context(&[], &self.state_id),
         };
 
-        self.current_txn = Some(transaction.transaction().header_signature().into());
+        self.current_txn = Some(transaction_pair.transaction().header_signature().into());
         self.execution_tx
-            .send(ExecutionTask::new(transaction, context_id))?;
+            .send(ExecutionTask::new(transaction_pair, context_id))?;
         self.next_ready = false;
 
         Ok(())
+    }
+
+    fn invalidate_current_batch(&mut self, invalid_result: InvalidTransactionResult) {
+        let current_batch_id = self
+            .current_batch
+            .as_ref()
+            .expect("attemping to invalidate current batch but no current batch exists")
+            .batch()
+            .header_signature();
+
+        // Invalidate all previously executed transactions in the batch
+        self.txn_results = self
+            .txn_results
+            .iter()
+            .map(|result| match result {
+                TransactionExecutionResult::Valid(receipt) => {
+                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                        transaction_id: receipt.transaction_id.clone(),
+                        error_message: format!(
+                            "containing batch ({}) is invalid",
+                            current_batch_id,
+                        ),
+                        error_data: vec![],
+                    })
+                }
+                TransactionExecutionResult::Invalid(_) => {
+                    // When an invalid transaction is encountered, the scheduler should fail-fast
+                    // and invalidate the whole batch immediately; if an invalid result is in the
+                    // previously executed transaction results, this did not happen.
+                    panic!("should not already have an invalid result");
+                }
+            })
+            .collect();
+
+        self.txn_results
+            .push(TransactionExecutionResult::Invalid(invalid_result));
+
+        // Invalidate all unexecuted transactions in the batch
+        self.txn_results.append(
+            &mut self
+                .txn_queue
+                .drain(..)
+                .map(|txn| {
+                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                        transaction_id: txn.header_signature().into(),
+                        error_message: format!(
+                            "containing batch ({}) is invalid",
+                            current_batch_id
+                        ),
+                        error_data: vec![],
+                    })
+                })
+                .collect(),
+        );
+    }
+
+    fn send_batch_result(&mut self) {
+        let batch = self
+            .current_batch
+            .take()
+            .expect("attempting to send batch result but no current batch is executing");
+
+        let mut results = vec![];
+        std::mem::swap(&mut results, &mut self.txn_results);
+
+        let batch_result = BatchExecutionResult { batch, results };
+
+        let shared = self
+            .shared_lock
+            .lock()
+            .expect("scheduler shared lock is poisoned");
+        match shared.result_callback() {
+            Some(callback) => {
+                callback(Some(batch_result));
+            }
+            None => {
+                warn!(
+                    "dropped batch execution result: {}",
+                    batch_result.batch.batch().header_signature()
+                );
+            }
+        }
     }
 
     fn run(&mut self) -> Result<(), CoreError> {
@@ -240,96 +324,13 @@ impl SchedulerCore {
                             ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
-                            let current_batch_id = self
-                                .current_batch
-                                .as_ref()
-                                .expect(
-                                    "attemping to invalidate current batch but no current \
-                                     batch exists",
-                                )
-                                .batch()
-                                .header_signature();
-
-                            // Invalidate all previously executed transactions in the batch
-                            self.txn_results = self
-                                .txn_results
-                                .iter()
-                                .map(|existing_result| match existing_result {
-                                    TransactionExecutionResult::Valid(receipt) => {
-                                        TransactionExecutionResult::Invalid(
-                                            InvalidTransactionResult {
-                                                transaction_id: receipt.transaction_id.clone(),
-                                                error_message: format!(
-                                                    "containing batch ({}) is invalid",
-                                                    current_batch_id,
-                                                ),
-                                                error_data: vec![],
-                                            },
-                                        )
-                                    }
-                                    TransactionExecutionResult::Invalid(_) => {
-                                        // When an invalid transaction is encountered, the
-                                        // scheduler should fail-fast and invalidate the whole
-                                        // batch immediately; if an invalid result is in the
-                                        // previously executed transaction results, this did not
-                                        // happen.
-                                        panic!("should not already have an invalid result");
-                                    }
-                                })
-                                .collect();
-
                             self.current_txn = None;
-                            self.txn_results
-                                .push(TransactionExecutionResult::Invalid(result));
-
-                            // Invalidate all unexecuted transactions in the batch
-                            self.txn_results.append(
-                                &mut self
-                                    .txn_queue
-                                    .drain(..)
-                                    .map(|txn| {
-                                        TransactionExecutionResult::Invalid(
-                                            InvalidTransactionResult {
-                                                transaction_id: txn.header_signature().into(),
-                                                error_message: format!(
-                                                    "containing batch ({}) is invalid",
-                                                    current_batch_id,
-                                                ),
-                                                error_data: vec![],
-                                            },
-                                        )
-                                    })
-                                    .collect(),
-                            );
+                            self.invalidate_current_batch(result);
                         }
                     };
 
                     if self.txn_queue.is_empty() {
-                        let batch = self
-                            .current_batch
-                            .take()
-                            .expect("received execution result but no current batch is executing");
-
-                        let mut results = vec![];
-                        std::mem::swap(&mut results, &mut self.txn_results);
-
-                        let batch_result = BatchExecutionResult { batch, results };
-
-                        let shared = self
-                            .shared_lock
-                            .lock()
-                            .expect("scheduler shared lock is poisoned");
-                        match shared.result_callback() {
-                            Some(callback) => {
-                                callback(Some(batch_result));
-                            }
-                            None => {
-                                warn!(
-                                    "dropped batch execution result: {}",
-                                    batch_result.batch.batch().header_signature()
-                                );
-                            }
-                        }
+                        self.send_batch_result();
                     }
 
                     self.try_schedule_next()?;
