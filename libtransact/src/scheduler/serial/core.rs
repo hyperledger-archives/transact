@@ -57,9 +57,11 @@ pub enum CoreMessage {
 }
 
 #[derive(Debug)]
+#[allow(clippy::enum_variant_names)]
 enum CoreError {
     ExecutionSendError(Box<SendError<ExecutionTask>>),
     ContextManagerError(Box<ContextManagerError>),
+    InternalError(String),
 }
 
 impl std::error::Error for CoreError {
@@ -67,6 +69,7 @@ impl std::error::Error for CoreError {
         match *self {
             CoreError::ExecutionSendError(ref err) => err.description(),
             CoreError::ContextManagerError(ref err) => err.description(),
+            CoreError::InternalError(ref err) => err,
         }
     }
 
@@ -74,6 +77,7 @@ impl std::error::Error for CoreError {
         match *self {
             CoreError::ExecutionSendError(ref err) => Some(err),
             CoreError::ContextManagerError(ref err) => Some(err),
+            CoreError::InternalError(_) => None,
         }
     }
 }
@@ -87,6 +91,7 @@ impl std::fmt::Display for CoreError {
             CoreError::ContextManagerError(ref err) => {
                 write!(f, "ContextManagerError: {}", err.description())
             }
+            CoreError::InternalError(ref err) => write!(f, "InternalError: {}", err),
         }
     }
 }
@@ -188,10 +193,15 @@ impl SchedulerCore {
             }
         }
 
-        let transaction = self
-            .txn_queue
-            .pop()
-            .expect("There are no transactions left in the queue for the current batch");
+        let transaction = self.txn_queue.pop().ok_or_else(|| {
+            CoreError::InternalError(format!(
+                "no transactions left in current batch ({})",
+                self.current_batch
+                    .as_ref()
+                    .map(|pair| pair.batch().header_signature())
+                    .unwrap_or("")
+            ))
+        })?;
         let transaction_id = transaction.header_signature().into();
         let transaction_pair = match transaction.into_pair() {
             Ok(pair) => pair,
@@ -200,8 +210,8 @@ impl SchedulerCore {
                     transaction_id,
                     error_message: format!("ill-formed transaction: {}", err),
                     error_data: vec![],
-                });
-                self.send_batch_result();
+                })?;
+                self.send_batch_result()?;
                 return Ok(());
             }
         };
@@ -221,11 +231,18 @@ impl SchedulerCore {
         Ok(())
     }
 
-    fn invalidate_current_batch(&mut self, invalid_result: InvalidTransactionResult) {
+    fn invalidate_current_batch(
+        &mut self,
+        invalid_result: InvalidTransactionResult,
+    ) -> Result<(), CoreError> {
         let current_batch_id = self
             .current_batch
             .as_ref()
-            .expect("attemping to invalidate current batch but no current batch exists")
+            .ok_or_else(|| {
+                CoreError::InternalError(
+                    "attemping to invalidate current batch but no current batch exists".into(),
+                )
+            })?
             .batch()
             .header_signature();
 
@@ -273,13 +290,16 @@ impl SchedulerCore {
                 })
                 .collect(),
         );
+
+        Ok(())
     }
 
-    fn send_batch_result(&mut self) {
-        let batch = self
-            .current_batch
-            .take()
-            .expect("attempting to send batch result but no current batch is executing");
+    fn send_batch_result(&mut self) -> Result<(), CoreError> {
+        let batch = self.current_batch.take().ok_or_else(|| {
+            CoreError::InternalError(
+                "attempting to send batch result but no current batch is executing".into(),
+            )
+        })?;
 
         let mut results = vec![];
         std::mem::swap(&mut results, &mut self.txn_results);
@@ -301,6 +321,8 @@ impl SchedulerCore {
                 );
             }
         }
+
+        Ok(())
     }
 
     fn run(&mut self) -> Result<(), CoreError> {
@@ -310,9 +332,12 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let current_txn_id = self.current_txn.as_ref().expect(
-                        "received execution result but no current transaction is executing",
-                    );
+                    let current_txn_id = self.current_txn.as_ref().ok_or_else(|| {
+                        CoreError::InternalError(
+                            "received execution result but no current transaction is executing"
+                                .into(),
+                        )
+                    })?;
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
                             if &transaction_id != current_txn_id {
@@ -342,12 +367,12 @@ impl SchedulerCore {
                                 continue;
                             }
                             self.current_txn = None;
-                            self.invalidate_current_batch(result);
+                            self.invalidate_current_batch(result)?;
                         }
                     };
 
                     if self.txn_queue.is_empty() {
-                        self.send_batch_result();
+                        self.send_batch_result()?;
                     }
 
                     self.try_schedule_next()?;
