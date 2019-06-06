@@ -310,11 +310,20 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
+                    let current_txn_id = self.current_txn.as_ref().expect(
+                        "received execution result but no current transaction is executing",
+                    );
                     match task_notification {
-                        ExecutionTaskCompletionNotification::Valid(context_id, _transaction_id) => {
-                            let transaction_id = self.current_txn.take().expect(
-                                "received execution result but no current transaction is executing",
-                            );
+                        ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
+                            if &transaction_id != current_txn_id {
+                                error!(
+                                    "received execution result for a transaction ({}) that is \
+                                     not the current transaction ({})",
+                                    transaction_id, current_txn_id
+                                );
+                                continue;
+                            }
+                            self.current_txn = None;
                             self.previous_context = Some(context_id);
                             self.txn_results.push(TransactionExecutionResult::Valid(
                                 self.context_lifecycle.get_transaction_receipt(
@@ -324,6 +333,14 @@ impl SchedulerCore {
                             ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
+                            if &result.transaction_id != current_txn_id {
+                                error!(
+                                    "received execution result for a transaction ({}) that is \
+                                     not the current transaction ({})",
+                                    result.transaction_id, current_txn_id
+                                );
+                                continue;
+                            }
                             self.current_txn = None;
                             self.invalidate_current_batch(result);
                         }
