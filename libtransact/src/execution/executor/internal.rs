@@ -609,7 +609,10 @@ mod tests {
             if let ExecutionCommand::Event(execution_event) = event {
                 let (notifier, task) = *execution_event;
 
-                let notification = ExecutionTaskCompletionNotification::Valid(*task.context_id());
+                let notification = ExecutionTaskCompletionNotification::Valid(
+                    *task.context_id(),
+                    task.pair().transaction().header_signature().into(),
+                );
                 notifier.notify(notification);
             }
         }

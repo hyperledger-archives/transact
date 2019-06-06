@@ -113,7 +113,10 @@ fn execute_transaction(
             let mut static_context = StaticContext::new(context_manager, &context_id);
 
             match handler.apply(&transaction_pair, &mut static_context) {
-                Ok(_) => on_done(Ok(ExecutionTaskCompletionNotification::Valid(context_id))),
+                Ok(_) => on_done(Ok(ExecutionTaskCompletionNotification::Valid(
+                    context_id,
+                    transaction_pair.transaction().header_signature().to_owned(),
+                ))),
                 Err(ApplyError::InvalidTransaction(error_message)) => {
                     on_done(Ok(ExecutionTaskCompletionNotification::Invalid(
                         context_id,
@@ -325,6 +328,7 @@ mod test {
             address: "abc".into(),
             value: b"abc".to_vec(),
         }]);
+        let txn_id = txn_pair.transaction().header_signature().into();
         let context_id = context_manager.create_context(&[], &state_id);
 
         let (send, recv) = std::sync::mpsc::channel();
@@ -340,7 +344,7 @@ mod test {
         let result = recv.recv().unwrap();
 
         assert_eq!(
-            ExecutionTaskCompletionNotification::Valid(context_id.clone()),
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
             result.unwrap()
         );
         assert_eq!(

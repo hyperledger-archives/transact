@@ -311,7 +311,7 @@ impl SchedulerCore {
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
                     match task_notification {
-                        ExecutionTaskCompletionNotification::Valid(context_id) => {
+                        ExecutionTaskCompletionNotification::Valid(context_id, _transaction_id) => {
                             let transaction_id = self.current_txn.take().expect(
                                 "received execution result but no current transaction is executing",
                             );

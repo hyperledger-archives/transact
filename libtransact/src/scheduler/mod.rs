@@ -100,8 +100,8 @@ pub enum ExecutionTaskCompletionNotification {
     /// The transation was invalid.
     Invalid(ContextId, InvalidTransactionResult),
 
-    /// The transation was valid.
-    Valid(ContextId),
+    /// The transation was valid (String is transaction ID).
+    Valid(ContextId, String),
 }
 
 /// Schedules batches and transactions and returns execution results.
