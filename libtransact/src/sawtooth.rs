@@ -472,7 +472,10 @@ mod xo_compat_test {
             .expect("Should not have poisoned the lock")
             .as_ref()
             .expect("Should not be None")
-            .execute(task_iterator, scheduler.new_notifier())
+            .execute(
+                task_iterator,
+                scheduler.new_notifier().expect("Failed to get notifier"),
+            )
             .expect("Failed to execute schedule");
     }
 

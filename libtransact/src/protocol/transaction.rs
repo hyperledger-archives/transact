@@ -184,7 +184,7 @@ impl IntoBytes for TransactionHeader {
 impl IntoProto<protos::transaction::TransactionHeader> for TransactionHeader {}
 impl IntoNative<TransactionHeader> for protos::transaction::TransactionHeader {}
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Eq, Hash, PartialEq, Clone)]
 pub struct Transaction {
     header: Vec<u8>,
     header_signature: String,

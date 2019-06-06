@@ -27,6 +27,7 @@
 //! must be consumed by a component responsible for iterating over the `Transaction`s and providing
 //! `TransactionExecutionResult`s back to the `Scheduler` via the `SchedulerExecutionInterface`.
 
+pub mod multi;
 pub mod parallel;
 pub mod serial;
 
@@ -64,7 +65,7 @@ impl ExecutionTask {
 }
 
 /// Result from executing an invalid transaction.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct InvalidTransactionResult {
     /// Transaction identifier.
     pub transaction_id: String,
@@ -78,6 +79,7 @@ pub struct InvalidTransactionResult {
 }
 
 /// Result from executing a transaction.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum TransactionExecutionResult {
     /// The transation was invalid.
     Invalid(InvalidTransactionResult),
@@ -87,6 +89,7 @@ pub enum TransactionExecutionResult {
 }
 
 /// Result of executing a batch.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct BatchExecutionResult {
     /// The `BatchPair` which was executed.
     pub batch: BatchPair,
@@ -224,6 +227,46 @@ mod tests {
 
     use std::sync::{Arc, Condvar, Mutex};
     use std::thread;
+
+    pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let results = batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| {
+                TransactionExecutionResult::Valid(TransactionReceipt {
+                    state_changes: vec![],
+                    events: vec![],
+                    data: vec![],
+                    transaction_id: txn.header_signature().into(),
+                })
+            })
+            .collect();
+        Some(BatchExecutionResult { batch, results })
+    }
+
+    pub fn invalid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let results = batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| {
+                TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                    transaction_id: txn.header_signature().into(),
+                    error_message: String::new(),
+                    error_data: vec![],
+                })
+            })
+            .collect();
+        Some(BatchExecutionResult { batch, results })
+    }
+
+    pub fn mock_context_id() -> ContextId {
+        [
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+            0x0f, 0x10,
+        ]
+    }
 
     #[derive(Clone)]
     pub struct MockContextLifecycle {}
