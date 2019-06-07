@@ -14,11 +14,10 @@
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
+use hex::{decode, encode_upper};
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
-
-use hex::{decode, encode_upper};
 
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {

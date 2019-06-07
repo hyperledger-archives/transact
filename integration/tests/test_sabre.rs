@@ -19,15 +19,13 @@
     The test is order dependent so the tests are written as one test to ensure ordering.
 */
 
-extern crate serde_json;
-extern crate subprocess;
-
 use serde_json::Value;
+use subprocess::Exec;
+
 use std::error::Error as StdError;
 use std::fs::File;
 use std::io::Read;
 use std::io::{BufRead, BufReader};
-use subprocess::Exec;
 
 const INTKEY_MULTIPLY_DEF: &str = "/project/example/intkey_multiply/intkey_multiply.yaml";
 

@@ -14,13 +14,6 @@
 
 #[macro_use]
 extern crate clap;
-extern crate crypto;
-extern crate futures;
-extern crate hyper;
-extern crate protobuf;
-extern crate sawtooth_sdk;
-extern crate tokio_core;
-extern crate users;
 
 mod error;
 mod key;

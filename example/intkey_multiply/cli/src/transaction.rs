@@ -19,10 +19,8 @@ use std::time::Instant;
 
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
-
 use protobuf;
 use protobuf::Message;
-
 use sawtooth_sdk::messages::batch::Batch;
 use sawtooth_sdk::messages::batch::BatchHeader;
 use sawtooth_sdk::messages::batch::BatchList;
@@ -30,7 +28,7 @@ use sawtooth_sdk::messages::transaction::Transaction;
 use sawtooth_sdk::messages::transaction::TransactionHeader;
 use sawtooth_sdk::signing::Signer;
 
-use error::CliError;
+use crate::error::CliError;
 
 /// The Intkey Multiply transaction family name (intkey_multiply)
 const INTKEY_MULITPLY_FAMILY_NAME: &'static str = "intkey_multiply";
