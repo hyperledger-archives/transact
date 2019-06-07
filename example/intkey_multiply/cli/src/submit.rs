@@ -20,13 +20,13 @@ use hyper;
 use hyper::client::{Client, Request};
 use hyper::header::{ContentLength, ContentType};
 use hyper::Method;
+use protobuf::Message;
 use std::str;
 use tokio_core;
 
 use sawtooth_sdk::messages::batch::BatchList;
 
-use error::CliError;
-use protobuf::Message;
+use crate::error::CliError;
 
 pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliError> {
     let post_url = String::from(url) + "/batches";

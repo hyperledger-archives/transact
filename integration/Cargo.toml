@@ -2,6 +2,7 @@
 name = "integration"
 version = "0.2.0"
 authors = ["Cargill Incorporated"]
+edition = "2018"
 
 [dev-dependencies]
 subprocess = "0.1.12"

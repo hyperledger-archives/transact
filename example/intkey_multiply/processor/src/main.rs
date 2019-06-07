@@ -13,7 +13,6 @@
 // limitations under the License.
 #[macro_use]
 extern crate cfg_if;
-extern crate hex;
 cfg_if! {
     if #[cfg(target_arch = "wasm32")] {
         #[macro_use]
@@ -21,11 +20,8 @@ cfg_if! {
     } else {
         #[macro_use]
         extern crate clap;
-        extern crate log4rs;
         #[macro_use]
         extern crate log;
-        extern crate rustc_serialize;
-        extern crate sawtooth_sdk;
         use std::process;
         use log::LogLevelFilter;
         use log4rs::append::console::ConsoleAppender;

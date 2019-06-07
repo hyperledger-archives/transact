@@ -11,17 +11,17 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-extern crate protobuf;
 
 mod externs;
 pub mod log;
 pub mod protocol;
 pub mod protos;
 
-pub use externs::{WasmPtr, WasmPtrList};
 use std::collections::HashMap;
 use std::error::Error;
 use std::string::FromUtf8Error;
+
+pub use crate::externs::{WasmPtr, WasmPtrList};
 
 pub struct Header {
     signer: String,
