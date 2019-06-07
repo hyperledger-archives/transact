@@ -12,35 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-//! The following are no-op log macros that will be used when running a smart contract in
-//! Sabre.
+//! The following are logging macros that will be used when running a smart contract in
+//! Sabre. The log level is the same level set on the sabre transaction processor running the
+//! smart contract.
 
 #[macro_export]
 macro_rules! log {
-    ($lvl:expr, $($arg:tt)+) => {};
+    ($lvl:path, $($arg:tt)+) => ({
+        let lvl = $lvl;
+        if ::sabre_sdk::log_enabled(lvl) {
+            let x = format_args!($($arg)*).to_string();
+            ::sabre_sdk::log_message(lvl, x);
+        }
+    })
 }
 
 #[macro_export]
 macro_rules! trace {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) =>(log!(::sabre_sdk::LogLevel::Trace, $($arg)*))
 }
 
 #[macro_export]
 macro_rules! debug {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) =>(log!(::sabre_sdk::LogLevel::Debug, $($arg)*))
 }
 
 #[macro_export]
 macro_rules! info {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) =>(log!(::sabre_sdk::LogLevel::Info, $($arg)*))
 }
 
 #[macro_export]
 macro_rules! warn {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) =>(log!(::sabre_sdk::LogLevel::Warn, $($arg)*))
 }
-
 #[macro_export]
 macro_rules! error {
-    ($($arg:tt)*) => {};
+    ($($arg:tt)*) =>(log!(::sabre_sdk::LogLevel::Error, $($arg)*))
 }

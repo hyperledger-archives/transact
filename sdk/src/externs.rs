@@ -36,4 +36,6 @@ extern "C" {
         public_key: WasmPtr,
         payload: WasmPtr,
     ) -> i32;
+    pub fn log_buffer(log_level: WasmPtr, log_string: WasmPtr);
+    pub fn log_level() -> WasmPtr;
 }
