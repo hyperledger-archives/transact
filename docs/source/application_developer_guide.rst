@@ -112,7 +112,7 @@ The following is an example for intkey-multiply
   hex = "0.3.1"
 
   [target.'cfg(target_arch = "wasm32")'.dependencies]
-  rust_crypto = {git = "https://github.com/agunde406/rust-crypto", branch="wasm_sha2"}
+  rust-crypto-wasm = "0.3"
   sabre-sdk = {path = "../../../sdk"}
 
   [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
