@@ -15,6 +15,14 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+
+//! Traits for handling the execution of a transaction.
+//!
+//! The TransactionHandler trait provides the interface for implementing smart contract engines.
+//! These handlers must be stateless and deterministic.  They are provided, along with the
+//! transaction itself, a TransactonContext implementation which provides access to reading and
+//! writing from state, as well appending events and other opaque data to the receipt.
+
 mod error;
 
 pub use crate::handler::error::{ApplyError, ContextError};
