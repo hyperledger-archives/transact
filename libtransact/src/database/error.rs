@@ -15,6 +15,8 @@
  * ------------------------------------------------------------------------------
  */
 
+//! A common set of errors that can occur on database operations.
+
 use std;
 
 #[derive(Debug)]

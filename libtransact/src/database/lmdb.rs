@@ -15,6 +15,8 @@
  * ------------------------------------------------------------------------------
  */
 
+//! An LMDB (Lightning Memory-Mapped DB) implementation of the database traits.
+
 use crate::database::{
     Database, DatabaseCursor, DatabaseReader, DatabaseReaderCursor, DatabaseWriter,
 };
