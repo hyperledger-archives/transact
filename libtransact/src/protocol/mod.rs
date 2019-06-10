@@ -15,6 +15,11 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Transact structs for batches, transactions and receipts.
+//!
+//! These structs cover the core protocols of the Transact system.  Batches of transactions are
+//! scheduled and executed.  The resuls of execution are stored in transaction receipts.
+
 pub mod batch;
 pub mod receipt;
 pub mod transaction;
