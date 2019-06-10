@@ -104,6 +104,7 @@ The following is an example for intkey-multiply
   name = "intkey-multiply"
   version = "0.1.0"
   authors = ["Cargill Incorporated"]
+  edition = "2018"
 
   [dependencies]
   clap = "2"
@@ -139,11 +140,8 @@ the handler a public module and add an empty main function.
       } else {
           #[macro_use]
           extern crate clap;
-          extern crate log4rs;
           #[macro_use]
           extern crate log;
-          extern crate rustc_serialize;
-          extern crate sawtooth_sdk;
           use std::process;
           use log::LogLevelFilter;
           use log4rs::append::console::ConsoleAppender;
