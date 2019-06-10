@@ -196,7 +196,10 @@ decorator, so they will only be compiled when compiling into Wasm.
       let handler = IntkeyMultiplyTransactionHandler::new();
       match handler.apply(request, context) {
           Ok(_) => Ok(true),
-          Err(err) => Err(err)
+          Err(err) => {
+              info!("{}", err);
+              Err(err)
+          }
       }
 
   }
@@ -219,6 +222,51 @@ decorator, so they will only be compiled when compiling into Wasm.
 
 For the full intkey-multiply example look at
 sawtooth-sabre/example/intkey_multiply/processor
+
+
+.. _logging-in-smart-contracts:
+
+Logging in a Sabre Smart Contract
+=================================
+The Sabre SDK provides log macros that match the provided log macros from the
+`log crate <https://doc.rust-lang.org/1.1.0/log/macro.info!.html>`_. To use add
+``#[macro_use]`` above ``extern crate sabre_sdk`` and use the macros as normal.
+
+.. code-block:: rust
+
+  info!(
+      "payload: {} {} {}",
+      payload.get_name_a(),
+      payload.get_name_b(),
+      payload.get_name_c()
+  );
+
+For debugging purposes, add a log statement to the final match statement in
+the apply method:
+
+.. code-block::
+
+  #[cfg(target_arch = "wasm32")]
+  // Sabre apply must return a bool
+  fn apply(
+      request: &TpProcessRequest,
+      context: &mut dyn TransactionContext,
+  ) -> Result<bool, ApplyError> {
+
+      let handler = IntkeyMultiplyTransactionHandler::new();
+      match handler.apply(request, context) {
+          Ok(_) => Ok(true),
+          Err(err) => {
+              info!("{}", err);
+              Err(err)
+          }
+      }
+
+  }
+
+The log level of the Sabre transaction processor is enforced for all smart
+contracts. For example, if the Sabre transaction processor has a log level of
+``info`` a ``debug`` statement in a smart contract will not be logged.
 
 .. _compiling-smart-contract-label:
 
