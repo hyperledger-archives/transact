@@ -43,6 +43,7 @@ fn main() {
                 .to_str()
                 .unwrap(),
             proto_path.join("merkle.proto").to_str().unwrap(),
+            proto_path.join("command.proto").to_str().unwrap(),
         ],
         includes: &[proto_path.to_str().unwrap()],
         customize: Customize::default(),
@@ -52,6 +53,6 @@ fn main() {
     // Create mod.rs accordingly
     let mut mod_file = File::create(dest_path.join("mod.rs")).unwrap();
     mod_file
-        .write_all(b"pub mod batch;\npub mod events;\npub mod transaction;\npub mod transaction_receipt;\npub mod merkle;\n")
+        .write_all(b"pub mod batch;\npub mod events;\npub mod transaction;\npub mod transaction_receipt;\npub mod merkle;\npub mod command;\n")
         .unwrap();
 }
