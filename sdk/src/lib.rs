@@ -566,7 +566,7 @@ impl WasmBuffer {
 
         Ok(WasmBuffer {
             raw,
-            data: buffer.clone().to_vec(),
+            data: buffer.to_vec(),
         })
     }
 
