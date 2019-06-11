@@ -556,8 +556,8 @@ impl WasmBuffer {
             ));
         }
 
-        for i in 0..buffer.len() {
-            if externs::write_byte(raw, i as u32, buffer[i]) < 0 {
+        for (i, byte) in buffer.iter().enumerate() {
+            if externs::write_byte(raw, i as u32, *byte) < 0 {
                 return Err(WasmSdkError::MemoryWriteError(
                     "Failed to write data to host memory".into(),
                 ));
