@@ -571,7 +571,7 @@ impl WasmBuffer {
     }
 
     pub unsafe fn from_raw(raw: WasmPtr) -> Result<WasmBuffer, WasmSdkError> {
-        let data = ptr_to_vec(raw)?.unwrap_or(Vec::new());
+        let data = ptr_to_vec(raw)?.unwrap_or_default();
         Ok(WasmBuffer { raw, data })
     }
 
