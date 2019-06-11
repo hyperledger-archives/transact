@@ -45,14 +45,14 @@ use crate::protocol::transaction::{TransactionHeader, TransactionPair};
 /// can be adapted as follows:
 ///
 ///     # use sawtooth_xo::handler::XoTransactionHandler;
-///     # use transact::context::manager::sync::ContextManager;
+///     # use transact::context::manager::thread::{ContextManagerJoinHandle, ContextManager};
 ///     # use transact::database::btree::BTreeDatabase;
 ///     # use transact::execution::adapter::static_adapter::StaticExecutionAdapter;
 ///     # use transact::sawtooth::SawtoothToTransactHandlerAdapter;
 ///     # use transact::state::merkle::{self, MerkleRadixTree, MerkleState};
 ///     #
 ///     # let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
-///     # let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+///     # let (join_handle, context_manager) = ContextManagerJoinHandle::new(Box::new(MerkleState::new(db.clone())));
 ///     let execution_adapter = StaticExecutionAdapter::new_adapter(
 ///         vec![Box::new(SawtoothToTransactHandlerAdapter::new(
 ///             XoTransactionHandler::new(),
@@ -229,12 +229,13 @@ fn to_context_error(err: ContextError) -> SawtoothContextError {
 #[cfg(test)]
 mod xo_compat_test {
     use std::panic;
+    use std::panic::AssertUnwindSafe;
     use std::sync::{Arc, Mutex};
 
     use sawtooth_xo::handler::XoTransactionHandler;
     use sha2::{Digest, Sha512};
 
-    use crate::context::manager::sync::ContextManager;
+    use crate::context::manager::thread::{ContextManager, ContextManagerJoinHandle};
     use crate::database::{btree::BTreeDatabase, Database};
     use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
     use crate::protocol::{
@@ -259,7 +260,9 @@ mod xo_compat_test {
     #[test]
     fn execute_create_xo_game() {
         let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
-        let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+        let (join_handle, context_manager) =
+            ContextManagerJoinHandle::new(Box::new(MerkleState::new(db.clone())));
+        let context_manager = AssertUnwindSafe(context_manager);
 
         let executor = create_executor(&context_manager);
         start_executor(&executor);
@@ -273,8 +276,9 @@ mod xo_compat_test {
 
             let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+            let mut scheduler =
+                SerialScheduler::new(Box::new(context_manager.clone()), state_root.clone())
+                    .expect("Failed to create scheduler");
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
             scheduler
@@ -308,6 +312,7 @@ mod xo_compat_test {
             );
         });
 
+        assert!(join_handle.shutdown().is_ok());
         stop_executor(&executor);
 
         assert!(panic_check.is_ok());
@@ -324,7 +329,9 @@ mod xo_compat_test {
     #[test]
     fn execute_multiple_xo_transactions() {
         let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
-        let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
+        let (join_handle, context_manager) =
+            ContextManagerJoinHandle::new(Box::new(MerkleState::new(db.clone())));
+        let context_manager = AssertUnwindSafe(context_manager);
 
         let executor = create_executor(&context_manager);
         start_executor(&executor);
@@ -339,8 +346,9 @@ mod xo_compat_test {
 
             let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+            let mut scheduler =
+                SerialScheduler::new(Box::new(context_manager.clone()), state_root.clone())
+                    .expect("Failed to create scheduler");
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
             scheduler
@@ -394,6 +402,7 @@ mod xo_compat_test {
             );
         });
 
+        assert!(join_handle.shutdown().is_ok());
         stop_executor(&executor);
 
         assert!(panic_check.is_ok());
