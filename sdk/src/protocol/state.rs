@@ -89,12 +89,6 @@ impl StdError for VersionBuildError {
             VersionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            VersionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for VersionBuildError {
@@ -259,12 +253,6 @@ impl StdError for ContractRegistryBuildError {
             ContractRegistryBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ContractRegistryBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for ContractRegistryBuildError {
@@ -416,12 +404,6 @@ impl StdError for ContractRegistryListBuildError {
             ContractRegistryListBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ContractRegistryListBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for ContractRegistryListBuildError {
@@ -523,12 +505,6 @@ impl StdError for PermissionBuildError {
     fn description(&self) -> &str {
         match *self {
             PermissionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            PermissionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -691,12 +667,6 @@ impl StdError for NamespaceRegistryBuildError {
             NamespaceRegistryBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            NamespaceRegistryBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for NamespaceRegistryBuildError {
@@ -848,12 +818,6 @@ impl StdError for NamespaceRegistryListBuildError {
             NamespaceRegistryListBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            NamespaceRegistryListBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for NamespaceRegistryListBuildError {
@@ -1003,12 +967,6 @@ impl StdError for ContractBuildError {
     fn description(&self) -> &str {
         match *self {
             ContractBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ContractBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1200,12 +1158,6 @@ impl StdError for ContractListBuildError {
             ContractListBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ContractListBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for ContractListBuildError {
@@ -1328,12 +1280,6 @@ impl StdError for SmartPermissionBuildError {
     fn description(&self) -> &str {
         match *self {
             SmartPermissionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            SmartPermissionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1482,12 +1428,6 @@ impl StdError for SmartPermissionListBuildError {
     fn description(&self) -> &str {
         match *self {
             SmartPermissionListBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            SmartPermissionListBuildError::MissingField(_) => None,
         }
     }
 }
