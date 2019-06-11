@@ -533,12 +533,10 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
         let mut state = IntkeyState::new(context);
         info!(
-            "payload: {} {} {} {} {}",
+            "payload: {} {} {}",
             payload.get_name_a(),
             payload.get_name_b(),
-            payload.get_name_c(),
-            request.get_header().get_inputs()[0],
-            request.get_header().get_outputs()[0]
+            payload.get_name_c()
         );
 
         #[cfg(target_arch = "wasm32")]
@@ -641,7 +639,10 @@ fn apply(
     let handler = IntkeyMultiplyTransactionHandler::new();
     match handler.apply(request, context) {
         Ok(_) => Ok(true),
-        Err(err) => Err(err),
+        Err(err) => {
+            info!("{}", err);
+            Err(err)
+        }
     }
 }
 

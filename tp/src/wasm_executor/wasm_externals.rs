@@ -19,6 +19,7 @@ use std::fmt;
 use std::string::FromUtf8Error;
 use std::time::Instant;
 
+use log::{max_level, LevelFilter};
 use sabre_sdk::protocol::state::{SmartPermission, SmartPermissionList};
 use sabre_sdk::protos::FromBytes;
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
@@ -147,6 +148,15 @@ const ADD_TO_COLLECTION: usize = 11;
 /// successfully retrieved from state.
 ///
 const SMART_PERMISSION: usize = 12;
+
+/// Args
+///
+/// 1) log level
+/// 2) the formated string to log
+const LOG: usize = 13;
+
+/// Returns the current logleel set on the transaction processor
+const LOG_LEVEL: usize = 14;
 
 pub struct WasmExternals<'a> {
     pub memory_ref: MemoryRef,
@@ -557,6 +567,27 @@ impl<'a> Externals for WasmExternals<'a> {
                     None => Err(ExternalsError::to_trap("No result returned".into())),
                 }
             }
+            LOG => {
+                let log_level: u32 = args.nth(0);
+                let log_ptr: u32 = args.nth(1);
+                let log_string = self.ptr_to_string(log_ptr)?;
+                match log_level {
+                    0 => error!("{}", log_string),
+                    1 => warn!("{}", log_string),
+                    2 => info!("{}", log_string),
+                    3 => debug!("{}", log_string),
+                    4 => trace!("{}", log_string),
+                    _ => warn!("Unknown log level requested: {}", log_level),
+                }
+                Ok(None)
+            }
+            LOG_LEVEL => match max_level() {
+                LevelFilter::Trace => Ok(Some(RuntimeValue::I32(4))),
+                LevelFilter::Debug => Ok(Some(RuntimeValue::I32(3))),
+                LevelFilter::Info => Ok(Some(RuntimeValue::I32(2))),
+                LevelFilter::Warn => Ok(Some(RuntimeValue::I32(1))),
+                LevelFilter::Error | _ => Ok(Some(RuntimeValue::I32(0))),
+            },
             _ => Err(ExternalsError::to_trap("Function does not exist".into())),
         }
     }
@@ -630,7 +661,14 @@ impl<'a> ModuleImportResolver for WasmExternals<'a> {
                 Signature::new(&[ValueType::I32, ValueType::I32][..], Some(ValueType::I32)),
                 ADD_TO_COLLECTION,
             )),
-
+            "log_buffer" => Ok(FuncInstance::alloc_host(
+                Signature::new(&[ValueType::I32, ValueType::I32][..], None),
+                LOG,
+            )),
+            "log_level" => Ok(FuncInstance::alloc_host(
+                Signature::new(&[][..], Some(ValueType::I32)),
+                LOG_LEVEL,
+            )),
             _ => Err(Error::Instantiation(format!(
                 "Export {} not found",
                 field_name
