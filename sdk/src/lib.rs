@@ -53,15 +53,15 @@ impl<'a> TpProcessRequest<'a> {
     }
 
     pub fn get_payload(&self) -> &[u8] {
-        return &self.payload;
+        &self.payload
     }
 
     pub fn get_header(&self) -> &Header {
-        return self.header;
+        self.header
     }
 
     pub fn get_signature(&self) -> String {
-        return self.signature.to_string();
+        self.signature.to_string()
     }
 }
 
