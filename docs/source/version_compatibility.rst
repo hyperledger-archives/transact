@@ -25,8 +25,6 @@ the Sabre transaction processor image.
 | Processor  |          |           |         |                                |
 +============+==========+===========+=========+================================+
 | 0.0        | 0.1      | 0.1       |  0.2    |                                |
-|            |          |           |         |                                |
-|            |          |           |         |                                |
 +------------+----------+-----------+---------+--------------------------------+
 | 0.2        | 0.2      | 0.2       |  0.3    | - Transaction context is a     |
 |            |          |           |         |   trait                        |
@@ -44,4 +42,10 @@ the Sabre transaction processor image.
 |            |          |           |         |   Transaction Processor.       |
 |            |          |           |         | - Adds no-op logging macros to |
 |            |          |           |         |   the Sabre SDK                |
++------------+----------+-----------+---------+--------------------------------+
+| 0.4        | 0.4      | 0.4       |  0.3    | - Replaces the no-op log macros|
+|            |          |           |         |   with macros that will        |
+|            |          |           |         |   marshal the log back to the  |
+|            |          |           |         |   Sabre Transaction Processor  |
+|            |          |           |         |   where it will be logged.     |
 +------------+----------+-----------+---------+--------------------------------+
