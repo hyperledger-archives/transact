@@ -681,7 +681,7 @@ unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
         vec.push(externs::read_byte(ptr as isize + i));
     }
 
-    if vec.len() == 0 {
+    if vec.is_empty() {
         return Ok(None);
     }
     Ok(Some(vec))
