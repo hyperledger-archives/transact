@@ -340,12 +340,12 @@ impl IntkeyPayload {
 }
 
 pub struct IntkeyState<'a> {
-    context: &'a mut TransactionContext,
+    context: &'a mut dyn TransactionContext,
     get_cache: HashMap<String, BTreeMap<String, u32>>,
 }
 
 impl<'a> IntkeyState<'a> {
-    pub fn new(context: &'a mut TransactionContext) -> IntkeyState {
+    pub fn new(context: &'a mut dyn TransactionContext) -> IntkeyState {
         IntkeyState {
             context,
             get_cache: HashMap::new(),
