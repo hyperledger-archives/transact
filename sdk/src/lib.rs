@@ -181,6 +181,7 @@ pub trait TransactionContext {
     fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError>;
 }
 
+#[derive(Default)]
 pub struct SabreTransactionContext {}
 
 impl SabreTransactionContext {
