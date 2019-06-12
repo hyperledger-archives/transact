@@ -311,17 +311,7 @@ impl SchedulerCore {
             .shared_lock
             .lock()
             .expect("scheduler shared lock is poisoned");
-        match shared.result_callback() {
-            Some(callback) => {
-                callback(Some(batch_result));
-            }
-            None => {
-                warn!(
-                    "dropped batch execution result: {}",
-                    batch_result.batch.batch().header_signature()
-                );
-            }
-        }
+        shared.result_callback()(Some(batch_result));
 
         Ok(())
     }
