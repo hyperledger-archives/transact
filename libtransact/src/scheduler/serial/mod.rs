@@ -27,6 +27,7 @@ use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use crate::scheduler::Scheduler;
+use crate::scheduler::SchedulerError;
 
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
@@ -94,6 +95,14 @@ impl Scheduler for SerialScheduler {
             .lock()
             .expect("scheduler shared lock is poisoned");
         shared.set_result_callback(callback);
+    }
+
+    fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
+        let mut shared = self
+            .shared_lock
+            .lock()
+            .expect("scheduler shared lock is poisoned");
+        shared.set_error_callback(callback);
     }
 
     fn add_batch(&mut self, batch: BatchPair) {

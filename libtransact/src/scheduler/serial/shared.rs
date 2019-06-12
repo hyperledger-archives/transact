@@ -19,6 +19,7 @@
 
 use crate::protocol::batch::BatchPair;
 use crate::scheduler::BatchExecutionResult;
+use crate::scheduler::SchedulerError;
 
 use std::collections::VecDeque;
 
@@ -26,6 +27,7 @@ use std::collections::VecDeque;
 pub struct Shared {
     finalized: bool,
     result_callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+    error_callback: Box<Fn(SchedulerError) + Send>,
     unscheduled_batches: VecDeque<BatchPair>,
 }
 
@@ -34,6 +36,7 @@ impl Shared {
         Shared {
             finalized: false,
             result_callback: Box::new(default_result_callback),
+            error_callback: Box::new(default_error_callback),
             unscheduled_batches: VecDeque::new(),
         }
     }
@@ -46,12 +49,20 @@ impl Shared {
         &*self.result_callback
     }
 
+    pub fn error_callback(&self) -> &(Fn(SchedulerError) + Send) {
+        &*self.error_callback
+    }
+
     pub fn set_finalized(&mut self, finalized: bool) {
         self.finalized = finalized;
     }
 
     pub fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>) {
         self.result_callback = callback;
+    }
+
+    pub fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
+        self.error_callback = callback;
     }
 
     pub fn add_unscheduled_batch(&mut self, batch: BatchPair) {
@@ -75,4 +86,8 @@ fn default_result_callback(batch_result: Option<BatchExecutionResult>) {
             None => "None",
         }
     );
+}
+
+fn default_error_callback(error: SchedulerError) {
+    error!("No error callback set; SchedulerError: {}", error);
 }

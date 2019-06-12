@@ -104,6 +104,15 @@ pub enum ExecutionTaskCompletionNotification {
     Valid(ContextId, String),
 }
 
+#[derive(Debug)]
+pub enum SchedulerError {}
+
+impl std::fmt::Display for SchedulerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "scheduler encountered an error")
+    }
+}
+
 /// Schedules batches and transactions and returns execution results.
 pub trait Scheduler {
     /// Sets a callback to receive results from processing batches. The order
@@ -111,6 +120,10 @@ pub trait Scheduler {
     /// batches were added with `add_batch`. If callback is called with None,
     /// all batch results have been sent.
     fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>);
+
+    /// Sets a callback to receive any errors encountered by the Scheduler that are not related to
+    /// a specific batch.
+    fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>);
 
     /// Adds a BatchPair to the scheduler.
     fn add_batch(&mut self, batch: BatchPair);
