@@ -25,6 +25,7 @@ use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::scheduler::InvalidTransactionResult;
+use crate::scheduler::SchedulerError;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
@@ -316,6 +317,14 @@ impl SchedulerCore {
         Ok(())
     }
 
+    fn send_scheduler_error(&mut self, error: SchedulerError) {
+        let shared = self
+            .shared_lock
+            .lock()
+            .expect("scheduler shared lock is poisoned");
+        shared.error_callback()(error);
+    }
+
     fn run(&mut self) -> Result<(), CoreError> {
         loop {
             match self.rx.recv() {
@@ -332,11 +341,9 @@ impl SchedulerCore {
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
                             if &transaction_id != current_txn_id {
-                                error!(
-                                    "received execution result for a transaction ({}) that is \
-                                     not the current transaction ({})",
-                                    transaction_id, current_txn_id
-                                );
+                                self.send_scheduler_error(SchedulerError::UnexpectedNotification(
+                                    transaction_id,
+                                ));
                                 continue;
                             }
                             self.current_txn = None;
@@ -350,11 +357,9 @@ impl SchedulerCore {
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
                             if &result.transaction_id != current_txn_id {
-                                error!(
-                                    "received execution result for a transaction ({}) that is \
-                                     not the current transaction ({})",
-                                    result.transaction_id, current_txn_id
-                                );
+                                self.send_scheduler_error(SchedulerError::UnexpectedNotification(
+                                    result.transaction_id,
+                                ));
                                 continue;
                             }
                             self.current_txn = None;

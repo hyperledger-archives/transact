@@ -105,11 +105,21 @@ pub enum ExecutionTaskCompletionNotification {
 }
 
 #[derive(Debug)]
-pub enum SchedulerError {}
+pub enum SchedulerError {
+    /// An `ExecutionTaskCompletionNotification` was received for a transaction that the scheduler
+    /// was not expecting; the contained `String` is the transaction ID.
+    UnexpectedNotification(String),
+}
 
 impl std::fmt::Display for SchedulerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "scheduler encountered an error")
+        match *self {
+            SchedulerError::UnexpectedNotification(ref txn_id) => write!(
+                f,
+                "scheduler received an unexpected notification: {}",
+                txn_id
+            ),
+        }
     }
 }
 
