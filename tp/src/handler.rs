@@ -542,7 +542,7 @@ fn create_contract_registry(
 
     for entry in setting.get_entries() {
         if entry.key == "sawtooth.swa.administrators" {
-            let values = entry.value.split(",");
+            let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
                 return Err(ApplyError::InvalidTransaction(format!(
@@ -683,7 +683,7 @@ fn create_namespace_registry(
 
     for entry in setting.get_entries() {
         if entry.key == "sawtooth.swa.administrators" {
-            let values = entry.value.split(",");
+            let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
                 return Err(ApplyError::InvalidTransaction(format!(
@@ -1080,7 +1080,7 @@ fn can_update_namespace_registry(
 
         for entry in setting.get_entries() {
             if entry.key == "sawtooth.swa.administrators" {
-                let values = entry.value.split(",");
+                let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(
@@ -1119,7 +1119,7 @@ fn can_update_contract_registry(
 
         for entry in setting.get_entries() {
             if entry.key == "sawtooth.swa.administrators" {
-                let values = entry.value.split(",");
+                let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(
