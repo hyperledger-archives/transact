@@ -810,7 +810,7 @@ impl<'a> SmartPermissionModule<'a> {
             role_ptrs.push(i.unwrap());
         }
 
-        let role_list_ptr = if role_ptrs.len() > 0 {
+        let role_list_ptr = if !role_ptrs.is_empty() {
             env.collect_ptrs(role_ptrs)? as i32
         } else {
             -1

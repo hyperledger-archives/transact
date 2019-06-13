@@ -586,7 +586,7 @@ fn delete_contract_registry(
         }
     };
 
-    if contract_registry.versions().len() != 0 {
+    if !contract_registry.versions().is_empty() {
         return Err(ApplyError::InvalidTransaction(format!(
             "Contract Registry can only be deleted if there are no versions: {}",
             name,
@@ -729,7 +729,7 @@ fn delete_namespace_registry(
     };
     can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
 
-    if namespace_registry.permissions().len() != 0 {
+    if !namespace_registry.permissions().is_empty() {
         return Err(ApplyError::InvalidTransaction(format!(
             "Namespace Registry can only be deleted if there are no permissions: {}",
             namespace,
