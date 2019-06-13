@@ -564,7 +564,7 @@ impl<'a> Externals for WasmExternals<'a> {
                         );
                         Ok(Some(RuntimeValue::I32(x)))
                     }
-                    None => Err(ExternalsError::to_trap("No result returned".into())),
+                    None => Err(ExternalsError::trap("No result returned".into())),
                 }
             }
             LOG => {
@@ -588,7 +588,7 @@ impl<'a> Externals for WasmExternals<'a> {
                 LevelFilter::Warn => Ok(Some(RuntimeValue::I32(1))),
                 LevelFilter::Error | _ => Ok(Some(RuntimeValue::I32(0))),
             },
-            _ => Err(ExternalsError::to_trap("Function does not exist".into())),
+            _ => Err(ExternalsError::trap("Function does not exist".into())),
         }
     }
 }
@@ -714,7 +714,7 @@ pub struct ExternalsError {
 }
 
 impl ExternalsError {
-    fn to_trap(msg: String) -> Trap {
+    fn trap(msg: String) -> Trap {
         Trap::from(TrapKind::Host(Box::new(ExternalsError::from(msg))))
     }
 }
