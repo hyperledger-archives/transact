@@ -57,7 +57,7 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             ))
         })?;
 
-    let private_key_filename = env::home_dir()
+    let private_key_filename = dirs::home_dir()
         .ok_or_else(|| CliError::UserError(String::from(
             "Could not load signing key: unable to determine home directory",
         )))
