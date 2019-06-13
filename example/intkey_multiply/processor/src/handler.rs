@@ -491,6 +491,7 @@ pub struct IntkeyMultiplyTransactionHandler {
 }
 
 impl IntkeyMultiplyTransactionHandler {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> IntkeyMultiplyTransactionHandler {
         IntkeyMultiplyTransactionHandler {
             family_name: "intkey_multiply".to_string(),
