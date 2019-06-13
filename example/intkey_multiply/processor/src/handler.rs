@@ -584,7 +584,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
 
         let orig_value_b: u64 = match state.get(payload.get_name_b()) {
-            Ok(Some(v)) => v as u64,
+            Ok(Some(v)) => u64::from(v),
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_b",
@@ -594,7 +594,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
 
         let orig_value_c: u64 = match state.get(payload.get_name_c()) {
-            Ok(Some(v)) => v as u64,
+            Ok(Some(v)) => u64::from(v) ,
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_c",
@@ -603,7 +603,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             Err(err) => return Err(err),
         };
         let new_value = orig_value_b * orig_value_c;
-        if new_value > (MAX_VALUE as u64) {
+        if new_value > u64::from(MAX_VALUE) {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Multiplied value is larger then max allowed: {}",
                 new_value
