@@ -50,6 +50,6 @@ pub fn do_multiply(
     let mut buffer = File::create(output)?;
     buffer
         .write_all(&txn_payload)
-        .map_err(|err| CliError::IoError(err))?;
+        .map_err(CliError::IoError)?;
     Ok(())
 }
