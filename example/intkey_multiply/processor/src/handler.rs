@@ -128,7 +128,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                 "Name is either too long, too short, or not a string.",
             )));
         }
-        start = start + 2;
+        start += 2;
         let length = (string_type - 96) * 2;
         let name_hex = hex_string
             .get(start..start + length)
@@ -141,7 +141,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         let name = String::from_utf8(name_bytes).map_err(|err| {
             ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
         })?;
-        start = start + length;
+        start += length;
         let number_type = hex_string.get(start..start + 2).ok_or_else(|| {
             ApplyError::InvalidTransaction("Unable to get hex for Value data".into())
         })?;
@@ -150,19 +150,19 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
             ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
         })?;
 
-        start = start + 2;
+        start += 2;
         // For number less than 23 (decimal) the first two bytes represent the number. If it is
         // greater than 23 the first two bytes represent the number of digits required to
         // calculate the value followed by the actual bytes for the number.
         if number > 23 {
-            number = number - 23;
+            number -= 23;
             let value = match number {
                 // two bytes
                 1 => {
                     let value = hex_string.get(start..start + 2).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 2;
+                    start += 2;
                     value
                 }
                 // 4 bytes
@@ -170,7 +170,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                     let value = hex_string.get(start..start + 4).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 4;
+                    start += 4;
                     value
                 }
                 // 8 bytes
@@ -178,7 +178,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                     let value = hex_string.get(start..start + 8).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 8;
+                    start += 8;
                     value
                 }
                 // Anymore than 8 bytes is not a u32 and is invalid.
