@@ -279,7 +279,7 @@ impl IntkeyPayload {
                     "Name A must be a string",
                 )));
             }
-            Some(name_a_raw) => name_a_raw.clone().into(),
+            Some(name_a_raw) => name_a_raw.to_string(),
         };
 
         if name_a_raw.len() > MAX_NAME_LEN {
@@ -294,7 +294,7 @@ impl IntkeyPayload {
                     "Name B must be a string",
                 )));
             }
-            Some(name_b_raw) => name_b_raw.clone().into(),
+            Some(name_b_raw) => name_b_raw.to_string(),
         };
 
         if name_b_raw.len() > MAX_NAME_LEN {
@@ -309,7 +309,7 @@ impl IntkeyPayload {
                     "Name C must be a string",
                 )));
             }
-            Some(name_c_raw) => name_c_raw.clone().into(),
+            Some(name_c_raw) => name_c_raw.to_string(),
         };
 
         if name_c_raw.len() > MAX_NAME_LEN {
@@ -367,7 +367,7 @@ impl<'a> IntkeyState<'a> {
                 let map = decode_intkey(hex_vec.join(""))?;
 
                 let status = match map.get(name) {
-                    Some(x) => Ok(Some(x.clone())),
+                    Some(x) => Ok(Some(*x)),
                     None => Ok(None),
                 };
                 self.get_cache.insert(address.clone(), map.clone());
