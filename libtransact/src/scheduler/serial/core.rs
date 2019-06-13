@@ -398,7 +398,14 @@ impl SchedulerCore {
             .name(String::from("Thread-SerialScheduler"))
             .spawn(move || {
                 if let Err(err) = self.run() {
-                    error!("scheduler thread ended due to error: {}", err);
+                    // Attempt to send notification using the error callback; if that fails, just
+                    // log it.
+                    let error = SchedulerError::Internal(format!(
+                        "serial scheduler's internal thread ended due to error: {}",
+                        err
+                    ));
+                    self.send_scheduler_error(error.clone())
+                        .unwrap_or_else(|_| error!("{}", error));
                 }
             })
             .map_err(|err| {

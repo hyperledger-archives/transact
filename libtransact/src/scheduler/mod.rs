@@ -104,7 +104,7 @@ pub enum ExecutionTaskCompletionNotification {
     Valid(ContextId, String),
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum SchedulerError {
     /// The scheduler's `add_batch` method was called with a batch that the scheduler already has
     /// pending or in progress; the contained `String` is the batch ID.
