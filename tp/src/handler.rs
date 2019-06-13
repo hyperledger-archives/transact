@@ -249,7 +249,7 @@ fn create_contract(
 
     let contract_registry_version = VersionBuilder::new()
         .with_version(version.into())
-        .with_contract_sha512(sha.result_str().into())
+        .with_contract_sha512(sha.result_str())
         .with_creator(signer.into())
         .build()
         .map_err(|_| {
