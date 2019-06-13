@@ -63,6 +63,7 @@ pub struct SabreTransactionHandler {
 
 impl SabreTransactionHandler {
     /// Constructs a new SabreTransactionHandler
+    #[allow(clippy::new_without_default)]
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
