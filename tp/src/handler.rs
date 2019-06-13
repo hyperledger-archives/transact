@@ -38,13 +38,13 @@ use sabre_sdk::protocol::payload::{
 };
 
 /// The namespace registry prefix for global state (00ec00)
-const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
+const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
 
 /// The contract registry prefix for global state (00ec01)
-const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
+const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 
 /// The contract prefix for global state (00ec02)
-const CONTRACT_PREFIX: &'static str = "00ec02";
+const CONTRACT_PREFIX: &str = "00ec02";
 
 /// Handles Sabre Transactions
 ///
