@@ -37,7 +37,7 @@ cfg_if! {
     }
 }
 
-const MAX_VALUE: u32 = 4294967295;
+const MAX_VALUE: u32 = 4_294_967_295;
 const MAX_NAME_LEN: usize = 20;
 
 /// The smart permission prefix for global state (00ec03)
