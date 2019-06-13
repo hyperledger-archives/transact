@@ -271,7 +271,7 @@ impl IntkeyPayload {
         // will be multiplied together.
         let payload = String::from_utf8(payload_data.to_vec())
             .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
-        let payload_vec = payload.split(",").collect::<Vec<&str>>();
+        let payload_vec = payload.split(',').collect::<Vec<&str>>();
 
         let name_a_raw: String = match payload_vec.get(0) {
             None => {
