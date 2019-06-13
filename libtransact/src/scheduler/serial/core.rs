@@ -251,28 +251,32 @@ impl SchedulerCore {
             .header_signature();
 
         // Invalidate all previously executed transactions in the batch
-        self.txn_results = self
-            .txn_results
-            .iter()
-            .map(|result| match result {
+        for result in &mut self.txn_results {
+            match result {
                 TransactionExecutionResult::Valid(receipt) => {
-                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
-                        transaction_id: receipt.transaction_id.clone(),
-                        error_message: format!(
-                            "containing batch ({}) is invalid",
-                            current_batch_id,
-                        ),
-                        error_data: vec![],
-                    })
+                    let mut new_result =
+                        TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                            transaction_id: receipt.transaction_id.clone(),
+                            error_message: format!(
+                                "containing batch ({}) is invalid",
+                                current_batch_id,
+                            ),
+                            error_data: vec![],
+                        });
+                    std::mem::swap(result, &mut new_result);
                 }
-                TransactionExecutionResult::Invalid(_) => {
+                TransactionExecutionResult::Invalid(invalid_txn_result) => {
                     // When an invalid transaction is encountered, the scheduler should fail-fast
-                    // and invalidate the whole batch immediately; if an invalid result is in the
-                    // previously executed transaction results, this did not happen.
-                    panic!("should not already have an invalid result");
+                    // and invalidate the whole batch immediately; this did not happen if an
+                    // invalid result is in the previously executed transaction results, so
+                    // something has gone wrong.
+                    return Err(CoreError::Internal(format!(
+                        "previously invalid transaction result ({}) found in batch {}",
+                        invalid_txn_result.transaction_id, current_batch_id
+                    )));
                 }
-            })
-            .collect();
+            }
+        }
 
         self.txn_results
             .push(TransactionExecutionResult::Invalid(invalid_result));
