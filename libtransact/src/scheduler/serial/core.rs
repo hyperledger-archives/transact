@@ -384,7 +384,7 @@ impl SchedulerCore {
                     // before this end. However, it would be more
                     // elegant to gracefully handle it by sending a
                     // close message across.
-                    error!("Thread-SerialScheduler recv error: {}", err);
+                    warn!("Thread-SerialScheduler recv failed: {}", err);
                     break;
                 }
             }

@@ -105,10 +105,7 @@ impl SerialScheduler {
                 }
             }
             Err(err) => {
-                error!(
-                    "failed to send to send to scheduler thread during drop: {}",
-                    err
-                );
+                warn!("failed to send to scheduler thread during drop: {}", err);
             }
         }
     }
