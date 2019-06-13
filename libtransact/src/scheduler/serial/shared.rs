@@ -65,6 +65,10 @@ impl Shared {
         self.error_callback = callback;
     }
 
+    pub fn batch_already_queued(&self, batch: &BatchPair) -> bool {
+        self.unscheduled_batches.contains(batch)
+    }
+
     pub fn add_unscheduled_batch(&mut self, batch: BatchPair) {
         self.unscheduled_batches.push_back(batch);
     }

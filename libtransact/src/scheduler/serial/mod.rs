@@ -121,6 +121,12 @@ impl Scheduler for SerialScheduler {
             return Err(SchedulerError::SchedulerFinalized);
         }
 
+        if shared.batch_already_queued(&batch) {
+            return Err(SchedulerError::DuplicateBatch(
+                batch.batch().header_signature().into(),
+            ));
+        }
+
         shared.add_unscheduled_batch(batch);
 
         // Notify the core that a batch has been added. Note that the batch is

@@ -11,7 +11,7 @@ use crate::signing;
 
 use super::transaction::Transaction;
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct BatchHeader {
     signer_public_key: Vec<u8>,
     transaction_ids: Vec<Vec<u8>>,
@@ -83,6 +83,7 @@ impl IntoBytes for BatchHeader {
 impl IntoProto<protos::batch::BatchHeader> for BatchHeader {}
 impl IntoNative<BatchHeader> for protos::batch::BatchHeader {}
 
+#[derive(Debug, PartialEq)]
 pub struct Batch {
     header: Vec<u8>,
     header_signature: String,
@@ -117,6 +118,7 @@ impl Batch {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct BatchPair {
     batch: Batch,
     header: BatchHeader,

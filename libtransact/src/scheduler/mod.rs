@@ -106,6 +106,9 @@ pub enum ExecutionTaskCompletionNotification {
 
 #[derive(Debug)]
 pub enum SchedulerError {
+    /// The scheduler's `add_batch` method was called with a batch that the scheduler already has
+    /// pending or in progress; the contained `String` is the batch ID.
+    DuplicateBatch(String),
     /// An internal error occurred that the scheduler could not recover from.
     Internal(String),
     /// The scheduler's `add_batch` method was called, but the scheduler was already finalized
@@ -118,6 +121,9 @@ pub enum SchedulerError {
 impl std::fmt::Display for SchedulerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            SchedulerError::DuplicateBatch(ref batch_id) => {
+                write!(f, "duplicate batch added to scheduler: {}", batch_id)
+            }
             SchedulerError::Internal(ref err) => {
                 write!(f, "scheduler encountered an internal error: {}", err)
             }
