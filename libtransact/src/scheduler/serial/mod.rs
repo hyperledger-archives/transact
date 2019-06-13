@@ -92,7 +92,13 @@ impl SerialScheduler {
         match self.core_tx.send(core::CoreMessage::Shutdown) {
             Ok(_) => {
                 if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().expect("failed to join scheduler thread");
+                    join_handle.join().unwrap_or_else(|err| {
+                        // This should not never happen, because the core thread should never panic
+                        error!(
+                            "failed to join scheduler thread because it panicked: {:?}",
+                            err
+                        )
+                    });
                 }
             }
             Err(err) => {
