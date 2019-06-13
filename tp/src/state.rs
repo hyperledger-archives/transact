@@ -34,7 +34,7 @@ pub struct SabreState<'a> {
 
 impl<'a> SabreState<'a> {
     pub fn new(context: &'a mut dyn TransactionContext) -> SabreState {
-        SabreState { context: context }
+        SabreState { context }
     }
 
     pub fn context(&mut self) -> &mut dyn TransactionContext {
