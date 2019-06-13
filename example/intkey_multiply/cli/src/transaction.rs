@@ -89,7 +89,7 @@ pub fn create_transaction(
     name_c: &str,
     payload: &[u8],
     signer: &Signer,
-    public_key: &String,
+    public_key: &str,
 ) -> Result<Transaction, CliError> {
     let mut txn = Transaction::new();
     let mut txn_header = TransactionHeader::new();
@@ -97,8 +97,8 @@ pub fn create_transaction(
     txn_header.set_family_name(String::from(INTKEY_MULITPLY_FAMILY_NAME));
     txn_header.set_family_version(String::from(INTKEY_MULITPLY_VERSION));
     txn_header.set_nonce(create_nonce());
-    txn_header.set_signer_public_key(public_key.clone());
-    txn_header.set_batcher_public_key(public_key.clone());
+    txn_header.set_signer_public_key(public_key.to_string());
+    txn_header.set_batcher_public_key(public_key.to_string());
 
     let addresses = vec![
         compute_intkey_address(name_a),
@@ -146,7 +146,7 @@ pub fn create_transaction(
 pub fn create_batch(
     txn: Transaction,
     signer: &Signer,
-    public_key: &String,
+    public_key: &str,
 ) -> Result<Batch, CliError> {
     let mut batch = Batch::new();
     let mut batch_header = BatchHeader::new();
@@ -154,7 +154,7 @@ pub fn create_batch(
     batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![txn
         .header_signature
         .clone()]));
-    batch_header.set_signer_public_key(public_key.clone());
+    batch_header.set_signer_public_key(public_key.to_string());
     batch.set_transactions(protobuf::RepeatedField::from_vec(vec![txn]));
 
     let batch_header_bytes = batch_header.write_to_bytes()?;
