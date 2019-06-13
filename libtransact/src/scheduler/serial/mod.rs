@@ -42,6 +42,14 @@ impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, shared::Shared>>> for
     }
 }
 
+// If the core `Receiver` disconnects, report an internal error since the scheduler can't operate
+// without the core thread.
+impl From<std::sync::mpsc::SendError<core::CoreMessage>> for SchedulerError {
+    fn from(error: std::sync::mpsc::SendError<core::CoreMessage>) -> SchedulerError {
+        SchedulerError::Internal(format!("scheduler's core thread disconnected: {}", error))
+    }
+}
+
 /// A `Scheduler` implementation which schedules transactions for execution
 /// one at a time.
 pub struct SerialScheduler {
@@ -133,9 +141,7 @@ impl Scheduler for SerialScheduler {
         // not sent across the channel because the batch has already been added
         // to the unscheduled queue above, where we hold a lock; adding a batch
         // must be exclusive with finalize.
-        self.core_tx
-            .send(core::CoreMessage::BatchAdded)
-            .expect("failed to send to the scheduler thread");
+        self.core_tx.send(core::CoreMessage::BatchAdded)?;
 
         Ok(())
     }
