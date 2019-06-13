@@ -273,7 +273,8 @@ mod xo_compat_test {
 
             let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
+            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+                .expect("Failed to create scheduler");
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
             scheduler
@@ -338,7 +339,8 @@ mod xo_compat_test {
 
             let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
+            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+                .expect("Failed to create scheduler");
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
             scheduler

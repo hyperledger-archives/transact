@@ -389,7 +389,7 @@ impl SchedulerCore {
         Ok(())
     }
 
-    pub fn start(mut self) -> std::thread::JoinHandle<()> {
+    pub fn start(mut self) -> Result<std::thread::JoinHandle<()>, SchedulerError> {
         thread::Builder::new()
             .name(String::from("Thread-SerialScheduler"))
             .spawn(move || {
@@ -397,6 +397,11 @@ impl SchedulerCore {
                     error!("scheduler thread ended due to error: {}", err);
                 }
             })
-            .expect("could not build a thread for the scheduler")
+            .map_err(|err| {
+                SchedulerError::Internal(format!(
+                    "could not build a thread for the scheduler: {}",
+                    err
+                ))
+            })
     }
 }

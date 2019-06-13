@@ -61,7 +61,10 @@ pub struct SerialScheduler {
 
 impl SerialScheduler {
     /// Returns a newly created `SerialScheduler`.
-    pub fn new(context_lifecycle: Box<ContextLifecycle>, state_id: String) -> SerialScheduler {
+    pub fn new(
+        context_lifecycle: Box<ContextLifecycle>,
+        state_id: String,
+    ) -> Result<SerialScheduler, SchedulerError> {
         let (execution_tx, execution_rx) = mpsc::channel();
         let (core_tx, core_rx) = mpsc::channel();
 
@@ -75,9 +78,9 @@ impl SerialScheduler {
             context_lifecycle,
             state_id,
         )
-        .start();
+        .start()?;
 
-        SerialScheduler {
+        Ok(SerialScheduler {
             shared_lock,
             core_handle: Some(core_handle),
             core_tx: core_tx.clone(),
@@ -85,7 +88,7 @@ impl SerialScheduler {
                 core_tx,
                 execution_rx,
             ))),
-        }
+        })
     }
 
     pub fn shutdown(mut self) {
@@ -220,14 +223,17 @@ mod tests {
     fn test_scheduler_thread_cleanup() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
-        SerialScheduler::new(context_lifecycle, state_id).shutdown();
+        SerialScheduler::new(context_lifecycle, state_id)
+            .expect("Failed to create scheduler")
+            .shutdown();
     }
 
     #[test]
     fn test_serial_scheduler() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler(&mut scheduler);
         scheduler.shutdown();
     }
@@ -236,7 +242,8 @@ mod tests {
     fn test_serial_scheduler_cancel() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_cancel(&mut scheduler);
         scheduler.shutdown();
     }
@@ -245,7 +252,8 @@ mod tests {
     pub fn test_serial_scheduler_flow_with_one_transaction() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let mut scheduler = SerialScheduler::new(context_lifecycle, state_id);
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_flow_with_one_transaction(&mut scheduler);
         scheduler.shutdown();
     }
