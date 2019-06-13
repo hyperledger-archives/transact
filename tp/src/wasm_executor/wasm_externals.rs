@@ -459,7 +459,7 @@ impl<'a> Externals for WasmExternals<'a> {
                     .get_memory_ref()
                     .get(offset as u32, 1)
                     .map_err(ExternalsError::from)?[0];
-                Ok(Some(RuntimeValue::I32(byte as i32)))
+                Ok(Some(RuntimeValue::I32(i32::from(byte))))
             }
             WRITE_BYTE_IDX => {
                 let ptr: u32 = args.nth(0);
