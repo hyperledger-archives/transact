@@ -106,6 +106,8 @@ pub enum ExecutionTaskCompletionNotification {
 
 #[derive(Debug)]
 pub enum SchedulerError {
+    /// An internal error occurred that the scheduler could not recover from.
+    Internal(String),
     /// An `ExecutionTaskCompletionNotification` was received for a transaction that the scheduler
     /// was not expecting; the contained `String` is the transaction ID.
     UnexpectedNotification(String),
@@ -114,6 +116,9 @@ pub enum SchedulerError {
 impl std::fmt::Display for SchedulerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            SchedulerError::Internal(ref err) => {
+                write!(f, "scheduler encountered an internal error: {}", err)
+            }
             SchedulerError::UnexpectedNotification(ref txn_id) => write!(
                 f,
                 "scheduler received an unexpected notification: {}",
@@ -129,25 +134,31 @@ pub trait Scheduler {
     /// the results are received is not guarenteed to be the same order as the
     /// batches were added with `add_batch`. If callback is called with None,
     /// all batch results have been sent.
-    fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>);
+    fn set_result_callback(
+        &mut self,
+        callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+    ) -> Result<(), SchedulerError>;
 
     /// Sets a callback to receive any errors encountered by the Scheduler that are not related to
     /// a specific batch.
-    fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>);
+    fn set_error_callback(
+        &mut self,
+        callback: Box<Fn(SchedulerError) + Send>,
+    ) -> Result<(), SchedulerError>;
 
     /// Adds a BatchPair to the scheduler.
-    fn add_batch(&mut self, batch: BatchPair);
+    fn add_batch(&mut self, batch: BatchPair) -> Result<(), SchedulerError>;
 
     /// Drops any unscheduled transactions from this scheduler. Any already
     /// scheduled transactions will continue to execute.
     ///
     /// Returns a `Vec` of the dropped `BatchPair`s.
-    fn cancel(&mut self) -> Vec<BatchPair>;
+    fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError>;
 
     /// Finalizes the scheduler, which will disable the ability to add more
     /// batches. After this is called, `add_batch()` will be return a
     /// FinalizedSchedulerError.
-    fn finalize(&mut self);
+    fn finalize(&mut self) -> Result<(), SchedulerError>;
 
     /// Returns an iterator that returns transactions to be executed.
     fn take_task_iterator(&mut self) -> Box<dyn Iterator<Item = ExecutionTask> + Send>;
@@ -184,17 +195,23 @@ mod tests {
 
     pub fn test_scheduler(scheduler: &mut Scheduler) {
         let mut workload = XoBatchWorkload::new_with_seed(5);
-        scheduler.add_batch(workload.next_batch().unwrap());
+        scheduler
+            .add_batch(workload.next_batch().unwrap())
+            .expect("Failed to add batch");
     }
 
     /// Tests that cancel will properly drain the scheduler by adding a couple
     /// of batches and then calling cancel twice.
     pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
         let mut workload = XoBatchWorkload::new_with_seed(4);
-        scheduler.add_batch(workload.next_batch().unwrap());
-        scheduler.add_batch(workload.next_batch().unwrap());
-        assert_eq!(scheduler.cancel().len(), 2);
-        assert_eq!(scheduler.cancel().len(), 0);
+        scheduler
+            .add_batch(workload.next_batch().unwrap())
+            .expect("Failed to add 1st batch");
+        scheduler
+            .add_batch(workload.next_batch().unwrap())
+            .expect("Failed to add 2nd batch");
+        assert_eq!(scheduler.cancel().expect("Failed 1st cancel").len(), 2);
+        assert_eq!(scheduler.cancel().expect("Failed 2nd cancel").len(), 0);
     }
 
     /// Tests a simple scheduler worklfow of processing a single transaction.
@@ -208,13 +225,15 @@ mod tests {
 
         let mut workload = XoBatchWorkload::new_with_seed(8);
 
-        scheduler.set_result_callback(Box::new(move |_batch_result| {
-            let &(ref lock, ref cvar) = &*shared2;
+        scheduler
+            .set_result_callback(Box::new(move |_batch_result| {
+                let &(ref lock, ref cvar) = &*shared2;
 
-            let mut inner = lock.lock().unwrap();
-            *inner = true;
-            cvar.notify_one();
-        }));
+                let mut inner = lock.lock().unwrap();
+                *inner = true;
+                cvar.notify_one();
+            }))
+            .expect("Failed to set result callback");
 
         let mut task_iterator = scheduler.take_task_iterator();
         let notifier = scheduler.new_notifier();
@@ -250,7 +269,9 @@ mod tests {
             })
             .unwrap();
 
-        scheduler.add_batch(workload.next_batch().unwrap());
+        scheduler
+            .add_batch(workload.next_batch().unwrap())
+            .expect("Failed to add batch");
 
         let &(ref lock, ref cvar) = &*shared;
 

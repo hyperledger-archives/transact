@@ -110,6 +110,12 @@ impl From<ContextManagerError> for CoreError {
     }
 }
 
+impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, Shared>>> for CoreError {
+    fn from(error: std::sync::PoisonError<std::sync::MutexGuard<'_, Shared>>) -> CoreError {
+        CoreError::Internal(format!("scheduler shared lock is poisoned: {}", error))
+    }
+}
+
 pub struct SchedulerCore {
     /// The data shared between this core thread and the thread which owns
     /// `SerialScheduler`.
@@ -182,11 +188,7 @@ impl SchedulerCore {
         }
 
         if self.current_batch.is_none() {
-            let mut shared = self
-                .shared_lock
-                .lock()
-                .expect("scheduler shared lock is poisoned");
-
+            let mut shared = self.shared_lock.lock()?;
             if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
                 self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
                 self.current_batch = Some(unscheduled_batch);
@@ -308,21 +310,14 @@ impl SchedulerCore {
 
         let batch_result = BatchExecutionResult { batch, results };
 
-        let shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.result_callback()(Some(batch_result));
+        self.shared_lock.lock()?.result_callback()(Some(batch_result));
 
         Ok(())
     }
 
-    fn send_scheduler_error(&mut self, error: SchedulerError) {
-        let shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.error_callback()(error);
+    fn send_scheduler_error(&mut self, error: SchedulerError) -> Result<(), CoreError> {
+        self.shared_lock.lock()?.error_callback()(error);
+        Ok(())
     }
 
     fn run(&mut self) -> Result<(), CoreError> {
@@ -343,7 +338,7 @@ impl SchedulerCore {
                             if &transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     transaction_id,
-                                ));
+                                ))?;
                                 continue;
                             }
                             self.current_txn = None;
@@ -359,7 +354,7 @@ impl SchedulerCore {
                             if &result.transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     result.transaction_id,
-                                ));
+                                ))?;
                                 continue;
                             }
                             self.current_txn = None;

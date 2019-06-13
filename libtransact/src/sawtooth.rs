@@ -276,14 +276,18 @@ mod xo_compat_test {
             let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler.set_result_callback(Box::new(move |batch_result| {
-                result_tx
-                    .send(batch_result)
-                    .expect("Unable to send batch result")
-            }));
+            scheduler
+                .set_result_callback(Box::new(move |batch_result| {
+                    result_tx
+                        .send(batch_result)
+                        .expect("Unable to send batch result")
+                }))
+                .expect("Failed to set result callback");
 
-            scheduler.add_batch(batch_pair);
-            scheduler.finalize();
+            scheduler
+                .add_batch(batch_pair)
+                .expect("Failed to add batch");
+            scheduler.finalize().expect("Failed to finalize scheduler");
 
             run_schedule(&test_executor, &mut scheduler);
 
@@ -337,15 +341,21 @@ mod xo_compat_test {
             let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone());
 
             let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler.set_result_callback(Box::new(move |batch_result| {
-                result_tx
-                    .send(batch_result)
-                    .expect("Unable to send batch result")
-            }));
+            scheduler
+                .set_result_callback(Box::new(move |batch_result| {
+                    result_tx
+                        .send(batch_result)
+                        .expect("Unable to send batch result")
+                }))
+                .expect("Failed to set result callback");
 
-            scheduler.add_batch(create_batch_pair);
-            scheduler.add_batch(take_batch_pair);
-            scheduler.finalize();
+            scheduler
+                .add_batch(create_batch_pair)
+                .expect("Failed to add 1st batch");
+            scheduler
+                .add_batch(take_batch_pair)
+                .expect("Failed to add 2nd batch");
+            scheduler.finalize().expect("Failed to finalize scheduler");
 
             run_schedule(&test_executor, &mut scheduler);
 

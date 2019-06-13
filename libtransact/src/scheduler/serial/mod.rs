@@ -33,6 +33,15 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
+// If the shared lock is poisoned, report an internal error since the scheduler cannot recover.
+impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, shared::Shared>>> for SchedulerError {
+    fn from(
+        error: std::sync::PoisonError<std::sync::MutexGuard<'_, shared::Shared>>,
+    ) -> SchedulerError {
+        SchedulerError::Internal(format!("scheduler shared lock is poisoned: {}", error))
+    }
+}
+
 /// A `Scheduler` implementation which schedules transactions for execution
 /// one at a time.
 pub struct SerialScheduler {
@@ -89,27 +98,24 @@ impl SerialScheduler {
 }
 
 impl Scheduler for SerialScheduler {
-    fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>) {
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.set_result_callback(callback);
+    fn set_result_callback(
+        &mut self,
+        callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+    ) -> Result<(), SchedulerError> {
+        self.shared_lock.lock()?.set_result_callback(callback);
+        Ok(())
     }
 
-    fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.set_error_callback(callback);
+    fn set_error_callback(
+        &mut self,
+        callback: Box<Fn(SchedulerError) + Send>,
+    ) -> Result<(), SchedulerError> {
+        self.shared_lock.lock()?.set_error_callback(callback);
+        Ok(())
     }
 
-    fn add_batch(&mut self, batch: BatchPair) {
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
+    fn add_batch(&mut self, batch: BatchPair) -> Result<(), SchedulerError> {
+        let mut shared = self.shared_lock.lock()?;
 
         if shared.finalized() {
             panic!("add_batch called after scheduler finalized");
@@ -124,22 +130,17 @@ impl Scheduler for SerialScheduler {
         self.core_tx
             .send(core::CoreMessage::BatchAdded)
             .expect("failed to send to the scheduler thread");
+
+        Ok(())
     }
 
-    fn cancel(&mut self) -> Vec<BatchPair> {
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.drain_unscheduled_batches()
+    fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError> {
+        Ok(self.shared_lock.lock()?.drain_unscheduled_batches())
     }
 
-    fn finalize(&mut self) {
-        let mut shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        shared.set_finalized(true);
+    fn finalize(&mut self) -> Result<(), SchedulerError> {
+        self.shared_lock.lock()?.set_finalized(true);
+        Ok(())
     }
 
     fn take_task_iterator(&mut self) -> Box<dyn Iterator<Item = ExecutionTask> + Send> {
