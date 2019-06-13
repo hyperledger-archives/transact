@@ -161,13 +161,12 @@ impl Scheduler for SerialScheduler {
         Ok(())
     }
 
-    fn take_task_iterator(&mut self) -> Box<dyn Iterator<Item = ExecutionTask> + Send> {
-        match self.task_iterator.take() {
-            Some(taken) => taken,
-            None => {
-                panic!("task iterator can not be taken more than once");
-            }
-        }
+    fn take_task_iterator(
+        &mut self,
+    ) -> Result<Box<dyn Iterator<Item = ExecutionTask> + Send>, SchedulerError> {
+        self.task_iterator
+            .take()
+            .ok_or(SchedulerError::NoTaskIterator)
     }
 
     fn new_notifier(&mut self) -> Box<dyn ExecutionTaskCompletionNotifier> {

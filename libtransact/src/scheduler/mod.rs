@@ -111,6 +111,9 @@ pub enum SchedulerError {
     DuplicateBatch(String),
     /// An internal error occurred that the scheduler could not recover from.
     Internal(String),
+    /// A scheduler only has one task iterator, so its `take_task_iterator` method can only be
+    /// called once.
+    NoTaskIterator,
     /// The scheduler's `add_batch` method was called, but the scheduler was already finalized
     SchedulerFinalized,
     /// An `ExecutionTaskCompletionNotification` was received for a transaction that the scheduler
@@ -127,6 +130,7 @@ impl std::fmt::Display for SchedulerError {
             SchedulerError::Internal(ref err) => {
                 write!(f, "scheduler encountered an internal error: {}", err)
             }
+            SchedulerError::NoTaskIterator => write!(f, "task iterator already taken"),
             SchedulerError::SchedulerFinalized => write!(f, "batch added to finalized scheduler"),
             SchedulerError::UnexpectedNotification(ref txn_id) => write!(
                 f,
@@ -170,7 +174,9 @@ pub trait Scheduler {
     fn finalize(&mut self) -> Result<(), SchedulerError>;
 
     /// Returns an iterator that returns transactions to be executed.
-    fn take_task_iterator(&mut self) -> Box<dyn Iterator<Item = ExecutionTask> + Send>;
+    fn take_task_iterator(
+        &mut self,
+    ) -> Result<Box<dyn Iterator<Item = ExecutionTask> + Send>, SchedulerError>;
 
     /// Returns a newly allocated ExecutionTaskCompletionNotifier which allows
     /// sending a notification to the scheduler that indicates the task has
@@ -244,7 +250,9 @@ mod tests {
             }))
             .expect("Failed to set result callback");
 
-        let mut task_iterator = scheduler.take_task_iterator();
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
         let notifier = scheduler.new_notifier();
 
         thread::Builder::new()

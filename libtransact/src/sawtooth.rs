@@ -462,12 +462,15 @@ mod xo_compat_test {
     }
 
     fn run_schedule(executor: &Arc<Mutex<Option<Executor>>>, scheduler: &mut dyn Scheduler) {
+        let task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to take task iterator");
         executor
             .lock()
             .expect("Should not have poisoned the lock")
             .as_ref()
             .expect("Should not be None")
-            .execute(scheduler.take_task_iterator(), scheduler.new_notifier())
+            .execute(task_iterator, scheduler.new_notifier())
             .expect("Failed to execute schedule");
     }
 
