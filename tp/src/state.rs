@@ -75,11 +75,11 @@ impl<'a> SabreState<'a> {
                         err,
                     ))
                 })?;
-                return Ok(contracts
+                Ok(contracts
                     .contracts()
                     .iter()
                     .find(|c| c.name() == name)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }
@@ -169,11 +169,11 @@ impl<'a> SabreState<'a> {
                         ))
                     })?;
 
-                return Ok(contract_registries
+                Ok(contract_registries
                     .registries()
                     .iter()
                     .find(|reg| reg.name() == name)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }
@@ -264,11 +264,11 @@ impl<'a> SabreState<'a> {
                         ))
                     })?;
 
-                return Ok(namespace_registries
+                Ok(namespace_registries
                     .registries()
                     .iter()
                     .find(|reg| reg.namespace() == namespace)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }
@@ -380,11 +380,11 @@ impl<'a> SabreState<'a> {
                         ))
                     })?;
 
-                return Ok(smart_permissions
+                Ok(smart_permissions
                     .smart_permissions()
                     .iter()
                     .find(|sp| sp.name() == name)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }
@@ -473,11 +473,11 @@ impl<'a> SabreState<'a> {
                     ))
                 })?;
 
-                return Ok(orgs
+                Ok(orgs
                     .organizations()
                     .iter()
                     .find(|org| org.org_id() == id)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }
@@ -495,11 +495,11 @@ impl<'a> SabreState<'a> {
                     ))
                 })?;
 
-                return Ok(agents
+                Ok(agents
                     .agents()
                     .iter()
                     .find(|agent| agent.public_key() == public_key)
-                    .cloned());
+                    .cloned())
             }
             None => Ok(None),
         }

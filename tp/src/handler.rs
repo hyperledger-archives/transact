@@ -78,15 +78,15 @@ impl SabreTransactionHandler {
 
 impl TransactionHandler for SabreTransactionHandler {
     fn family_name(&self) -> String {
-        return self.family_name.clone();
+        self.family_name.clone()
     }
 
     fn family_versions(&self) -> Vec<String> {
-        return self.family_versions.clone();
+        self.family_versions.clone()
     }
 
     fn namespaces(&self) -> Vec<String> {
-        return self.namespaces.clone();
+        self.namespaces.clone()
     }
 
     fn apply(
@@ -485,25 +485,19 @@ fn execute_contract<'a>(
         .map_err(|e| ApplyError::InvalidTransaction(format!("{:?}", e)))?;
 
     match result {
-        None => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Wasm contract did not return a result: {}, {}",
-                name, version,
-            )));
-        }
+        None => Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract did not return a result: {}, {}",
+            name, version,
+        ))),
         Some(1) => Ok(()),
-        Some(-3) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Wasm contract returned invalid transaction: {}, {}",
-                name, version,
-            )));
-        }
-        Some(num) => {
-            return Err(ApplyError::InternalError(format!(
-                "Wasm contract returned internal error: {}",
-                num
-            )));
-        }
+        Some(-3) => Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract returned invalid transaction: {}, {}",
+            name, version,
+        ))),
+        Some(num) => Err(ApplyError::InternalError(format!(
+            "Wasm contract returned internal error: {}",
+            num
+        ))),
     }
 }
 
