@@ -57,27 +57,26 @@ pub enum CoreMessage {
 }
 
 #[derive(Debug)]
-#[allow(clippy::enum_variant_names)]
 enum CoreError {
-    ExecutionSendError(Box<SendError<ExecutionTask>>),
-    ContextManagerError(Box<ContextManagerError>),
-    InternalError(String),
+    ExecutionSend(Box<SendError<ExecutionTask>>),
+    ContextManager(Box<ContextManagerError>),
+    Internal(String),
 }
 
 impl std::error::Error for CoreError {
     fn description(&self) -> &str {
         match *self {
-            CoreError::ExecutionSendError(ref err) => err.description(),
-            CoreError::ContextManagerError(ref err) => err.description(),
-            CoreError::InternalError(ref err) => err,
+            CoreError::ExecutionSend(ref err) => err.description(),
+            CoreError::ContextManager(ref err) => err.description(),
+            CoreError::Internal(ref err) => err,
         }
     }
 
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            CoreError::ExecutionSendError(ref err) => Some(err),
-            CoreError::ContextManagerError(ref err) => Some(err),
-            CoreError::InternalError(_) => None,
+            CoreError::ExecutionSend(ref err) => Some(err),
+            CoreError::ContextManager(ref err) => Some(err),
+            CoreError::Internal(_) => None,
         }
     }
 }
@@ -85,26 +84,28 @@ impl std::error::Error for CoreError {
 impl std::fmt::Display for CoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CoreError::ExecutionSendError(ref err) => {
-                write!(f, "ExecutionSendError: {}", err.description())
+            CoreError::ExecutionSend(ref err) => write!(
+                f,
+                "failed to send transaction to executor: {}",
+                err.description()
+            ),
+            CoreError::ContextManager(ref err) => {
+                write!(f, "call to ContextManager failed: {}", err.description())
             }
-            CoreError::ContextManagerError(ref err) => {
-                write!(f, "ContextManagerError: {}", err.description())
-            }
-            CoreError::InternalError(ref err) => write!(f, "InternalError: {}", err),
+            CoreError::Internal(ref err) => write!(f, "internal error occurred: {}", err),
         }
     }
 }
 
 impl From<SendError<ExecutionTask>> for CoreError {
     fn from(error: SendError<ExecutionTask>) -> CoreError {
-        CoreError::ExecutionSendError(Box::new(error))
+        CoreError::ExecutionSend(Box::new(error))
     }
 }
 
 impl From<ContextManagerError> for CoreError {
     fn from(error: ContextManagerError) -> CoreError {
-        CoreError::ContextManagerError(Box::new(error))
+        CoreError::ContextManager(Box::new(error))
     }
 }
 
@@ -194,7 +195,7 @@ impl SchedulerCore {
         }
 
         let transaction = self.txn_queue.pop().ok_or_else(|| {
-            CoreError::InternalError(format!(
+            CoreError::Internal(format!(
                 "no transactions left in current batch ({})",
                 self.current_batch
                     .as_ref()
@@ -239,7 +240,7 @@ impl SchedulerCore {
             .current_batch
             .as_ref()
             .ok_or_else(|| {
-                CoreError::InternalError(
+                CoreError::Internal(
                     "attemping to invalidate current batch but no current batch exists".into(),
                 )
             })?
@@ -296,7 +297,7 @@ impl SchedulerCore {
 
     fn send_batch_result(&mut self) -> Result<(), CoreError> {
         let batch = self.current_batch.take().ok_or_else(|| {
-            CoreError::InternalError(
+            CoreError::Internal(
                 "attempting to send batch result but no current batch is executing".into(),
             )
         })?;
@@ -333,7 +334,7 @@ impl SchedulerCore {
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
                     let current_txn_id = self.current_txn.as_ref().ok_or_else(|| {
-                        CoreError::InternalError(
+                        CoreError::Internal(
                             "received execution result but no current transaction is executing"
                                 .into(),
                         )
