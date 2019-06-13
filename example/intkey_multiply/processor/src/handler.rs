@@ -595,7 +595,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
 
         let orig_value_c: u64 = match state.get(payload.get_name_c()) {
-            Ok(Some(v)) => u64::from(v) ,
+            Ok(Some(v)) => u64::from(v),
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_c",
