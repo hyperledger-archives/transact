@@ -337,7 +337,7 @@ fn delete_contract(
     state.delete_contract(name, version)
 }
 
-fn execute_contract<'a>(
+fn execute_contract(
     payload: ExecuteContractAction,
     signer: &str,
     signature: &str,
