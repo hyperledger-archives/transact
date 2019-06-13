@@ -829,7 +829,7 @@ impl<'a> SmartPermissionModule<'a> {
 
         let result = instance.invoke_export(
             "entrypoint",
-            &vec![
+            &[
                 RuntimeValue::I32(role_list_ptr),
                 RuntimeValue::I32(org_id_ptr),
                 RuntimeValue::I32(public_key_ptr),
