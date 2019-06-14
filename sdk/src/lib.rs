@@ -721,9 +721,5 @@ pub fn log_level() -> LogLevel {
 }
 
 pub fn log_enabled(lvl: LogLevel) -> bool {
-    if lvl >= log_level() {
-        true
-    } else {
-        false
-    }
+    lvl >= log_level()
 }
