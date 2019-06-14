@@ -205,10 +205,7 @@ impl TransactionContext for SabreTransactionContext {
 
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
-                externs::add_to_collection(
-                    header_address_buffer.to_raw(),
-                    wasm_buffer.to_raw(),
-                );
+                externs::add_to_collection(header_address_buffer.to_raw(), wasm_buffer.to_raw());
             }
 
             let results =
@@ -284,10 +281,7 @@ impl TransactionContext for SabreTransactionContext {
 
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
-                externs::add_to_collection(
-                    header_address_buffer.to_raw(),
-                    wasm_buffer.to_raw(),
-                );
+                externs::add_to_collection(header_address_buffer.to_raw(), wasm_buffer.to_raw());
             }
             let result =
                 WasmBuffer::from_list(externs::delete_state(header_address_buffer.to_raw()))?;
@@ -474,8 +468,7 @@ where
     F: Fn(Request) -> Result<bool, WasmSdkError>,
 {
     let roles = if let Ok(i) = WasmBuffer::from_list(roles_ptr) {
-        let results: Vec<Result<String, WasmSdkError>> =
-            i.iter().map(|x| x.to_string()).collect();
+        let results: Vec<Result<String, WasmSdkError>> = i.iter().map(|x| x.to_string()).collect();
 
         if results.iter().any(|x| x.is_err()) {
             return -1;
