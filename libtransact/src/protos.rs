@@ -15,6 +15,8 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Protobuf structs and associated conversion traits.
+
 use std::error::Error as StdError;
 
 #[derive(Debug)]

@@ -14,6 +14,12 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+//! Transaction context management.
+//!
+//! In Transact, state reads and writes are scoped (sandboxed) to a specific "context" that
+//! contains a reference to a state ID (such as a Merkle-Radix state root hash) and one or more
+//! previous contexts. The context manager implements the context lifecycle and services the calls
+//! that read, write, and delete data from state.
 
 /// Unique id that references a "Context" from which a `Transaction` can query state and
 /// modify events, data, and state.

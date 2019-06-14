@@ -15,6 +15,13 @@
  * -----------------------------------------------------------------------------
  */
 
+//! An in-memory implementation of the database traits.
+//!
+//! This in-memory implementation of the Database uses a BTree map.  All keys are sorted by their
+//! natural order.
+//!
+//! Atomicity is provided via a RwLock.
+
 use crate::database::error::DatabaseError;
 use crate::database::{
     Database, DatabaseCursor, DatabaseReader, DatabaseReaderCursor, DatabaseWriter,

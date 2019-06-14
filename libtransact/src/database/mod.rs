@@ -15,6 +15,20 @@
  * ------------------------------------------------------------------------------
  */
 
+//! Traits for reading and writing from databases.
+//!
+//! Transact operates on key-value entries at the database level, where both keys and values are
+//! opaque bytes.
+//!
+//! # Readers and Writers
+//!
+//! Both the DatabsaeReader and DatabaseWriter traits imply that the underlying database
+//! implementation maintains transactional consistency throughout their lifetimes.  For example,
+//! while a cursor on a DatabaseReader is in use, any changes to the underlying data should not
+//! alter the iteration of the reader.
+//!
+//! Changes to the underlying database are rendered via the DatabaseWriter's commit method.
+
 pub mod btree;
 pub mod error;
 pub mod lmdb;
