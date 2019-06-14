@@ -112,7 +112,10 @@ impl TestExecutionAdapterState {
         >,
     ) {
         on_done(if self.available {
-            Ok(ExecutionTaskCompletionNotification::Valid(context_id))
+            Ok(ExecutionTaskCompletionNotification::Valid(
+                context_id,
+                transaction_pair.transaction().header_signature().into(),
+            ))
         } else {
             Err(ExecutionAdapterError::RoutingError(Box::new(
                 transaction_pair,
@@ -188,7 +191,7 @@ mod tests {
                 );
                 assert!(
                     match notification.unwrap() {
-                        ExecutionTaskCompletionNotification::Valid(_) => true,
+                        ExecutionTaskCompletionNotification::Valid(_, _) => true,
                         _ => false,
                     },
                     "The transaction was not valid"

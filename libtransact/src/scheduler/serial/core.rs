@@ -20,9 +20,11 @@
 use crate::context::manager::ContextManagerError;
 use crate::context::{ContextId, ContextLifecycle};
 use crate::protocol::batch::BatchPair;
+use crate::protocol::transaction::Transaction;
 use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
+use crate::scheduler::InvalidTransactionResult;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
@@ -56,22 +58,25 @@ pub enum CoreMessage {
 
 #[derive(Debug)]
 enum CoreError {
-    ExecutionSendError(Box<SendError<ExecutionTask>>),
-    ContextManagerError(Box<ContextManagerError>),
+    ExecutionSend(Box<SendError<ExecutionTask>>),
+    ContextManager(Box<ContextManagerError>),
+    Internal(String),
 }
 
 impl std::error::Error for CoreError {
     fn description(&self) -> &str {
         match *self {
-            CoreError::ExecutionSendError(ref err) => err.description(),
-            CoreError::ContextManagerError(ref err) => err.description(),
+            CoreError::ExecutionSend(ref err) => err.description(),
+            CoreError::ContextManager(ref err) => err.description(),
+            CoreError::Internal(ref err) => err,
         }
     }
 
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            CoreError::ExecutionSendError(ref err) => Some(err),
-            CoreError::ContextManagerError(ref err) => Some(err),
+            CoreError::ExecutionSend(ref err) => Some(err),
+            CoreError::ContextManager(ref err) => Some(err),
+            CoreError::Internal(_) => None,
         }
     }
 }
@@ -79,25 +84,28 @@ impl std::error::Error for CoreError {
 impl std::fmt::Display for CoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CoreError::ExecutionSendError(ref err) => {
-                write!(f, "ExecutionSendError: {}", err.description())
+            CoreError::ExecutionSend(ref err) => write!(
+                f,
+                "failed to send transaction to executor: {}",
+                err.description()
+            ),
+            CoreError::ContextManager(ref err) => {
+                write!(f, "call to ContextManager failed: {}", err.description())
             }
-            CoreError::ContextManagerError(ref err) => {
-                write!(f, "ContextManagerError: {}", err.description())
-            }
+            CoreError::Internal(ref err) => write!(f, "internal error occurred: {}", err),
         }
     }
 }
 
 impl From<SendError<ExecutionTask>> for CoreError {
     fn from(error: SendError<ExecutionTask>) -> CoreError {
-        CoreError::ExecutionSendError(Box::new(error))
+        CoreError::ExecutionSend(Box::new(error))
     }
 }
 
 impl From<ContextManagerError> for CoreError {
     fn from(error: ContextManagerError) -> CoreError {
-        CoreError::ContextManagerError(Box::new(error))
+        CoreError::ContextManager(Box::new(error))
     }
 }
 
@@ -119,6 +127,15 @@ pub struct SchedulerCore {
 
     /// The current batch which is being executed.
     current_batch: Option<BatchPair>,
+
+    /// The ID of the current transaction which is being executed (from the current batch).
+    current_txn: Option<String>,
+
+    /// A queue of the current batch's transactions that have not been exeucted yet.
+    txn_queue: Vec<Transaction>,
+
+    /// The results of the current batch's transactions that have already been executed.
+    txn_results: Vec<TransactionExecutionResult>,
 
     /// The interface for context creation and deletion.
     context_lifecycle: Box<ContextLifecycle>,
@@ -145,6 +162,9 @@ impl SchedulerCore {
             execution_tx,
             next_ready: false,
             current_batch: None,
+            current_txn: None,
+            txn_queue: vec![],
+            txn_results: vec![],
             context_lifecycle,
             state_id,
             previous_context: None,
@@ -156,40 +176,151 @@ impl SchedulerCore {
             return Ok(());
         }
 
-        if self.current_batch.is_some() {
+        if self.current_txn.is_some() {
             return Ok(());
         }
 
-        let mut shared = self
+        if self.current_batch.is_none() {
+            let mut shared = self
+                .shared_lock
+                .lock()
+                .expect("scheduler shared lock is poisoned");
+
+            if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
+                self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
+                self.current_batch = Some(unscheduled_batch);
+            } else {
+                return Ok(());
+            }
+        }
+
+        let transaction = self.txn_queue.pop().ok_or_else(|| {
+            CoreError::Internal(format!(
+                "no transactions left in current batch ({})",
+                self.current_batch
+                    .as_ref()
+                    .map(|pair| pair.batch().header_signature())
+                    .unwrap_or("")
+            ))
+        })?;
+        let transaction_id = transaction.header_signature().into();
+        let transaction_pair = match transaction.into_pair() {
+            Ok(pair) => pair,
+            Err(err) => {
+                self.invalidate_current_batch(InvalidTransactionResult {
+                    transaction_id,
+                    error_message: format!("ill-formed transaction: {}", err),
+                    error_data: vec![],
+                })?;
+                self.send_batch_result()?;
+                return Ok(());
+            }
+        };
+
+        let context_id = match self.previous_context {
+            Some(previous_context_id) => self
+                .context_lifecycle
+                .create_context(&[previous_context_id], &self.state_id),
+            None => self.context_lifecycle.create_context(&[], &self.state_id),
+        };
+
+        self.current_txn = Some(transaction_pair.transaction().header_signature().into());
+        self.execution_tx
+            .send(ExecutionTask::new(transaction_pair, context_id))?;
+        self.next_ready = false;
+
+        Ok(())
+    }
+
+    fn invalidate_current_batch(
+        &mut self,
+        invalid_result: InvalidTransactionResult,
+    ) -> Result<(), CoreError> {
+        let current_batch_id = self
+            .current_batch
+            .as_ref()
+            .ok_or_else(|| {
+                CoreError::Internal(
+                    "attemping to invalidate current batch but no current batch exists".into(),
+                )
+            })?
+            .batch()
+            .header_signature();
+
+        // Invalidate all previously executed transactions in the batch
+        self.txn_results = self
+            .txn_results
+            .iter()
+            .map(|result| match result {
+                TransactionExecutionResult::Valid(receipt) => {
+                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                        transaction_id: receipt.transaction_id.clone(),
+                        error_message: format!(
+                            "containing batch ({}) is invalid",
+                            current_batch_id,
+                        ),
+                        error_data: vec![],
+                    })
+                }
+                TransactionExecutionResult::Invalid(_) => {
+                    // When an invalid transaction is encountered, the scheduler should fail-fast
+                    // and invalidate the whole batch immediately; if an invalid result is in the
+                    // previously executed transaction results, this did not happen.
+                    panic!("should not already have an invalid result");
+                }
+            })
+            .collect();
+
+        self.txn_results
+            .push(TransactionExecutionResult::Invalid(invalid_result));
+
+        // Invalidate all unexecuted transactions in the batch
+        self.txn_results.append(
+            &mut self
+                .txn_queue
+                .drain(..)
+                .map(|txn| {
+                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                        transaction_id: txn.header_signature().into(),
+                        error_message: format!(
+                            "containing batch ({}) is invalid",
+                            current_batch_id
+                        ),
+                        error_data: vec![],
+                    })
+                })
+                .collect(),
+        );
+
+        Ok(())
+    }
+
+    fn send_batch_result(&mut self) -> Result<(), CoreError> {
+        let batch = self.current_batch.take().ok_or_else(|| {
+            CoreError::Internal(
+                "attempting to send batch result but no current batch is executing".into(),
+            )
+        })?;
+
+        let mut results = vec![];
+        std::mem::swap(&mut results, &mut self.txn_results);
+
+        let batch_result = BatchExecutionResult { batch, results };
+
+        let shared = self
             .shared_lock
             .lock()
             .expect("scheduler shared lock is poisoned");
-
-        if let Some(pair) = shared.pop_unscheduled_batch() {
-            if pair.batch().transactions().len() != 1 {
-                unimplemented!("can't handle more than one transaction per batch");
+        match shared.result_callback() {
+            Some(callback) => {
+                callback(Some(batch_result));
             }
-
-            let transaction = match pair.batch().transactions()[0].clone().into_pair() {
-                Ok(transaction) => transaction,
-                Err(err) => {
-                    // An error can occur here if the header of the
-                    // transaction cannot be deserialized. If this occurs,
-                    // we panic as handling this is not currently implemented.
-                    unimplemented!("cannot handle ill-formed transaction: {}", err)
-                }
-            };
-
-            let context_id = match self.previous_context {
-                Some(previous_context_id) => self
-                    .context_lifecycle
-                    .create_context(&[previous_context_id], &self.state_id),
-                None => self.context_lifecycle.create_context(&[], &self.state_id),
-            };
-
-            self.current_batch = Some(pair);
-            self.execution_tx
-                .send(ExecutionTask::new(transaction, context_id))?
+            None => {
+                warn!(
+                    "dropped batch execution result: {}",
+                    batch_result.batch.batch().header_signature()
+                );
+            }
         }
 
         Ok(())
@@ -202,46 +333,47 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let batch = match self.current_batch.take() {
-                        Some(batch) => batch,
-                        None => {
-                            panic!("received execution result but no current batch is executing")
-                        }
-                    };
-
-                    let results = match task_notification {
-                        ExecutionTaskCompletionNotification::Valid(context_id) => {
+                    let current_txn_id = self.current_txn.as_ref().ok_or_else(|| {
+                        CoreError::Internal(
+                            "received execution result but no current transaction is executing"
+                                .into(),
+                        )
+                    })?;
+                    match task_notification {
+                        ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
+                            if &transaction_id != current_txn_id {
+                                error!(
+                                    "received execution result for a transaction ({}) that is \
+                                     not the current transaction ({})",
+                                    transaction_id, current_txn_id
+                                );
+                                continue;
+                            }
+                            self.current_txn = None;
                             self.previous_context = Some(context_id);
-                            vec![TransactionExecutionResult::Valid(
+                            self.txn_results.push(TransactionExecutionResult::Valid(
                                 self.context_lifecycle.get_transaction_receipt(
                                     &context_id,
-                                    &hex::encode(&batch.header().transaction_ids()[0]),
+                                    &hex::encode(transaction_id),
                                 )?,
-                            )]
+                            ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
-                            vec![TransactionExecutionResult::Invalid(result)]
+                            if &result.transaction_id != current_txn_id {
+                                error!(
+                                    "received execution result for a transaction ({}) that is \
+                                     not the current transaction ({})",
+                                    result.transaction_id, current_txn_id
+                                );
+                                continue;
+                            }
+                            self.current_txn = None;
+                            self.invalidate_current_batch(result)?;
                         }
                     };
 
-                    let batch_result = BatchExecutionResult { batch, results };
-
-                    {
-                        let shared = self
-                            .shared_lock
-                            .lock()
-                            .expect("scheduler shared lock is poisoned");
-                        match shared.result_callback() {
-                            Some(callback) => {
-                                callback(Some(batch_result));
-                            }
-                            None => {
-                                warn!(
-                                    "dropped batch execution result: {}",
-                                    batch_result.batch.batch().header_signature()
-                                );
-                            }
-                        }
+                    if self.txn_queue.is_empty() {
+                        self.send_batch_result()?;
                     }
 
                     self.try_schedule_next()?;
