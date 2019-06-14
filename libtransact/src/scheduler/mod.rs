@@ -217,11 +217,45 @@ fn default_error_callback(error: SchedulerError) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::manager::ContextManagerError;
+    use crate::context::ContextLifecycle;
     use crate::workload::xo::XoBatchWorkload;
     use crate::workload::BatchWorkload;
 
     use std::sync::{Arc, Condvar, Mutex};
     use std::thread;
+
+    #[derive(Clone)]
+    pub struct MockContextLifecycle {}
+
+    impl MockContextLifecycle {
+        pub fn new() -> Self {
+            MockContextLifecycle {}
+        }
+    }
+
+    impl ContextLifecycle for MockContextLifecycle {
+        fn create_context(
+            &mut self,
+            _dependent_contexts: &[ContextId],
+            _state_id: &str,
+        ) -> ContextId {
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01,
+            ]
+        }
+
+        fn get_transaction_receipt(
+            &self,
+            _context_id: &ContextId,
+            _transaction_id: &str,
+        ) -> Result<TransactionReceipt, ContextManagerError> {
+            unimplemented!()
+        }
+
+        fn drop_context(&mut self, _context_id: ContextId) {}
+    }
 
     pub fn test_scheduler(scheduler: &mut Scheduler) {
         let mut workload = XoBatchWorkload::new_with_seed(5);

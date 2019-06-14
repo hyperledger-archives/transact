@@ -180,41 +180,7 @@ impl Scheduler for SerialScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::context::manager::ContextManagerError;
-    use crate::context::{ContextId, ContextLifecycle};
-    use crate::protocol::receipt::TransactionReceipt;
     use crate::scheduler::tests::*;
-
-    struct MockContextLifecycle {}
-
-    impl MockContextLifecycle {
-        fn new() -> Self {
-            MockContextLifecycle {}
-        }
-    }
-
-    impl ContextLifecycle for MockContextLifecycle {
-        fn create_context(
-            &mut self,
-            _dependent_contexts: &[ContextId],
-            _state_id: &str,
-        ) -> ContextId {
-            [
-                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                0x00, 0x01,
-            ]
-        }
-
-        fn get_transaction_receipt(
-            &self,
-            _context_id: &ContextId,
-            _transaction_id: &str,
-        ) -> Result<TransactionReceipt, ContextManagerError> {
-            unimplemented!()
-        }
-
-        fn drop_context(&mut self, _context_id: ContextId) {}
-    }
 
     /// This test will hang if join() fails within the scheduler.
     #[test]
