@@ -81,6 +81,13 @@ pipeline {
             }
         }
 
+        stage('Run Lint') {
+            steps {
+              sh 'docker build . -f docker/lint -t lint-sabre:$ISOLATION_ID'
+              sh 'docker run --rm -v $(pwd):/project/sawtooth-sabre lint-sabre:$ISOLATION_ID'
+            }
+        }
+
         stage('Build Sabre') {
             steps {
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-cli'
