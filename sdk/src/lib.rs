@@ -683,18 +683,18 @@ unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
 }
 
 #[derive(PartialOrd, PartialEq, Copy, Clone)]
-pub enum LogLevel{
+pub enum LogLevel {
     Trace,
     Debug,
     Info,
     Warn,
-    Error
+    Error,
 }
 
 pub fn log_message(log_level: LogLevel, log_string: String) {
     unsafe {
         // WasmBuffer was created properly, log message otherwise ignore
-        if let Ok(log_buffer) =  WasmBuffer::new(log_string.as_bytes()) {
+        if let Ok(log_buffer) = WasmBuffer::new(log_string.as_bytes()) {
             match log_level {
                 LogLevel::Trace => externs::log_buffer(4 as i32, log_buffer.to_raw()),
                 LogLevel::Debug => externs::log_buffer(3 as i32, log_buffer.to_raw()),
@@ -706,7 +706,6 @@ pub fn log_message(log_level: LogLevel, log_string: String) {
     }
 }
 
-
 pub fn log_level() -> LogLevel {
     unsafe {
         match externs::log_level() {
@@ -717,7 +716,6 @@ pub fn log_level() -> LogLevel {
             _ => LogLevel::Error,
         }
     }
-
 }
 
 pub fn log_enabled(lvl: LogLevel) -> bool {
