@@ -200,6 +200,20 @@ impl Clone for Box<ExecutionTaskCompletionNotifier> {
     }
 }
 
+fn default_result_callback(batch_result: Option<BatchExecutionResult>) {
+    warn!(
+        "No result callback set; dropping batch execution result: {}",
+        match batch_result {
+            Some(ref result) => result.batch.batch().header_signature(),
+            None => "None",
+        }
+    );
+}
+
+fn default_error_callback(error: SchedulerError) {
+    error!("No error callback set; SchedulerError: {}", error);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
