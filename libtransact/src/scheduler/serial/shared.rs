@@ -31,6 +31,12 @@ pub struct Shared {
     unscheduled_batches: VecDeque<BatchPair>,
 }
 
+impl Default for Shared {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Shared {
     pub fn new() -> Self {
         Shared {
