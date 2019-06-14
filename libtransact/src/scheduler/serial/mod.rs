@@ -118,7 +118,7 @@ impl Scheduler for SerialScheduler {
         let mut shared = self.shared_lock.lock()?;
 
         if shared.finalized() {
-            panic!("add_batch called after scheduler finalized");
+            return Err(SchedulerError::SchedulerFinalized);
         }
 
         shared.add_unscheduled_batch(batch);

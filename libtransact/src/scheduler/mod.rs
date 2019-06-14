@@ -108,6 +108,8 @@ pub enum ExecutionTaskCompletionNotification {
 pub enum SchedulerError {
     /// An internal error occurred that the scheduler could not recover from.
     Internal(String),
+    /// The scheduler's `add_batch` method was called, but the scheduler was already finalized
+    SchedulerFinalized,
     /// An `ExecutionTaskCompletionNotification` was received for a transaction that the scheduler
     /// was not expecting; the contained `String` is the transaction ID.
     UnexpectedNotification(String),
@@ -119,6 +121,7 @@ impl std::fmt::Display for SchedulerError {
             SchedulerError::Internal(ref err) => {
                 write!(f, "scheduler encountered an internal error: {}", err)
             }
+            SchedulerError::SchedulerFinalized => write!(f, "batch added to finalized scheduler"),
             SchedulerError::UnexpectedNotification(ref txn_id) => write!(
                 f,
                 "scheduler received an unexpected notification: {}",
