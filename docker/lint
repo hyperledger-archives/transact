@@ -40,7 +40,8 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/proto
     && unzip -o protoc-3.7.1-linux-x86_64.zip -d /usr/local \
     && rm protoc-3.7.1-linux-x86_64.zip
 
-ENV PATH=$PATH:/root/.cargo/bin:/project/sawtooth-sabre/bin
+ENV PATH=$PATH:/root/.cargo/bin:/project/sawtooth-sabre/bin \
+  CARGO_INCREMENTAL=0
 
 # Install rustfmt and clippy
 RUN rustup component add rustfmt \

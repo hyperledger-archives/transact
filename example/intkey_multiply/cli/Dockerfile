@@ -40,4 +40,5 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
  && rm protoc-3.5.1-linux-x86_64.zip
 
 WORKDIR /project/example/intkey_multiply/cli/
-ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/example/intkey_multiply/cli/target/debug/
+ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/example/intkey_multiply/cli/target/debug/  \
+    CARGO_INCREMENTAL=0

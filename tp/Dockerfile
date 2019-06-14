@@ -34,4 +34,5 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
 WORKDIR /project/tp
 
 ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/tp/target/debug/ \
-    RUST_BACKTRACE=1
+    RUST_BACKTRACE=1  \
+    CARGO_INCREMENTAL=0

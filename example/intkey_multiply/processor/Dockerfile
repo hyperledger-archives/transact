@@ -33,4 +33,5 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y \
 
 WORKDIR /project/example/intkey_multiply/processor/
 
-ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/example/intkey_multiply/processor/target/debug/
+ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin:/project/example/intkey_multiply/processor/target/debug/  \
+    CARGO_INCREMENTAL=0
