@@ -170,9 +170,9 @@ impl Scheduler for SerialScheduler {
             .ok_or(SchedulerError::NoTaskIterator)
     }
 
-    fn new_notifier(&mut self) -> Box<dyn ExecutionTaskCompletionNotifier> {
-        Box::new(execution::SerialExecutionTaskCompletionNotifier::new(
-            self.core_tx.clone(),
+    fn new_notifier(&mut self) -> Result<Box<dyn ExecutionTaskCompletionNotifier>, SchedulerError> {
+        Ok(Box::new(
+            execution::SerialExecutionTaskCompletionNotifier::new(self.core_tx.clone()),
         ))
     }
 }

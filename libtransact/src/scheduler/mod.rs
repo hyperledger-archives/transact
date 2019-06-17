@@ -182,7 +182,7 @@ pub trait Scheduler {
     /// Returns a newly allocated ExecutionTaskCompletionNotifier which allows
     /// sending a notification to the scheduler that indicates the task has
     /// been executed.
-    fn new_notifier(&mut self) -> Box<dyn ExecutionTaskCompletionNotifier>;
+    fn new_notifier(&mut self) -> Result<Box<dyn ExecutionTaskCompletionNotifier>, SchedulerError>;
 }
 
 /// Allows sending a notification to the scheduler that execution of a task
@@ -302,7 +302,9 @@ mod tests {
         let mut task_iterator = scheduler
             .take_task_iterator()
             .expect("Failed to get task iterator");
-        let notifier = scheduler.new_notifier();
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
 
         thread::Builder::new()
             .name(String::from(
