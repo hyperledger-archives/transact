@@ -38,13 +38,13 @@ use sabre_sdk::protocol::payload::{
 };
 
 /// The namespace registry prefix for global state (00ec00)
-const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
+const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
 
 /// The contract registry prefix for global state (00ec01)
-const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
+const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 
 /// The contract prefix for global state (00ec02)
-const CONTRACT_PREFIX: &'static str = "00ec02";
+const CONTRACT_PREFIX: &str = "00ec02";
 
 /// Handles Sabre Transactions
 ///
@@ -63,6 +63,7 @@ pub struct SabreTransactionHandler {
 
 impl SabreTransactionHandler {
     /// Constructs a new SabreTransactionHandler
+    #[allow(clippy::new_without_default)]
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
@@ -78,15 +79,15 @@ impl SabreTransactionHandler {
 
 impl TransactionHandler for SabreTransactionHandler {
     fn family_name(&self) -> String {
-        return self.family_name.clone();
+        self.family_name.clone()
     }
 
     fn family_versions(&self) -> Vec<String> {
-        return self.family_versions.clone();
+        self.family_versions.clone()
     }
 
     fn namespaces(&self) -> Vec<String> {
-        return self.namespaces.clone();
+        self.namespaces.clone()
     }
 
     fn apply(
@@ -249,7 +250,7 @@ fn create_contract(
 
     let contract_registry_version = VersionBuilder::new()
         .with_version(version.into())
-        .with_contract_sha512(sha.result_str().into())
+        .with_contract_sha512(sha.result_str())
         .with_creator(signer.into())
         .build()
         .map_err(|_| {
@@ -337,7 +338,7 @@ fn delete_contract(
     state.delete_contract(name, version)
 }
 
-fn execute_contract<'a>(
+fn execute_contract(
     payload: ExecuteContractAction,
     signer: &str,
     signature: &str,
@@ -485,25 +486,19 @@ fn execute_contract<'a>(
         .map_err(|e| ApplyError::InvalidTransaction(format!("{:?}", e)))?;
 
     match result {
-        None => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Wasm contract did not return a result: {}, {}",
-                name, version,
-            )));
-        }
+        None => Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract did not return a result: {}, {}",
+            name, version,
+        ))),
         Some(1) => Ok(()),
-        Some(-3) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Wasm contract returned invalid transaction: {}, {}",
-                name, version,
-            )));
-        }
-        Some(num) => {
-            return Err(ApplyError::InternalError(format!(
-                "Wasm contract returned internal error: {}",
-                num
-            )));
-        }
+        Some(-3) => Err(ApplyError::InvalidTransaction(format!(
+            "Wasm contract returned invalid transaction: {}, {}",
+            name, version,
+        ))),
+        Some(num) => Err(ApplyError::InternalError(format!(
+            "Wasm contract returned internal error: {}",
+            num
+        ))),
     }
 }
 
@@ -548,7 +543,7 @@ fn create_contract_registry(
 
     for entry in setting.get_entries() {
         if entry.key == "sawtooth.swa.administrators" {
-            let values = entry.value.split(",");
+            let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
                 return Err(ApplyError::InvalidTransaction(format!(
@@ -592,7 +587,7 @@ fn delete_contract_registry(
         }
     };
 
-    if contract_registry.versions().len() != 0 {
+    if !contract_registry.versions().is_empty() {
         return Err(ApplyError::InvalidTransaction(format!(
             "Contract Registry can only be deleted if there are no versions: {}",
             name,
@@ -689,7 +684,7 @@ fn create_namespace_registry(
 
     for entry in setting.get_entries() {
         if entry.key == "sawtooth.swa.administrators" {
-            let values = entry.value.split(",");
+            let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
                 return Err(ApplyError::InvalidTransaction(format!(
@@ -735,7 +730,7 @@ fn delete_namespace_registry(
     };
     can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
 
-    if namespace_registry.permissions().len() != 0 {
+    if !namespace_registry.permissions().is_empty() {
         return Err(ApplyError::InvalidTransaction(format!(
             "Namespace Registry can only be deleted if there are no permissions: {}",
             namespace,
@@ -1086,7 +1081,7 @@ fn can_update_namespace_registry(
 
         for entry in setting.get_entries() {
             if entry.key == "sawtooth.swa.administrators" {
-                let values = entry.value.split(",");
+                let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(
@@ -1125,7 +1120,7 @@ fn can_update_contract_registry(
 
         for entry in setting.get_entries() {
             if entry.key == "sawtooth.swa.administrators" {
-                let values = entry.value.split(",");
+                let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
                     return Err(ApplyError::InvalidTransaction(format!(

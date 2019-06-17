@@ -296,6 +296,184 @@ impl<'a> WasmExternals<'a> {
             None => Ok(None),
         }
     }
+
+    fn smart_permission(&mut self, args: RuntimeArgs) -> Result<Option<RuntimeValue>, Trap> {
+        let timer = Instant::now();
+        let contract_addr_ptr: i32 = args.nth(0);
+        let name: i32 = args.nth(1);
+        let roles_head_ptr: u32 = args.nth(2);
+        let org_id_ptr: i32 = args.nth(3);
+        let public_key_ptr: i32 = args.nth(4);
+        let payload_ptr: i32 = args.nth(5);
+
+        let roles = match self.ptr_collections.get(&roles_head_ptr) {
+            Some(roles) => roles.clone(),
+            None => return Ok(Some(RuntimeValue::I32(-1))),
+        };
+        let mut role_vec = Vec::new();
+        for role in roles {
+            let role_str = self.ptr_to_string(role).map_err(ExternalsError::from)?;
+            role_vec.push(role_str);
+        }
+        let org_id = self.ptr_to_string(org_id_ptr as u32)?;
+        let public_key = self.ptr_to_string(public_key_ptr as u32)?;
+        let payload = self.ptr_to_vec(payload_ptr as u32)?;
+        let name = self.ptr_to_string(name as u32)?;
+        let contract_addr = self.ptr_to_string(contract_addr_ptr as u32)?;
+
+        let contract = if let Some(sp) = self.get_smart_permission(&contract_addr, &name)? {
+            sp
+        } else {
+            return Ok(Some(RuntimeValue::I32(-2)));
+        };
+
+        // Invoke Smart Permission
+        let mut module = SmartPermissionModule::new(contract.function(), self.context)
+            .expect("Failed to create can_add module");
+        let result = module
+            .entrypoint(role_vec, org_id, public_key, payload.to_vec())
+            .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
+
+        match result {
+            Some(x) => {
+                info!(
+                    "SMART_PERMISSION Execution time: {} secs {} ms",
+                    timer.elapsed().as_secs(),
+                    timer.elapsed().subsec_millis()
+                );
+                Ok(Some(RuntimeValue::I32(x)))
+            }
+            None => Err(ExternalsError::trap("No result returned".into())),
+        }
+    }
+
+    fn get_state(
+        &mut self,
+        args: RuntimeArgs,
+        timer: Instant,
+    ) -> Result<Option<RuntimeValue>, Trap> {
+        let head_ptr: u32 = args.nth(0);
+        let addresses = match self.ptr_collections.get(&head_ptr) {
+            Some(addresses) => addresses.clone(),
+            None => return Ok(Some(RuntimeValue::I32(-1))),
+        };
+        let mut addr_vec = Vec::new();
+        for addr in addresses {
+            let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
+            addr_vec.push(address);
+        }
+
+        info!("Attempting to get state, addresses: {:?}", addr_vec);
+
+        let state = self
+            .context
+            .get_state_entries(&addr_vec)
+            .map_err(ExternalsError::from)?;
+
+        let mut ptr_vec = Vec::new();
+        for (addr, data) in state {
+            let addr_raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
+            ptr_vec.push(addr_raw_ptr);
+
+            let data_raw_ptr = self.write_data(data)?;
+            ptr_vec.push(data_raw_ptr);
+        }
+
+        // collect ptrs or return empty vec
+        let raw_ptr = if ptr_vec.is_empty() {
+            self.write_data(Vec::new())?
+        } else {
+            self.collect_ptrs(ptr_vec)?
+        };
+
+        info!(
+            "GET_STATE Execution time: {} secs {} ms",
+            timer.elapsed().as_secs(),
+            timer.elapsed().subsec_millis()
+        );
+
+        Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
+    }
+
+    fn set_state(
+        &mut self,
+        args: RuntimeArgs,
+        timer: Instant,
+    ) -> Result<Option<RuntimeValue>, Trap> {
+        let head_ptr: u32 = args.nth(0);
+        let addr_state = match self.ptr_collections.get(&head_ptr) {
+            Some(addresses) => addresses.clone(),
+            None => return Ok(Some(RuntimeValue::I32(-1))),
+        };
+
+        // if the length is not even return deserialization error
+        if (addr_state.len() % 2) != 0 {
+            return Ok(Some(RuntimeValue::I32(-1)));
+        }
+
+        let mut entries = Vec::new();
+        for entry in addr_state.chunks(2) {
+            let address = self.ptr_to_string(entry[0]).map_err(ExternalsError::from)?;
+            let data = self.ptr_to_vec(entry[1])?;
+            entries.push((address, data));
+        }
+
+        info!("Attempting to set state, entries: {:?}", entries);
+
+        match self.context.set_state_entries(entries) {
+            Ok(()) => {
+                info!(
+                    "SET_STATE Execution time: {} secs {} ms",
+                    timer.elapsed().as_secs(),
+                    timer.elapsed().subsec_millis()
+                );
+                Ok(Some(RuntimeValue::I32(1)))
+            }
+            Err(err) => {
+                info!("Set Error: {}", err);
+                info!(
+                    "SET_STATE Execution time: {} secs {} ms",
+                    timer.elapsed().as_secs(),
+                    timer.elapsed().subsec_millis()
+                );
+                Ok(Some(RuntimeValue::I32(0)))
+            }
+        }
+    }
+
+    fn delete_state(&mut self, args: RuntimeArgs) -> Result<Option<RuntimeValue>, Trap> {
+        let head_ptr: u32 = args.nth(0);
+
+        let addresses = match self.ptr_collections.get(&head_ptr) {
+            Some(addresses) => addresses.clone(),
+            None => return Ok(Some(RuntimeValue::I32(-1))),
+        };
+        let mut addr_vec = Vec::new();
+        for addr in addresses {
+            let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
+            addr_vec.push(address);
+        }
+        info!("Attempting to delete state, addresses: {:?}", addr_vec);
+        let result = self
+            .context
+            .delete_state_entries(&addr_vec)
+            .map_err(ExternalsError::from)?;
+
+        let mut ptr_vec = Vec::new();
+        for addr in result {
+            let raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
+            ptr_vec.push(raw_ptr);
+        }
+
+        // collect ptrs or return empty vec
+        let raw_ptr = if ptr_vec.is_empty() {
+            self.write_data(Vec::new())?
+        } else {
+            self.collect_ptrs(ptr_vec)?
+        };
+
+        Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
+    }
 }
 
 impl<'a> Externals for WasmExternals<'a> {
@@ -306,123 +484,9 @@ impl<'a> Externals for WasmExternals<'a> {
     ) -> Result<Option<RuntimeValue>, Trap> {
         let timer = Instant::now();
         match index {
-            GET_STATE_IDX => {
-                let head_ptr: u32 = args.nth(0);
-                let addresses = match self.ptr_collections.get(&head_ptr) {
-                    Some(addresses) => addresses.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1))),
-                };
-                let mut addr_vec = Vec::new();
-                for addr in addresses {
-                    let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
-                    addr_vec.push(address);
-                }
-
-                info!("Attempting to get state, addresses: {:?}", addr_vec);
-
-                let state = self
-                    .context
-                    .get_state_entries(&addr_vec)
-                    .map_err(ExternalsError::from)?;
-
-                let mut ptr_vec = Vec::new();
-                for (addr, data) in state {
-                    let addr_raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
-                    ptr_vec.push(addr_raw_ptr);
-
-                    let data_raw_ptr = self.write_data(data)?;
-                    ptr_vec.push(data_raw_ptr);
-                }
-
-                // collect ptrs or return empty vec
-                let raw_ptr = if ptr_vec.is_empty() {
-                    self.write_data(Vec::new())?
-                } else {
-                    self.collect_ptrs(ptr_vec)?
-                };
-
-                info!(
-                    "GET_STATE Execution time: {} secs {} ms",
-                    timer.elapsed().as_secs(),
-                    timer.elapsed().subsec_millis()
-                );
-
-                Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
-            }
-            SET_STATE_IDX => {
-                let head_ptr: u32 = args.nth(0);
-                let addr_state = match self.ptr_collections.get(&head_ptr) {
-                    Some(addresses) => addresses.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1))),
-                };
-
-                // if the length is not even return deserialization error
-                if (addr_state.len() % 2) != 0 {
-                    return Ok(Some(RuntimeValue::I32(-1)));
-                }
-
-                let mut entries = Vec::new();
-                for entry in addr_state.chunks(2) {
-                    let address = self.ptr_to_string(entry[0]).map_err(ExternalsError::from)?;
-                    let data = self.ptr_to_vec(entry[1])?;
-                    entries.push((address, data));
-                }
-
-                info!("Attempting to set state, entries: {:?}", entries);
-
-                match self.context.set_state_entries(entries) {
-                    Ok(()) => {
-                        info!(
-                            "SET_STATE Execution time: {} secs {} ms",
-                            timer.elapsed().as_secs(),
-                            timer.elapsed().subsec_millis()
-                        );
-                        Ok(Some(RuntimeValue::I32(1)))
-                    }
-                    Err(err) => {
-                        info!("Set Error: {}", err);
-                        info!(
-                            "SET_STATE Execution time: {} secs {} ms",
-                            timer.elapsed().as_secs(),
-                            timer.elapsed().subsec_millis()
-                        );
-                        Ok(Some(RuntimeValue::I32(0)))
-                    }
-                }
-            }
-            DELETE_STATE_IDX => {
-                let head_ptr: u32 = args.nth(0);
-
-                let addresses = match self.ptr_collections.get(&head_ptr) {
-                    Some(addresses) => addresses.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1))),
-                };
-                let mut addr_vec = Vec::new();
-                for addr in addresses {
-                    let address = self.ptr_to_string(addr).map_err(ExternalsError::from)?;
-                    addr_vec.push(address);
-                }
-                info!("Attempting to delete state, addresses: {:?}", addr_vec);
-                let result = self
-                    .context
-                    .delete_state_entries(&addr_vec)
-                    .map_err(ExternalsError::from)?;
-
-                let mut ptr_vec = Vec::new();
-                for addr in result {
-                    let raw_ptr = self.write_data(addr.as_bytes().to_vec())?;
-                    ptr_vec.push(raw_ptr);
-                }
-
-                // collect ptrs or return empty vec
-                let raw_ptr = if ptr_vec.is_empty() {
-                    self.write_data(Vec::new())?
-                } else {
-                    self.collect_ptrs(ptr_vec)?
-                };
-
-                Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
-            }
+            GET_STATE_IDX => self.get_state(args, timer),
+            SET_STATE_IDX => self.set_state(args, timer),
+            DELETE_STATE_IDX => self.delete_state(args),
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
 
@@ -459,7 +523,7 @@ impl<'a> Externals for WasmExternals<'a> {
                     .get_memory_ref()
                     .get(offset as u32, 1)
                     .map_err(ExternalsError::from)?[0];
-                Ok(Some(RuntimeValue::I32(byte as i32)))
+                Ok(Some(RuntimeValue::I32(i32::from(byte))))
             }
             WRITE_BYTE_IDX => {
                 let ptr: u32 = args.nth(0);
@@ -518,55 +582,7 @@ impl<'a> Externals for WasmExternals<'a> {
                 self.add_to_collection(head_ptr, raw_ptr)?;
                 Ok(Some(RuntimeValue::I32(head_ptr as i32)))
             }
-            SMART_PERMISSION => {
-                let timer = Instant::now();
-                let contract_addr_ptr: i32 = args.nth(0);
-                let name: i32 = args.nth(1);
-                let roles_head_ptr: u32 = args.nth(2);
-                let org_id_ptr: i32 = args.nth(3);
-                let public_key_ptr: i32 = args.nth(4);
-                let payload_ptr: i32 = args.nth(5);
-
-                let roles = match self.ptr_collections.get(&roles_head_ptr) {
-                    Some(roles) => roles.clone(),
-                    None => return Ok(Some(RuntimeValue::I32(-1))),
-                };
-                let mut role_vec = Vec::new();
-                for role in roles {
-                    let role_str = self.ptr_to_string(role).map_err(ExternalsError::from)?;
-                    role_vec.push(role_str);
-                }
-                let org_id = self.ptr_to_string(org_id_ptr as u32)?;
-                let public_key = self.ptr_to_string(public_key_ptr as u32)?;
-                let payload = self.ptr_to_vec(payload_ptr as u32)?;
-                let name = self.ptr_to_string(name as u32)?;
-                let contract_addr = self.ptr_to_string(contract_addr_ptr as u32)?;
-
-                let contract = if let Some(sp) = self.get_smart_permission(&contract_addr, &name)? {
-                    sp
-                } else {
-                    return Ok(Some(RuntimeValue::I32(-2)));
-                };
-
-                // Invoke Smart Permission
-                let mut module = SmartPermissionModule::new(contract.function(), self.context)
-                    .expect("Failed to create can_add module");
-                let result = module
-                    .entrypoint(role_vec, org_id, public_key, payload.to_vec())
-                    .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
-
-                match result {
-                    Some(x) => {
-                        info!(
-                            "SMART_PERMISSION Execution time: {} secs {} ms",
-                            timer.elapsed().as_secs(),
-                            timer.elapsed().subsec_millis()
-                        );
-                        Ok(Some(RuntimeValue::I32(x)))
-                    }
-                    None => Err(ExternalsError::to_trap("No result returned".into())),
-                }
-            }
+            SMART_PERMISSION => self.smart_permission(args),
             LOG => {
                 let log_level: u32 = args.nth(0);
                 let log_ptr: u32 = args.nth(1);
@@ -588,7 +604,7 @@ impl<'a> Externals for WasmExternals<'a> {
                 LevelFilter::Warn => Ok(Some(RuntimeValue::I32(1))),
                 LevelFilter::Error | _ => Ok(Some(RuntimeValue::I32(0))),
             },
-            _ => Err(ExternalsError::to_trap("Function does not exist".into())),
+            _ => Err(ExternalsError::trap("Function does not exist".into())),
         }
     }
 }
@@ -714,7 +730,7 @@ pub struct ExternalsError {
 }
 
 impl ExternalsError {
-    fn to_trap(msg: String) -> Trap {
+    fn trap(msg: String) -> Trap {
         Trap::from(TrapKind::Host(Box::new(ExternalsError::from(msg))))
     }
 }
@@ -810,7 +826,7 @@ impl<'a> SmartPermissionModule<'a> {
             role_ptrs.push(i.unwrap());
         }
 
-        let role_list_ptr = if role_ptrs.len() > 0 {
+        let role_list_ptr = if !role_ptrs.is_empty() {
             env.collect_ptrs(role_ptrs)? as i32
         } else {
             -1
@@ -829,7 +845,7 @@ impl<'a> SmartPermissionModule<'a> {
 
         let result = instance.invoke_export(
             "entrypoint",
-            &vec![
+            &[
                 RuntimeValue::I32(role_list_ptr),
                 RuntimeValue::I32(org_id_ptr),
                 RuntimeValue::I32(public_key_ptr),

@@ -37,7 +37,7 @@ cfg_if! {
     }
 }
 
-const MAX_VALUE: u32 = 4294967295;
+const MAX_VALUE: u32 = 4_294_967_295;
 const MAX_NAME_LEN: usize = 20;
 
 /// The smart permission prefix for global state (00ec03)
@@ -128,7 +128,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                 "Name is either too long, too short, or not a string.",
             )));
         }
-        start = start + 2;
+        start += 2;
         let length = (string_type - 96) * 2;
         let name_hex = hex_string
             .get(start..start + length)
@@ -141,7 +141,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         let name = String::from_utf8(name_bytes).map_err(|err| {
             ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
         })?;
-        start = start + length;
+        start += length;
         let number_type = hex_string.get(start..start + 2).ok_or_else(|| {
             ApplyError::InvalidTransaction("Unable to get hex for Value data".into())
         })?;
@@ -150,19 +150,19 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
             ApplyError::InvalidTransaction(format!("Unable to decode cbor: {}", err))
         })?;
 
-        start = start + 2;
+        start += 2;
         // For number less than 23 (decimal) the first two bytes represent the number. If it is
         // greater than 23 the first two bytes represent the number of digits required to
         // calculate the value followed by the actual bytes for the number.
         if number > 23 {
-            number = number - 23;
+            number -= 23;
             let value = match number {
                 // two bytes
                 1 => {
                     let value = hex_string.get(start..start + 2).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 2;
+                    start += 2;
                     value
                 }
                 // 4 bytes
@@ -170,7 +170,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                     let value = hex_string.get(start..start + 4).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 4;
+                    start += 4;
                     value
                 }
                 // 8 bytes
@@ -178,7 +178,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
                     let value = hex_string.get(start..start + 8).ok_or_else(|| {
                         ApplyError::InvalidTransaction("Unable to get number data".into())
                     })?;
-                    start = start + 8;
+                    start += 8;
                     value
                 }
                 // Anymore than 8 bytes is not a u32 and is invalid.
@@ -230,7 +230,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
         let raw_value = map
             .get(&key)
             .ok_or_else(|| ApplyError::InvalidTransaction("Value from map".into()))?;
-        if raw_value > &(23 as u32) {
+        if *raw_value > (23 as u32) {
             let mut value = format!("{:02X}", raw_value);
             if value.len() % 2 == 1 {
                 value = "0".to_string() + &value.clone();
@@ -247,7 +247,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
                 }
             };
             hex_string =
-                hex_string + &format!("{:X}", length) + &encoded_key + &value_length + &value;
+                hex_string + &format!("{:X}", length) + &encoded_key + value_length + &value;
         } else {
             hex_string = hex_string
                 + &format!("{:X}", length)
@@ -271,7 +271,7 @@ impl IntkeyPayload {
         // will be multiplied together.
         let payload = String::from_utf8(payload_data.to_vec())
             .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
-        let payload_vec = payload.split(",").collect::<Vec<&str>>();
+        let payload_vec = payload.split(',').collect::<Vec<&str>>();
 
         let name_a_raw: String = match payload_vec.get(0) {
             None => {
@@ -279,7 +279,7 @@ impl IntkeyPayload {
                     "Name A must be a string",
                 )));
             }
-            Some(name_a_raw) => name_a_raw.clone().into(),
+            Some(name_a_raw) => name_a_raw.to_string(),
         };
 
         if name_a_raw.len() > MAX_NAME_LEN {
@@ -294,7 +294,7 @@ impl IntkeyPayload {
                     "Name B must be a string",
                 )));
             }
-            Some(name_b_raw) => name_b_raw.clone().into(),
+            Some(name_b_raw) => name_b_raw.to_string(),
         };
 
         if name_b_raw.len() > MAX_NAME_LEN {
@@ -309,7 +309,7 @@ impl IntkeyPayload {
                     "Name C must be a string",
                 )));
             }
-            Some(name_c_raw) => name_c_raw.clone().into(),
+            Some(name_c_raw) => name_c_raw.to_string(),
         };
 
         if name_c_raw.len() > MAX_NAME_LEN {
@@ -347,7 +347,7 @@ pub struct IntkeyState<'a> {
 impl<'a> IntkeyState<'a> {
     pub fn new(context: &'a mut TransactionContext) -> IntkeyState {
         IntkeyState {
-            context: context,
+            context,
             get_cache: HashMap::new(),
         }
     }
@@ -367,7 +367,7 @@ impl<'a> IntkeyState<'a> {
                 let map = decode_intkey(hex_vec.join(""))?;
 
                 let status = match map.get(name) {
-                    Some(x) => Ok(Some(x.clone())),
+                    Some(x) => Ok(Some(*x)),
                     None => Ok(None),
                 };
                 self.get_cache.insert(address.clone(), map.clone());
@@ -491,6 +491,7 @@ pub struct IntkeyMultiplyTransactionHandler {
 }
 
 impl IntkeyMultiplyTransactionHandler {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> IntkeyMultiplyTransactionHandler {
         IntkeyMultiplyTransactionHandler {
             family_name: "intkey_multiply".to_string(),
@@ -502,15 +503,15 @@ impl IntkeyMultiplyTransactionHandler {
 
 impl TransactionHandler for IntkeyMultiplyTransactionHandler {
     fn family_name(&self) -> String {
-        return self.family_name.clone();
+        self.family_name.clone()
     }
 
     fn family_versions(&self) -> Vec<String> {
-        return self.family_versions.clone();
+        self.family_versions.clone()
     }
 
     fn namespaces(&self) -> Vec<String> {
-        return self.namespaces.clone();
+        self.namespaces.clone()
     }
 
     fn apply(
@@ -584,7 +585,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
 
         let orig_value_b: u64 = match state.get(payload.get_name_b()) {
-            Ok(Some(v)) => v as u64,
+            Ok(Some(v)) => u64::from(v),
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_b",
@@ -594,7 +595,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
         };
 
         let orig_value_c: u64 = match state.get(payload.get_name_c()) {
-            Ok(Some(v)) => v as u64,
+            Ok(Some(v)) => u64::from(v),
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(String::from(
                     "Multiply requires a set value for name_c",
@@ -603,7 +604,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             Err(err) => return Err(err),
         };
         let new_value = orig_value_b * orig_value_c;
-        if new_value > (MAX_VALUE as u64) {
+        if new_value > u64::from(MAX_VALUE) {
             return Err(ApplyError::InvalidTransaction(format!(
                 "Multiplied value is larger then max allowed: {}",
                 new_value

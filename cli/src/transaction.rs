@@ -34,28 +34,28 @@ use sawtooth_sdk::signing::Signer;
 use crate::error::CliError;
 
 /// The Sawtooth Sabre transaction family name (sabre)
-const SABRE_FAMILY_NAME: &'static str = "sabre";
+const SABRE_FAMILY_NAME: &str = "sabre";
 
 /// The Sawtooth Sabre transaction family version (0.3)
-const SABRE_FAMILY_VERSION: &'static str = "0.3";
+const SABRE_FAMILY_VERSION: &str = "0.3";
 
 /// The namespace registry prefix for global state (00ec00)
-const NAMESPACE_REGISTRY_PREFIX: &'static str = "00ec00";
+const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
 
 /// The contract registry prefix for global state (00ec01)
-const CONTRACT_REGISTRY_PREFIX: &'static str = "00ec01";
+const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 
 /// The contract prefix for global state (00ec02)
-const CONTRACT_PREFIX: &'static str = "00ec02";
+const CONTRACT_PREFIX: &str = "00ec02";
 
 /// The smart permission prefix for global state (00ec03)
-const SMART_PERMISSION_PREFIX: &'static str = "00ec03";
+const SMART_PERMISSION_PREFIX: &str = "00ec03";
 
-const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
+const PIKE_AGENT_PREFIX: &str = "cad11d00";
 
-const PIKE_ORG_PREFIX: &'static str = "cad11d01";
+const PIKE_ORG_PREFIX: &str = "cad11d01";
 
-const SETTING_PREFIX: &'static str = "000000";
+const SETTING_PREFIX: &str = "000000";
 
 /// Creates a nonce appropriate for a TransactionHeader
 fn create_nonce() -> String {
@@ -225,7 +225,7 @@ fn hash_256(to_hash: &str, num: usize) -> String {
 pub fn create_transaction(
     payload: SabrePayload,
     signer: &Signer,
-    public_key: &String,
+    public_key: &str,
 ) -> Result<Transaction, CliError> {
     let mut txn = Transaction::new();
     let mut txn_header = TransactionHeader::new();
@@ -233,8 +233,8 @@ pub fn create_transaction(
     txn_header.set_family_name(String::from(SABRE_FAMILY_NAME));
     txn_header.set_family_version(String::from(SABRE_FAMILY_VERSION));
     txn_header.set_nonce(create_nonce());
-    txn_header.set_signer_public_key(public_key.clone());
-    txn_header.set_batcher_public_key(public_key.clone());
+    txn_header.set_signer_public_key(public_key.to_string());
+    txn_header.set_batcher_public_key(public_key.to_string());
 
     let (input_addresses, output_addresses) = match payload.action() {
         Action::CreateContract(create_contract) => {
@@ -441,7 +441,7 @@ pub fn create_transaction(
 pub fn create_batch(
     txn: Transaction,
     signer: &Signer,
-    public_key: &String,
+    public_key: &str,
 ) -> Result<Batch, CliError> {
     let mut batch = Batch::new();
     let mut batch_header = BatchHeader::new();
@@ -449,7 +449,7 @@ pub fn create_batch(
     batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(vec![txn
         .header_signature
         .clone()]));
-    batch_header.set_signer_public_key(public_key.clone());
+    batch_header.set_signer_public_key(public_key.to_string());
     batch.set_transactions(protobuf::RepeatedField::from_vec(vec![txn]));
 
     let batch_header_bytes = batch_header.write_to_bytes()?;
@@ -469,5 +469,5 @@ pub fn create_batch(
 pub fn create_batch_list_from_one(batch: Batch) -> BatchList {
     let mut batch_list = BatchList::new();
     batch_list.set_batches(protobuf::RepeatedField::from_vec(vec![batch]));
-    return batch_list;
+    batch_list
 }

@@ -139,58 +139,64 @@ impl ContractDefinition {
         }
         let doc = &docs[0];
 
-        let name = doc["name"].as_str().ok_or(CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"name\"",
-            filename
-        )))?;
+        let name = doc["name"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"name\"",
+                filename
+            ))
+        })?;
 
-        let version = doc["version"].as_str().ok_or(CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"version\"",
-            filename
-        )))?;
+        let version = doc["version"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"version\"",
+                filename
+            ))
+        })?;
 
-        let wasm = doc["wasm"].as_str().ok_or(CliError::UserError(format!(
-            "Malformed contract definition file \"{}\": missing string field \"wasm\"",
-            filename
-        )))?;
+        let wasm = doc["wasm"].as_str().ok_or_else(|| {
+            CliError::UserError(format!(
+                "Malformed contract definition file \"{}\": missing string field \"wasm\"",
+                filename
+            ))
+        })?;
 
         let inputs = doc["inputs"]
             .as_vec()
-            .ok_or(CliError::UserError(format!(
+            .ok_or_else(|| CliError::UserError(format!(
                 "Malformed contract definition file \"{}\": missing array \"inputs\"",
                 filename
             )))?
-            .into_iter()
+            .iter()
             .map(|y| {
                 y.as_str()
-                 .ok_or(CliError::UserError(format!(
+                 .ok_or_else(|| CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": inputs array contains non-string values",
                      filename)))
-                 .map(|s| String::from(s))
+                 .map(String::from)
             })
             .collect::<Result<Vec<_>, CliError>>()?;
 
         let outputs = doc["outputs"]
             .as_vec()
-            .ok_or(CliError::UserError(format!(
+            .ok_or_else(|| CliError::UserError(format!(
                 "Malformed contract definition file \"{}\": missing array \"outputs\"",
                 filename
             )))?
-            .into_iter()
+            .iter()
             .map(|y| {
                 y.as_str()
-                 .ok_or(CliError::UserError(format!(
+                 .ok_or_else(|| CliError::UserError(format!(
                      "Malformed contract definition file: \"{}\": outputs array contains non-string values",
                      filename)))
-                 .map(|s| String::from(s))
+                 .map(String::from)
             })
             .collect::<Result<Vec<_>, CliError>>()?;
 
         Ok(ContractDefinition {
             name: String::from(name),
             version: String::from(version),
-            inputs: inputs,
-            outputs: outputs,
+            inputs,
+            outputs,
             wasm: String::from(wasm),
         })
     }

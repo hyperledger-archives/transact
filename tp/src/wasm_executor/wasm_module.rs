@@ -56,7 +56,7 @@ impl<'a> WasmModule<'a> {
 
         let result = instance.invoke_export(
             "entrypoint",
-            &vec![
+            &[
                 RuntimeValue::I32(payload_ptr),
                 RuntimeValue::I32(signer_ptr),
                 RuntimeValue::I32(signature_ptr),

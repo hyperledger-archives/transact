@@ -48,7 +48,7 @@ use crate::error::CliError;
 /// retrieved from the environment, a CliError::VarError is returned.
 pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
     let username: String = name
-        .map(|s| String::from(s))
+        .map(String::from)
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
         .map_err(|_| {
@@ -57,10 +57,12 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             ))
         })?;
 
-    let private_key_filename = env::home_dir()
-        .ok_or(CliError::UserError(String::from(
-            "Could not load signing key: unable to determine home directory",
-        )))
+    let private_key_filename = dirs::home_dir()
+        .ok_or_else(|| {
+            CliError::UserError(String::from(
+                "Could not load signing key: unable to determine home directory",
+            ))
+        })
         .and_then(|mut p| {
             p.push(".sawtooth");
             p.push("keys");

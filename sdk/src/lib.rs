@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#![allow(renamed_and_removed_lints)]
+
 mod externs;
 pub mod log;
 pub mod protocol;
@@ -53,15 +55,15 @@ impl<'a> TpProcessRequest<'a> {
     }
 
     pub fn get_payload(&self) -> &[u8] {
-        return &self.payload;
+        &self.payload
     }
 
     pub fn get_header(&self) -> &Header {
-        return self.header;
+        self.header
     }
 
     pub fn get_signature(&self) -> String {
-        return self.signature.to_string();
+        self.signature.to_string()
     }
 }
 
@@ -181,6 +183,7 @@ pub trait TransactionContext {
     fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError>;
 }
 
+#[derive(Default)]
 pub struct SabreTransactionContext {}
 
 impl SabreTransactionContext {
@@ -200,18 +203,15 @@ impl TransactionContext for SabreTransactionContext {
             }
             let head = &addresses[0];
             let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
-            externs::create_collection(header_address_buffer.into_raw());
+            externs::create_collection(header_address_buffer.to_raw());
 
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
-                externs::add_to_collection(
-                    header_address_buffer.into_raw(),
-                    wasm_buffer.into_raw(),
-                );
+                externs::add_to_collection(header_address_buffer.to_raw(), wasm_buffer.to_raw());
             }
 
             let results =
-                WasmBuffer::from_list(externs::get_state(header_address_buffer.into_raw()))?;
+                WasmBuffer::from_list(externs::get_state(header_address_buffer.to_raw()))?;
             let mut result_vec = Vec::new();
 
             if (result_vec.len() % 2) != 0 {
@@ -221,8 +221,8 @@ impl TransactionContext for SabreTransactionContext {
             }
 
             for result in results.chunks(2) {
-                let addr = String::from_utf8(result[0].into_bytes())?;
-                result_vec.push((addr, result[1].into_bytes()))
+                let addr = String::from_utf8(result[0].to_bytes())?;
+                result_vec.push((addr, result[1].to_bytes()))
             }
             Ok(result_vec)
         }
@@ -237,29 +237,29 @@ impl TransactionContext for SabreTransactionContext {
             };
 
             let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
-            externs::create_collection(header_address_buffer.into_raw());
+            externs::create_collection(header_address_buffer.to_raw());
 
             let wasm_head_data_buffer = WasmBuffer::new(head_data)?;
             externs::add_to_collection(
-                header_address_buffer.into_raw(),
-                wasm_head_data_buffer.into_raw(),
+                header_address_buffer.to_raw(),
+                wasm_head_data_buffer.to_raw(),
             );
 
             for (address, data) in entries_iter {
                 let wasm_addr_buffer = WasmBuffer::new(address.as_bytes())?;
                 externs::add_to_collection(
-                    header_address_buffer.into_raw(),
-                    wasm_addr_buffer.into_raw(),
+                    header_address_buffer.to_raw(),
+                    wasm_addr_buffer.to_raw(),
                 );
 
                 let wasm_data_buffer = WasmBuffer::new(data)?;
                 externs::add_to_collection(
-                    header_address_buffer.into_raw(),
-                    wasm_data_buffer.into_raw(),
+                    header_address_buffer.to_raw(),
+                    wasm_data_buffer.to_raw(),
                 );
             }
 
-            let result = externs::set_state(header_address_buffer.into_raw());
+            let result = externs::set_state(header_address_buffer.to_raw());
 
             if result == 0 {
                 return Err(WasmSdkError::InvalidTransaction(
@@ -279,17 +279,14 @@ impl TransactionContext for SabreTransactionContext {
             }
             let head = &addresses[0];
             let header_address_buffer = WasmBuffer::new(head.as_bytes())?;
-            externs::create_collection(header_address_buffer.into_raw());
+            externs::create_collection(header_address_buffer.to_raw());
 
             for addr in addresses[1..].iter() {
                 let wasm_buffer = WasmBuffer::new(addr.as_bytes())?;
-                externs::add_to_collection(
-                    header_address_buffer.into_raw(),
-                    wasm_buffer.into_raw(),
-                );
+                externs::add_to_collection(header_address_buffer.to_raw(), wasm_buffer.to_raw());
             }
             let result =
-                WasmBuffer::from_list(externs::delete_state(header_address_buffer.into_raw()))?;
+                WasmBuffer::from_list(externs::delete_state(header_address_buffer.to_raw()))?;
             let mut result_vec = Vec::new();
             for i in result {
                 let addr = String::from_utf8(i.data)?;
@@ -326,11 +323,11 @@ pub fn invoke_smart_permission(
         }
         let head = &roles[0];
         let header_role_buffer = WasmBuffer::new(head.as_bytes())?;
-        externs::create_collection(header_role_buffer.into_raw());
+        externs::create_collection(header_role_buffer.to_raw());
 
         for role in roles[1..].iter() {
             let wasm_buffer = WasmBuffer::new(role.as_bytes())?;
-            externs::add_to_collection(header_role_buffer.into_raw(), wasm_buffer.into_raw());
+            externs::add_to_collection(header_role_buffer.to_raw(), wasm_buffer.to_raw());
         }
         let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
         let name_buffer = WasmBuffer::new(name.as_bytes())?;
@@ -339,12 +336,12 @@ pub fn invoke_smart_permission(
         let payload_buffer = WasmBuffer::new(payload)?;
 
         Ok(externs::invoke_smart_permission(
-            contract_addr_buffer.into_raw(),
-            name_buffer.into_raw(),
-            header_role_buffer.into_raw(),
-            org_id_buffer.into_raw(),
-            public_key_buffer.into_raw(),
-            payload_buffer.into_raw(),
+            contract_addr_buffer.to_raw(),
+            name_buffer.to_raw(),
+            header_role_buffer.to_raw(),
+            org_id_buffer.to_raw(),
+            public_key_buffer.to_raw(),
+            payload_buffer.to_raw(),
         ))
     }
 }
@@ -363,13 +360,13 @@ where
     F: Fn(&TpProcessRequest, &mut dyn TransactionContext) -> Result<bool, ApplyError>,
 {
     let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
-        i.into_bytes()
+        i.to_bytes()
     } else {
         return -1;
     };
 
     let signature = if let Ok(i) = WasmBuffer::from_raw(signature_ptr) {
-        match i.into_string() {
+        match i.to_string() {
             Ok(s) => s,
             Err(_) => return -2,
         }
@@ -378,7 +375,7 @@ where
     };
 
     let signer = if let Ok(i) = WasmBuffer::from_raw(signer_ptr) {
-        match i.into_string() {
+        match i.to_string() {
             Ok(s) => s,
             Err(_) => return -2,
         }
@@ -440,7 +437,7 @@ impl Request {
     pub fn get_state(&self, address: String) -> Result<Option<Vec<u8>>, WasmSdkError> {
         unsafe {
             let wasm_buffer = WasmBuffer::new(address.as_bytes())?;
-            ptr_to_vec(externs::get_state(wasm_buffer.into_raw()))
+            ptr_to_vec(externs::get_state(wasm_buffer.to_raw()))
         }
     }
 
@@ -473,8 +470,7 @@ where
     F: Fn(Request) -> Result<bool, WasmSdkError>,
 {
     let roles = if let Ok(i) = WasmBuffer::from_list(roles_ptr) {
-        let results: Vec<Result<String, WasmSdkError>> =
-            i.iter().map(|x| x.into_string()).collect();
+        let results: Vec<Result<String, WasmSdkError>> = i.iter().map(|x| x.to_string()).collect();
 
         if results.iter().any(|x| x.is_err()) {
             return -1;
@@ -486,7 +482,7 @@ where
     };
 
     let org_id = if let Ok(i) = WasmBuffer::from_raw(org_id_ptr) {
-        match i.into_string() {
+        match i.to_string() {
             Ok(s) => s,
             Err(_) => {
                 return -2;
@@ -497,7 +493,7 @@ where
     };
 
     let public_key = if let Ok(i) = WasmBuffer::from_raw(public_key_ptr) {
-        match i.into_string() {
+        match i.to_string() {
             Ok(s) => s,
             Err(_) => {
                 return -3;
@@ -508,7 +504,7 @@ where
     };
 
     let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
-        i.into_bytes()
+        i.to_bytes()
     } else {
         return -4;
     };
@@ -555,8 +551,8 @@ impl WasmBuffer {
             ));
         }
 
-        for i in 0..buffer.len() {
-            if externs::write_byte(raw, i as u32, buffer[i]) < 0 {
+        for (i, byte) in buffer.iter().enumerate() {
+            if externs::write_byte(raw, i as u32, *byte) < 0 {
                 return Err(WasmSdkError::MemoryWriteError(
                     "Failed to write data to host memory".into(),
                 ));
@@ -565,12 +561,12 @@ impl WasmBuffer {
 
         Ok(WasmBuffer {
             raw,
-            data: buffer.clone().to_vec(),
+            data: buffer.to_vec(),
         })
     }
 
     pub unsafe fn from_raw(raw: WasmPtr) -> Result<WasmBuffer, WasmSdkError> {
-        let data = ptr_to_vec(raw)?.unwrap_or(Vec::new());
+        let data = ptr_to_vec(raw)?.unwrap_or_default();
         Ok(WasmBuffer { raw, data })
     }
 
@@ -593,15 +589,15 @@ impl WasmBuffer {
         Ok(wasm_buffers)
     }
 
-    pub fn into_bytes(&self) -> Vec<u8> {
+    pub fn to_bytes(&self) -> Vec<u8> {
         self.data.clone()
     }
 
-    pub fn into_raw(&self) -> WasmPtr {
+    pub fn to_raw(&self) -> WasmPtr {
         self.raw
     }
 
-    pub fn into_string(&self) -> Result<String, WasmSdkError> {
+    pub fn to_string(&self) -> Result<String, WasmSdkError> {
         String::from_utf8(self.data.clone()).map_err(WasmSdkError::from)
     }
 }
@@ -680,36 +676,35 @@ unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
         vec.push(externs::read_byte(ptr as isize + i));
     }
 
-    if vec.len() == 0 {
+    if vec.is_empty() {
         return Ok(None);
     }
     Ok(Some(vec))
 }
 
 #[derive(PartialOrd, PartialEq, Copy, Clone)]
-pub enum LogLevel{
+pub enum LogLevel {
     Trace,
     Debug,
     Info,
     Warn,
-    Error
+    Error,
 }
 
 pub fn log_message(log_level: LogLevel, log_string: String) {
     unsafe {
         // WasmBuffer was created properly, log message otherwise ignore
-        if let Ok(log_buffer) =  WasmBuffer::new(log_string.as_bytes()) {
+        if let Ok(log_buffer) = WasmBuffer::new(log_string.as_bytes()) {
             match log_level {
-                LogLevel::Trace => externs::log_buffer(4 as i32, log_buffer.into_raw()),
-                LogLevel::Debug => externs::log_buffer(3 as i32, log_buffer.into_raw()),
-                LogLevel::Info => externs::log_buffer(2 as i32, log_buffer.into_raw()),
-                LogLevel::Warn => externs::log_buffer(1 as i32, log_buffer.into_raw()),
-                LogLevel::Error => externs::log_buffer(0 as i32, log_buffer.into_raw()),
+                LogLevel::Trace => externs::log_buffer(4 as i32, log_buffer.to_raw()),
+                LogLevel::Debug => externs::log_buffer(3 as i32, log_buffer.to_raw()),
+                LogLevel::Info => externs::log_buffer(2 as i32, log_buffer.to_raw()),
+                LogLevel::Warn => externs::log_buffer(1 as i32, log_buffer.to_raw()),
+                LogLevel::Error => externs::log_buffer(0 as i32, log_buffer.to_raw()),
             };
         }
     }
 }
-
 
 pub fn log_level() -> LogLevel {
     unsafe {
@@ -721,13 +716,8 @@ pub fn log_level() -> LogLevel {
             _ => LogLevel::Error,
         }
     }
-
 }
 
 pub fn log_enabled(lvl: LogLevel) -> bool {
-    if lvl >= log_level() {
-        true
-    } else {
-        false
-    }
+    lvl >= log_level()
 }
