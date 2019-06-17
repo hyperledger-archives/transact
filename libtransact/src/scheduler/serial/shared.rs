@@ -19,21 +19,30 @@
 
 use crate::protocol::batch::BatchPair;
 use crate::scheduler::BatchExecutionResult;
+use crate::scheduler::SchedulerError;
 
 use std::collections::VecDeque;
 
 /// Stores all serial scheduler data which is shared between threads.
 pub struct Shared {
     finalized: bool,
-    result_callback: Option<Box<Fn(Option<BatchExecutionResult>) + Send>>,
+    result_callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+    error_callback: Box<Fn(SchedulerError) + Send>,
     unscheduled_batches: VecDeque<BatchPair>,
+}
+
+impl Default for Shared {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Shared {
     pub fn new() -> Self {
         Shared {
             finalized: false,
-            result_callback: None,
+            result_callback: Box::new(default_result_callback),
+            error_callback: Box::new(default_error_callback),
             unscheduled_batches: VecDeque::new(),
         }
     }
@@ -42,8 +51,12 @@ impl Shared {
         self.finalized
     }
 
-    pub fn result_callback(&self) -> &Option<Box<Fn(Option<BatchExecutionResult>) + Send>> {
-        &self.result_callback
+    pub fn result_callback(&self) -> &(Fn(Option<BatchExecutionResult>) + Send) {
+        &*self.result_callback
+    }
+
+    pub fn error_callback(&self) -> &(Fn(SchedulerError) + Send) {
+        &*self.error_callback
     }
 
     pub fn set_finalized(&mut self, finalized: bool) {
@@ -51,7 +64,15 @@ impl Shared {
     }
 
     pub fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>) {
-        self.result_callback = Some(callback);
+        self.result_callback = callback;
+    }
+
+    pub fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
+        self.error_callback = callback;
+    }
+
+    pub fn batch_already_queued(&self, batch: &BatchPair) -> bool {
+        self.unscheduled_batches.contains(batch)
     }
 
     pub fn add_unscheduled_batch(&mut self, batch: BatchPair) {
@@ -65,4 +86,18 @@ impl Shared {
     pub fn pop_unscheduled_batch(&mut self) -> Option<BatchPair> {
         self.unscheduled_batches.pop_front()
     }
+}
+
+fn default_result_callback(batch_result: Option<BatchExecutionResult>) {
+    warn!(
+        "No result callback set; dropping batch execution result: {}",
+        match batch_result {
+            Some(ref result) => result.batch.batch().header_signature(),
+            None => "None",
+        }
+    );
+}
+
+fn default_error_callback(error: SchedulerError) {
+    error!("No error callback set; SchedulerError: {}", error);
 }

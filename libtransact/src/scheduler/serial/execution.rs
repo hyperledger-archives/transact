@@ -80,7 +80,7 @@ impl ExecutionTaskCompletionNotifier for SerialExecutionTaskCompletionNotifier {
     fn notify(&self, notification: ExecutionTaskCompletionNotification) {
         self.tx
             .send(CoreMessage::ExecutionResult(notification))
-            .unwrap();
+            .unwrap_or_else(|err| error!("failed to send notification to core: {}", err));
     }
 
     fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier> {

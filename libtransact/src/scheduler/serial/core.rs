@@ -25,6 +25,7 @@ use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::scheduler::InvalidTransactionResult;
+use crate::scheduler::SchedulerError;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
@@ -109,6 +110,12 @@ impl From<ContextManagerError> for CoreError {
     }
 }
 
+impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, Shared>>> for CoreError {
+    fn from(error: std::sync::PoisonError<std::sync::MutexGuard<'_, Shared>>) -> CoreError {
+        CoreError::Internal(format!("scheduler shared lock is poisoned: {}", error))
+    }
+}
+
 pub struct SchedulerCore {
     /// The data shared between this core thread and the thread which owns
     /// `SerialScheduler`.
@@ -181,11 +188,7 @@ impl SchedulerCore {
         }
 
         if self.current_batch.is_none() {
-            let mut shared = self
-                .shared_lock
-                .lock()
-                .expect("scheduler shared lock is poisoned");
-
+            let mut shared = self.shared_lock.lock()?;
             if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
                 self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
                 self.current_batch = Some(unscheduled_batch);
@@ -248,28 +251,32 @@ impl SchedulerCore {
             .header_signature();
 
         // Invalidate all previously executed transactions in the batch
-        self.txn_results = self
-            .txn_results
-            .iter()
-            .map(|result| match result {
+        for result in &mut self.txn_results {
+            match result {
                 TransactionExecutionResult::Valid(receipt) => {
-                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
-                        transaction_id: receipt.transaction_id.clone(),
-                        error_message: format!(
-                            "containing batch ({}) is invalid",
-                            current_batch_id,
-                        ),
-                        error_data: vec![],
-                    })
+                    let mut new_result =
+                        TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                            transaction_id: receipt.transaction_id.clone(),
+                            error_message: format!(
+                                "containing batch ({}) is invalid",
+                                current_batch_id,
+                            ),
+                            error_data: vec![],
+                        });
+                    std::mem::swap(result, &mut new_result);
                 }
-                TransactionExecutionResult::Invalid(_) => {
+                TransactionExecutionResult::Invalid(invalid_txn_result) => {
                     // When an invalid transaction is encountered, the scheduler should fail-fast
-                    // and invalidate the whole batch immediately; if an invalid result is in the
-                    // previously executed transaction results, this did not happen.
-                    panic!("should not already have an invalid result");
+                    // and invalidate the whole batch immediately; this did not happen if an
+                    // invalid result is in the previously executed transaction results, so
+                    // something has gone wrong.
+                    return Err(CoreError::Internal(format!(
+                        "previously invalid transaction result ({}) found in batch {}",
+                        invalid_txn_result.transaction_id, current_batch_id
+                    )));
                 }
-            })
-            .collect();
+            }
+        }
 
         self.txn_results
             .push(TransactionExecutionResult::Invalid(invalid_result));
@@ -307,22 +314,13 @@ impl SchedulerCore {
 
         let batch_result = BatchExecutionResult { batch, results };
 
-        let shared = self
-            .shared_lock
-            .lock()
-            .expect("scheduler shared lock is poisoned");
-        match shared.result_callback() {
-            Some(callback) => {
-                callback(Some(batch_result));
-            }
-            None => {
-                warn!(
-                    "dropped batch execution result: {}",
-                    batch_result.batch.batch().header_signature()
-                );
-            }
-        }
+        self.shared_lock.lock()?.result_callback()(Some(batch_result));
 
+        Ok(())
+    }
+
+    fn send_scheduler_error(&mut self, error: SchedulerError) -> Result<(), CoreError> {
+        self.shared_lock.lock()?.error_callback()(error);
         Ok(())
     }
 
@@ -342,11 +340,9 @@ impl SchedulerCore {
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
                             if &transaction_id != current_txn_id {
-                                error!(
-                                    "received execution result for a transaction ({}) that is \
-                                     not the current transaction ({})",
-                                    transaction_id, current_txn_id
-                                );
+                                self.send_scheduler_error(SchedulerError::UnexpectedNotification(
+                                    transaction_id,
+                                ))?;
                                 continue;
                             }
                             self.current_txn = None;
@@ -360,11 +356,9 @@ impl SchedulerCore {
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
                             if &result.transaction_id != current_txn_id {
-                                error!(
-                                    "received execution result for a transaction ({}) that is \
-                                     not the current transaction ({})",
-                                    result.transaction_id, current_txn_id
-                                );
+                                self.send_scheduler_error(SchedulerError::UnexpectedNotification(
+                                    result.transaction_id,
+                                ))?;
                                 continue;
                             }
                             self.current_txn = None;
@@ -390,7 +384,7 @@ impl SchedulerCore {
                     // before this end. However, it would be more
                     // elegant to gracefully handle it by sending a
                     // close message across.
-                    error!("Thread-SerialScheduler recv error: {}", err);
+                    warn!("Thread-SerialScheduler recv failed: {}", err);
                     break;
                 }
             }
@@ -399,14 +393,26 @@ impl SchedulerCore {
         Ok(())
     }
 
-    pub fn start(mut self) -> std::thread::JoinHandle<()> {
+    pub fn start(mut self) -> Result<std::thread::JoinHandle<()>, SchedulerError> {
         thread::Builder::new()
             .name(String::from("Thread-SerialScheduler"))
             .spawn(move || {
                 if let Err(err) = self.run() {
-                    error!("scheduler thread ended due to error: {}", err);
+                    // Attempt to send notification using the error callback; if that fails, just
+                    // log it.
+                    let error = SchedulerError::Internal(format!(
+                        "serial scheduler's internal thread ended due to error: {}",
+                        err
+                    ));
+                    self.send_scheduler_error(error.clone())
+                        .unwrap_or_else(|_| error!("{}", error));
                 }
             })
-            .expect("could not build a thread for the scheduler")
+            .map_err(|err| {
+                SchedulerError::Internal(format!(
+                    "could not build a thread for the scheduler: {}",
+                    err
+                ))
+            })
     }
 }
