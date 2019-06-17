@@ -57,12 +57,6 @@ impl StdError for TestError {
             TestError::TestError(ref s) => &s,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            TestError::TestError(ref _s) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for TestError {

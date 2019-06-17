@@ -99,12 +99,6 @@ impl StdError for KeyValueEntryBuildError {
             KeyValueEntryBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            KeyValueEntryBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for KeyValueEntryBuildError {
@@ -253,12 +247,6 @@ impl StdError for AgentBuildError {
     fn description(&self) -> &str {
         match *self {
             AgentBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            AgentBuildError::MissingField(_) => None,
         }
     }
 }
@@ -414,12 +402,6 @@ impl StdError for AgentListBuildError {
             AgentListBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            AgentListBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for AgentListBuildError {
@@ -560,12 +542,6 @@ impl StdError for OrganizationBuildError {
     fn description(&self) -> &str {
         match *self {
             OrganizationBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            OrganizationBuildError::MissingField(_) => None,
         }
     }
 }
@@ -716,12 +692,6 @@ impl StdError for OrganizationListBuildError {
     fn description(&self) -> &str {
         match *self {
             OrganizationListBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            OrganizationListBuildError::MissingField(_) => None,
         }
     }
 }

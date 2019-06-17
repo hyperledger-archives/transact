@@ -172,12 +172,6 @@ impl StdError for CreateContractActionBuildError {
             CreateContractActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            CreateContractActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for CreateContractActionBuildError {
@@ -337,12 +331,6 @@ impl StdError for DeleteContractActionBuildError {
             DeleteContractActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            DeleteContractActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for DeleteContractActionBuildError {
@@ -488,12 +476,6 @@ impl StdError for ExecuteContractActionBuildError {
     fn description(&self) -> &str {
         match *self {
             ExecuteContractActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ExecuteContractActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -659,12 +641,6 @@ impl StdError for CreateContractRegistryActionBuildError {
             CreateContractRegistryActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            CreateContractRegistryActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for CreateContractRegistryActionBuildError {
@@ -790,12 +766,6 @@ impl StdError for DeleteContractRegistryActionBuildError {
     fn description(&self) -> &str {
         match *self {
             DeleteContractRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            DeleteContractRegistryActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -928,12 +898,6 @@ impl StdError for UpdateContractRegistryOwnersActionBuildError {
     fn description(&self) -> &str {
         match *self {
             UpdateContractRegistryOwnersActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            UpdateContractRegistryOwnersActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1073,12 +1037,6 @@ impl StdError for CreateNamespaceRegistryActionBuildError {
             CreateNamespaceRegistryActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            CreateNamespaceRegistryActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for CreateNamespaceRegistryActionBuildError {
@@ -1203,12 +1161,6 @@ impl StdError for DeleteNamespaceRegistryActionBuildError {
     fn description(&self) -> &str {
         match *self {
             DeleteNamespaceRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            DeleteNamespaceRegistryActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1341,12 +1293,6 @@ impl StdError for UpdateNamespaceRegistryOwnersActionBuildError {
     fn description(&self) -> &str {
         match *self {
             UpdateNamespaceRegistryOwnersActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            UpdateNamespaceRegistryOwnersActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1520,12 +1466,6 @@ impl StdError for CreateNamespaceRegistryPermissionActionBuildError {
     fn description(&self) -> &str {
         match *self {
             CreateNamespaceRegistryPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            CreateNamespaceRegistryPermissionActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -1705,12 +1645,6 @@ impl StdError for DeleteNamespaceRegistryPermissionActionBuildError {
             DeleteNamespaceRegistryPermissionActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            DeleteNamespaceRegistryPermissionActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for DeleteNamespaceRegistryPermissionActionBuildError {
@@ -1858,12 +1792,6 @@ impl StdError for CreateSmartPermissionActionBuildError {
     fn description(&self) -> &str {
         match *self {
             CreateSmartPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            CreateSmartPermissionActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -2023,12 +1951,6 @@ impl StdError for UpdateSmartPermissionActionBuildError {
             UpdateSmartPermissionActionBuildError::MissingField(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            UpdateSmartPermissionActionBuildError::MissingField(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for UpdateSmartPermissionActionBuildError {
@@ -2177,12 +2099,6 @@ impl StdError for DeleteSmartPermissionActionBuildError {
     fn description(&self) -> &str {
         match *self {
             DeleteSmartPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            DeleteSmartPermissionActionBuildError::MissingField(_) => None,
         }
     }
 }
@@ -2448,12 +2364,6 @@ impl StdError for SabrePayloadBuildError {
     fn description(&self) -> &str {
         match *self {
             SabrePayloadBuildError::MissingField(ref msg) => msg,
-        }
-    }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            SabrePayloadBuildError::MissingField(_) => None,
         }
     }
 }

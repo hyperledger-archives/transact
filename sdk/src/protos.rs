@@ -27,13 +27,6 @@ impl StdError for ProtoConversionError {
             ProtoConversionError::InvalidTypeError(ref msg) => msg,
         }
     }
-
-    fn cause(&self) -> Option<&StdError> {
-        match *self {
-            ProtoConversionError::SerializationError(_) => None,
-            ProtoConversionError::InvalidTypeError(_) => None,
-        }
-    }
 }
 
 impl std::fmt::Display for ProtoConversionError {
