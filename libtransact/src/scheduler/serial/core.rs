@@ -52,6 +52,9 @@ pub enum CoreMessage {
     /// ExecuteTask message.
     Next,
 
+    /// An indicator to the `SchedulerCore` thread that the scheduler has been finalized
+    Finalized,
+
     /// An indicator to the `SchedulerCore` thread that it should exit its
     /// loop.
     Shutdown,
@@ -189,11 +192,19 @@ impl SchedulerCore {
 
         if self.current_batch.is_none() {
             let mut shared = self.shared_lock.lock()?;
-            if let Some(unscheduled_batch) = shared.pop_unscheduled_batch() {
-                self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
-                self.current_batch = Some(unscheduled_batch);
-            } else {
-                return Ok(());
+            match shared.pop_unscheduled_batch() {
+                Some(unscheduled_batch) => {
+                    self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
+                    self.current_batch = Some(unscheduled_batch);
+                }
+                None => {
+                    // If the scheduler is finalized, no more batches will be added; send a `None`
+                    // result to let the calling code know that all results have been sent.
+                    if shared.finalized() {
+                        shared.result_callback()(None);
+                    }
+                    return Ok(());
+                }
             }
         }
 
@@ -375,6 +386,16 @@ impl SchedulerCore {
                 Ok(CoreMessage::Next) => {
                     self.next_ready = true;
                     self.try_schedule_next()?;
+                }
+                Ok(CoreMessage::Finalized) => {
+                    // If there are no unscheduled batches and no batch is currently executing, the
+                    // scheduler is done; send a `None` result to let the calling code know that
+                    // all results have been sent.
+                    let shared = self.shared_lock.lock()?;
+                    if self.current_batch.is_none() && shared.unscheduled_batches_is_empty() {
+                        shared.result_callback()(None);
+                        break;
+                    }
                 }
                 Ok(CoreMessage::Shutdown) => {
                     break;

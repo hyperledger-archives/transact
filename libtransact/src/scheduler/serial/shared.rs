@@ -75,6 +75,10 @@ impl Shared {
         self.unscheduled_batches.contains(batch)
     }
 
+    pub fn unscheduled_batches_is_empty(&self) -> bool {
+        self.unscheduled_batches.is_empty()
+    }
+
     pub fn add_unscheduled_batch(&mut self, batch: BatchPair) {
         self.unscheduled_batches.push_back(batch);
     }
