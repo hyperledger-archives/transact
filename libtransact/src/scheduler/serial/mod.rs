@@ -158,6 +158,7 @@ impl Scheduler for SerialScheduler {
 
     fn finalize(&mut self) -> Result<(), SchedulerError> {
         self.shared_lock.lock()?.set_finalized(true);
+        self.core_tx.send(core::CoreMessage::Finalized)?;
         Ok(())
     }
 
