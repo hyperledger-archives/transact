@@ -146,7 +146,8 @@ pub trait Scheduler {
     /// Sets a callback to receive results from processing batches. The order
     /// the results are received is not guarenteed to be the same order as the
     /// batches were added with `add_batch`. If callback is called with None,
-    /// all batch results have been sent.
+    /// all batch results have been sent (only used when the scheduler has been
+    /// finalized and no more batches will be added).
     fn set_result_callback(
         &mut self,
         callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
