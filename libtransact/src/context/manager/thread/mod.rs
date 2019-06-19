@@ -236,8 +236,28 @@ impl ContextLifecycle for ContextManager {
     }
 
     /// Drops the specified context from the ContextManager.
-    fn drop_context(&mut self, _context_id: ContextId) -> Result<(), ContextManagerError> {
-        unimplemented!();
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), ContextManagerError> {
+        let (handler_sender, handler_receiver) = mpsc::channel();
+
+        match self.core_sender.send(ContextOperationMessage::DropContext {
+            context_id,
+            handler_sender,
+        }) {
+            Ok(_) => {
+                if let ContextOperationResponse::ValidResult { result: None } =
+                    handler_receiver.recv()?
+                {
+                    Ok(())
+                } else {
+                    Err(ContextManagerError::InternalError(Box::new(
+                        ContextManagerCoreError::CoreReceiveError(RecvError),
+                    )))
+                }
+            }
+            Err(err) => Err(ContextManagerError::InternalError(Box::new(
+                ContextManagerCoreError::HandlerSendError(err),
+            ))),
+        }
     }
 
     ///Creates a TransactionReceipt based on the information available within the specified Context.

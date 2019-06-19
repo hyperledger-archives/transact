@@ -67,6 +67,10 @@ pub enum ContextOperationMessage {
         dependent_contexts: Vec<ContextId>,
         state_id: String,
     },
+    DropContext {
+        handler_sender: Sender<ContextOperationResponse>,
+        context_id: ContextId,
+    },
     Shutdown,
 }
 
@@ -151,6 +155,20 @@ impl ContextManagerCore {
                         handler_sender.send(ContextOperationResponse::ValidResult {
                             result: Some(ContextOperationResult::CreateContext { context_id }),
                         })?;
+                    }
+                    Err(err) => {
+                        handler_sender.send(ContextOperationResponse::InvalidResult {
+                            error_message: err.to_string(),
+                        })?;
+                    }
+                },
+                ContextOperationMessage::DropContext {
+                    context_id,
+                    handler_sender,
+                } => match self.manager.drop_context(context_id) {
+                    Ok(()) => {
+                        handler_sender
+                            .send(ContextOperationResponse::ValidResult { result: None })?;
                     }
                     Err(err) => {
                         handler_sender.send(ContextOperationResponse::InvalidResult {
