@@ -192,13 +192,23 @@ mod tests {
             .shutdown();
     }
 
+    /// In addition to the basic functionality verified by `test_scheduler_add_batch`, this test
+    /// verifies that the SerialScheduler adds the batch to its unscheduled batches queue.
     #[test]
-    fn test_serial_scheduler() {
+    fn test_serial_scheduler_add_batch() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
-        test_scheduler(&mut scheduler);
+
+        let batch = test_scheduler_add_batch(&mut scheduler);
+
+        assert!(scheduler
+            .shared_lock
+            .lock()
+            .expect("shared lock is poisoned")
+            .batch_already_queued(&batch));
+
         scheduler.shutdown();
     }
 

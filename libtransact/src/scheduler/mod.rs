@@ -300,11 +300,23 @@ mod tests {
         fn drop_context(&mut self, _context_id: ContextId) {}
     }
 
-    pub fn test_scheduler(scheduler: &mut Scheduler) {
-        let mut workload = XoBatchWorkload::new_with_seed(5);
+    /// Attempt to add a batch to the scheduler; attempt to add the batch again and verify that a
+    /// `DuplicateBatch` error is returned. Return the batch so the calling test can verify other
+    /// expected behavior.
+    pub fn test_scheduler_add_batch(scheduler: &mut Scheduler) -> BatchPair {
+        let batch = XoBatchWorkload::new_with_seed(0)
+            .next_batch()
+            .expect("Failed to get batch");
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batch.clone())
             .expect("Failed to add batch");
+        match scheduler.add_batch(batch.clone()) {
+            Err(SchedulerError::DuplicateBatch(batch_id)) => {
+                assert_eq!(batch_id, batch.batch().header_signature())
+            }
+            res => panic!("Did not get DuplicateBatch; got {:?}", res),
+        }
+        batch
     }
 
     /// Tests that cancel will properly drain the scheduler by adding a couple
