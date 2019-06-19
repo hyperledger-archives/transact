@@ -44,7 +44,7 @@ impl ContextLifecycle for ContextManager {
         Ok(*new_context.id())
     }
 
-    fn drop_context(&mut self, _context_id: ContextId) {
+    fn drop_context(&mut self, _context_id: ContextId) -> Result<(), ContextManagerError> {
         unimplemented!();
     }
 

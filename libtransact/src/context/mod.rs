@@ -42,7 +42,7 @@ pub trait ContextLifecycle: Send {
         state_id: &str,
     ) -> Result<ContextId, ContextManagerError>;
 
-    fn drop_context(&mut self, context_id: ContextId);
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), ContextManagerError>;
 
     fn get_transaction_receipt(
         &self,

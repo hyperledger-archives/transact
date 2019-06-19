@@ -236,7 +236,7 @@ impl ContextLifecycle for ContextManager {
     }
 
     /// Drops the specified context from the ContextManager.
-    fn drop_context(&mut self, _context_id: ContextId) {
+    fn drop_context(&mut self, _context_id: ContextId) -> Result<(), ContextManagerError> {
         unimplemented!();
     }
 

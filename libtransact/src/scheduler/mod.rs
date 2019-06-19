@@ -336,7 +336,9 @@ mod tests {
                 .map_err(|err| ContextManagerError::from(err))
         }
 
-        fn drop_context(&mut self, _context_id: ContextId) {}
+        fn drop_context(&mut self, _context_id: ContextId) -> Result<(), ContextManagerError> {
+            unimplemented!()
+        }
     }
 
     /// Attempt to add a batch to the scheduler; attempt to add the batch again and verify that a
