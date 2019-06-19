@@ -319,18 +319,25 @@ mod tests {
         batch
     }
 
-    /// Tests that cancel will properly drain the scheduler by adding a couple
-    /// of batches and then calling cancel twice.
+    /// Add two batches to the scheduler, then attempt to cancel it twice; verify that it properly
+    /// drains and returns the pending batches.
     pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
-        let mut workload = XoBatchWorkload::new_with_seed(4);
+        let mut workload = XoBatchWorkload::new_with_seed(1);
+        let batches = (0..2)
+            .map(|_| workload.next_batch().expect("Failed to get batch"))
+            .collect::<Vec<_>>();
+
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batches[0].clone())
             .expect("Failed to add 1st batch");
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batches[1].clone())
             .expect("Failed to add 2nd batch");
-        assert_eq!(scheduler.cancel().expect("Failed 1st cancel").len(), 2);
-        assert_eq!(scheduler.cancel().expect("Failed 2nd cancel").len(), 0);
+
+        for batch in scheduler.cancel().expect("Failed 1st cancel") {
+            assert!(batches.contains(&batch));
+        }
+        assert!(scheduler.cancel().expect("Failed 2nd cancel").is_empty());
     }
 
     /// Tests a simple scheduler worklfow of processing a single transaction.

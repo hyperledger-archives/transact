@@ -212,13 +212,23 @@ mod tests {
         scheduler.shutdown();
     }
 
+    /// In addition to the basic functionality verified by `test_scheduler_cancel`, this test
+    /// verifies that the SerialScheduler drains all batches from its unscheduled batches queue.
     #[test]
     fn test_serial_scheduler_cancel() {
         let state_id = String::from("state0");
         let context_lifecycle = Box::new(MockContextLifecycle::new());
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+
         test_scheduler_cancel(&mut scheduler);
+
+        assert!(scheduler
+            .shared_lock
+            .lock()
+            .expect("shared lock is poisoned")
+            .unscheduled_batches_is_empty());
+
         scheduler.shutdown();
     }
 

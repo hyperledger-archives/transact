@@ -228,7 +228,6 @@ impl Scheduler for MultiScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::scheduler::serial::SerialScheduler;
     use crate::scheduler::tests::*;
     use crate::scheduler::{ExecutionTaskCompletionNotification, ExecutionTaskCompletionNotifier};
     use crate::workload::xo::XoBatchWorkload;
@@ -424,24 +423,27 @@ mod tests {
         multi_scheduler.shutdown();
     }
 
+    /// In addition to the basic functionality verified by `test_scheduler_cancel`, this test
+    /// verifies that the MultiScheduler cancels all sub-schedulers and drains its pending batches.
     #[test]
     fn test_multi_scheduler_cancel() {
-        let state_id = String::from("state0");
-        let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let serial_schedulers = (0..5)
-            .map(|_| {
-                Box::new(
-                    SerialScheduler::new(context_lifecycle.clone(), state_id.clone())
-                        .expect("Failed to create scheduler"),
-                ) as Box<dyn Scheduler + Send>
-            })
+        let sub_schedulers: Vec<_> = (0..3)
+            .map(|_| Box::new(MockSubScheduler::new(vec![])))
             .collect();
-
-        let mut multi_scheduler =
-            MultiScheduler::new(serial_schedulers, &mut MockSubSchedulerHandler::new())
-                .expect("Failed to create scheduler");
+        let mut multi_scheduler = clone_mocksubschedulers_into_multischeduler(&sub_schedulers);
 
         test_scheduler_cancel(&mut multi_scheduler);
+
+        for sub_scheduler in sub_schedulers {
+            assert!(sub_scheduler.received_batches().is_empty());
+        }
+        assert!(multi_scheduler
+            .shared_lock
+            .lock()
+            .expect("shared lock is poisoned")
+            .pending_results()
+            .is_empty());
+
         multi_scheduler.shutdown();
     }
 
@@ -453,36 +455,6 @@ mod tests {
         MultiScheduler::new(vec![], &mut MockSubSchedulerHandler::new())
             .expect("Failed to create scheduler")
             .shutdown();
-    }
-
-    /// This test verifies that when the MultiScheduler is cancelled, it cancels all
-    /// sub-schedulers, clears its pending results, and returns all pending batches
-    #[test]
-    fn test_cancel() {
-        let batch = XoBatchWorkload::new_with_seed(1)
-            .next_batch()
-            .expect("Failed to get batch");
-        let sub_schedulers: Vec<_> = (0..3)
-            .map(|_| Box::new(MockSubScheduler::new(vec![])))
-            .collect();
-        let mut multi_scheduler = clone_mocksubschedulers_into_multischeduler(&sub_schedulers);
-        multi_scheduler
-            .add_batch(batch.clone())
-            .expect("Failed to add batch");
-        assert_eq!(
-            vec![batch],
-            multi_scheduler.cancel().expect("Failed to cancel")
-        );
-        for sub_scheduler in sub_schedulers {
-            assert!(sub_scheduler.received_batches().is_empty());
-        }
-        assert!(multi_scheduler
-            .shared_lock
-            .lock()
-            .expect("shared lock is poisoned")
-            .pending_results()
-            .is_empty());
-        multi_scheduler.shutdown();
     }
 
     /// This test verifies that when the MultiScheduler is finalized, it finalizes all
