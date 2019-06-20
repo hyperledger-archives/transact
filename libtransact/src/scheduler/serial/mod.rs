@@ -232,6 +232,26 @@ mod tests {
         scheduler.shutdown();
     }
 
+    /// In addition to the basic functionality verified by `test_scheduler_finalize`, this test
+    /// verifies that the SerialScheduler properly updates its internal state to finalized.
+    #[test]
+    fn test_serial_scheduler_finalize() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+
+        test_scheduler_finalize(&mut scheduler);
+
+        assert!(scheduler
+            .shared_lock
+            .lock()
+            .expect("shared lock is poisoned")
+            .finalized());
+
+        scheduler.shutdown();
+    }
+
     #[test]
     pub fn test_serial_scheduler_flow_with_one_transaction() {
         let state_id = String::from("state0");

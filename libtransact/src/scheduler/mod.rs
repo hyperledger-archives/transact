@@ -340,6 +340,33 @@ mod tests {
         assert!(scheduler.cancel().expect("Failed 2nd cancel").is_empty());
     }
 
+    /// Finalize the scheduler, then verify:
+    /// 1. A `None` result is sent by the scheduler, indicating that it is finalized and has
+    ///    processed all batches
+    /// 2. When attempting to add a batch, a `SchedulerFinalized` error is returned
+    pub fn test_scheduler_finalize(scheduler: &mut Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+
+        scheduler.finalize().expect("Failed to finalize");
+
+        assert!(rx.recv().expect("Failed to receive result").is_none());
+
+        match scheduler.add_batch(
+            XoBatchWorkload::new_with_seed(2)
+                .next_batch()
+                .expect("Failed to get batch"),
+        ) {
+            Err(SchedulerError::SchedulerFinalized) => (),
+            res => panic!("Did not get SchedulerFinalized; got {:?}", res),
+        }
+    }
+
     /// Tests a simple scheduler worklfow of processing a single transaction.
     ///
     /// For the purposes of this test, we simply return an invalid transaction

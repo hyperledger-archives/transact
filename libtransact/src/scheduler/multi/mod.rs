@@ -447,25 +447,18 @@ mod tests {
         multi_scheduler.shutdown();
     }
 
-    // MultiScheduler-specific tests
-
-    /// This test will hang if join() fails within the scheduler.
+    /// In addition to the basic functionality verified by `test_scheduler_finalize`, this test
+    /// verifies that the MultiScheduler finalizes all sub-schedulers and updates its internal
+    /// state to finalized.
     #[test]
-    fn test_scheduler_thread_cleanup() {
-        MultiScheduler::new(vec![], &mut MockSubSchedulerHandler::new())
-            .expect("Failed to create scheduler")
-            .shutdown();
-    }
-
-    /// This test verifies that when the MultiScheduler is finalized, it finalizes all
-    /// sub-schedulers and marks itself as finalized
-    #[test]
-    fn test_finalize() {
+    fn test_multi_scheduler_finalize() {
         let sub_schedulers: Vec<_> = (0..3)
             .map(|_| Box::new(MockSubScheduler::new(vec![])))
             .collect();
         let mut multi_scheduler = clone_mocksubschedulers_into_multischeduler(&sub_schedulers);
-        multi_scheduler.finalize().expect("Failed to finalize");
+
+        test_scheduler_finalize(&mut multi_scheduler);
+
         for sub_scheduler in sub_schedulers {
             assert!(sub_scheduler.finalized());
         }
@@ -474,32 +467,18 @@ mod tests {
             .lock()
             .expect("shared lock is poisoned")
             .finalized());
+
         multi_scheduler.shutdown();
     }
 
-    /// This test verifies that when the MultiScheduler is finalized and all batches have been
-    /// executed by all of the sub-schedulers, it will send a None result to signal that it is done
-    /// with all of its batches.
+    // MultiScheduler-specific tests
+
+    /// This test will hang if join() fails within the scheduler.
     #[test]
-    fn test_all_done() {
-        let sub_schedulers: Vec<_> = (0..3)
-            .map(|_| Box::new(MockSubScheduler::new(vec![])))
-            .collect();
-        let mut multi_scheduler = clone_mocksubschedulers_into_multischeduler(&sub_schedulers);
-
-        // Use a channel to pass the result to this test
-        let (tx, rx) = mpsc::channel();
-        multi_scheduler
-            .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send");
-            }))
-            .expect("Failed to set result callback");
-
-        multi_scheduler.finalize().expect("Failed to finalize");
-
-        assert!(rx.recv().expect("Failed to receive").is_none());
-
-        multi_scheduler.shutdown();
+    fn test_scheduler_thread_cleanup() {
+        MultiScheduler::new(vec![], &mut MockSubSchedulerHandler::new())
+            .expect("Failed to create scheduler")
+            .shutdown();
     }
 
     /// This test verifies that when all sub-schedulers report that they are done, but one or more
