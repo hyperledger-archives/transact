@@ -225,8 +225,7 @@ mod tests {
     use crate::workload::xo::XoBatchWorkload;
     use crate::workload::BatchWorkload;
 
-    use std::sync::{Arc, Condvar, Mutex};
-    use std::thread;
+    use std::sync::mpsc;
 
     pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
         let results = batch
@@ -367,74 +366,53 @@ mod tests {
         }
     }
 
-    /// Tests a simple scheduler worklfow of processing a single transaction.
+    /// Tests a simple scheduler workflow of processing a single transaction; this tests the
+    /// scheduler's task iterator, notifier, and result callback functionality.
     ///
     /// For the purposes of this test, we simply return an invalid transaction
     /// as we are not testing the actual execution of the transaction but
     /// rather the flow of getting a result after adding the batch.
     pub fn test_scheduler_flow_with_one_transaction(scheduler: &mut Scheduler) {
-        let shared = Arc::new((Mutex::new(false), Condvar::new()));
-        let shared2 = shared.clone();
-
-        let mut workload = XoBatchWorkload::new_with_seed(8);
-
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
         scheduler
-            .set_result_callback(Box::new(move |_batch_result| {
-                let &(ref lock, ref cvar) = &*shared2;
-
-                let mut inner = lock.lock().unwrap();
-                *inner = true;
-                cvar.notify_one();
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
             }))
             .expect("Failed to set result callback");
 
+        // Add batch to scheduler
+        let batch = XoBatchWorkload::new_with_seed(3)
+            .next_batch()
+            .expect("Failed to get batch");
+        scheduler
+            .add_batch(batch.clone())
+            .expect("Failed to add batch");
+
+        // Simulate retrieving the execution task, executing it, and sending the notification
         let mut task_iterator = scheduler
             .take_task_iterator()
             .expect("Failed to get task iterator");
         let notifier = scheduler
             .new_notifier()
             .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+            mock_context_id(),
+            InvalidTransactionResult {
+                transaction_id: task_iterator
+                    .next()
+                    .expect("Failed to get task")
+                    .pair()
+                    .transaction()
+                    .header_signature()
+                    .into(),
+                error_message: String::new(),
+                error_data: vec![],
+            },
+        ));
 
-        thread::Builder::new()
-            .name(String::from(
-                "Thread-test_scheduler_flow_with_one_transaction",
-            ))
-            .spawn(move || loop {
-                let context_id = [
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x01,
-                ];
-                match task_iterator.next() {
-                    Some(task) => {
-                        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
-                            context_id,
-                            InvalidTransactionResult {
-                                transaction_id: task
-                                    .pair()
-                                    .transaction()
-                                    .header_signature()
-                                    .to_string(),
-                                error_message: String::from("invalid"),
-                                error_data: vec![],
-                            },
-                        ));
-                    }
-                    None => {
-                        break;
-                    }
-                }
-            })
-            .unwrap();
-
-        scheduler
-            .add_batch(workload.next_batch().unwrap())
-            .expect("Failed to add batch");
-
-        let &(ref lock, ref cvar) = &*shared;
-
-        let mut inner = lock.lock().unwrap();
-        while !(*inner) {
-            inner = cvar.wait(inner).unwrap();
-        }
+        // Verify that the correct result is returned
+        let result = rx.recv().expect("Failed to receive result");
+        assert_eq!(result, invalid_result_from_batch(batch));
     }
 }
