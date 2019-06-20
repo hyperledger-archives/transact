@@ -222,10 +222,46 @@ mod tests {
     use super::*;
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
-    use crate::workload::xo::XoBatchWorkload;
-    use crate::workload::BatchWorkload;
+    use crate::protocol::batch::BatchBuilder;
+    use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
+    use crate::signing::hash::HashSigner;
 
     use std::sync::mpsc;
+
+    pub fn mock_transactions(num: u8) -> Vec<Transaction> {
+        (0..num)
+            .map(|i| {
+                TransactionBuilder::new()
+                    .with_family_name("mock".into())
+                    .with_family_version("0.1".into())
+                    .with_inputs(vec![])
+                    .with_outputs(vec![])
+                    .with_nonce(vec![i])
+                    .with_payload(vec![])
+                    .with_payload_hash_method(HashMethod::SHA512)
+                    .build(&HashSigner::new())
+                    .expect("Failed to build transaction")
+            })
+            .collect()
+    }
+
+    pub fn mock_batch(transactions: Vec<Transaction>) -> BatchPair {
+        BatchBuilder::new()
+            .with_transactions(transactions)
+            .build_pair(&HashSigner::new())
+            .expect("Failed to build batch pair")
+    }
+
+    pub fn mock_batch_with_num_txns(num: u8) -> BatchPair {
+        mock_batch(mock_transactions(num))
+    }
+
+    pub fn mock_batches_with_one_transaction(num_batches: u8) -> Vec<BatchPair> {
+        mock_transactions(num_batches)
+            .into_iter()
+            .map(|txn| mock_batch(vec![txn]))
+            .collect()
+    }
 
     pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
         let results = batch
@@ -303,9 +339,7 @@ mod tests {
     /// `DuplicateBatch` error is returned. Return the batch so the calling test can verify other
     /// expected behavior.
     pub fn test_scheduler_add_batch(scheduler: &mut Scheduler) -> BatchPair {
-        let batch = XoBatchWorkload::new_with_seed(0)
-            .next_batch()
-            .expect("Failed to get batch");
+        let batch = mock_batch_with_num_txns(1);
         scheduler
             .add_batch(batch.clone())
             .expect("Failed to add batch");
@@ -321,10 +355,7 @@ mod tests {
     /// Add two batches to the scheduler, then attempt to cancel it twice; verify that it properly
     /// drains and returns the pending batches.
     pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
-        let mut workload = XoBatchWorkload::new_with_seed(1);
-        let batches = (0..2)
-            .map(|_| workload.next_batch().expect("Failed to get batch"))
-            .collect::<Vec<_>>();
+        let batches = mock_batches_with_one_transaction(2);
 
         scheduler
             .add_batch(batches[0].clone())
@@ -356,11 +387,7 @@ mod tests {
 
         assert!(rx.recv().expect("Failed to receive result").is_none());
 
-        match scheduler.add_batch(
-            XoBatchWorkload::new_with_seed(2)
-                .next_batch()
-                .expect("Failed to get batch"),
-        ) {
+        match scheduler.add_batch(mock_batch_with_num_txns(1)) {
             Err(SchedulerError::SchedulerFinalized) => (),
             res => panic!("Did not get SchedulerFinalized; got {:?}", res),
         }
@@ -382,9 +409,7 @@ mod tests {
             .expect("Failed to set result callback");
 
         // Add batch to scheduler
-        let batch = XoBatchWorkload::new_with_seed(3)
-            .next_batch()
-            .expect("Failed to get batch");
+        let batch = mock_batch_with_num_txns(1);
         scheduler
             .add_batch(batch.clone())
             .expect("Failed to add batch");

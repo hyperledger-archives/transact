@@ -230,8 +230,6 @@ mod tests {
     use super::*;
     use crate::scheduler::tests::*;
     use crate::scheduler::{ExecutionTaskCompletionNotification, ExecutionTaskCompletionNotifier};
-    use crate::workload::xo::XoBatchWorkload;
-    use crate::workload::BatchWorkload;
 
     use std::cell::RefCell;
     use std::collections::VecDeque;
@@ -485,9 +483,7 @@ mod tests {
     /// sub-scheduler(s) did not return a result for a batch, the MultiScheduler returns an error
     #[test]
     fn test_done_incorrectly() {
-        let batch = XoBatchWorkload::new_with_seed(2)
-            .next_batch()
-            .expect("Failed to get batch");
+        let batch = mock_batch_with_num_txns(1);
         let valid_result = valid_result_from_batch(batch.clone());
 
         // The first sub-scheduler doens't have a result for the batch
@@ -542,10 +538,7 @@ mod tests {
     /// agree on the same result for a batch.
     #[test]
     pub fn test_multi_scheduler_result_handling() {
-        let mut workload = XoBatchWorkload::new_with_seed(2);
-        let batches = (0..3)
-            .map(|_| workload.next_batch().expect("Failed to get batch"))
-            .collect::<Vec<_>>();
+        let batches = mock_batches_with_one_transaction(3);
 
         // First batch is valid for all schedulers, second batch is invalid for all schedulers,
         // third batch has a different result for one of the schedulers
