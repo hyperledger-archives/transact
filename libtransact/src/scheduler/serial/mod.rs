@@ -182,15 +182,7 @@ mod tests {
     use super::*;
     use crate::scheduler::tests::*;
 
-    /// This test will hang if join() fails within the scheduler.
-    #[test]
-    fn test_scheduler_thread_cleanup() {
-        let state_id = String::from("state0");
-        let context_lifecycle = Box::new(MockContextLifecycle::new());
-        SerialScheduler::new(context_lifecycle, state_id)
-            .expect("Failed to create scheduler")
-            .shutdown();
-    }
+    // General Scheduler tests
 
     /// In addition to the basic functionality verified by `test_scheduler_add_batch`, this test
     /// verifies that the SerialScheduler adds the batch to its unscheduled batches queue.
@@ -252,6 +244,7 @@ mod tests {
         scheduler.shutdown();
     }
 
+    /// Tests that the serial scheduler can process a batch with a single transaction.
     #[test]
     pub fn test_serial_scheduler_flow_with_one_transaction() {
         let state_id = String::from("state0");
@@ -295,5 +288,17 @@ mod tests {
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_unexpected_notification(&mut scheduler);
         scheduler.shutdown();
+    }
+
+    // SerialScheduler-specific tests
+
+    /// This test will hang if join() fails within the scheduler.
+    #[test]
+    fn test_scheduler_thread_cleanup() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        SerialScheduler::new(context_lifecycle, state_id)
+            .expect("Failed to create scheduler")
+            .shutdown();
     }
 }
