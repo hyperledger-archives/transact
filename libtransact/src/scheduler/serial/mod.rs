@@ -272,4 +272,16 @@ mod tests {
         test_scheduler_flow_with_multiple_transactions(&mut scheduler);
         scheduler.shutdown();
     }
+
+    /// Tests that the serial scheduler invalidates the whole batch when one of its transactions is
+    /// invalid.
+    #[test]
+    pub fn test_serial_scheduler_invalid_transaction_invalidates_batch() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+        test_scheduler_invalid_transaction_invalidates_batch(&mut scheduler);
+        scheduler.shutdown();
+    }
 }
