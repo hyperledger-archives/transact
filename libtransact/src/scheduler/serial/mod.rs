@@ -181,6 +181,7 @@ impl Scheduler for SerialScheduler {
 mod tests {
     use super::*;
     use crate::scheduler::tests::*;
+    use crate::scheduler::ExecutionTaskCompletionNotification;
 
     // General Scheduler tests
 
@@ -300,5 +301,109 @@ mod tests {
         SerialScheduler::new(context_lifecycle, state_id)
             .expect("Failed to create scheduler")
             .shutdown();
+    }
+
+    /// This test verifies that the SerialScheduler executes transactions strictly in order, and
+    /// does not return the next execution task until the previous one is completed.
+    #[test]
+    fn test_serial_scheduler_ordering() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+
+        let transactions = mock_transactions(10);
+        let batch = mock_batch(transactions.clone());
+        scheduler
+            .add_batch(batch.clone())
+            .expect("Failed to add batch");
+        scheduler.finalize().expect("Failed to finalize");
+
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+
+        let mut transaction_ids = transactions.into_iter();
+
+        // Get the first task, but take some time to execute it in a background thread; meanwhile,
+        // wait for the next task. A channel is used to verify that the next task isn't returned
+        // until the result for the first is received by the scheduler.
+        let (tx, rx) = mpsc::channel();
+        let first_task_notifier = notifier.clone();
+        let first_task_txn_id = task_iterator
+            .next()
+            .expect("Failed to get 1st task")
+            .pair()
+            .transaction()
+            .header_signature()
+            .to_string();
+        assert_eq!(
+            transaction_ids
+                .next()
+                .expect("Failed to get next transaction")
+                .header_signature(),
+            &first_task_txn_id,
+        );
+        std::thread::Builder::new()
+            .name("Thread-test_serial_scheduler_ordering".into())
+            .spawn(move || {
+                std::thread::sleep(std::time::Duration::from_secs(1));
+                first_task_notifier.notify(ExecutionTaskCompletionNotification::Valid(
+                    mock_context_id(),
+                    first_task_txn_id,
+                ));
+                // This send must occur before the next task is returned.
+                tx.send(()).expect("Failed to send");
+            })
+            .expect("Failed to spawn thread");
+
+        let second_task_txn_id = task_iterator
+            .next()
+            .expect("Failed to get 2nd task")
+            .pair()
+            .transaction()
+            .header_signature()
+            .to_string();
+        assert_eq!(
+            transaction_ids
+                .next()
+                .expect("Failed to get next transaction")
+                .header_signature(),
+            &second_task_txn_id,
+        );
+        // If the signal was never sent, this task is being returned before the
+        // previous result was sent.
+        rx.try_recv()
+            .expect("Returned next task before previous completed");
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            second_task_txn_id,
+        ));
+
+        // Process the rest of the execution tasks and verify the order
+        loop {
+            match task_iterator.next() {
+                Some(task) => {
+                    let txn_id = task.pair().transaction().header_signature().to_string();
+                    assert_eq!(
+                        transaction_ids
+                            .next()
+                            .expect("Failed to get next transaction")
+                            .header_signature(),
+                        &txn_id,
+                    );
+                    notifier.notify(ExecutionTaskCompletionNotification::Valid(
+                        mock_context_id(),
+                        txn_id,
+                    ));
+                }
+                None => break,
+            }
+        }
+
+        scheduler.shutdown();
     }
 }
