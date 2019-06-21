@@ -62,7 +62,7 @@ pub enum CoreMessage {
 
 #[derive(Debug)]
 enum CoreError {
-    ExecutionSend(Box<SendError<ExecutionTask>>),
+    ExecutionSend(Box<SendError<Option<ExecutionTask>>>),
     ContextManager(Box<ContextManagerError>),
     Internal(String),
 }
@@ -101,8 +101,8 @@ impl std::fmt::Display for CoreError {
     }
 }
 
-impl From<SendError<ExecutionTask>> for CoreError {
-    fn from(error: SendError<ExecutionTask>) -> CoreError {
+impl From<SendError<Option<ExecutionTask>>> for CoreError {
+    fn from(error: SendError<Option<ExecutionTask>>) -> CoreError {
         CoreError::ExecutionSend(Box::new(error))
     }
 }
@@ -129,7 +129,7 @@ pub struct SchedulerCore {
 
     /// The sender to be used to send an ExecutionTask to the iterator after
     /// it requested one with CoreMessage::Next.
-    execution_tx: Sender<ExecutionTask>,
+    execution_tx: Sender<Option<ExecutionTask>>,
 
     /// Indicates that next() has been called on the SchedulerExecutionInterface
     /// and is waiting for an ExecutionTask to be sent.
@@ -162,7 +162,7 @@ impl SchedulerCore {
     pub fn new(
         shared_lock: Arc<Mutex<Shared>>,
         rx: Receiver<CoreMessage>,
-        execution_tx: Sender<ExecutionTask>,
+        execution_tx: Sender<Option<ExecutionTask>>,
         context_lifecycle: Box<ContextLifecycle>,
         state_id: String,
     ) -> Self {
@@ -240,7 +240,7 @@ impl SchedulerCore {
 
         self.current_txn = Some(transaction_pair.transaction().header_signature().into());
         self.execution_tx
-            .send(ExecutionTask::new(transaction_pair, context_id))?;
+            .send(Some(ExecutionTask::new(transaction_pair, context_id)))?;
         self.next_ready = false;
 
         Ok(())
@@ -379,6 +379,20 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::Next) => {
+                    // If the scheduler is finalized, there are no unscheduled batches, and there
+                    // are no more transactions in the queue for the current batch: there are no
+                    // more execution tasks to return.
+                    {
+                        let shared = self.shared_lock.lock()?;
+                        if shared.finalized()
+                            && shared.unscheduled_batches_is_empty()
+                            && self.txn_queue.is_empty()
+                        {
+                            self.execution_tx.send(None)?;
+                            continue;
+                        }
+                    }
+
                     self.next_ready = true;
                     self.try_schedule_next()?;
                 }

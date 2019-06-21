@@ -378,6 +378,7 @@ mod tests {
     /// 1. A `None` result is sent by the scheduler, indicating that it is finalized and has
     ///    processed all batches
     /// 2. When attempting to add a batch, a `SchedulerFinalized` error is returned
+    /// 3. The scheduler's execution task iterator returns None when next() is called
     pub fn test_scheduler_finalize(scheduler: &mut Scheduler) {
         // Use a channel to pass the result to this test
         let (tx, rx) = mpsc::channel();
@@ -386,6 +387,9 @@ mod tests {
                 tx.send(result).expect("Failed to send result");
             }))
             .expect("Failed to set result callback");
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
 
         scheduler.finalize().expect("Failed to finalize");
 
@@ -395,6 +399,8 @@ mod tests {
             Err(SchedulerError::SchedulerFinalized) => (),
             res => panic!("Did not get SchedulerFinalized; got {:?}", res),
         }
+
+        assert!(task_iterator.next().is_none());
     }
 
     /// Tests a simple scheduler workflow of processing a single transaction; this tests the
