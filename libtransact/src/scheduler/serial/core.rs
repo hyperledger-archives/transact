@@ -29,6 +29,7 @@ use crate::scheduler::SchedulerError;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
+use std::collections::VecDeque;
 use std::error::Error;
 use std::sync::mpsc::{Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex};
@@ -142,7 +143,7 @@ pub struct SchedulerCore {
     current_txn: Option<String>,
 
     /// A queue of the current batch's transactions that have not been exeucted yet.
-    txn_queue: Vec<Transaction>,
+    txn_queue: VecDeque<Transaction>,
 
     /// The results of the current batch's transactions that have already been executed.
     txn_results: Vec<TransactionExecutionResult>,
@@ -173,7 +174,7 @@ impl SchedulerCore {
             next_ready: false,
             current_batch: None,
             current_txn: None,
-            txn_queue: vec![],
+            txn_queue: VecDeque::new(),
             txn_results: vec![],
             context_lifecycle,
             state_id,
@@ -194,7 +195,8 @@ impl SchedulerCore {
             let mut shared = self.shared_lock.lock()?;
             match shared.pop_unscheduled_batch() {
                 Some(unscheduled_batch) => {
-                    self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
+                    self.txn_queue =
+                        VecDeque::from(unscheduled_batch.batch().transactions().to_vec());
                     self.current_batch = Some(unscheduled_batch);
                 }
                 None => {
@@ -208,7 +210,7 @@ impl SchedulerCore {
             }
         }
 
-        let transaction = self.txn_queue.pop().ok_or_else(|| {
+        let transaction = self.txn_queue.pop_front().ok_or_else(|| {
             CoreError::Internal(format!(
                 "no transactions left in current batch ({})",
                 self.current_batch
