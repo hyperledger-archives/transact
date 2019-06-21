@@ -342,15 +342,10 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let current_txn_id = self.current_txn.as_ref().ok_or_else(|| {
-                        CoreError::Internal(
-                            "received execution result but no current transaction is executing"
-                                .into(),
-                        )
-                    })?;
+                    let current_txn_id = self.current_txn.clone().unwrap_or_else(|| "".into());
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
-                            if &transaction_id != current_txn_id {
+                            if transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     transaction_id,
                                 ))?;
@@ -366,7 +361,7 @@ impl SchedulerCore {
                             ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
-                            if &result.transaction_id != current_txn_id {
+                            if result.transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     result.transaction_id,
                                 ))?;

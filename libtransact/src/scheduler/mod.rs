@@ -600,4 +600,34 @@ mod tests {
             .sort_unstable();
         assert_eq!(original_batch_txn_ids, result_txn_ids);
     }
+
+    // Send a result to the scheduler for a transaction that it is not processing; verify that an
+    // `UnexpectedNotification` is sent using the error callback.
+    pub fn test_scheduler_unexpected_notification(scheduler: &mut Scheduler) {
+        // Use a channel to pass the error to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_error_callback(Box::new(move |err| {
+                tx.send(err).expect("Failed to send error");
+            }))
+            .expect("Failed to set error callback");
+
+        // Simulate retrieving the unexpected notification
+        let txn_id = "mock-id".to_string();
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            txn_id.clone(),
+        ));
+
+        // Verify that the error is returned
+        match rx.recv().expect("Failed to receive result") {
+            SchedulerError::UnexpectedNotification(unexpected_id) => {
+                assert_eq!(unexpected_id, txn_id)
+            }
+            err => panic!("Received unexpected error: {}", err),
+        }
+    }
 }

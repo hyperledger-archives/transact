@@ -284,4 +284,16 @@ mod tests {
         test_scheduler_invalid_transaction_invalidates_batch(&mut scheduler);
         scheduler.shutdown();
     }
+
+    /// Tests that the serial scheduler returns the appropriate error via the error callback when
+    /// an unexpected task completion notification is received.
+    #[test]
+    pub fn test_serial_scheduler_unexpected_notification() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+        test_scheduler_unexpected_notification(&mut scheduler);
+        scheduler.shutdown();
+    }
 }
