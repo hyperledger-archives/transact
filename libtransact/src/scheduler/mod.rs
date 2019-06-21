@@ -223,6 +223,7 @@ mod tests {
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
     use crate::protocol::batch::BatchBuilder;
+    use crate::protocol::receipt::TransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
     use crate::signing::hash::HashSigner;
 
@@ -327,9 +328,12 @@ mod tests {
         fn get_transaction_receipt(
             &self,
             _context_id: &ContextId,
-            _transaction_id: &str,
+            transaction_id: &str,
         ) -> Result<TransactionReceipt, ContextManagerError> {
-            unimplemented!()
+            TransactionReceiptBuilder::new()
+                .with_transaction_id(transaction_id.into())
+                .build()
+                .map_err(|err| ContextManagerError::from(err))
         }
 
         fn drop_context(&mut self, _context_id: ContextId) {}
@@ -439,5 +443,85 @@ mod tests {
         // Verify that the correct result is returned
         let result = rx.recv().expect("Failed to receive result");
         assert_eq!(result, invalid_result_from_batch(batch));
+    }
+
+    /// Tests a simple scheduler workflow of processing a single batch with three transactions.
+    pub fn test_scheduler_flow_with_multiple_transactions(scheduler: &mut Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+
+        // Add batch to scheduler
+        let original_batch = mock_batch_with_num_txns(3);
+        scheduler
+            .add_batch(original_batch.clone())
+            .expect("Failed to add batch");
+
+        // Simulate retrieving the execution task, executing it, and sending the notification
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+
+        // Verify that the correct result is returned; can't just compare result itself, since the
+        // order of transactions in the result is unknown.
+        let BatchExecutionResult { batch, results } = rx
+            .recv()
+            .expect("Failed to receive result")
+            .expect("Got None result");
+        assert_eq!(batch, original_batch);
+
+        let original_batch_txn_ids = original_batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| txn.header_signature())
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        let result_txn_ids = results
+            .iter()
+            .map(|result| match result {
+                TransactionExecutionResult::Valid(receipt) => &receipt.transaction_id,
+                res => panic!("Did not get valid result; got {:?}", res),
+            })
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        assert_eq!(original_batch_txn_ids, result_txn_ids);
     }
 }
