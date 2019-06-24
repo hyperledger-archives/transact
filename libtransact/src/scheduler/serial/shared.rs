@@ -20,6 +20,7 @@
 use crate::protocol::batch::BatchPair;
 use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::SchedulerError;
+use crate::scheduler::{default_error_callback, default_result_callback};
 
 use std::collections::VecDeque;
 
@@ -90,18 +91,4 @@ impl Shared {
     pub fn pop_unscheduled_batch(&mut self) -> Option<BatchPair> {
         self.unscheduled_batches.pop_front()
     }
-}
-
-fn default_result_callback(batch_result: Option<BatchExecutionResult>) {
-    warn!(
-        "No result callback set; dropping batch execution result: {}",
-        match batch_result {
-            Some(ref result) => result.batch.batch().header_signature(),
-            None => "None",
-        }
-    );
-}
-
-fn default_error_callback(error: SchedulerError) {
-    error!("No error callback set; SchedulerError: {}", error);
 }

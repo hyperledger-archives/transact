@@ -27,6 +27,7 @@
 //! must be consumed by a component responsible for iterating over the `Transaction`s and providing
 //! `TransactionExecutionResult`s back to the `Scheduler` via the `SchedulerExecutionInterface`.
 
+pub mod multi;
 pub mod parallel;
 pub mod serial;
 
@@ -64,7 +65,7 @@ impl ExecutionTask {
 }
 
 /// Result from executing an invalid transaction.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct InvalidTransactionResult {
     /// Transaction identifier.
     pub transaction_id: String,
@@ -78,6 +79,7 @@ pub struct InvalidTransactionResult {
 }
 
 /// Result from executing a transaction.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub enum TransactionExecutionResult {
     /// The transation was invalid.
     Invalid(InvalidTransactionResult),
@@ -87,6 +89,7 @@ pub enum TransactionExecutionResult {
 }
 
 /// Result of executing a batch.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct BatchExecutionResult {
     /// The `BatchPair` which was executed.
     pub batch: BatchPair,
@@ -182,7 +185,7 @@ pub trait Scheduler {
     /// Returns a newly allocated ExecutionTaskCompletionNotifier which allows
     /// sending a notification to the scheduler that indicates the task has
     /// been executed.
-    fn new_notifier(&mut self) -> Box<dyn ExecutionTaskCompletionNotifier>;
+    fn new_notifier(&mut self) -> Result<Box<dyn ExecutionTaskCompletionNotifier>, SchedulerError>;
 }
 
 /// Allows sending a notification to the scheduler that execution of a task
@@ -200,14 +203,102 @@ impl Clone for Box<ExecutionTaskCompletionNotifier> {
     }
 }
 
+fn default_result_callback(batch_result: Option<BatchExecutionResult>) {
+    warn!(
+        "No result callback set; dropping batch execution result: {}",
+        match batch_result {
+            Some(ref result) => result.batch.batch().header_signature(),
+            None => "None",
+        }
+    );
+}
+
+fn default_error_callback(error: SchedulerError) {
+    error!("No error callback set; SchedulerError: {}", error);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::context::manager::ContextManagerError;
+    use crate::context::ContextLifecycle;
     use crate::workload::xo::XoBatchWorkload;
     use crate::workload::BatchWorkload;
 
     use std::sync::{Arc, Condvar, Mutex};
     use std::thread;
+
+    pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let results = batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| {
+                TransactionExecutionResult::Valid(TransactionReceipt {
+                    state_changes: vec![],
+                    events: vec![],
+                    data: vec![],
+                    transaction_id: txn.header_signature().into(),
+                })
+            })
+            .collect();
+        Some(BatchExecutionResult { batch, results })
+    }
+
+    pub fn invalid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let results = batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| {
+                TransactionExecutionResult::Invalid(InvalidTransactionResult {
+                    transaction_id: txn.header_signature().into(),
+                    error_message: String::new(),
+                    error_data: vec![],
+                })
+            })
+            .collect();
+        Some(BatchExecutionResult { batch, results })
+    }
+
+    pub fn mock_context_id() -> ContextId {
+        [
+            0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
+            0x0f, 0x10,
+        ]
+    }
+
+    #[derive(Clone)]
+    pub struct MockContextLifecycle {}
+
+    impl MockContextLifecycle {
+        pub fn new() -> Self {
+            MockContextLifecycle {}
+        }
+    }
+
+    impl ContextLifecycle for MockContextLifecycle {
+        fn create_context(
+            &mut self,
+            _dependent_contexts: &[ContextId],
+            _state_id: &str,
+        ) -> ContextId {
+            [
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                0x00, 0x01,
+            ]
+        }
+
+        fn get_transaction_receipt(
+            &self,
+            _context_id: &ContextId,
+            _transaction_id: &str,
+        ) -> Result<TransactionReceipt, ContextManagerError> {
+            unimplemented!()
+        }
+
+        fn drop_context(&mut self, _context_id: ContextId) {}
+    }
 
     pub fn test_scheduler(scheduler: &mut Scheduler) {
         let mut workload = XoBatchWorkload::new_with_seed(5);
@@ -254,7 +345,9 @@ mod tests {
         let mut task_iterator = scheduler
             .take_task_iterator()
             .expect("Failed to get task iterator");
-        let notifier = scheduler.new_notifier();
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
 
         thread::Builder::new()
             .name(String::from(

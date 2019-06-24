@@ -22,6 +22,7 @@ use internal::ExecutorThread;
 use reader::ExecutionTaskReader;
 
 use crate::execution::adapter::ExecutionAdapter;
+use crate::scheduler::multi::SubSchedulerHandler;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
@@ -96,6 +97,17 @@ impl Executor {
             readers: Arc::new(Mutex::new(HashMap::new())),
             executor_thread: ExecutorThread::new(execution_adapters),
         }
+    }
+}
+
+impl SubSchedulerHandler for Executor {
+    fn pass_scheduler(
+        &mut self,
+        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<ExecutionTaskCompletionNotifier>,
+    ) -> Result<(), String> {
+        self.execute(task_iterator, notifier)
+            .map_err(|err| format!("{}", err))
     }
 }
 
