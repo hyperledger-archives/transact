@@ -21,5 +21,6 @@
 //! scheduled and executed.  The resuls of execution are stored in transaction receipts.
 
 pub mod batch;
+pub mod command;
 pub mod receipt;
 pub mod transaction;
