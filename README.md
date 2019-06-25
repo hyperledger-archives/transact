@@ -5,13 +5,13 @@ with smart contracts.
 
 The Hyperledger Transact project includes several repositories:
 
-- [This repository](https://github.com/bitwiseio/transact) contains the core
+- [This repository](https://github.com/hyperledger/transact) contains the core
   Transact Rust library.
 
-- The [transact-contrib](https://github.com/bitwiseio/transact-contrib)
+- The [transact-contrib](https://github.com/hyperledger/transact-contrib)
   repository contains examples and reference implementations.
 
-- The [transact-rfcs](https://github.com/bitwiseio/transact-rfcs) repository
+- The [transact-rfcs](https://github.com/hyperledger/transact-rfcs) repository
   contains RFCs (requests for comments) for proposed and approved changes to
   Hyperledger Transact.
 
