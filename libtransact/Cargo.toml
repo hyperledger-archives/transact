@@ -10,6 +10,7 @@ description = """\
     a library or component when implementing distributed ledgers, including \
     blockchains.
 """
+repository = "http://github.com/hyperledger/transact"
 
 [dependencies]
 hex = "0.3"
