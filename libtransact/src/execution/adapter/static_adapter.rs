@@ -301,9 +301,17 @@ mod test {
     };
 
     use crate::context::ContextLifecycle;
+    use crate::protocol::command::{BytesEntry, Command, GetState, ReturnInvalid, SetState};
     use crate::scheduler::{ExecutionTaskCompletionNotification, InvalidTransactionResult};
     use crate::state::hashmap::HashMapState;
-    use crate::workload::command::{make_command_transaction, Command, CommandTransactionHandler};
+    use crate::workload::command::{make_command_transaction, CommandTransactionHandler};
+
+    fn create_bytes_entry(state_writes: Vec<(String, Vec<u8>)>) -> Vec<BytesEntry> {
+        state_writes
+            .into_iter()
+            .map(|(k, v)| BytesEntry::new(k.to_string(), v.to_vec()))
+            .collect()
+    }
 
     /// Apply the static adapter with a simple transaction that sets a value successfully.
     #[test]
@@ -324,10 +332,9 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a simple transaction
-        let txn_pair = make_command_transaction(&[Command::Set {
-            address: "abc".into(),
-            value: b"abc".to_vec(),
-        }]);
+        let txn_pair = make_command_transaction(&[Command::SetState(SetState::new(
+            create_bytes_entry(vec![("abc".into(), b"abc".to_vec())]),
+        ))]);
         let txn_id = txn_pair.transaction().header_signature().into();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -357,7 +364,7 @@ mod test {
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
-    /// Apply the static adapter with a failing transaction
+    /// Apply the static adapter with a failing transaction which returns an invalid error.
     #[test]
     fn apply_static_adapter_invalid_txn() {
         let registry = MockRegistry::default();
@@ -377,12 +384,8 @@ mod test {
 
         // Create and execute a failing transaction.
         let txn_pair = make_command_transaction(&[
-            Command::Get {
-                address: "abc".into(),
-            },
-            Command::Fail {
-                error_msg: "Test Fail Succeeded".into(),
-            },
+            Command::GetState(GetState::new(vec!["abc".into()])),
+            Command::ReturnInvalid(ReturnInvalid::new("Test Fail Succeeded".into())),
         ]);
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
