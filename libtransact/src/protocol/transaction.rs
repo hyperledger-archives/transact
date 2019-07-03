@@ -34,6 +34,7 @@ use crate::protos::{
     FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 use crate::signing;
+use transact_derive::{FromBytesImpl, FromProtoImpl, IntoBytesImpl, IntoNativeImpl, IntoProtoImpl};
 
 static DEFAULT_NONCE_SIZE: usize = 32;
 
@@ -42,7 +43,8 @@ pub enum HashMethod {
     SHA512,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(IntoProtoImpl, IntoBytesImpl, IntoNativeImpl, FromBytesImpl, Debug, PartialEq, Clone)]
+#[proto_type = "protos::transaction::TransactionHeader"]
 pub struct TransactionHeader {
     batcher_public_key: Vec<u8>,
     dependencies: Vec<Vec<u8>>,
@@ -157,37 +159,14 @@ impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
     }
 }
 
-impl FromBytes<TransactionHeader> for TransactionHeader {
-    fn from_bytes(bytes: &[u8]) -> Result<TransactionHeader, ProtoConversionError> {
-        let proto: protos::transaction::TransactionHeader = protobuf::parse_from_bytes(bytes)
-            .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get TransactionHeader from bytes".to_string(),
-                )
-            })?;
-        proto.into_native()
-    }
-}
-
-impl IntoBytes for TransactionHeader {
-    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
-        let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from TransactionHeader".to_string(),
-            )
-        })?;
-        Ok(bytes)
-    }
-}
-
-impl IntoProto<protos::transaction::TransactionHeader> for TransactionHeader {}
-impl IntoNative<TransactionHeader> for protos::transaction::TransactionHeader {}
-
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(FromProtoImpl, Debug, Eq, Hash, PartialEq, Clone)]
+#[proto_type = "protos::transaction::Transaction"]
 pub struct Transaction {
     header: Vec<u8>,
+
+    #[from_proto_impl(to_string)]
     header_signature: String,
+
     payload: Vec<u8>,
 }
 
@@ -219,16 +198,6 @@ impl Transaction {
             transaction: self,
             header,
         })
-    }
-}
-
-impl From<protos::transaction::Transaction> for Transaction {
-    fn from(transaction: protos::transaction::Transaction) -> Self {
-        Transaction {
-            header: transaction.get_header().to_vec(),
-            header_signature: transaction.get_header_signature().to_string(),
-            payload: transaction.get_payload().to_vec(),
-        }
     }
 }
 
@@ -756,8 +725,8 @@ mod tests {
         let transaction_proto: protos::transaction::Transaction =
             protobuf::parse_from_bytes(&transaction_bytes).unwrap();
 
-        // Convert to a Transaction
-        let transaction: Transaction = transaction_proto.into();
+        //Convert to a Transaction
+        let transaction: Transaction = Transaction::from_proto(transaction_proto).unwrap();
 
         assert_eq!(BYTES1.to_vec(), transaction.header());
         assert_eq!(SIGNATURE1, transaction.header_signature());

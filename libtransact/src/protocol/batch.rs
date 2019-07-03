@@ -31,6 +31,7 @@ use crate::protos::{
     FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 use crate::signing;
+use transact_derive::FromProtoImpl;
 
 use super::transaction::Transaction;
 
@@ -106,10 +107,14 @@ impl IntoBytes for BatchHeader {
 impl IntoProto<protos::batch::BatchHeader> for BatchHeader {}
 impl IntoNative<BatchHeader> for protos::batch::BatchHeader {}
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(FromProtoImpl, Debug, Clone, Eq, Hash, PartialEq)]
+#[proto_type = "protos::batch::Batch"]
 pub struct Batch {
     header: Vec<u8>,
+    #[from_proto_impl(to_string)]
     header_signature: String,
+
+    #[from_proto_impl(Vec)]
     transactions: Vec<Transaction>,
     trace: bool,
 }
@@ -158,22 +163,6 @@ impl BatchPair {
 
     pub fn take(self) -> (Batch, BatchHeader) {
         (self.batch, self.header)
-    }
-}
-
-impl From<protos::batch::Batch> for Batch {
-    fn from(batch: protos::batch::Batch) -> Self {
-        Batch {
-            header: batch.get_header().to_vec(),
-            header_signature: batch.get_header_signature().to_string(),
-            transactions: batch
-                .get_transactions()
-                .to_vec()
-                .into_iter()
-                .map(Transaction::from)
-                .collect(),
-            trace: batch.get_trace(),
-        }
     }
 }
 
