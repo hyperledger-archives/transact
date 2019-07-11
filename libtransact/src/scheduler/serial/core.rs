@@ -29,6 +29,7 @@ use crate::scheduler::SchedulerError;
 use crate::scheduler::TransactionExecutionResult;
 
 use hex;
+use std::collections::VecDeque;
 use std::error::Error;
 use std::sync::mpsc::{Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex};
@@ -62,7 +63,7 @@ pub enum CoreMessage {
 
 #[derive(Debug)]
 enum CoreError {
-    ExecutionSend(Box<SendError<ExecutionTask>>),
+    ExecutionSend(Box<SendError<Option<ExecutionTask>>>),
     ContextManager(Box<ContextManagerError>),
     Internal(String),
 }
@@ -101,8 +102,8 @@ impl std::fmt::Display for CoreError {
     }
 }
 
-impl From<SendError<ExecutionTask>> for CoreError {
-    fn from(error: SendError<ExecutionTask>) -> CoreError {
+impl From<SendError<Option<ExecutionTask>>> for CoreError {
+    fn from(error: SendError<Option<ExecutionTask>>) -> CoreError {
         CoreError::ExecutionSend(Box::new(error))
     }
 }
@@ -129,7 +130,7 @@ pub struct SchedulerCore {
 
     /// The sender to be used to send an ExecutionTask to the iterator after
     /// it requested one with CoreMessage::Next.
-    execution_tx: Sender<ExecutionTask>,
+    execution_tx: Sender<Option<ExecutionTask>>,
 
     /// Indicates that next() has been called on the SchedulerExecutionInterface
     /// and is waiting for an ExecutionTask to be sent.
@@ -142,7 +143,7 @@ pub struct SchedulerCore {
     current_txn: Option<String>,
 
     /// A queue of the current batch's transactions that have not been exeucted yet.
-    txn_queue: Vec<Transaction>,
+    txn_queue: VecDeque<Transaction>,
 
     /// The results of the current batch's transactions that have already been executed.
     txn_results: Vec<TransactionExecutionResult>,
@@ -162,7 +163,7 @@ impl SchedulerCore {
     pub fn new(
         shared_lock: Arc<Mutex<Shared>>,
         rx: Receiver<CoreMessage>,
-        execution_tx: Sender<ExecutionTask>,
+        execution_tx: Sender<Option<ExecutionTask>>,
         context_lifecycle: Box<ContextLifecycle>,
         state_id: String,
     ) -> Self {
@@ -173,7 +174,7 @@ impl SchedulerCore {
             next_ready: false,
             current_batch: None,
             current_txn: None,
-            txn_queue: vec![],
+            txn_queue: VecDeque::new(),
             txn_results: vec![],
             context_lifecycle,
             state_id,
@@ -194,7 +195,8 @@ impl SchedulerCore {
             let mut shared = self.shared_lock.lock()?;
             match shared.pop_unscheduled_batch() {
                 Some(unscheduled_batch) => {
-                    self.txn_queue = unscheduled_batch.batch().transactions().to_vec();
+                    self.txn_queue =
+                        VecDeque::from(unscheduled_batch.batch().transactions().to_vec());
                     self.current_batch = Some(unscheduled_batch);
                 }
                 None => {
@@ -208,7 +210,7 @@ impl SchedulerCore {
             }
         }
 
-        let transaction = self.txn_queue.pop().ok_or_else(|| {
+        let transaction = self.txn_queue.pop_front().ok_or_else(|| {
             CoreError::Internal(format!(
                 "no transactions left in current batch ({})",
                 self.current_batch
@@ -240,7 +242,7 @@ impl SchedulerCore {
 
         self.current_txn = Some(transaction_pair.transaction().header_signature().into());
         self.execution_tx
-            .send(ExecutionTask::new(transaction_pair, context_id))?;
+            .send(Some(ExecutionTask::new(transaction_pair, context_id)))?;
         self.next_ready = false;
 
         Ok(())
@@ -342,15 +344,10 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let current_txn_id = self.current_txn.as_ref().ok_or_else(|| {
-                        CoreError::Internal(
-                            "received execution result but no current transaction is executing"
-                                .into(),
-                        )
-                    })?;
+                    let current_txn_id = self.current_txn.clone().unwrap_or_else(|| "".into());
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
-                            if &transaction_id != current_txn_id {
+                            if transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     transaction_id,
                                 ))?;
@@ -366,7 +363,7 @@ impl SchedulerCore {
                             ));
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
-                            if &result.transaction_id != current_txn_id {
+                            if result.transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     result.transaction_id,
                                 ))?;
@@ -384,6 +381,20 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::Next) => {
+                    // If the scheduler is finalized, there are no unscheduled batches, and there
+                    // are no more transactions in the queue for the current batch: there are no
+                    // more execution tasks to return.
+                    {
+                        let shared = self.shared_lock.lock()?;
+                        if shared.finalized()
+                            && shared.unscheduled_batches_is_empty()
+                            && self.txn_queue.is_empty()
+                        {
+                            self.execution_tx.send(None)?;
+                            continue;
+                        }
+                    }
+
                     self.next_ready = true;
                     self.try_schedule_next()?;
                 }

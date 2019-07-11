@@ -222,11 +222,47 @@ mod tests {
     use super::*;
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
-    use crate::workload::xo::XoBatchWorkload;
-    use crate::workload::BatchWorkload;
+    use crate::protocol::batch::BatchBuilder;
+    use crate::protocol::receipt::TransactionReceiptBuilder;
+    use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
+    use crate::signing::hash::HashSigner;
 
-    use std::sync::{Arc, Condvar, Mutex};
-    use std::thread;
+    use std::sync::mpsc;
+
+    pub fn mock_transactions(num: u8) -> Vec<Transaction> {
+        (0..num)
+            .map(|i| {
+                TransactionBuilder::new()
+                    .with_family_name("mock".into())
+                    .with_family_version("0.1".into())
+                    .with_inputs(vec![])
+                    .with_outputs(vec![])
+                    .with_nonce(vec![i])
+                    .with_payload(vec![])
+                    .with_payload_hash_method(HashMethod::SHA512)
+                    .build(&HashSigner::new())
+                    .expect("Failed to build transaction")
+            })
+            .collect()
+    }
+
+    pub fn mock_batch(transactions: Vec<Transaction>) -> BatchPair {
+        BatchBuilder::new()
+            .with_transactions(transactions)
+            .build_pair(&HashSigner::new())
+            .expect("Failed to build batch pair")
+    }
+
+    pub fn mock_batch_with_num_txns(num: u8) -> BatchPair {
+        mock_batch(mock_transactions(num))
+    }
+
+    pub fn mock_batches_with_one_transaction(num_batches: u8) -> Vec<BatchPair> {
+        mock_transactions(num_batches)
+            .into_iter()
+            .map(|txn| mock_batch(vec![txn]))
+            .collect()
+    }
 
     pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
         let results = batch
@@ -292,56 +328,227 @@ mod tests {
         fn get_transaction_receipt(
             &self,
             _context_id: &ContextId,
-            _transaction_id: &str,
+            transaction_id: &str,
         ) -> Result<TransactionReceipt, ContextManagerError> {
-            unimplemented!()
+            TransactionReceiptBuilder::new()
+                .with_transaction_id(transaction_id.into())
+                .build()
+                .map_err(|err| ContextManagerError::from(err))
         }
 
         fn drop_context(&mut self, _context_id: ContextId) {}
     }
 
-    pub fn test_scheduler(scheduler: &mut Scheduler) {
-        let mut workload = XoBatchWorkload::new_with_seed(5);
+    /// Attempt to add a batch to the scheduler; attempt to add the batch again and verify that a
+    /// `DuplicateBatch` error is returned. Return the batch so the calling test can verify other
+    /// expected behavior.
+    pub fn test_scheduler_add_batch(scheduler: &mut Scheduler) -> BatchPair {
+        let batch = mock_batch_with_num_txns(1);
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batch.clone())
             .expect("Failed to add batch");
+        match scheduler.add_batch(batch.clone()) {
+            Err(SchedulerError::DuplicateBatch(batch_id)) => {
+                assert_eq!(batch_id, batch.batch().header_signature())
+            }
+            res => panic!("Did not get DuplicateBatch; got {:?}", res),
+        }
+        batch
     }
 
-    /// Tests that cancel will properly drain the scheduler by adding a couple
-    /// of batches and then calling cancel twice.
+    /// Add two batches to the scheduler, then attempt to cancel it twice; verify that it properly
+    /// drains and returns the pending batches.
     pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
-        let mut workload = XoBatchWorkload::new_with_seed(4);
+        let batches = mock_batches_with_one_transaction(2);
+
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batches[0].clone())
             .expect("Failed to add 1st batch");
         scheduler
-            .add_batch(workload.next_batch().unwrap())
+            .add_batch(batches[1].clone())
             .expect("Failed to add 2nd batch");
-        assert_eq!(scheduler.cancel().expect("Failed 1st cancel").len(), 2);
-        assert_eq!(scheduler.cancel().expect("Failed 2nd cancel").len(), 0);
+
+        for batch in scheduler.cancel().expect("Failed 1st cancel") {
+            assert!(batches.contains(&batch));
+        }
+        assert!(scheduler.cancel().expect("Failed 2nd cancel").is_empty());
     }
 
-    /// Tests a simple scheduler worklfow of processing a single transaction.
+    /// Finalize the scheduler, then verify:
+    /// 1. A `None` result is sent by the scheduler, indicating that it is finalized and has
+    ///    processed all batches
+    /// 2. When attempting to add a batch, a `SchedulerFinalized` error is returned
+    /// 3. The scheduler's execution task iterator returns None when next() is called
+    pub fn test_scheduler_finalize(scheduler: &mut Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+
+        scheduler.finalize().expect("Failed to finalize");
+
+        assert!(rx.recv().expect("Failed to receive result").is_none());
+
+        match scheduler.add_batch(mock_batch_with_num_txns(1)) {
+            Err(SchedulerError::SchedulerFinalized) => (),
+            res => panic!("Did not get SchedulerFinalized; got {:?}", res),
+        }
+
+        assert!(task_iterator.next().is_none());
+    }
+
+    /// Tests a simple scheduler workflow of processing a single transaction; this tests the
+    /// scheduler's task iterator, notifier, and result callback functionality.
     ///
     /// For the purposes of this test, we simply return an invalid transaction
     /// as we are not testing the actual execution of the transaction but
     /// rather the flow of getting a result after adding the batch.
     pub fn test_scheduler_flow_with_one_transaction(scheduler: &mut Scheduler) {
-        let shared = Arc::new((Mutex::new(false), Condvar::new()));
-        let shared2 = shared.clone();
-
-        let mut workload = XoBatchWorkload::new_with_seed(8);
-
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
         scheduler
-            .set_result_callback(Box::new(move |_batch_result| {
-                let &(ref lock, ref cvar) = &*shared2;
-
-                let mut inner = lock.lock().unwrap();
-                *inner = true;
-                cvar.notify_one();
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
             }))
             .expect("Failed to set result callback");
 
+        // Add batch to scheduler
+        let batch = mock_batch_with_num_txns(1);
+        scheduler
+            .add_batch(batch.clone())
+            .expect("Failed to add batch");
+
+        // Simulate retrieving the execution task, executing it, and sending the notification
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+            mock_context_id(),
+            InvalidTransactionResult {
+                transaction_id: task_iterator
+                    .next()
+                    .expect("Failed to get task")
+                    .pair()
+                    .transaction()
+                    .header_signature()
+                    .into(),
+                error_message: String::new(),
+                error_data: vec![],
+            },
+        ));
+
+        // Verify that the correct result is returned
+        let result = rx.recv().expect("Failed to receive result");
+        assert_eq!(result, invalid_result_from_batch(batch));
+    }
+
+    /// Tests a simple scheduler workflow of processing a single batch with three transactions.
+    pub fn test_scheduler_flow_with_multiple_transactions(scheduler: &mut Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+
+        // Add batch to scheduler
+        let original_batch = mock_batch_with_num_txns(3);
+        scheduler
+            .add_batch(original_batch.clone())
+            .expect("Failed to add batch");
+
+        // Simulate retrieving the execution task, executing it, and sending the notification
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+
+        // Verify that the correct result is returned; can't just compare result itself, since the
+        // order of transactions in the result is unknown.
+        let BatchExecutionResult { batch, results } = rx
+            .recv()
+            .expect("Failed to receive result")
+            .expect("Got None result");
+        assert_eq!(batch, original_batch);
+
+        let original_batch_txn_ids = original_batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| txn.header_signature())
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        let result_txn_ids = results
+            .iter()
+            .map(|result| match result {
+                TransactionExecutionResult::Valid(receipt) => &receipt.transaction_id,
+                res => panic!("Did not get valid result; got {:?}", res),
+            })
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        assert_eq!(original_batch_txn_ids, result_txn_ids);
+    }
+
+    /// Process a batch with multiple transactions, one of which is invalid; verify that the
+    /// scheduler invalidates the entire batch and returns the appropriate result.
+    pub fn test_scheduler_invalid_transaction_invalidates_batch(scheduler: &mut Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+
+        // Add batch with 3 transactions to scheduler
+        let original_batch = mock_batch_with_num_txns(3);
+        scheduler
+            .add_batch(original_batch.clone())
+            .expect("Failed to add batch");
+
+        // Simulate retrieving the execution tasks, executing them, and sending the notifications.
         let mut task_iterator = scheduler
             .take_task_iterator()
             .expect("Failed to get task iterator");
@@ -349,46 +556,84 @@ mod tests {
             .new_notifier()
             .expect("Failed to get new notifier");
 
-        thread::Builder::new()
-            .name(String::from(
-                "Thread-test_scheduler_flow_with_one_transaction",
-            ))
-            .spawn(move || loop {
-                let context_id = [
-                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                    0x00, 0x00, 0x01,
-                ];
-                match task_iterator.next() {
-                    Some(task) => {
-                        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
-                            context_id,
-                            InvalidTransactionResult {
-                                transaction_id: task
-                                    .pair()
-                                    .transaction()
-                                    .header_signature()
-                                    .to_string(),
-                                error_message: String::from("invalid"),
-                                error_data: vec![],
-                            },
-                        ));
-                    }
-                    None => {
-                        break;
-                    }
-                }
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            task_iterator
+                .next()
+                .expect("Failed to get task")
+                .pair()
+                .transaction()
+                .header_signature()
+                .into(),
+        ));
+        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+            mock_context_id(),
+            InvalidTransactionResult {
+                transaction_id: task_iterator
+                    .next()
+                    .expect("Failed to get task")
+                    .pair()
+                    .transaction()
+                    .header_signature()
+                    .into(),
+                error_message: String::new(),
+                error_data: vec![],
+            },
+        ));
+        // Don't actually get the 3rd task; the scheduler should have invalidated the whole batch
+        // and sent the result already, so the 3rd transaction won't be in the iterator.
+
+        let BatchExecutionResult { batch, results } = rx
+            .recv()
+            .expect("Failed to receive result")
+            .expect("Got None result");
+        assert_eq!(batch, original_batch);
+
+        let original_batch_txn_ids = original_batch
+            .batch()
+            .transactions()
+            .iter()
+            .map(|txn| txn.header_signature())
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        let result_txn_ids = results
+            .iter()
+            .map(|result| match result {
+                TransactionExecutionResult::Invalid(invalid_res) => &invalid_res.transaction_id,
+                res => panic!("Did not get invalid result; got {:?}", res),
             })
-            .unwrap();
+            .collect::<Vec<_>>()
+            .sort_unstable();
+        assert_eq!(original_batch_txn_ids, result_txn_ids);
+    }
 
+    // Send a result to the scheduler for a transaction that it is not processing; verify that an
+    // `UnexpectedNotification` is sent using the error callback.
+    pub fn test_scheduler_unexpected_notification(scheduler: &mut Scheduler) {
+        // Use a channel to pass the error to this test
+        let (tx, rx) = mpsc::channel();
         scheduler
-            .add_batch(workload.next_batch().unwrap())
-            .expect("Failed to add batch");
+            .set_error_callback(Box::new(move |err| {
+                tx.send(err).expect("Failed to send error");
+            }))
+            .expect("Failed to set error callback");
 
-        let &(ref lock, ref cvar) = &*shared;
+        // Simulate retrieving the unexpected notification
+        let txn_id = "mock-id".to_string();
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+        notifier.notify(ExecutionTaskCompletionNotification::Valid(
+            mock_context_id(),
+            txn_id.clone(),
+        ));
 
-        let mut inner = lock.lock().unwrap();
-        while !(*inner) {
-            inner = cvar.wait(inner).unwrap();
+        // Verify that the error is returned
+        match rx.recv().expect("Failed to receive result") {
+            SchedulerError::UnexpectedNotification(unexpected_id) => {
+                assert_eq!(unexpected_id, txn_id)
+            }
+            err => panic!("Received unexpected error: {}", err),
         }
     }
 }

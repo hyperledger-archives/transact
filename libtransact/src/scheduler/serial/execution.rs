@@ -28,11 +28,11 @@ use super::core::CoreMessage;
 
 pub struct SerialExecutionTaskIterator {
     tx: Sender<CoreMessage>,
-    rx: Receiver<ExecutionTask>,
+    rx: Receiver<Option<ExecutionTask>>,
 }
 
 impl SerialExecutionTaskIterator {
-    pub fn new(tx: Sender<CoreMessage>, rx: Receiver<ExecutionTask>) -> Self {
+    pub fn new(tx: Sender<CoreMessage>, rx: Receiver<Option<ExecutionTask>>) -> Self {
         SerialExecutionTaskIterator { tx, rx }
     }
 }
@@ -46,7 +46,7 @@ impl Iterator for SerialExecutionTaskIterator {
         match self.tx.send(CoreMessage::Next) {
             Ok(_) => {
                 match self.rx.recv() {
-                    Ok(task) => Some(task),
+                    Ok(task) => task,
                     Err(_) => {
                         // This is expected if the other side shuts down before this
                         // end.
