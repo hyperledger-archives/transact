@@ -1,2 +1,2 @@
 [workspace]
-members = ["libtransact"]
+members = ["libtransact", "transact_derive"]

@@ -1,0 +1,14 @@
+[package]
+name = "transact-derive"
+version = "0.1.0"
+authors = ["Cargill Incorporated"]
+edition = "2018"
+license = "Apache-2.0"
+
+[dependencies]
+syn = { version = "0.15", features = [ "full", "extra-traits", "parsing"] }
+quote = "0.6"
+proc-macro2 = "0.4"
+
+[lib]
+proc-macro = true

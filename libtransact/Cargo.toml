@@ -24,6 +24,7 @@ libc = ">=0.2.35"
 openssl = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
 sawtooth-sdk = { version = "0.3", optional = true }
+transact-derive = { path = "../transact_derive" }
 
 [dev-dependencies]
 rand_hc = "0.1"
