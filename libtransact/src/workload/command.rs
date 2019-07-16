@@ -15,10 +15,13 @@
  * -----------------------------------------------------------------------------
  */
 //! A basic Command Transaction Family
-use std::error::Error;
+use std::{thread, time};
 
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
+use crate::protocol;
+use crate::protocol::command::{Command, CommandPayload, SleepType};
 use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
+use crate::protos::{FromBytes, IntoBytes};
 use crate::signing::hash::HashSigner;
 
 const COMMAND_FAMILY_NAME: &str = "command";
@@ -51,22 +54,63 @@ impl TransactionHandler for CommandTransactionHandler {
         transaction_pair: &TransactionPair,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let commands = parse_commands(transaction_pair.transaction().payload())
-            .map_err(|err| ApplyError::InvalidTransaction(err.to_string()))?;
+        let command_payload = CommandPayload::from_bytes(transaction_pair.transaction().payload())
+            .expect("Unable to parse CommandPayload");
 
-        for command in commands.into_iter() {
+        for command in command_payload.commands().iter() {
             match command {
-                Command::Set { address, value } => {
-                    context.set_state_entry(address, value)?;
+                Command::SetState(set_state) => {
+                    context.set_state_entries(
+                        set_state
+                            .state_writes()
+                            .to_vec()
+                            .iter()
+                            .map(|b| (b.key().to_string(), b.value().to_vec()))
+                            .collect(),
+                    )?;
                 }
-                Command::Delete { address } => {
-                    context.delete_state_entry(&address)?;
+                Command::DeleteState(delete_state) => {
+                    context.delete_state_entries(delete_state.state_keys())?;
                 }
-                Command::Get { address } => {
-                    context.get_state_entry(&address)?;
+                Command::GetState(get_state) => {
+                    context.get_state_entries(get_state.state_keys())?;
                 }
-                Command::Fail { error_msg } => {
-                    return Err(ApplyError::InvalidTransaction(error_msg));
+                Command::AddEvent(add_event) => {
+                    context.add_event(
+                        add_event.event_type().to_string(),
+                        add_event
+                            .attributes()
+                            .to_vec()
+                            .iter()
+                            .map(|b| {
+                                (
+                                    b.key().to_string(),
+                                    String::from_utf8(b.value().to_vec())
+                                        .expect("Unable to get BytesEntry value"),
+                                )
+                            })
+                            .collect(),
+                        add_event.data().to_vec(),
+                    )?;
+                }
+                Command::AddReceiptData(add_receipt_data) => {
+                    context.add_receipt_data(add_receipt_data.receipt_data().to_vec())?;
+                }
+                Command::Sleep(sleep_payload) => {
+                    sleep(
+                        sleep_payload.sleep_type().clone(),
+                        *sleep_payload.duration_millis(),
+                    );
+                }
+                Command::ReturnInternalError(internal_err) => {
+                    return Err(ApplyError::InternalError(
+                        internal_err.error_message().to_string(),
+                    ));
+                }
+                Command::ReturnInvalid(invalid_err) => {
+                    return Err(ApplyError::InvalidTransaction(
+                        invalid_err.error_message().to_string(),
+                    ));
                 }
             }
         }
@@ -75,30 +119,9 @@ impl TransactionHandler for CommandTransactionHandler {
     }
 }
 
-#[derive(Debug)]
-pub enum Command {
-    Set { address: String, value: Vec<u8> },
-    Delete { address: String },
-    Get { address: String },
-    Fail { error_msg: String },
-}
-
-impl std::fmt::Display for Command {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Command::Set {
-                ref address,
-                ref value,
-            } => write!(f, "set,{},{}", address, hex::encode(value)),
-            Command::Get { ref address } => write!(f, "get,{}", address),
-            Command::Delete { ref address } => write!(f, "del,{}", address),
-            Command::Fail { ref error_msg } => write!(f, "fail,{}", error_msg),
-        }
-    }
-}
-
 pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
     let signer = HashSigner::new();
+    let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()
         .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
         .with_family_name(COMMAND_FAMILY_NAME.to_owned())
@@ -107,9 +130,21 @@ pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
             commands
                 .iter()
                 .map(|cmd| match cmd {
-                    Command::Set { address, .. } | Command::Delete { address } => {
-                        Some(address.as_bytes().to_vec())
-                    }
+                    Command::SetState(set_state) => Some(
+                        set_state
+                            .state_writes()
+                            .iter()
+                            .flat_map(|b| b.key().as_bytes().to_vec())
+                            .collect(),
+                    ),
+                    Command::DeleteState(delete_state) => Some(
+                        delete_state
+                            .state_keys()
+                            .to_vec()
+                            .iter()
+                            .flat_map(|k| k.as_bytes().to_vec())
+                            .collect(),
+                    ),
                     _ => None,
                 })
                 .filter(Option::is_some)
@@ -120,9 +155,21 @@ pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
             commands
                 .iter()
                 .map(|cmd| match cmd {
-                    Command::Set { address, .. } | Command::Delete { address } => {
-                        Some(address.as_bytes().to_vec())
-                    }
+                    Command::SetState(set_state) => Some(
+                        set_state
+                            .state_writes()
+                            .iter()
+                            .flat_map(|b| b.key().as_bytes().to_vec())
+                            .collect(),
+                    ),
+                    Command::DeleteState(delete_state) => Some(
+                        delete_state
+                            .state_keys()
+                            .to_vec()
+                            .iter()
+                            .flat_map(|k| k.as_bytes().to_vec())
+                            .collect(),
+                    ),
                     _ => None,
                 })
                 .filter(Option::is_some)
@@ -131,92 +178,27 @@ pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
         )
         .with_payload_hash_method(HashMethod::SHA512)
         .with_payload(
-            commands
-                .iter()
-                .map(ToString::to_string)
-                .collect::<Vec<_>>()
-                .join("|")
-                .into_bytes(),
+            command_payload
+                .into_bytes()
+                .expect("Unable to get bytes from Command Payload"),
         )
         .build_pair(&signer)
         .unwrap()
 }
 
-fn parse_commands(payload: &[u8]) -> Result<Vec<Command>, ParseCommandError> {
-    std::str::from_utf8(payload)
-        .map_err(|err| ParseCommandError(format!("Payload not valid utf8 bytes: {}", err)))?
-        .split("|")
-        .map(|s| s.parse())
-        .collect::<Result<Vec<Command>, ParseCommandError>>()
-}
-
-impl std::str::FromStr for Command {
-    type Err = ParseCommandError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let mut command_parts = s.split(',');
-
-        let command = command_parts.next().map(|s| s.to_lowercase());
-        match command {
-            Some(ref set) if set == "set" => {
-                let address = command_parts
-                    .next()
-                    .map(|s| s.to_owned())
-                    .ok_or_else(|| ParseCommandError("Cannot set without address".into()))?;
-
-                Ok(Command::Set {
-                    address,
-                    value: command_parts
-                        .next()
-                        .ok_or_else(|| ParseCommandError("Cannot set without a value".into()))
-                        .and_then(|v| {
-                            if v.is_empty() {
-                                Ok(vec![])
-                            } else {
-                                hex::decode(v).map_err(|err| {
-                                    ParseCommandError(format!("Invalid hex: {}", err))
-                                })
-                            }
-                        })?,
-                })
-            }
-            Some(ref del) if del == "del" => {
-                let address = command_parts
-                    .next()
-                    .map(|s| s.to_owned())
-                    .ok_or_else(|| ParseCommandError("Cannot delete without address".into()))?;
-
-                Ok(Command::Delete { address })
-            }
-            Some(ref get) if get == "get" => {
-                let address = command_parts
-                    .next()
-                    .map(|s| s.to_owned())
-                    .ok_or_else(|| ParseCommandError("Cannot get without address".into()))?;
-
-                Ok(Command::Get { address })
-            }
-            Some(ref fail) if fail == "fail" => {
-                let error_msg = command_parts
-                    .next()
-                    .map(|s| s.to_owned())
-                    .unwrap_or("".to_owned());
-
-                Ok(Command::Fail { error_msg })
-            }
-            Some(cmd) => Err(ParseCommandError(format!("No command {} supported", cmd))),
-            None => Err(ParseCommandError("No command included".into())),
+fn sleep(sleep_type: SleepType, duration: u32) {
+    let duration_millis = time::Duration::from_millis(duration.into());
+    match sleep_type {
+        SleepType::Wait => {
+            thread::sleep(duration_millis);
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct ParseCommandError(String);
-
-impl Error for ParseCommandError {}
-
-impl std::fmt::Display for ParseCommandError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "Unable to parse command: {}", self.0)
+        SleepType::BusyWait => {
+            let now = time::Instant::now();
+            loop {
+                if now.elapsed() >= duration_millis {
+                    break;
+                }
+            }
+        }
     }
 }

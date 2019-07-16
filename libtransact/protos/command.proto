@@ -1,0 +1,121 @@
+// Copyright 2019 Cargill Incorporated
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+// -----------------------------------------------------------------------------
+
+syntax = "proto3";
+
+// A transaction payload for the Command Family
+message CommandPayload {
+    // The list of commands to execute
+    repeated Command commands = 1;
+}
+
+// A key-value pair where the value is a bytes field.
+message BytesEntry {
+    // The key, for instance a state address or a string value, depending on
+    // the target of the entry.
+    string key = 1;
+    // The byte value to be stored
+    bytes value = 2;
+}
+
+// The list of state keys to be retrieved via a GET_STATE command.
+message GetState {
+    // a non-empty list of valid state keys
+    repeated string state_keys = 1;
+}
+
+// The list of state entries to be set via a SET_STATE command.
+message SetState {
+    // a non-empty list of BytesEntry instances, where the key field is a
+    // valid state key.
+    repeated BytesEntry state_writes = 1;
+}
+
+// The list of state keys to be deleted via a DELETE_STATE command.
+message DeleteState {
+    // a non-empty list of valid state keys
+    repeated string state_keys = 1;
+}
+
+// Describes an event to add to the receipt via an ADD_EVENT command.
+message AddEvent {
+    // The event type
+    string event_type = 1;
+    // The attribute entries
+    repeated BytesEntry attributes = 2;
+    // Arbitrary opaque event data
+    bytes data = 3;
+}
+
+// The opaque byte data to add to the receipt via an ADD_RECEIPT_DATA
+// command.
+message AddReceiptData {
+    // a non-empty byte array
+    bytes receipt_data = 1;
+}
+
+// The duration and method of sleep to apply during a SLEEP command.
+message Sleep {
+    enum SleepType {
+        // This will wait, releasing cpu utilization to other processes
+        WAIT = 0;
+        // This will consume a cpu core for the specified time
+        BUSY_WAIT = 1;
+    }
+
+    // The duration to sleep, in milliseconds
+    uint32 duration_millis = 1;
+    SleepType sleep_type = 2;
+}
+
+// The details to return on an RETURN_INVALID command.
+message ReturnInvalid {
+    // An optional error message
+    string error_message = 1;
+}
+
+// The details to return on an RETURN_INTERNAL_ERROR command.
+message ReturnInternalError {
+    // An optional error message
+    string error_message = 1;
+}
+
+// A command to be executed
+message Command {
+    enum CommandType {
+        UNSET_COMMAND_TYPE = 0;
+        GET_STATE = 1;
+        SET_STATE = 2;
+        DELETE_STATE = 3;
+        ADD_EVENT = 4;
+        ADD_RECEIPT_DATA = 5;
+        SLEEP = 6;
+        RETURN_INVALID = 7;
+        RETURN_INTERNAL_ERROR = 8;
+    }
+
+    // The type of the command, which indicates which of the following
+    // fields will be set.
+    CommandType command_type = 1;
+
+    GetState get_state = 2;
+    SetState set_state = 3;
+    DeleteState delete_state = 4;
+    AddEvent add_event = 5;
+    AddReceiptData add_receipt_data = 6;
+    Sleep sleep = 7;
+    ReturnInvalid return_invalid = 8;
+    ReturnInternalError return_internal_error = 9;
+}

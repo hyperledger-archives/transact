@@ -299,11 +299,23 @@ mod test {
         atomic::{AtomicBool, Ordering},
         Arc,
     };
+    use std::time;
 
     use crate::context::ContextLifecycle;
+    use crate::protocol::command::{
+        AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
+        ReturnInvalid, SetState, Sleep, SleepType,
+    };
     use crate::scheduler::{ExecutionTaskCompletionNotification, InvalidTransactionResult};
     use crate::state::hashmap::HashMapState;
-    use crate::workload::command::{make_command_transaction, Command, CommandTransactionHandler};
+    use crate::workload::command::{make_command_transaction, CommandTransactionHandler};
+
+    fn create_bytes_entry(state_writes: Vec<(String, Vec<u8>)>) -> Vec<BytesEntry> {
+        state_writes
+            .into_iter()
+            .map(|(k, v)| BytesEntry::new(k.to_string(), v.to_vec()))
+            .collect()
+    }
 
     /// Apply the static adapter with a simple transaction that sets a value successfully.
     #[test]
@@ -323,11 +335,10 @@ mod test {
 
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
-        // Create and execute a simple transaction
-        let txn_pair = make_command_transaction(&[Command::Set {
-            address: "abc".into(),
-            value: b"abc".to_vec(),
-        }]);
+        // Create and execute a simple transaction.
+        let txn_pair = make_command_transaction(&[Command::SetState(SetState::new(
+            create_bytes_entry(vec![("abc".into(), b"abc".to_vec())]),
+        ))]);
         let txn_id = txn_pair.transaction().header_signature().into();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -357,7 +368,7 @@ mod test {
         assert!(Box::new(static_adapter).stop().is_ok());
     }
 
-    /// Apply the static adapter with a failing transaction
+    /// Apply the static adapter with a failing transaction which returns an invalid error.
     #[test]
     fn apply_static_adapter_invalid_txn() {
         let registry = MockRegistry::default();
@@ -375,14 +386,10 @@ mod test {
 
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
-        // Create and execute a failing transaction.
+        // Create and execute a failing transaction, resulting in an invalid error.
         let txn_pair = make_command_transaction(&[
-            Command::Get {
-                address: "abc".into(),
-            },
-            Command::Fail {
-                error_msg: "Test Fail Succeeded".into(),
-            },
+            Command::GetState(GetState::new(vec!["abc".into()])),
+            Command::ReturnInvalid(ReturnInvalid::new("Test Fail Succeeded".into())),
         ]);
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
@@ -411,6 +418,411 @@ mod test {
             ),
             result.unwrap()
         );
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with a failing transaction which returns an internal error.
+    #[test]
+    fn apply_static_adapter_internal_error() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute a failing transaction, resulting in an internal error.
+        let txn_pair = make_command_transaction(&[
+            Command::GetState(GetState::new(vec!["abc".into()])),
+            Command::ReturnInternalError(ReturnInternalError::new(
+                "Test Internal Fail Succeeded".into(),
+            )),
+        ]);
+
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        assert!(result.is_err());
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with a valid delete transaction.
+    #[test]
+    fn apply_static_adapter_valid_delete() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute a valid delete transaction.
+        let txn_pair = make_command_transaction(&[
+            Command::SetState(SetState::new(create_bytes_entry(vec![(
+                "abc".into(),
+                b"abc".to_vec(),
+            )]))),
+            Command::GetState(GetState::new(vec!["abc".into()])),
+            Command::DeleteState(DeleteState::new(vec!["abc".into()])),
+        ]);
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
+            result.unwrap()
+        );
+        assert_eq!(
+            context_manager
+                .get(&context_id, &["abc".to_owned()])
+                .unwrap(),
+            vec![],
+        );
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with a valid busy wait command.
+    #[test]
+    fn apply_static_adapter_busy_wait_sleep() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute a busy wait transaction.
+        let txn_pair =
+            make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::BusyWait))]);
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let time_before_execution = time::Instant::now();
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        let elapsed = time_before_execution.elapsed();
+        assert!(elapsed.ge(&time::Duration::from_millis(100)));
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
+            result.unwrap()
+        );
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with a valid wait command.
+    #[test]
+    fn apply_static_adapter_wait_sleep() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute a sleep transaction.
+        let txn_pair =
+            make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::Wait))]);
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let time_before_execution = time::Instant::now();
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        let elapsed = time_before_execution.elapsed();
+        assert!(elapsed.ge(&time::Duration::from_millis(100)));
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id),
+            result.unwrap()
+        );
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with a list of commands that will return early with an internal
+    /// error.
+    #[test]
+    fn apply_static_adapter_early_internal_error() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute a Set transaction, followed by an Internal error. This will cause
+        // the rest of the commands to be short-circuited.
+        let txn_pair = make_command_transaction(&[
+            Command::SetState(SetState::new(create_bytes_entry(vec![(
+                "abc".into(),
+                b"abc".to_vec(),
+            )]))),
+            Command::ReturnInternalError(ReturnInternalError::new(
+                "Return internal error between transactions".into(),
+            )),
+            Command::SetState(SetState::new(create_bytes_entry(vec![(
+                "def".into(),
+                b"def".to_vec(),
+            )]))),
+        ]);
+
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        assert!(result.is_err());
+        assert_eq!(
+            vec![("abc".to_owned(), b"abc".to_vec())],
+            context_manager
+                .get(&context_id, &["abc".to_owned()])
+                .unwrap(),
+        );
+        assert_eq!(
+            context_manager
+                .get(&context_id, &["def".to_owned()])
+                .unwrap(),
+            vec![],
+        );
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with several commands to add Events.
+    #[test]
+    fn apply_static_adapter_add_events() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute an Add Event transaction.
+        let txn_pair = make_command_transaction(&[
+            Command::AddEvent(AddEvent::new(
+                "First event".to_string(),
+                create_bytes_entry(vec![
+                    ("key1".to_string(), "value1".as_bytes().to_vec()),
+                    ("key2".to_string(), "value2".as_bytes().to_vec()),
+                ]),
+                b"abc".to_vec(),
+            )),
+            Command::AddEvent(AddEvent::new(
+                "Second event".to_string(),
+                create_bytes_entry(vec![
+                    ("key1".to_string(), "value1".as_bytes().to_vec()),
+                    ("key2".to_string(), "value2".as_bytes().to_vec()),
+                ]),
+                b"def".to_vec(),
+            )),
+        ]);
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id.clone()),
+            result.unwrap()
+        );
+
+        let txn_receipt = context_manager
+            .get_transaction_receipt(&context_id, &txn_id)
+            .unwrap();
+        let events = txn_receipt.events;
+        let first_event = events.first().unwrap();
+        assert_eq!(first_event.event_type, "First event".to_string());
+        assert_eq!(
+            first_event.attributes,
+            vec![
+                ("key1".to_string(), "value1".to_string()),
+                ("key2".to_string(), "value2".to_string())
+            ]
+        );
+        assert_eq!(first_event.data, b"abc".to_vec());
+
+        let second_event = events.last().unwrap();
+        assert_eq!(second_event.event_type, "Second event".to_string());
+        assert_eq!(
+            second_event.attributes,
+            vec![
+                ("key1".to_string(), "value1".to_string()),
+                ("key2".to_string(), "value2".to_string())
+            ]
+        );
+        assert_eq!(second_event.data, b"def".to_vec());
+
+        assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    /// Apply the static adapter with several commands to add Transaction Receipt data.
+    #[test]
+    fn apply_static_adapter_add_receipt_data() {
+        let registry = MockRegistry::default();
+
+        let state = HashMapState::new();
+        let state_id = HashMapState::state_id(&HashMap::new());
+
+        let mut context_manager: ContextManager = ContextManager::new(Box::new(state));
+
+        let handler = CommandTransactionHandler::new();
+
+        let mut static_adapter =
+            StaticExecutionAdapter::new_adapter(vec![Box::new(handler)], context_manager.clone())
+                .expect("Could not create adapter");
+
+        assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
+
+        // Create and execute an Add Receipt Data transaction.
+        let txn_pair = make_command_transaction(&[
+            Command::AddReceiptData(AddReceiptData::new(b"abc".to_vec())),
+            Command::AddReceiptData(AddReceiptData::new(b"def".to_vec())),
+        ]);
+
+        let txn_id = txn_pair.transaction().header_signature().to_owned();
+        let context_id = context_manager.create_context(&[], &state_id);
+
+        let (send, recv) = std::sync::mpsc::channel();
+        assert!(static_adapter
+            .execute(
+                txn_pair,
+                context_id.clone(),
+                Box::new(move |res| {
+                    send.send(res).expect("Unable to send result");
+                }),
+            )
+            .is_ok());
+        let result = recv.recv().unwrap();
+
+        assert_eq!(
+            ExecutionTaskCompletionNotification::Valid(context_id.clone(), txn_id.clone()),
+            result.unwrap()
+        );
+
+        let txn_receipt = context_manager
+            .get_transaction_receipt(&context_id, &txn_id)
+            .unwrap();
+        let receipt_data = txn_receipt.data;
+        assert_eq!(receipt_data.first().unwrap(), &b"abc".to_vec());
+        assert_eq!(receipt_data.last().unwrap(), &b"def".to_vec());
 
         assert!(Box::new(static_adapter).stop().is_ok());
     }
