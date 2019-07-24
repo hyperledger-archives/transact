@@ -88,6 +88,7 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
     let br = BufReader::new(x);
     for line in br.lines() {
         let response_string = line.map_err(|err| TestError::TestError(err.to_string()))?;
+        println!("Response String from sabre cli: {}", response_string);
         if response_string.starts_with("StatusResponse ") {
             let json_string = match response_string.get(15..) {
                 Some(x) => x,
