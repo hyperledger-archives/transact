@@ -77,7 +77,10 @@ services:
     depends_on:
       - rest-api
     entrypoint: "bash -c \"\
-        sleep 180 && \
+        while true; \
+          do curl -s http://rest-api:9708/state | grep -q head; if [ $$? -eq 0 ]; then break; fi; sleep 0.5; done; \
+        while true; \
+          do if [ -f /project/example/intkey_multiply/processor/target/wasm32-unknown-unknown/release/intkey-multiply.wasm ]; then break; fi; sleep 0.5; done; \
         cargo build && \
         cd /project/integration && \
         cargo test -- --nocapture
