@@ -31,6 +31,8 @@ pub mod multi;
 pub mod parallel;
 pub mod serial;
 
+use std::error::Error;
+
 use crate::context::ContextId;
 use crate::protocol::batch::BatchPair;
 use crate::protocol::receipt::TransactionReceipt;
@@ -123,6 +125,8 @@ pub enum SchedulerError {
     /// was not expecting; the contained `String` is the transaction ID.
     UnexpectedNotification(String),
 }
+
+impl Error for SchedulerError {}
 
 impl std::fmt::Display for SchedulerError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
