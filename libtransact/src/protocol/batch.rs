@@ -82,10 +82,11 @@ impl FromNative<BatchHeader> for protos::batch::BatchHeader {
 impl FromBytes<BatchHeader> for BatchHeader {
     fn from_bytes(bytes: &[u8]) -> Result<BatchHeader, ProtoConversionError> {
         let proto: protos::batch::BatchHeader =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get BatchHeader from bytes".to_string(),
-                )
+            protobuf::parse_from_bytes(bytes).map_err(|err| {
+                ProtoConversionError::SerializationError(format!(
+                    "unable to get BatchHeader from bytes: {}",
+                    err
+                ))
             })?;
         proto.into_native()
     }
@@ -94,10 +95,11 @@ impl FromBytes<BatchHeader> for BatchHeader {
 impl IntoBytes for BatchHeader {
     fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
         let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from BatchHeader".to_string(),
-            )
+        let bytes = proto.write_to_bytes().map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get bytes from BatchHeader: {}",
+                err
+            ))
         })?;
         Ok(bytes)
     }
@@ -176,8 +178,11 @@ impl FromNative<Batch> for protos::batch::Batch {
 
 impl FromBytes<Batch> for Batch {
     fn from_bytes(bytes: &[u8]) -> Result<Batch, ProtoConversionError> {
-        let proto: protos::batch::Batch = protobuf::parse_from_bytes(bytes).map_err(|_| {
-            ProtoConversionError::SerializationError("Unable to get Batch from bytes".to_string())
+        let proto: protos::batch::Batch = protobuf::parse_from_bytes(bytes).map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get Batch from bytes: {}",
+                err
+            ))
         })?;
         proto.into_native()
     }
@@ -186,8 +191,11 @@ impl FromBytes<Batch> for Batch {
 impl IntoBytes for Batch {
     fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
         let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError("Unable to get bytes from Batch".to_string())
+        let bytes = proto.write_to_bytes().map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get bytes from Batch: {}",
+                err
+            ))
         })?;
         Ok(bytes)
     }

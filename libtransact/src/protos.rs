@@ -48,12 +48,16 @@ impl std::fmt::Display for ProtoConversionError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             ProtoConversionError::DeserializationError(ref s) => {
-                write!(f, "DeserializationError: {}", s)
+                write!(f, "unable to deserialize during protobuf conversion: {}", s)
             }
             ProtoConversionError::SerializationError(ref s) => {
-                write!(f, "SerializationError: {}", s)
+                write!(f, "unable to serialize during protobuf conversion: {}", s)
             }
-            ProtoConversionError::InvalidTypeError(ref s) => write!(f, "InvalidTypeError: {}", s),
+            ProtoConversionError::InvalidTypeError(ref s) => write!(
+                f,
+                "invalid type encountered during protobuf conversion: {}",
+                s
+            ),
         }
     }
 }

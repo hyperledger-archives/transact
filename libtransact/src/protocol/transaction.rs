@@ -160,10 +160,11 @@ impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
 impl FromBytes<TransactionHeader> for TransactionHeader {
     fn from_bytes(bytes: &[u8]) -> Result<TransactionHeader, ProtoConversionError> {
         let proto: protos::transaction::TransactionHeader = protobuf::parse_from_bytes(bytes)
-            .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get TransactionHeader from bytes".to_string(),
-                )
+            .map_err(|err| {
+                ProtoConversionError::SerializationError(format!(
+                    "unable to get TransactionHeader from bytes: {}",
+                    err
+                ))
             })?;
         proto.into_native()
     }
@@ -172,10 +173,11 @@ impl FromBytes<TransactionHeader> for TransactionHeader {
 impl IntoBytes for TransactionHeader {
     fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
         let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from TransactionHeader".to_string(),
-            )
+        let bytes = proto.write_to_bytes().map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get bytes from TransactionHeader: {}",
+                err
+            ))
         })?;
         Ok(bytes)
     }
@@ -247,10 +249,11 @@ impl FromNative<Transaction> for protos::transaction::Transaction {
 impl FromBytes<Transaction> for Transaction {
     fn from_bytes(bytes: &[u8]) -> Result<Transaction, ProtoConversionError> {
         let proto: protos::transaction::Transaction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get Transaction from bytes".to_string(),
-                )
+            protobuf::parse_from_bytes(bytes).map_err(|err| {
+                ProtoConversionError::SerializationError(format!(
+                    "unable to get Transaction from bytes: {}",
+                    err
+                ))
             })?;
         proto.into_native()
     }
@@ -259,10 +262,11 @@ impl FromBytes<Transaction> for Transaction {
 impl IntoBytes for Transaction {
     fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
         let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from Transaction".to_string(),
-            )
+        let bytes = proto.write_to_bytes().map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get bytes from Transaction: {}",
+                err
+            ))
         })?;
         Ok(bytes)
     }
