@@ -141,6 +141,61 @@ impl Batch {
     }
 }
 
+impl FromProto<protos::batch::Batch> for Batch {
+    fn from_proto(batch: protos::batch::Batch) -> Result<Self, ProtoConversionError> {
+        Ok(Batch {
+            header: batch.header,
+            header_signature: batch.header_signature,
+            transactions: batch
+                .transactions
+                .into_iter()
+                .map(|txn| txn.into_native())
+                .collect::<Result<Vec<_>, _>>()?,
+            trace: batch.trace,
+        })
+    }
+}
+
+impl FromNative<Batch> for protos::batch::Batch {
+    fn from_native(batch: Batch) -> Result<Self, ProtoConversionError> {
+        let mut proto_batch = protos::batch::Batch::new();
+        proto_batch.set_header(batch.header);
+        proto_batch.set_header_signature(batch.header_signature);
+        proto_batch.set_transactions(
+            batch
+                .transactions
+                .into_iter()
+                .map(|txn| txn.into_proto())
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
+        );
+        proto_batch.set_trace(batch.trace);
+        Ok(proto_batch)
+    }
+}
+
+impl FromBytes<Batch> for Batch {
+    fn from_bytes(bytes: &[u8]) -> Result<Batch, ProtoConversionError> {
+        let proto: protos::batch::Batch = protobuf::parse_from_bytes(bytes).map_err(|_| {
+            ProtoConversionError::SerializationError("Unable to get Batch from bytes".to_string())
+        })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for Batch {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError("Unable to get bytes from Batch".to_string())
+        })?;
+        Ok(bytes)
+    }
+}
+
+impl IntoProto<protos::batch::Batch> for Batch {}
+impl IntoNative<Batch> for protos::batch::Batch {}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BatchPair {
     batch: Batch,
@@ -158,22 +213,6 @@ impl BatchPair {
 
     pub fn take(self) -> (Batch, BatchHeader) {
         (self.batch, self.header)
-    }
-}
-
-impl From<protos::batch::Batch> for Batch {
-    fn from(batch: protos::batch::Batch) -> Self {
-        Batch {
-            header: batch.get_header().to_vec(),
-            header_signature: batch.get_header_signature().to_string(),
-            transactions: batch
-                .get_transactions()
-                .to_vec()
-                .into_iter()
-                .map(Transaction::from)
-                .collect(),
-            trace: batch.get_trace(),
-        }
     }
 }
 
