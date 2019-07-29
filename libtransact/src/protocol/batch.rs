@@ -216,6 +216,37 @@ impl BatchPair {
     }
 }
 
+impl FromProto<protos::batch::Batch> for BatchPair {
+    fn from_proto(batch: protos::batch::Batch) -> Result<Self, ProtoConversionError> {
+        Batch::from_proto(batch)?
+            .into_pair()
+            .map_err(|err| ProtoConversionError::DeserializationError(err.to_string()))
+    }
+}
+
+impl FromNative<BatchPair> for protos::batch::Batch {
+    fn from_native(batch_pair: BatchPair) -> Result<Self, ProtoConversionError> {
+        batch_pair.take().0.into_proto()
+    }
+}
+
+impl FromBytes<BatchPair> for BatchPair {
+    fn from_bytes(bytes: &[u8]) -> Result<BatchPair, ProtoConversionError> {
+        Batch::from_bytes(bytes)?
+            .into_pair()
+            .map_err(|err| ProtoConversionError::DeserializationError(err.to_string()))
+    }
+}
+
+impl IntoBytes for BatchPair {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        self.take().0.into_bytes()
+    }
+}
+
+impl IntoProto<protos::batch::Batch> for BatchPair {}
+impl IntoNative<BatchPair> for protos::batch::Batch {}
+
 #[derive(Debug)]
 pub enum BatchBuildError {
     MissingField(String),
