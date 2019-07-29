@@ -21,6 +21,7 @@ use std::error::Error as StdError;
 
 #[derive(Debug)]
 pub enum ProtoConversionError {
+    DeserializationError(String),
     SerializationError(String),
     InvalidTypeError(String),
 }
@@ -28,6 +29,7 @@ pub enum ProtoConversionError {
 impl StdError for ProtoConversionError {
     fn description(&self) -> &str {
         match *self {
+            ProtoConversionError::DeserializationError(ref msg) => msg,
             ProtoConversionError::SerializationError(ref msg) => msg,
             ProtoConversionError::InvalidTypeError(ref msg) => msg,
         }
@@ -35,6 +37,7 @@ impl StdError for ProtoConversionError {
 
     fn cause(&self) -> Option<&StdError> {
         match *self {
+            ProtoConversionError::DeserializationError(_) => None,
             ProtoConversionError::SerializationError(_) => None,
             ProtoConversionError::InvalidTypeError(_) => None,
         }
@@ -44,6 +47,9 @@ impl StdError for ProtoConversionError {
 impl std::fmt::Display for ProtoConversionError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            ProtoConversionError::DeserializationError(ref s) => {
+                write!(f, "DeserializationError: {}", s)
+            }
             ProtoConversionError::SerializationError(ref s) => {
                 write!(f, "SerializationError: {}", s)
             }
