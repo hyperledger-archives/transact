@@ -222,15 +222,54 @@ impl Transaction {
     }
 }
 
-impl From<protos::transaction::Transaction> for Transaction {
-    fn from(transaction: protos::transaction::Transaction) -> Self {
-        Transaction {
-            header: transaction.get_header().to_vec(),
-            header_signature: transaction.get_header_signature().to_string(),
-            payload: transaction.get_payload().to_vec(),
-        }
+impl FromProto<protos::transaction::Transaction> for Transaction {
+    fn from_proto(
+        transaction: protos::transaction::Transaction,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(Transaction {
+            header: transaction.header,
+            header_signature: transaction.header_signature,
+            payload: transaction.payload,
+        })
     }
 }
+
+impl FromNative<Transaction> for protos::transaction::Transaction {
+    fn from_native(transaction: Transaction) -> Result<Self, ProtoConversionError> {
+        let mut proto_transaction = protos::transaction::Transaction::new();
+        proto_transaction.set_header(transaction.header);
+        proto_transaction.set_header_signature(transaction.header_signature);
+        proto_transaction.set_payload(transaction.payload);
+        Ok(proto_transaction)
+    }
+}
+
+impl FromBytes<Transaction> for Transaction {
+    fn from_bytes(bytes: &[u8]) -> Result<Transaction, ProtoConversionError> {
+        let proto: protos::transaction::Transaction =
+            protobuf::parse_from_bytes(bytes).map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get Transaction from bytes".to_string(),
+                )
+            })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for Transaction {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|_| {
+            ProtoConversionError::SerializationError(
+                "Unable to get bytes from Transaction".to_string(),
+            )
+        })?;
+        Ok(bytes)
+    }
+}
+
+impl IntoProto<protos::transaction::Transaction> for Transaction {}
+impl IntoNative<Transaction> for protos::transaction::Transaction {}
 
 #[derive(Debug)]
 pub struct TransactionPair {
@@ -757,7 +796,9 @@ mod tests {
             protobuf::parse_from_bytes(&transaction_bytes).unwrap();
 
         // Convert to a Transaction
-        let transaction: Transaction = transaction_proto.into();
+        let transaction: Transaction = transaction_proto
+            .into_native()
+            .expect("failed to convert to native");
 
         assert_eq!(BYTES1.to_vec(), transaction.header());
         assert_eq!(SIGNATURE1, transaction.header_signature());
