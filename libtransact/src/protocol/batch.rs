@@ -204,6 +204,22 @@ impl IntoBytes for Batch {
 impl IntoProto<protos::batch::Batch> for Batch {}
 impl IntoNative<Batch> for protos::batch::Batch {}
 
+impl FromBytes<Vec<Batch>> for Vec<Batch> {
+    fn from_bytes(bytes: &[u8]) -> Result<Vec<Batch>, ProtoConversionError> {
+        let proto: protos::batch::BatchList = protobuf::parse_from_bytes(bytes).map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get BatchList from bytes: {}",
+                err
+            ))
+        })?;
+        proto
+            .batches
+            .into_iter()
+            .map(|batch| batch.into_native())
+            .collect()
+    }
+}
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BatchPair {
     batch: Batch,
@@ -254,6 +270,23 @@ impl IntoBytes for BatchPair {
 
 impl IntoProto<protos::batch::Batch> for BatchPair {}
 impl IntoNative<BatchPair> for protos::batch::Batch {}
+
+impl FromBytes<Vec<BatchPair>> for Vec<BatchPair> {
+    fn from_bytes(bytes: &[u8]) -> Result<Vec<BatchPair>, ProtoConversionError> {
+        let batches: Vec<Batch> = Vec::from_bytes(bytes)?;
+        batches
+            .into_iter()
+            .map(|batch| {
+                batch.into_pair().map_err(|err| {
+                    ProtoConversionError::DeserializationError(format!(
+                        "failed to get BatchPair from Batch: {}",
+                        err
+                    ))
+                })
+            })
+            .collect()
+    }
+}
 
 #[derive(Debug)]
 pub enum BatchBuildError {
