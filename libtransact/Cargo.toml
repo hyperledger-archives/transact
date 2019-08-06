@@ -1,6 +1,6 @@
 [package]
 name = "transact"
-version = "0.1.5"
+version = "0.1.6"
 authors = ["Bitwise IO, Inc.", "Cargill Incorporated"]
 edition = "2018"
 license = "Apache-2.0"
