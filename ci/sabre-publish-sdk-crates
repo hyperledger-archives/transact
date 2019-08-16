@@ -18,8 +18,8 @@
 #   Your crates api token must be passed in as CARGO_CRED at runtime
 #   using Docker's -e option.
 
-# docker build -f ci/sawtooth-publish-crates -t sawtooth-publish-crates ci/
-# docker run --rm -v $(pwd):/project/sawtooth-sabre -e CARGO_CRED=%CREDVALUE% sawtooth-publish-crates
+# docker build -f ci/sabre-publish-sdk-crates -t sabre-publish-sdk-crates ci/
+# docker run --rm -v $(pwd):/project/sawtooth-sabre -e CARGO_CRED=%CREDVALUE% sabre-publish-sdk-crates
 
 FROM ubuntu:bionic
 
@@ -27,9 +27,11 @@ RUN apt-get update \
  && apt-get install -y \
     curl \
     gcc \
+    git \
     libssl-dev \
     libzmq3-dev \
     pkg-config \
+    python3 \
     unzip \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
@@ -47,6 +49,9 @@ WORKDIR /project/sawtooth-sabre
 CMD cd sdk \
  && cargo login $CARGO_CRED \
  && rm -f Cargo.lock \
+ && REPO_VER=$(VERSION=AUTO_STRICT ../bin/get_version) \
+ && sed -i'' -e "s/version.*$/version\ =\ \"$REPO_VER\"/" Cargo.toml \
  && cargo clean \
  && cargo test \
- && cargo publish
+ && cargo publish --allow-dirty \
+ && git checkout Cargo.toml
