@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use crypto::digest::Digest;
-use crypto::sha2::Sha256;
 use crypto::sha2::Sha512;
 use sawtooth_sdk::processor::handler::ApplyError;
 
@@ -32,8 +31,6 @@ const SMART_PERMISSION_PREFIX: &str = "00ec03";
 const PIKE_AGENT_PREFIX: &str = "cad11d00";
 
 const PIKE_ORG_PREFIX: &str = "cad11d01";
-
-const SETTING_PREFIX: &str = "000000";
 
 pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
     let mut sha = Sha512::new();
@@ -63,22 +60,6 @@ fn bytes_to_hex_str(b: &[u8]) -> String {
         .join("")
 }
 
-pub fn hash_256(to_hash: &str, num: usize) -> Result<String, ApplyError> {
-    let mut sha = Sha256::new();
-    sha.input_str(to_hash);
-    let temp = sha.result_str().to_string();
-    let hash = match temp.get(..num) {
-        Some(x) => x,
-        None => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Cannot hash {} to Sha256 and return String with len {}",
-                to_hash, num
-            )));
-        }
-    };
-    Ok(hash.into())
-}
-
 pub fn make_contract_address(name: &str, version: &str) -> Result<String, ApplyError> {
     Ok(CONTRACT_PREFIX.to_string() + &hash(&(name.to_string() + "," + version), 64)?)
 }
@@ -98,14 +79,6 @@ pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyE
         }
     };
     Ok(NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)?)
-}
-
-pub fn get_sawtooth_admins_address() -> Result<String, ApplyError> {
-    Ok(SETTING_PREFIX.to_string()
-        + &hash_256("sawtooth", 16)?
-        + &hash_256("swa", 16)?
-        + &hash_256("administrators", 16)?
-        + &hash_256("", 16)?)
 }
 
 /// Returns a state address for a smart permission

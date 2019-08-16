@@ -17,6 +17,7 @@ use sabre_sdk::protocol::state::{
     ContractRegistryListBuilder, NamespaceRegistry, NamespaceRegistryList,
     NamespaceRegistryListBuilder, SmartPermission, SmartPermissionList, SmartPermissionListBuilder,
 };
+use sabre_sdk::protocol::ADMINISTRATORS_SETTING_ADDRESS;
 use sabre_sdk::protos::{FromBytes, IntoBytes};
 use sawtooth_sdk::messages::setting::Setting;
 use sawtooth_sdk::processor::handler::ApplyError;
@@ -24,8 +25,7 @@ use sawtooth_sdk::processor::handler::TransactionContext;
 
 use crate::addressing::{
     compute_agent_address, compute_org_address, compute_smart_permission_address,
-    get_sawtooth_admins_address, make_contract_address, make_contract_registry_address,
-    make_namespace_registry_address,
+    make_contract_address, make_contract_registry_address, make_namespace_registry_address,
 };
 
 pub struct SabreState<'a> {
@@ -42,8 +42,9 @@ impl<'a> SabreState<'a> {
     }
 
     pub fn get_admin_setting(&mut self) -> Result<Option<Setting>, ApplyError> {
-        let address = get_sawtooth_admins_address()?;
-        let d = self.context.get_state_entry(&address)?;
+        let d = self
+            .context
+            .get_state_entry(ADMINISTRATORS_SETTING_ADDRESS)?;
         match d {
             Some(packed) => {
                 let setting: Setting =

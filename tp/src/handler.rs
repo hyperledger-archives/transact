@@ -36,6 +36,7 @@ use sabre_sdk::protocol::payload::{
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
     UpdateSmartPermissionAction,
 };
+use sabre_sdk::protocol::ADMINISTRATORS_SETTING_KEY;
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
@@ -542,7 +543,7 @@ fn create_contract_registry(
     };
 
     for entry in setting.get_entries() {
-        if entry.key == "sawtooth.swa.administrators" {
+        if entry.key == ADMINISTRATORS_SETTING_KEY {
             let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
@@ -683,7 +684,7 @@ fn create_namespace_registry(
     };
 
     for entry in setting.get_entries() {
-        if entry.key == "sawtooth.swa.administrators" {
+        if entry.key == ADMINISTRATORS_SETTING_KEY {
             let values = entry.value.split(',');
             let value_vec: Vec<&str> = values.collect();
             if !value_vec.contains(&signer) {
@@ -1080,7 +1081,7 @@ fn can_update_namespace_registry(
         };
 
         for entry in setting.get_entries() {
-            if entry.key == "sawtooth.swa.administrators" {
+            if entry.key == ADMINISTRATORS_SETTING_KEY {
                 let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
@@ -1119,7 +1120,7 @@ fn can_update_contract_registry(
         };
 
         for entry in setting.get_entries() {
-            if entry.key == "sawtooth.swa.administrators" {
+            if entry.key == ADMINISTRATORS_SETTING_KEY {
                 let values = entry.value.split(',');
                 let value_vec: Vec<&str> = values.collect();
                 if !value_vec.contains(&signer) {
