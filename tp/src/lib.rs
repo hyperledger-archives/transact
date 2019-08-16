@@ -20,3 +20,5 @@ pub mod handler;
 mod payload;
 mod state;
 mod wasm_executor;
+
+pub use sabre_sdk::protocol::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};
