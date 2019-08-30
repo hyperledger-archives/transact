@@ -97,3 +97,9 @@ services:
       - .:/project
       - ./keys:/root/.sawtooth/keys
     entrypoint: tail -f /dev/null
+
+  intkey_multiply:
+    build:
+      context: .
+      dockerfile: example/intkey_multiply/processor/Dockerfile-scar
+    image: intkeym-scar:${ISOLATION_ID}
