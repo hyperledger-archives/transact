@@ -92,6 +92,8 @@ pipeline {
             steps {
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-cli'
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
+                sh 'docker-compose -f docker-compose-installed.yaml build intkey_multiply'
+
             }
         }
 
@@ -124,6 +126,7 @@ pipeline {
                 sh 'mkdir -p build/debs'
                 sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-cli:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
                 sh 'docker run --rm -v $(pwd)/build/debs:/build/debs --entrypoint "/bin/bash" sawtooth-sabre-tp:${ISOLATION_ID} "-c" "cp /tmp/*.deb /build/debs"'
+                sh 'docker run --rm -v $(pwd)/build/scar:/build/scar --entrypoint "/bin/bash" intkeym-scar:${ISOLATION_ID} "-c" "cp /tmp/*.scar /build/scar"'
             }
         }
     }
@@ -133,7 +136,7 @@ pipeline {
             sh 'docker-compose -f docs/docker-compose.yaml down'
         }
         success {
-            archiveArtifacts artifacts: '*.tgz, *.zip, build/debs/*.deb, docs/build/html/**'
+            archiveArtifacts artifacts: '*.tgz, *.zip, build/debs/*.deb, build/scar/*.scar, docs/build/html/**'
         }
         aborted {
             error "Aborted, exiting now"
