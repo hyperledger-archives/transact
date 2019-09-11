@@ -27,19 +27,19 @@ use crate::signing::Error;
 use crate::signing::Signer;
 
 pub struct HashSigner {
-    dummy_public_key: Vec<u8>,
+    public_key: Vec<u8>,
 }
 
 impl HashSigner {
-    pub fn new() -> Self {
-        HashSigner::default()
+    pub fn new(public_key: Vec<u8>) -> Self {
+        Self { public_key }
     }
 }
 
 impl Default for HashSigner {
     fn default() -> Self {
         HashSigner {
-            dummy_public_key: String::from("hash_signer").into_bytes(),
+            public_key: String::from("hash_signer").into_bytes(),
         }
     }
 }
@@ -52,6 +52,6 @@ impl Signer for HashSigner {
     }
 
     fn public_key(&self) -> &[u8] {
-        &self.dummy_public_key
+        &self.public_key
     }
 }

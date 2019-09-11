@@ -241,7 +241,7 @@ mod tests {
 
     impl MockTaskExecutionIterator {
         fn new() -> Self {
-            let signer = HashSigner::new();
+            let signer = HashSigner::default();
             let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
             let family_name = |i| {

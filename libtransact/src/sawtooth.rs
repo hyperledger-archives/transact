@@ -267,7 +267,7 @@ mod xo_compat_test {
         let test_executor = executor.clone();
 
         let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new();
+            let signer = HashSigner::new(vec![00u8, 01, 02]);
 
             let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
 
@@ -332,7 +332,7 @@ mod xo_compat_test {
         let test_executor = executor.clone();
 
         let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new();
+            let signer = HashSigner::new(vec![00u8, 01, 02]);
 
             let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
             let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");

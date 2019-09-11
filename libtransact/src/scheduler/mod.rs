@@ -244,7 +244,7 @@ mod tests {
                     .with_nonce(vec![i])
                     .with_payload(vec![])
                     .with_payload_hash_method(HashMethod::SHA512)
-                    .build(&HashSigner::new())
+                    .build(&HashSigner::default())
                     .expect("Failed to build transaction")
             })
             .collect()
@@ -253,7 +253,7 @@ mod tests {
     pub fn mock_batch(transactions: Vec<Transaction>) -> BatchPair {
         BatchBuilder::new()
             .with_transactions(transactions)
-            .build_pair(&HashSigner::new())
+            .build_pair(&HashSigner::default())
             .expect("Failed to build batch pair")
     }
 
