@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn transaction_builder_chain() {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         let pair = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
@@ -595,7 +595,7 @@ mod tests {
 
     #[test]
     fn transaction_builder_seperate() {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         let mut builder = TransactionBuilder::new();
         builder = builder.with_batcher_public_key(hex::decode(KEY1).unwrap());
@@ -838,7 +838,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_transaction_builder(b: &mut Bencher) {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
         let transaction = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
             .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])

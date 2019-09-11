@@ -203,23 +203,14 @@ fn as_sawtooth_header(header: &TransactionHeader) -> SawtoothTxnHeader {
 
     sawtooth_header.set_family_name(header.family_name().to_owned());
     sawtooth_header.set_family_version(header.family_version().to_owned());
-    sawtooth_header.set_signer_public_key(to_hex(&header.signer_public_key()));
-    sawtooth_header.set_batcher_public_key(to_hex(&header.batcher_public_key()));
-    sawtooth_header.set_dependencies(header.dependencies().iter().map(to_hex).collect());
-    sawtooth_header.set_inputs(header.inputs().iter().map(to_hex).collect());
-    sawtooth_header.set_outputs(header.outputs().iter().map(to_hex).collect());
-    sawtooth_header.set_nonce(to_hex(&header.nonce()));
+    sawtooth_header.set_signer_public_key(hex::encode(&header.signer_public_key()));
+    sawtooth_header.set_batcher_public_key(hex::encode(&header.batcher_public_key()));
+    sawtooth_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
+    sawtooth_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
+    sawtooth_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
+    sawtooth_header.set_nonce(hex::encode(&header.nonce()));
 
     sawtooth_header
-}
-
-fn to_hex<T: AsRef<[u8]>>(bytes: &T) -> String {
-    let bytes = bytes.as_ref();
-    let mut buf = String::with_capacity(bytes.len() * 2);
-    for b in bytes {
-        write!(&mut buf, "{:0x}", b).unwrap(); // this can't fail
-    }
-    buf
 }
 
 fn to_context_error(err: ContextError) -> SawtoothContextError {
@@ -267,7 +258,7 @@ mod xo_compat_test {
         let test_executor = executor.clone();
 
         let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new();
+            let signer = HashSigner::new(vec![00u8, 01, 02]);
 
             let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
 
@@ -332,7 +323,7 @@ mod xo_compat_test {
         let test_executor = executor.clone();
 
         let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new();
+            let signer = HashSigner::new(vec![00u8, 01, 02]);
 
             let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
             let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");

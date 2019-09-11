@@ -27,7 +27,7 @@ pub struct XoTransactionWorkload {
 impl XoTransactionWorkload {
     pub fn new() -> Self {
         let rng = Hc128Rng::from_entropy();
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         XoTransactionWorkload {
             rng,
@@ -37,7 +37,7 @@ impl XoTransactionWorkload {
 
     pub fn new_with_seed(seed: u64) -> XoTransactionWorkload {
         let rng = Hc128Rng::seed_from_u64(seed);
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         XoTransactionWorkload {
             rng,
@@ -76,7 +76,7 @@ pub struct XoBatchWorkload {
 
 impl XoBatchWorkload {
     pub fn new() -> XoBatchWorkload {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         XoBatchWorkload {
             transaction_workload: XoTransactionWorkload::new(),
@@ -85,7 +85,7 @@ impl XoBatchWorkload {
     }
 
     pub fn new_with_seed(seed: u64) -> XoBatchWorkload {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         XoBatchWorkload {
             transaction_workload: XoTransactionWorkload::new_with_seed(seed),

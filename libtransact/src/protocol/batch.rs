@@ -451,7 +451,7 @@ mod tests {
 
     #[test]
     fn batch_builder_chain() {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         let pair = BatchBuilder::new()
             .with_transactions(vec![
@@ -475,7 +475,7 @@ mod tests {
 
     #[test]
     fn batch_builder_separate() {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         let mut builder = BatchBuilder::new();
         builder = builder.with_transactions(vec![
@@ -620,7 +620,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_batch_builder(b: &mut Bencher) {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
         let batch = BatchBuilder::new()
             .with_transactions(vec![
                 Transaction::new(

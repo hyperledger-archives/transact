@@ -228,7 +228,7 @@ mod tests {
     }
 
     fn make_transaction() -> TransactionPair {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
 
         TransactionBuilder::new()
             .with_batcher_public_key(vec![])

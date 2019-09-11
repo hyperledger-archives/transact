@@ -709,7 +709,7 @@ mod tests {
     }
 
     fn create_iterator() -> impl Iterator<Item = ExecutionTask> {
-        let signer = HashSigner::new();
+        let signer = HashSigner::default();
         let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
         (0..NUMBER_OF_TRANSACTIONS)

@@ -120,7 +120,7 @@ impl TransactionHandler for CommandTransactionHandler {
 }
 
 pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
-    let signer = HashSigner::new();
+    let signer = HashSigner::default();
     let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()
         .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
