@@ -23,13 +23,14 @@ use crate::protos::{
     FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 use std::error::Error as StdError;
+use std::fmt;
 
 /// A change to be applied to state, in terms of keys and values.
 ///
 /// A `StateChange` represents the basic level of changes that can be applied to
 /// values in state.  This covers the setting of a key/value pair, or the
 /// deletion of a key.
-#[derive(Debug, Eq, Hash, PartialEq)]
+#[derive(Eq, Hash, PartialEq)]
 pub enum StateChange {
     Set { key: String, value: Vec<u8> },
     Delete { key: String },
@@ -44,6 +45,26 @@ impl StateChange {
             key == k
         } else {
             false
+        }
+    }
+}
+
+impl fmt::Debug for StateChange {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            StateChange::Set { key, value } => {
+                f.write_str("StateChange{ ")?;
+                write!(f, "key: {:?}, ", key)?;
+                let value_len = value.len();
+                write!(
+                    f,
+                    "value: <{} byte{}>",
+                    value_len,
+                    if value_len == 1 { "" } else { "s" }
+                )?;
+                f.write_str(" }")
+            }
+            StateChange::Delete { key } => write!(f, "StateChange::Delete{{ key: {:?} }})", key),
         }
     }
 }

@@ -23,8 +23,8 @@
 
 use hex;
 use protobuf::Message;
-use std;
 use std::error::Error as StdError;
+use std::fmt;
 
 use crate::protos;
 use crate::protos::{
@@ -34,7 +34,7 @@ use crate::signing;
 
 use super::transaction::Transaction;
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BatchHeader {
     signer_public_key: Vec<u8>,
     transaction_ids: Vec<Vec<u8>>,
@@ -47,6 +47,28 @@ impl BatchHeader {
 
     pub fn transaction_ids(&self) -> &[Vec<u8>] {
         &self.transaction_ids
+    }
+}
+
+impl fmt::Debug for BatchHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("BatchHeader{ ")?;
+        write!(
+            f,
+            "signer_public_key: {:?}, ",
+            hex::encode(&self.signer_public_key)
+        )?;
+        f.write_str("transaction_ids: [")?;
+        f.write_str(
+            &self
+                .transaction_ids
+                .iter()
+                .map(|id| format!("{:?}", hex::encode(id)))
+                .collect::<Vec<_>>()
+                .join(", "),
+        )?;
+        f.write_str("]")?;
+        f.write_str(" }")
     }
 }
 
@@ -108,7 +130,7 @@ impl IntoBytes for BatchHeader {
 impl IntoProto<protos::batch::BatchHeader> for BatchHeader {}
 impl IntoNative<BatchHeader> for protos::batch::BatchHeader {}
 
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+#[derive(Clone, Eq, Hash, PartialEq)]
 pub struct Batch {
     header: Vec<u8>,
     header_signature: String,
@@ -140,6 +162,25 @@ impl Batch {
             batch: self,
             header,
         })
+    }
+}
+
+impl fmt::Debug for Batch {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Batch{ ")?;
+
+        write!(f, "header_signature: {:?}, ", self.header_signature)?;
+        let header_len = self.header.len();
+        write!(
+            f,
+            "header: <{} byte{}>,  ",
+            header_len,
+            if header_len == 1 { "" } else { "s" }
+        )?;
+        write!(f, "transactions: {:?}, ", &self.transactions)?;
+        write!(f, "trace: {}", self.trace)?;
+
+        f.write_str(" }")
     }
 }
 
