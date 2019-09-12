@@ -23,8 +23,8 @@
 use hex;
 use protobuf::Message;
 use sha2::{Digest, Sha512};
-use std;
 use std::error::Error as StdError;
+use std::fmt;
 
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -42,7 +42,7 @@ pub enum HashMethod {
     SHA512,
 }
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(PartialEq, Clone)]
 pub struct TransactionHeader {
     batcher_public_key: Vec<u8>,
     dependencies: Vec<Vec<u8>>,
@@ -96,6 +96,43 @@ impl TransactionHeader {
     pub fn signer_public_key(&self) -> &[u8] {
         &self.signer_public_key
     }
+}
+
+impl fmt::Debug for TransactionHeader {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("TransactionHeader{ ")?;
+
+        write!(f, "family_name: {:?}, ", self.family_name)?;
+        write!(f, "family_version: {:?}, ", self.family_version)?;
+
+        write_vec_as_hex(f, "inputs", &self.inputs)?;
+        write_vec_as_hex(f, "outputs", &self.outputs)?;
+
+        write!(
+            f,
+            "signer_public_key: {:?}, ",
+            hex::encode(&self.signer_public_key)
+        )?;
+
+        write!(f, "payload_hash: {:?}, ", hex::encode(&self.payload_hash))?;
+        write!(f, "payload_hash_method: {:?}, ", self.payload_hash_method)?;
+
+        write!(f, "nonce: {:?}", hex::encode(&self.nonce))?;
+
+        f.write_str(" }")
+    }
+}
+
+fn write_vec_as_hex(f: &mut fmt::Formatter, field_name: &str, data: &[Vec<u8>]) -> fmt::Result {
+    write!(f, "{}: [", field_name)?;
+    f.write_str(
+        &data
+            .iter()
+            .map(|datum| format!("{:?}", hex::encode(datum)))
+            .collect::<Vec<_>>()
+            .join(", "),
+    )?;
+    f.write_str("]")
 }
 
 impl From<hex::FromHexError> for ProtoConversionError {
@@ -186,7 +223,7 @@ impl IntoBytes for TransactionHeader {
 impl IntoProto<protos::transaction::TransactionHeader> for TransactionHeader {}
 impl IntoNative<TransactionHeader> for protos::transaction::TransactionHeader {}
 
-#[derive(Debug, Eq, Hash, PartialEq, Clone)]
+#[derive(Eq, Hash, PartialEq, Clone)]
 pub struct Transaction {
     header: Vec<u8>,
     header_signature: String,
@@ -221,6 +258,32 @@ impl Transaction {
             transaction: self,
             header,
         })
+    }
+}
+
+impl fmt::Debug for Transaction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.write_str("Transaction {")?;
+
+        write!(f, "header_signature: {:?}, ", self.header_signature)?;
+
+        let header_len = self.header.len();
+        write!(
+            f,
+            "header: <{} byte{}>,  ",
+            header_len,
+            if header_len == 1 { "" } else { "s" }
+        )?;
+
+        let payload_len = self.payload.len();
+        write!(
+            f,
+            "payload: <{} byte{}>",
+            payload_len,
+            if payload_len == 1 { "" } else { "s" }
+        )?;
+
+        f.write_str(" }")
     }
 }
 
