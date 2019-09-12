@@ -27,8 +27,8 @@ use std::collections::VecDeque;
 /// Stores all serial scheduler data which is shared between threads.
 pub struct Shared {
     finalized: bool,
-    result_callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
-    error_callback: Box<Fn(SchedulerError) + Send>,
+    result_callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
+    error_callback: Box<dyn Fn(SchedulerError) + Send>,
     unscheduled_batches: VecDeque<BatchPair>,
 }
 
@@ -52,11 +52,11 @@ impl Shared {
         self.finalized
     }
 
-    pub fn result_callback(&self) -> &(Fn(Option<BatchExecutionResult>) + Send) {
+    pub fn result_callback(&self) -> &(dyn Fn(Option<BatchExecutionResult>) + Send) {
         &*self.result_callback
     }
 
-    pub fn error_callback(&self) -> &(Fn(SchedulerError) + Send) {
+    pub fn error_callback(&self) -> &(dyn Fn(SchedulerError) + Send) {
         &*self.error_callback
     }
 
@@ -64,11 +64,14 @@ impl Shared {
         self.finalized = finalized;
     }
 
-    pub fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>) {
+    pub fn set_result_callback(
+        &mut self,
+        callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
+    ) {
         self.result_callback = callback;
     }
 
-    pub fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
+    pub fn set_error_callback(&mut self, callback: Box<dyn Fn(SchedulerError) + Send>) {
         self.error_callback = callback;
     }
 

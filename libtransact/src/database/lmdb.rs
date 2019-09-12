@@ -134,7 +134,7 @@ impl Database for LmdbDatabase {
         Ok(Box::new(LmdbDatabaseWriter { db: &self, txn }))
     }
 
-    fn clone_box(&self) -> Box<Database> {
+    fn clone_box(&self) -> Box<dyn Database> {
         Box::new(Clone::clone(self))
     }
 }

@@ -134,7 +134,7 @@ impl Read for HashMapState {
             .collect())
     }
 
-    fn clone_box(&self) -> Box<Read<StateId = String, Key = String, Value = Vec<u8>>> {
+    fn clone_box(&self) -> Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(Clone::clone(self))
     }
 }

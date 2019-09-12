@@ -388,7 +388,7 @@ impl BatchBuilder {
         self
     }
 
-    pub fn build_pair(self, signer: &signing::Signer) -> Result<BatchPair, BatchBuildError> {
+    pub fn build_pair(self, signer: &dyn signing::Signer) -> Result<BatchPair, BatchBuildError> {
         let transactions = self.transactions.ok_or_else(|| {
             BatchBuildError::MissingField("'transactions' field is required".to_string())
         })?;
@@ -432,7 +432,7 @@ impl BatchBuilder {
         Ok(BatchPair { batch, header })
     }
 
-    pub fn build(self, signer: &signing::Signer) -> Result<Batch, BatchBuildError> {
+    pub fn build(self, signer: &dyn signing::Signer) -> Result<Batch, BatchBuildError> {
         Ok(self.build_pair(signer)?.batch)
     }
 }
@@ -463,7 +463,7 @@ mod tests {
     static SIGNATURE3: &str =
         "sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3";
 
-    fn check_builder_batch(signer: &Signer, pair: &BatchPair) {
+    fn check_builder_batch(signer: &dyn Signer, pair: &BatchPair) {
         assert_eq!(
             vec![
                 SIGNATURE2.as_bytes().to_vec(),

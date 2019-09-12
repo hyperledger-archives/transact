@@ -58,8 +58,8 @@ pub trait SubSchedulerHandler {
     /// execution reults back to the sub-scheduler.
     fn pass_scheduler(
         &mut self,
-        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-        notifier: Box<ExecutionTaskCompletionNotifier>,
+        task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), String>;
 }
 
@@ -74,7 +74,7 @@ impl MultiScheduler {
     /// Returns a newly created `MultiScheduler` that runs the specified sub-schedulers.
     pub fn new(
         mut schedulers: Vec<Box<dyn Scheduler + Send>>,
-        sub_scheduler_handler: &mut SubSchedulerHandler,
+        sub_scheduler_handler: &mut dyn SubSchedulerHandler,
     ) -> Result<MultiScheduler, SchedulerError> {
         let (core_tx, core_rx) = mpsc::channel();
 
@@ -175,7 +175,7 @@ impl MultiScheduler {
 impl Scheduler for MultiScheduler {
     fn set_result_callback(
         &mut self,
-        callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+        callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
     ) -> Result<(), SchedulerError> {
         self.shared_lock.lock()?.set_result_callback(callback);
         Ok(())
@@ -183,7 +183,7 @@ impl Scheduler for MultiScheduler {
 
     fn set_error_callback(
         &mut self,
-        callback: Box<Fn(SchedulerError) + Send>,
+        callback: Box<dyn Fn(SchedulerError) + Send>,
     ) -> Result<(), SchedulerError> {
         self.shared_lock.lock()?.set_error_callback(callback);
         Ok(())
@@ -240,7 +240,7 @@ mod tests {
     struct MockSubScheduler {
         received_batches: Arc<Mutex<Vec<BatchPair>>>,
         finalized: Arc<AtomicBool>,
-        callback: Arc<Mutex<Box<Fn(Option<BatchExecutionResult>) + Send>>>,
+        callback: Arc<Mutex<Box<dyn Fn(Option<BatchExecutionResult>) + Send>>>,
         results: Vec<Option<BatchExecutionResult>>,
     }
 
@@ -270,7 +270,7 @@ mod tests {
     impl Scheduler for MockSubScheduler {
         fn set_result_callback(
             &mut self,
-            callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+            callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
         ) -> Result<(), SchedulerError> {
             self.callback = Arc::new(Mutex::new(callback));
             Ok(())
@@ -278,7 +278,7 @@ mod tests {
 
         fn set_error_callback(
             &mut self,
-            _callback: Box<Fn(SchedulerError) + Send>,
+            _callback: Box<dyn Fn(SchedulerError) + Send>,
         ) -> Result<(), SchedulerError> {
             Ok(())
         }
@@ -323,7 +323,7 @@ mod tests {
             #[derive(Clone)]
             struct MockSubSchedulerNotifier {
                 results: RefCell<VecDeque<Option<BatchExecutionResult>>>,
-                callback: Arc<Mutex<Box<Fn(Option<BatchExecutionResult>) + Send>>>,
+                callback: Arc<Mutex<Box<dyn Fn(Option<BatchExecutionResult>) + Send>>>,
             }
             impl ExecutionTaskCompletionNotifier for MockSubSchedulerNotifier {
                 fn notify(&self, _notification: ExecutionTaskCompletionNotification) {
@@ -348,7 +348,7 @@ mod tests {
     }
 
     struct MockSubSchedulerHandler {
-        notifiers: Vec<Box<ExecutionTaskCompletionNotifier>>,
+        notifiers: Vec<Box<dyn ExecutionTaskCompletionNotifier>>,
     }
 
     impl MockSubSchedulerHandler {
@@ -373,8 +373,8 @@ mod tests {
     impl SubSchedulerHandler for MockSubSchedulerHandler {
         fn pass_scheduler(
             &mut self,
-            _task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-            notifier: Box<ExecutionTaskCompletionNotifier>,
+            _task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+            notifier: Box<dyn ExecutionTaskCompletionNotifier>,
         ) -> Result<(), String> {
             self.notifiers.push(notifier);
             Ok(())

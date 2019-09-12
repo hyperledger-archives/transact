@@ -30,8 +30,8 @@ pub struct MultiSchedulerShared {
     finalized: bool,
     /// The MultiScheduler's result callback; this is called when all sub-schedulers have returned
     /// the same result for a batch.
-    result_callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
-    error_callback: Box<Fn(SchedulerError) + Send>,
+    result_callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
+    error_callback: Box<dyn Fn(SchedulerError) + Send>,
     /// Tracks which sub-schedulers have returned results for the given batch pair.
     pending_results: HashMap<BatchPair, HashMap<usize, BatchExecutionResult>>,
     /// The sub-schedulers of this MultiScheduler.
@@ -53,19 +53,22 @@ impl MultiSchedulerShared {
         self.finalized
     }
 
-    pub fn result_callback(&self) -> &(Fn(Option<BatchExecutionResult>) + Send) {
+    pub fn result_callback(&self) -> &(dyn Fn(Option<BatchExecutionResult>) + Send) {
         &*self.result_callback
     }
 
-    pub fn error_callback(&self) -> &(Fn(SchedulerError) + Send) {
+    pub fn error_callback(&self) -> &(dyn Fn(SchedulerError) + Send) {
         &*self.error_callback
     }
 
-    pub fn set_result_callback(&mut self, callback: Box<Fn(Option<BatchExecutionResult>) + Send>) {
+    pub fn set_result_callback(
+        &mut self,
+        callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
+    ) {
         self.result_callback = callback;
     }
 
-    pub fn set_error_callback(&mut self, callback: Box<Fn(SchedulerError) + Send>) {
+    pub fn set_error_callback(&mut self, callback: Box<dyn Fn(SchedulerError) + Send>) {
         self.error_callback = callback;
     }
 

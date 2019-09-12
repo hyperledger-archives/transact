@@ -21,7 +21,7 @@ static NONCE_SIZE: usize = 32;
 
 pub struct XoTransactionWorkload {
     rng: Hc128Rng,
-    signer: Box<Signer>,
+    signer: Box<dyn Signer>,
 }
 
 impl XoTransactionWorkload {
@@ -71,7 +71,7 @@ impl TransactionWorkload for XoTransactionWorkload {
 
 pub struct XoBatchWorkload {
     transaction_workload: XoTransactionWorkload,
-    signer: Box<Signer>,
+    signer: Box<dyn Signer>,
 }
 
 impl XoBatchWorkload {

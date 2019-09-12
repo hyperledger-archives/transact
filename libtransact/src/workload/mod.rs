@@ -36,12 +36,12 @@ pub trait BatchWorkload {
 mod tests {
     use super::*;
 
-    pub fn test_transaction_workload(workload: &mut TransactionWorkload) {
+    pub fn test_transaction_workload(workload: &mut dyn TransactionWorkload) {
         workload.next_transaction().unwrap();
         workload.next_transaction().unwrap();
     }
 
-    pub fn test_batch_workload(workload: &mut BatchWorkload) {
+    pub fn test_batch_workload(workload: &mut dyn BatchWorkload) {
         workload.next_batch().unwrap();
         workload.next_batch().unwrap();
     }

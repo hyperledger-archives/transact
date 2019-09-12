@@ -149,7 +149,7 @@ pub struct SchedulerCore {
     txn_results: Vec<TransactionExecutionResult>,
 
     /// The interface for context creation and deletion.
-    context_lifecycle: Box<ContextLifecycle>,
+    context_lifecycle: Box<dyn ContextLifecycle>,
 
     /// The state root upon which transactions in this scheduler will be
     /// executed.
@@ -164,7 +164,7 @@ impl SchedulerCore {
         shared_lock: Arc<Mutex<Shared>>,
         rx: Receiver<CoreMessage>,
         execution_tx: Sender<Option<ExecutionTask>>,
-        context_lifecycle: Box<ContextLifecycle>,
+        context_lifecycle: Box<dyn ContextLifecycle>,
         state_id: String,
     ) -> Self {
         SchedulerCore {

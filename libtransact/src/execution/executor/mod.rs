@@ -38,8 +38,8 @@ pub struct Executor {
 impl Executor {
     pub fn execute(
         &self,
-        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-        notifier: Box<ExecutionTaskCompletionNotifier>,
+        task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), ExecutorError> {
         if let Some(sender) = self.executor_thread.sender() {
             let index = self
@@ -92,7 +92,7 @@ impl Executor {
         self.executor_thread.stop();
     }
 
-    pub fn new(execution_adapters: Vec<Box<ExecutionAdapter>>) -> Self {
+    pub fn new(execution_adapters: Vec<Box<dyn ExecutionAdapter>>) -> Self {
         Executor {
             readers: Arc::new(Mutex::new(HashMap::new())),
             executor_thread: ExecutorThread::new(execution_adapters),
@@ -103,8 +103,8 @@ impl Executor {
 impl SubSchedulerHandler for Executor {
     fn pass_scheduler(
         &mut self,
-        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-        notifier: Box<ExecutionTaskCompletionNotifier>,
+        task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), String> {
         self.execute(task_iterator, notifier)
             .map_err(|err| format!("{}", err))
@@ -214,7 +214,7 @@ mod tests {
         );
     }
 
-    fn create_txn(signer: &Signer, family_name: &str) -> TransactionPair {
+    fn create_txn(signer: &dyn Signer, family_name: &str) -> TransactionPair {
         TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
             .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])

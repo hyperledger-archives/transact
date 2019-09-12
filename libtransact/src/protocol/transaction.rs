@@ -376,7 +376,7 @@ impl StdError for TransactionBuildError {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             TransactionBuildError::DeserializationError(_) => None,
             TransactionBuildError::MissingField(_) => None,
@@ -475,7 +475,7 @@ impl TransactionBuilder {
 
     pub fn build_pair(
         self,
-        signer: &signing::Signer,
+        signer: &dyn signing::Signer,
     ) -> Result<TransactionPair, TransactionBuildError> {
         let batcher_public_key = self
             .batcher_public_key
@@ -558,7 +558,7 @@ impl TransactionBuilder {
         })
     }
 
-    pub fn build(self, signer: &signing::Signer) -> Result<Transaction, TransactionBuildError> {
+    pub fn build(self, signer: &dyn signing::Signer) -> Result<Transaction, TransactionBuildError> {
         Ok(self.build_pair(signer)?.transaction)
     }
 }
@@ -595,7 +595,7 @@ mod tests {
     static SIGNATURE1: &str =
         "sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1";
 
-    fn check_builder_transaction(signer: &Signer, pair: &TransactionPair) {
+    fn check_builder_transaction(signer: &dyn Signer, pair: &TransactionPair) {
         let payload_hash = match pair.header().payload_hash_method() {
             HashMethod::SHA512 => {
                 let mut hasher = Sha512::new();

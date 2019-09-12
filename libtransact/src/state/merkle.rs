@@ -42,7 +42,7 @@ pub const CHANGE_LOG_INDEX: &str = "change_log";
 pub const DUPLICATE_LOG_INDEX: &str = "duplicate_log";
 pub const INDEXES: [&str; 2] = [CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX];
 
-type StateIter = Iterator<Item = Result<(String, Vec<u8>), StateDatabaseError>>;
+type StateIter = dyn Iterator<Item = Result<(String, Vec<u8>), StateDatabaseError>>;
 type StateHash = Vec<u8>;
 
 #[derive(Clone)]
@@ -133,7 +133,7 @@ impl Read for MerkleState {
         })
     }
 
-    fn clone_box(&self) -> Box<Read<StateId = String, Key = String, Value = Vec<u8>>> {
+    fn clone_box(&self) -> Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(Clone::clone(self))
     }
 }

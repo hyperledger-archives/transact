@@ -47,7 +47,7 @@ impl Error for StateWriteError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match self {
             StateWriteError::InvalidStateId(_) => None,
             StateWriteError::StorageError(err) => Some(err.as_ref()),
@@ -88,7 +88,7 @@ impl Error for StateReadError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match self {
             StateReadError::InvalidStateId(_) | StateReadError::InvalidKey(_) => None,
             StateReadError::StorageError(err) => Some(err.as_ref()),
@@ -124,7 +124,7 @@ impl Error for StatePruneError {
         }
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         match self {
             StatePruneError::InvalidStateId(_) => None,
             StatePruneError::StorageError(err) => Some(err.as_ref()),

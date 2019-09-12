@@ -56,13 +56,13 @@ pub struct SerialScheduler {
     shared_lock: Arc<Mutex<shared::Shared>>,
     core_handle: Option<std::thread::JoinHandle<()>>,
     core_tx: Sender<core::CoreMessage>,
-    task_iterator: Option<Box<Iterator<Item = ExecutionTask> + Send>>,
+    task_iterator: Option<Box<dyn Iterator<Item = ExecutionTask> + Send>>,
 }
 
 impl SerialScheduler {
     /// Returns a newly created `SerialScheduler`.
     pub fn new(
-        context_lifecycle: Box<ContextLifecycle>,
+        context_lifecycle: Box<dyn ContextLifecycle>,
         state_id: String,
     ) -> Result<SerialScheduler, SchedulerError> {
         let (execution_tx, execution_rx) = mpsc::channel();
@@ -114,7 +114,7 @@ impl SerialScheduler {
 impl Scheduler for SerialScheduler {
     fn set_result_callback(
         &mut self,
-        callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+        callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
     ) -> Result<(), SchedulerError> {
         self.shared_lock.lock()?.set_result_callback(callback);
         Ok(())
@@ -122,7 +122,7 @@ impl Scheduler for SerialScheduler {
 
     fn set_error_callback(
         &mut self,
-        callback: Box<Fn(SchedulerError) + Send>,
+        callback: Box<dyn Fn(SchedulerError) + Send>,
     ) -> Result<(), SchedulerError> {
         self.shared_lock.lock()?.set_error_callback(callback);
         Ok(())
