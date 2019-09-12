@@ -120,7 +120,7 @@ pub enum ExecutorThreadError {
 }
 
 impl std::error::Error for ExecutorThreadError {
-    fn cause(&self) -> Option<&std::error::Error> {
+    fn cause(&self) -> Option<&dyn std::error::Error> {
         None
     }
 
@@ -148,7 +148,7 @@ impl std::fmt::Display for ExecutorThreadError {
 }
 
 pub struct ExecutorThread {
-    execution_adapters: Vec<Box<ExecutionAdapter>>,
+    execution_adapters: Vec<Box<dyn ExecutionAdapter>>,
     join_handles: Vec<JoinHandle<()>>,
     internal_thread: Option<JoinHandle<()>>,
     sender: Option<ExecutorCommandSender>,
@@ -156,7 +156,7 @@ pub struct ExecutorThread {
 }
 
 impl ExecutorThread {
-    pub fn new(execution_adapters: Vec<Box<ExecutionAdapter>>) -> Self {
+    pub fn new(execution_adapters: Vec<Box<dyn ExecutionAdapter>>) -> Self {
         ExecutorThread {
             execution_adapters,
             join_handles: vec![],
@@ -238,7 +238,7 @@ impl ExecutorThread {
 
     fn start_execution_adapter_thread(
         stop: Arc<AtomicBool>,
-        execution_adapter: Box<ExecutionAdapter>,
+        execution_adapter: Box<dyn ExecutionAdapter>,
         receiver: ExecutionEventReceiver,
         sender: &ExecutorCommandSender,
         index: usize,
@@ -687,7 +687,7 @@ mod tests {
         executor_thread.stop();
     }
 
-    fn create_txn(signer: &Signer) -> TransactionPair {
+    fn create_txn(signer: &dyn Signer) -> TransactionPair {
         TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
             .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])

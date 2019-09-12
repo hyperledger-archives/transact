@@ -157,14 +157,14 @@ pub trait Scheduler {
     /// finalized and no more batches will be added).
     fn set_result_callback(
         &mut self,
-        callback: Box<Fn(Option<BatchExecutionResult>) + Send>,
+        callback: Box<dyn Fn(Option<BatchExecutionResult>) + Send>,
     ) -> Result<(), SchedulerError>;
 
     /// Sets a callback to receive any errors encountered by the Scheduler that are not related to
     /// a specific batch.
     fn set_error_callback(
         &mut self,
-        callback: Box<Fn(SchedulerError) + Send>,
+        callback: Box<dyn Fn(SchedulerError) + Send>,
     ) -> Result<(), SchedulerError>;
 
     /// Adds a BatchPair to the scheduler.
@@ -201,7 +201,7 @@ pub trait ExecutionTaskCompletionNotifier: Send {
     fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier>;
 }
 
-impl Clone for Box<ExecutionTaskCompletionNotifier> {
+impl Clone for Box<dyn ExecutionTaskCompletionNotifier> {
     fn clone(&self) -> Self {
         self.clone_box()
     }
@@ -346,7 +346,7 @@ mod tests {
     /// Attempt to add a batch to the scheduler; attempt to add the batch again and verify that a
     /// `DuplicateBatch` error is returned. Return the batch so the calling test can verify other
     /// expected behavior.
-    pub fn test_scheduler_add_batch(scheduler: &mut Scheduler) -> BatchPair {
+    pub fn test_scheduler_add_batch(scheduler: &mut dyn Scheduler) -> BatchPair {
         let batch = mock_batch_with_num_txns(1);
         scheduler
             .add_batch(batch.clone())
@@ -362,7 +362,7 @@ mod tests {
 
     /// Add two batches to the scheduler, then attempt to cancel it twice; verify that it properly
     /// drains and returns the pending batches.
-    pub fn test_scheduler_cancel(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_cancel(scheduler: &mut dyn Scheduler) {
         let batches = mock_batches_with_one_transaction(2);
 
         scheduler
@@ -383,7 +383,7 @@ mod tests {
     ///    processed all batches
     /// 2. When attempting to add a batch, a `SchedulerFinalized` error is returned
     /// 3. The scheduler's execution task iterator returns None when next() is called
-    pub fn test_scheduler_finalize(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_finalize(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the result to this test
         let (tx, rx) = mpsc::channel();
         scheduler
@@ -413,7 +413,7 @@ mod tests {
     /// For the purposes of this test, we simply return an invalid transaction
     /// as we are not testing the actual execution of the transaction but
     /// rather the flow of getting a result after adding the batch.
-    pub fn test_scheduler_flow_with_one_transaction(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_flow_with_one_transaction(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the result to this test
         let (tx, rx) = mpsc::channel();
         scheduler
@@ -456,7 +456,7 @@ mod tests {
     }
 
     /// Tests a simple scheduler workflow of processing a single batch with three transactions.
-    pub fn test_scheduler_flow_with_multiple_transactions(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_flow_with_multiple_transactions(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the result to this test
         let (tx, rx) = mpsc::channel();
         scheduler
@@ -537,7 +537,7 @@ mod tests {
 
     /// Process a batch with multiple transactions, one of which is invalid; verify that the
     /// scheduler invalidates the entire batch and returns the appropriate result.
-    pub fn test_scheduler_invalid_transaction_invalidates_batch(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_invalid_transaction_invalidates_batch(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the result to this test
         let (tx, rx) = mpsc::channel();
         scheduler
@@ -613,7 +613,7 @@ mod tests {
 
     // Send a result to the scheduler for a transaction that it is not processing; verify that an
     // `UnexpectedNotification` is sent using the error callback.
-    pub fn test_scheduler_unexpected_notification(scheduler: &mut Scheduler) {
+    pub fn test_scheduler_unexpected_notification(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the error to this test
         let (tx, rx) = mpsc::channel();
         scheduler

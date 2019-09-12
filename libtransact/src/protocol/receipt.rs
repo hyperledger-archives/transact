@@ -326,7 +326,7 @@ impl StdError for EventBuilderError {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             EventBuilderError::MissingField(_) => None,
         }
@@ -393,7 +393,7 @@ impl StdError for TransactionReceiptBuilderError {
         }
     }
 
-    fn cause(&self) -> Option<&StdError> {
+    fn cause(&self) -> Option<&dyn StdError> {
         match *self {
             TransactionReceiptBuilderError::MissingField(_) => None,
         }

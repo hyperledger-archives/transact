@@ -143,7 +143,7 @@ fn execute_transaction(
 
 fn register_handlers(
     handlers: &[Box<dyn TransactionHandler>],
-    execution_registry: &mut ExecutionRegistry,
+    execution_registry: &mut dyn ExecutionRegistry,
 ) {
     for handler in handlers {
         for version in handler.family_versions() {

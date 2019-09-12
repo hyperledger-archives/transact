@@ -76,7 +76,7 @@ impl Database for BTreeDatabase {
         )))
     }
 
-    fn clone_box(&self) -> Box<Database> {
+    fn clone_box(&self) -> Box<dyn Database> {
         Box::new(Clone::clone(self))
     }
 }

@@ -46,8 +46,8 @@ impl ExecutionTaskReader {
 
     pub fn start(
         &mut self,
-        task_iterator: Box<Iterator<Item = ExecutionTask> + Send>,
-        notifier: Box<ExecutionTaskCompletionNotifier>,
+        task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<dyn ExecutionTaskCompletionNotifier>,
         internal: ExecutorCommandSender,
     ) -> Result<(), std::io::Error> {
         let stop = Arc::clone(&self.stop);

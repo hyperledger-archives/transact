@@ -228,7 +228,7 @@ impl<T: Clone> RadixTree<T> {
 
     /// Walk to ADDRESS, creating nodes if necessary, and set the data there to
     /// UPDATER(data)
-    pub fn update(&self, address: &str, updater: &Fn(Option<T>) -> Option<T>, prune: bool) {
+    pub fn update(&self, address: &str, updater: &dyn Fn(Option<T>) -> Option<T>, prune: bool) {
         let node = self.get_or_create(&address);
         let existing_data = node.borrow_mut().data.take();
         node.borrow_mut().data = updater(existing_data);

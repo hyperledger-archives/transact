@@ -40,11 +40,11 @@ pub type DatabaseCursor<'a> = Box<dyn DatabaseReaderCursor<Item = (Vec<u8>, Vec<
 pub trait Database: Sync + Send {
     fn get_reader<'a>(&'a self) -> Result<Box<dyn DatabaseReader + 'a>, DatabaseError>;
     fn get_writer<'a>(&'a self) -> Result<Box<dyn DatabaseWriter + 'a>, DatabaseError>;
-    fn clone_box(&self) -> Box<Database>;
+    fn clone_box(&self) -> Box<dyn Database>;
 }
 
-impl Clone for Box<Database> {
-    fn clone(&self) -> Box<Database> {
+impl Clone for Box<dyn Database> {
+    fn clone(&self) -> Box<dyn Database> {
         self.clone_box()
     }
 }

@@ -173,12 +173,13 @@ pub trait Read: Send + Send {
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError>;
 
-    fn clone_box(&self)
-        -> Box<Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>>;
+    fn clone_box(
+        &self,
+    ) -> Box<dyn Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>>;
 }
 
-impl<S, K, V> Clone for Box<Read<StateId = S, Key = K, Value = V>> {
-    fn clone(&self) -> Box<Read<StateId = S, Key = K, Value = V>> {
+impl<S, K, V> Clone for Box<dyn Read<StateId = S, Key = K, Value = V>> {
+    fn clone(&self) -> Box<dyn Read<StateId = S, Key = K, Value = V>> {
         self.clone_box()
     }
 }
