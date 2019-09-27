@@ -740,5 +740,4 @@ mod tests {
         assert_eq!(Some((vec!(2), vec!(22))), cursor.first());
         assert_eq!(Some((vec!(11), vec!(12))), cursor.last());
     }
-
 }

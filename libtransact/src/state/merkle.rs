@@ -1896,5 +1896,4 @@ mod tests {
     fn hex_hash(b: &[u8]) -> String {
         ::hex::encode(hash(b))
     }
-
 }
