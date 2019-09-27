@@ -820,8 +820,8 @@ impl<'a> SmartPermissionModule<'a> {
         let mut role_ptrs = Vec::new();
 
         for i in roles_write_results {
-            if i.is_err() {
-                return Err(i.unwrap_err());
+            if let Err(err) = i {
+                return Err(err);
             }
             role_ptrs.push(i.unwrap());
         }
