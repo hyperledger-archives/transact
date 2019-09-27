@@ -126,8 +126,8 @@ impl Read for MerkleState {
                     _ => Err(StateReadError::StorageError(Box::new(err))),
                 },
             }?;
-            if value.is_some() {
-                result.insert(key.to_string(), value.unwrap());
+            if let Some(value) = value {
+                result.insert(key.to_string(), value);
             }
             Ok(result)
         })
@@ -461,12 +461,8 @@ impl MerkleRadixTree {
             successors: vec![],
         };
 
-        if current_change_log.is_some() {
-            write_change_log(
-                &mut *db_writer,
-                &root_hash_bytes,
-                &current_change_log.unwrap(),
-            )?;
+        if let Some(current_change_log) = current_change_log {
+            write_change_log(&mut *db_writer, &root_hash_bytes, &current_change_log)?;
         }
         write_change_log(&mut *db_writer, successor_root_hash, &next_change_log)?;
 
