@@ -22,6 +22,7 @@ use crate::protos;
 use crate::protos::{
     FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
+use crate::state;
 use std::error::Error as StdError;
 use std::fmt;
 
@@ -45,6 +46,16 @@ impl StateChange {
             key == k
         } else {
             false
+        }
+    }
+}
+
+impl Into<state::StateChange> for StateChange {
+    /// Converts this modules StateChange into state::StateChange enum
+    fn into(self) -> state::StateChange {
+        match self {
+            StateChange::Set { key, value } => state::StateChange::Set { key, value },
+            StateChange::Delete { key } => state::StateChange::Delete { key },
         }
     }
 }
@@ -526,6 +537,34 @@ mod tests {
                 assert_eq!(BYTES1.to_vec(), value);
             }
             StateChange::Delete { key } => {
+                assert_eq!(ADDRESS, key);
+            }
+        }
+    }
+
+    #[test]
+    fn state_state_change_conversion() {
+        let receipt_state_change_set = StateChange::Set {
+            key: ADDRESS.to_string(),
+            value: BYTES1.to_vec(),
+        };
+        let change: state::StateChange = receipt_state_change_set.into();
+        check_state_state_change(change);
+
+        let receipt_state_change_delete = StateChange::Delete {
+            key: ADDRESS.to_string(),
+        };
+        let change: state::StateChange = receipt_state_change_delete.into();
+        check_state_state_change(change);
+    }
+
+    fn check_state_state_change(state_change: state::StateChange) {
+        match state_change {
+            state::StateChange::Set { key, value } => {
+                assert_eq!(ADDRESS, key);
+                assert_eq!(BYTES1.to_vec(), value);
+            }
+            state::StateChange::Delete { key } => {
                 assert_eq!(ADDRESS, key);
             }
         }
