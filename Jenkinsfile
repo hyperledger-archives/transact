@@ -34,6 +34,18 @@ pipeline {
     }
 
     stages {
+        stage('Check Whitelist') {
+            steps {
+                readTrusted 'bin/whitelist'
+                sh './bin/whitelist "$CHANGE_AUTHOR" /etc/jenkins-authorized-builders'
+            }
+            when {
+                not {
+                    branch 'master'
+                }
+            }
+        }
+
         stage("Run lint") {
             steps {
                 sh './bin/run_lint'
