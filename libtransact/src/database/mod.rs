@@ -99,6 +99,6 @@ pub trait DatabaseWriter: DatabaseReader {
 }
 
 pub trait DatabaseReaderCursor: Iterator {
-    fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
-    fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+    fn seek_first(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+    fn seek_last(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
 }
