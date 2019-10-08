@@ -46,9 +46,6 @@ RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
 ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin \
  CARGO_INCREMENTAL=0
 
-RUN rustup toolchain add nightly \
-  && rustup update \
-  && rustup target add wasm32-unknown-unknown --toolchain nightly \
-  && rustup default nightly
+RUN  rustup target add wasm32-unknown-unknown
 
 WORKDIR /project/example/intkey_multiply/processor
