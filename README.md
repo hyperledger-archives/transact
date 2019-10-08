@@ -1,5 +1,7 @@
 # Hyperledger Transact
 
+Please do not merge me, I'm just playing.
+
 Hyperledger Transact is a platform-agnostic library for executing transactions
 with smart contracts.
 
