@@ -33,7 +33,7 @@ pub mod btree;
 pub mod error;
 pub mod lmdb;
 
-use crate::database::error::DatabaseError;
+pub use crate::database::error::DatabaseError;
 
 pub type DatabaseCursor<'a> = Box<dyn DatabaseReaderCursor<Item = (Vec<u8>, Vec<u8>)> + 'a>;
 
