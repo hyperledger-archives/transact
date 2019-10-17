@@ -19,6 +19,8 @@
 
 pub mod error;
 pub mod hash;
+#[cfg(feature = "ursa-compat")]
+pub mod ursa;
 
 pub use crate::signing::error::Error;
 
