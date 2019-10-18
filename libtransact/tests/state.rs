@@ -1154,4 +1154,188 @@ mod state_tests {
             temp_dir.to_str().unwrap().to_string()
         }
     }
+
+    #[cfg(feature = "redis-db")]
+    mod redisdb {
+        use std::iter;
+        use std::panic;
+
+        use rand::distributions::Alphanumeric;
+        use rand::{thread_rng, Rng};
+        use redis::{self, PipelineCommands};
+
+        use transact::{
+            database::{btree::BTreeDatabase, redis::RedisDatabase},
+            state::merkle::INDEXES,
+        };
+
+        use super::*;
+
+        const DEFAULT_REDIS_URL: &str = "redis://localhost:6379/";
+
+        #[test]
+        fn merkle_trie_root_advance() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_root_advance(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_delete() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_delete(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_update() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_update(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_update_same_address_space() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_update_same_address_space(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_update_same_address_space_with_no_children() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_update_same_address_space_with_no_children(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_pruning_parent() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_pruning_parent(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_pruning_successors() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_pruning_successors(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_pruning_duplicate_leaves() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_pruning_duplicate_leaves(db);
+            })
+        }
+
+        #[test]
+        fn merkle_trie_pruning_successor_duplicate_leaves() {
+            run_test(|redis_url, primary| {
+                let db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                test_merkle_trie_pruning_successor_duplicate_leaves(db);
+            })
+        }
+        ///
+        /// Verifies that a state tree backed by redis and btree give the same root hashes
+        #[test]
+        fn redis_btree_comparison() {
+            run_test(|redis_url, primary| {
+                let redis_db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+
+                test_same_results(redis_db, btree_db);
+            });
+            run_test(|redis_url, primary| {
+                let redis_db = Box::new(
+                    RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                        .expect("Unable to create redis database"),
+                );
+                let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+
+                test_same_results(btree_db, redis_db);
+            });
+        }
+
+        fn run_test<T>(test: T) -> ()
+        where
+            T: FnOnce(&str, &str) -> () + panic::UnwindSafe,
+        {
+            let redis_url =
+                std::env::var("REDIS_URL").unwrap_or_else(|_| DEFAULT_REDIS_URL.to_string());
+            let mut rng = thread_rng();
+            let db_name = String::from("test-db-")
+                + &iter::repeat(())
+                    .map(|()| rng.sample(Alphanumeric))
+                    .take(7)
+                    .collect::<String>();
+
+            let test_redis_url = redis_url.clone();
+            let test_db_name = db_name.clone();
+            let result = panic::catch_unwind(move || test(&test_redis_url, &test_db_name));
+
+            clean_up(&redis_url, &db_name).unwrap();
+
+            assert!(result.is_ok())
+        }
+
+        fn clean_up(redis_url: &str, db_name: &str) -> Result<(), String> {
+            let client = redis::Client::open(redis_url).map_err(|e| e.to_string())?;
+            let mut con = client.get_connection().map_err(|e| e.to_string())?;
+
+            redis::pipe()
+                .atomic()
+                .del(db_name)
+                .ignore()
+                .del(
+                    INDEXES
+                        .iter()
+                        .map(|s| format!("{}_{}", db_name, s))
+                        .collect::<Vec<_>>(),
+                )
+                .ignore()
+                .query(&mut con)
+                .map_err(|e| e.to_string())?;
+
+            Ok(())
+        }
+    }
 }

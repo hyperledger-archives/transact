@@ -32,6 +32,8 @@
 pub mod btree;
 pub mod error;
 pub mod lmdb;
+#[cfg(feature = "redis-db")]
+pub mod redis;
 
 pub use crate::database::error::DatabaseError;
 
