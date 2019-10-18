@@ -36,7 +36,8 @@ mod state_tests {
     /// 6. Validate that the value set is in the trie
     fn test_merkle_trie_root_advance(db: Box<dyn Database>) {
         let merkle_state = MerkleState::new(db.clone());
-        let mut merkle_db = MerkleRadixTree::new(db.clone(), None).unwrap();
+        let mut merkle_db = MerkleRadixTree::new(db.clone(), None)
+            .expect("Could not overlay the merkle tree on the database");
 
         let orig_root = merkle_db.get_merkle_root();
         let orig_root_bytes = &::hex::decode(orig_root.clone()).unwrap();
