@@ -61,7 +61,6 @@ mod state_tests {
                 key: "abcd".to_string(),
                 value: "data_value".as_bytes().to_vec(),
             };
-            //merkle_db.set_merkle_root(orig_root.clone()).unwrap();
             let new_root = merkle_state.commit(&orig_root, &[state_change]).unwrap();
             let new_root_bytes = &::hex::decode(new_root.clone()).unwrap();
 
