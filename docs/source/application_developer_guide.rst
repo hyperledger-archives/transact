@@ -33,7 +33,7 @@ Include the Sabre SDK in the dependencies list of the Cargo.toml file.
   [dependencies]
   sabre-sdk = {git = "https://github.com/hyperledger/sawtooth-sabre"}
 
-The Sabre SDK the provides the following required structs needed to write
+The Sabre SDK provides the following required structs needed to write
 a smart contract.
 
 .. code-block:: rust
@@ -61,7 +61,7 @@ that can be passed into execute_entrypoint.
 .. code-block:: rust
 
   #[no_mangle]
-  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr: signature: WasmPtr) -> i32 {
+  pub unsafe fn entrypoint(payload: WasmPtr, signer: WasmPtr, signature: WasmPtr) -> i32 {
       execute_entrypoint(payload, signer, signature, apply)
   }
 
