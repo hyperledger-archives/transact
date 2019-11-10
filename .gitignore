@@ -1,3 +1,6 @@
+# Ignore the IDE files
+*.idea
+
 /build
 
 /cli/Cargo.lock
