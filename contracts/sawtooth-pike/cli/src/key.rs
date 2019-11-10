@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 //! Contains functions which assist with signing key management
 
+use dirs;
 use std::env;
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
 
 use users::get_current_username;
 
@@ -48,7 +48,8 @@ use error::CliError;
 /// If a HOME or USER environment variable is required but cannot be
 /// retrieved from the environment, a CliError::VarError is returned.
 pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
-    let username: String = name.map(|s| String::from(s))
+    let username: String = name
+        .map(|s| String::from(s))
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
         .map_err(|_| {
@@ -57,10 +58,12 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             ))
         })?;
 
-    let private_key_filename = env::home_dir()
-        .ok_or(CliError::UserError(String::from(
-            "Could not load signing key: unable to determine home directory",
-        )))
+    let private_key_filename = dirs::home_dir()
+        .ok_or_else(|| {
+            CliError::UserError(String::from(
+                "Could not load signing key: unable to determine home directory",
+            ))
+        })
         .and_then(|mut p| {
             p.push(".sawtooth");
             p.push("keys");
