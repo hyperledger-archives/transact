@@ -350,6 +350,11 @@ pub fn invoke_smart_permission(
 /// -2: Failed to deserialize signer
 /// -3: apply returned InvalidTransaction
 /// -4: apply returned InternalError
+///
+/// # Safety
+///
+/// This function is unsafe due to the call to WasmBuffer::from_raw which converts a WasmPtr
+/// to a WasmBuffer to access location in executor memory
 pub unsafe fn execute_entrypoint<F>(
     payload_ptr: WasmPtr,
     signer_ptr: WasmPtr,
@@ -459,6 +464,10 @@ impl Request {
 /// -9: Utf8EncodeError
 /// -10: ProtobufError
 ///
+/// # Safety
+///
+/// This function is unsafe due to the call to WasmBuffer::from_raw which converts a WasmPtr
+/// to a WasmBuffer to access a location in executor memory
 pub unsafe fn execute_smart_permission_entrypoint<F>(
     roles_ptr: WasmPtrList,
     org_id_ptr: WasmPtr,
