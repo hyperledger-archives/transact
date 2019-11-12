@@ -465,14 +465,14 @@ impl BTreeDatabaseCursor {
 }
 
 impl DatabaseReaderCursor for BTreeDatabaseCursor {
-    fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+    fn seek_first(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
         match self.db.iter().next() {
             Some((key, value)) => Some((key.to_vec(), value.to_vec())),
             None => None,
         }
     }
 
-    fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
+    fn seek_last(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
         match self.db.iter().last() {
             Some((key, value)) => Some((key.to_vec(), value.to_vec())),
             None => None,
@@ -493,7 +493,7 @@ impl Iterator for BTreeDatabaseCursor {
                 None => return None,
             }
         }
-        let last_key = match DatabaseReaderCursor::last(self) {
+        let last_key = match self.seek_last() {
             Some((key, _)) => key.to_vec(),
             None => return None,
         };
@@ -671,9 +671,9 @@ mod tests {
 
             cursor = reader.cursor().unwrap();
 
-            // assert cursor.first() and cursor.last() returns expected key/value pairs
-            assert_eq!(Some((vec!(3), vec!(4))), cursor.first());
-            assert_eq!(Some((vec!(10), vec!(1))), cursor.last());
+            // assert cursor.seek_first() and cursor.seek_last() returns expected key/value pairs
+            assert_eq!(Some((vec!(3), vec!(4))), cursor.seek_first());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.seek_last());
         }
 
         let mut writer = database.get_writer().unwrap();
@@ -689,12 +689,12 @@ mod tests {
         assert_eq!(Some((vec!(5), vec!(2))), cursor.next());
         assert_eq!(Some((vec!(11), vec!(12))), cursor.next());
         assert_eq!(None, cursor.next());
-        assert_eq!(None, cursor.last());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.seek_last());
 
         cursor = reader.index_cursor("a").unwrap();
 
-        assert_eq!(Some((vec!(2), vec!(22))), cursor.first());
-        assert_eq!(Some((vec!(11), vec!(12))), cursor.last());
+        assert_eq!(Some((vec!(2), vec!(22))), cursor.seek_first());
+        assert_eq!(Some((vec!(11), vec!(12))), cursor.seek_last());
     }
 
     #[test]
@@ -706,20 +706,24 @@ mod tests {
         writer.put(&[10], &[1]).unwrap();
         writer.put(&[4], &[12]).unwrap();
 
-        let mut cursor = writer.cursor().unwrap();
+        {
+            let mut cursor = writer.cursor().unwrap();
 
-        // assert cursor.next() returns the key/value pairs in the expected order
-        assert_eq!(Some((vec!(3), vec!(4))), cursor.next());
-        assert_eq!(Some((vec!(4), vec!(12))), cursor.next());
-        assert_eq!(Some((vec!(10), vec!(1))), cursor.next());
-        assert_eq!(None, cursor.next());
-        assert_eq!(None, cursor.last());
+            // assert cursor.next() returns the key/value pairs in the expected order
+            assert_eq!(Some((vec!(3), vec!(4))), cursor.next());
+            assert_eq!(Some((vec!(4), vec!(12))), cursor.next());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.next());
+            assert_eq!(None, cursor.next());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.seek_last());
+        }
 
-        cursor = writer.cursor().unwrap();
+        {
+            let mut cursor = writer.cursor().unwrap();
 
-        // assert cursor.first() and cursor.last() returns expected key/value pairs
-        assert_eq!(Some((vec!(3), vec!(4))), cursor.first());
-        assert_eq!(Some((vec!(10), vec!(1))), cursor.last());
+            // assert cursor.seek_first() and cursor.seek_last() returns expected key/value pairs
+            assert_eq!(Some((vec!(3), vec!(4))), cursor.seek_first());
+            assert_eq!(Some((vec!(10), vec!(1))), cursor.seek_last());
+        }
 
         writer.commit().unwrap();
         let mut writer = database.get_writer().unwrap();
@@ -727,17 +731,21 @@ mod tests {
         writer.index_put("a", &[11], &[12]).unwrap();
         writer.index_put("a", &[2], &[22]).unwrap();
 
-        let mut cursor = writer.index_cursor("a").unwrap();
+        {
+            let mut cursor = writer.index_cursor("a").unwrap();
 
-        assert_eq!(Some((vec!(2), vec!(22))), cursor.next());
-        assert_eq!(Some((vec!(5), vec!(2))), cursor.next());
-        assert_eq!(Some((vec!(11), vec!(12))), cursor.next());
-        assert_eq!(None, cursor.next());
-        assert_eq!(None, cursor.last());
+            assert_eq!(Some((vec!(2), vec!(22))), cursor.next());
+            assert_eq!(Some((vec!(5), vec!(2))), cursor.next());
+            assert_eq!(Some((vec!(11), vec!(12))), cursor.next());
+            assert_eq!(None, cursor.next());
+            assert_eq!(Some((vec!(11), vec!(12))), cursor.seek_last());
+        }
 
-        cursor = writer.index_cursor("a").unwrap();
+        {
+            let mut cursor = writer.index_cursor("a").unwrap();
 
-        assert_eq!(Some((vec!(2), vec!(22))), cursor.first());
-        assert_eq!(Some((vec!(11), vec!(12))), cursor.last());
+            assert_eq!(Some((vec!(2), vec!(22))), cursor.seek_first());
+            assert_eq!(Some((vec!(11), vec!(12))), cursor.seek_last());
+        }
     }
 }

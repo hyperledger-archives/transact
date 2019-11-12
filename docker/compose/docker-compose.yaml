@@ -18,3 +18,10 @@ services:
         cargo fmt -- --check
         cargo clippy -- -D clippy::all
       "
+    environment:
+        REDIS_URL: redis://redis:6379
+
+  redis:
+    image: redis
+    expose:
+      - 6379

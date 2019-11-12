@@ -32,8 +32,10 @@
 pub mod btree;
 pub mod error;
 pub mod lmdb;
+#[cfg(feature = "redis-db")]
+pub mod redis;
 
-use crate::database::error::DatabaseError;
+pub use crate::database::error::DatabaseError;
 
 pub type DatabaseCursor<'a> = Box<dyn DatabaseReaderCursor<Item = (Vec<u8>, Vec<u8>)> + 'a>;
 
@@ -99,6 +101,6 @@ pub trait DatabaseWriter: DatabaseReader {
 }
 
 pub trait DatabaseReaderCursor: Iterator {
-    fn first(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
-    fn last(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+    fn seek_first(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
+    fn seek_last(&mut self) -> Option<(Vec<u8>, Vec<u8>)>;
 }

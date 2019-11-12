@@ -8,7 +8,10 @@ function clean_up {
 
 trap clean_up EXIT
 
+docker-compose -f docker/compose/docker-compose.yaml up --detach redis
+
 docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
    /bin/bash -c \
    "cargo test && \
-    cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features=sawtooth-compat"
+    cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features sawtooth-compat && \
+    cargo test --manifest-path /project/transact/libtransact/Cargo.toml redis --features redis-db"
