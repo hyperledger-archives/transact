@@ -35,7 +35,7 @@ use std::error::Error;
 
 use crate::context::ContextId;
 use crate::protocol::batch::BatchPair;
-use crate::protocol::receipt::TransactionReceipt;
+use crate::protocol::receipt::{TransactionReceipt, TransactionResult};
 use crate::protocol::transaction::TransactionPair;
 
 /// A transation and associated information required to execute it.
@@ -66,7 +66,16 @@ impl ExecutionTask {
     }
 }
 
-/// Result from executing an invalid transaction.
+/// Result of executing a batch.
+#[derive(Debug, Clone, Eq, Hash, PartialEq)]
+pub struct BatchExecutionResult {
+    /// The `BatchPair` which was executed.
+    pub batch: BatchPair,
+
+    /// The receipts for each transaction in the batch.
+    pub receipts: Vec<TransactionReceipt>,
+}
+
 #[derive(Debug, Clone, Eq, Hash, PartialEq)]
 pub struct InvalidTransactionResult {
     /// Transaction identifier.
@@ -80,24 +89,16 @@ pub struct InvalidTransactionResult {
     pub error_data: Vec<u8>,
 }
 
-/// Result from executing a transaction.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub enum TransactionExecutionResult {
-    /// The transation was invalid.
-    Invalid(InvalidTransactionResult),
-
-    /// The transation was valid and execution produced a TransactionReceipt.
-    Valid(TransactionReceipt),
-}
-
-/// Result of executing a batch.
-#[derive(Debug, Clone, Eq, Hash, PartialEq)]
-pub struct BatchExecutionResult {
-    /// The `BatchPair` which was executed.
-    pub batch: BatchPair,
-
-    /// The results for each transaction in the batch.
-    pub results: Vec<TransactionExecutionResult>,
+impl Into<TransactionReceipt> for InvalidTransactionResult {
+    fn into(self) -> TransactionReceipt {
+        TransactionReceipt {
+            transaction_id: self.transaction_id,
+            transaction_result: TransactionResult::Invalid {
+                error_message: self.error_message,
+                error_data: self.error_data,
+            },
+        }
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -227,7 +228,7 @@ mod tests {
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
     use crate::protocol::batch::BatchBuilder;
-    use crate::protocol::receipt::TransactionReceiptBuilder;
+    use crate::protocol::receipt::ValidTransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
     use crate::signing::hash::HashSigner;
 
@@ -268,37 +269,37 @@ mod tests {
             .collect()
     }
 
-    pub fn valid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
-        let results = batch
+    pub fn valid_receipt_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let receipts = batch
             .batch()
             .transactions()
             .iter()
-            .map(|txn| {
-                TransactionExecutionResult::Valid(TransactionReceipt {
+            .map(|txn| TransactionReceipt {
+                transaction_id: txn.header_signature().into(),
+                transaction_result: TransactionResult::Valid {
                     state_changes: vec![],
                     events: vec![],
                     data: vec![],
-                    transaction_id: txn.header_signature().into(),
-                })
+                },
             })
             .collect();
-        Some(BatchExecutionResult { batch, results })
+        Some(BatchExecutionResult { batch, receipts })
     }
 
-    pub fn invalid_result_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
-        let results = batch
+    pub fn invalid_receipt_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {
+        let receipts = batch
             .batch()
             .transactions()
             .iter()
-            .map(|txn| {
-                TransactionExecutionResult::Invalid(InvalidTransactionResult {
-                    transaction_id: txn.header_signature().into(),
+            .map(|txn| TransactionReceipt {
+                transaction_id: txn.header_signature().into(),
+                transaction_result: TransactionResult::Invalid {
                     error_message: String::new(),
                     error_data: vec![],
-                })
+                },
             })
             .collect();
-        Some(BatchExecutionResult { batch, results })
+        Some(BatchExecutionResult { batch, receipts })
     }
 
     pub fn mock_context_id() -> ContextId {
@@ -334,7 +335,7 @@ mod tests {
             _context_id: &ContextId,
             transaction_id: &str,
         ) -> Result<TransactionReceipt, ContextManagerError> {
-            TransactionReceiptBuilder::new()
+            ValidTransactionReceiptBuilder::new()
                 .with_transaction_id(transaction_id.into())
                 .build()
                 .map_err(|err| ContextManagerError::from(err))
@@ -452,7 +453,7 @@ mod tests {
 
         // Verify that the correct result is returned
         let result = rx.recv().expect("Failed to receive result");
-        assert_eq!(result, invalid_result_from_batch(batch));
+        assert_eq!(result, invalid_receipt_from_batch(batch));
     }
 
     /// Tests a simple scheduler workflow of processing a single batch with three transactions.
@@ -511,7 +512,7 @@ mod tests {
 
         // Verify that the correct result is returned; can't just compare result itself, since the
         // order of transactions in the result is unknown.
-        let BatchExecutionResult { batch, results } = rx
+        let BatchExecutionResult { batch, receipts } = rx
             .recv()
             .expect("Failed to receive result")
             .expect("Got None result");
@@ -524,15 +525,15 @@ mod tests {
             .map(|txn| txn.header_signature())
             .collect::<Vec<_>>()
             .sort_unstable();
-        let result_txn_ids = results
+        let receipt_txn_ids = receipts
             .iter()
-            .map(|result| match result {
-                TransactionExecutionResult::Valid(receipt) => &receipt.transaction_id,
-                res => panic!("Did not get valid result; got {:?}", res),
+            .map(|receipt| match &receipt.transaction_result {
+                TransactionResult::Valid { .. } => &receipt.transaction_id,
+                res => panic!("Did not get valid receipt; got {:?}", res),
             })
             .collect::<Vec<_>>()
             .sort_unstable();
-        assert_eq!(original_batch_txn_ids, result_txn_ids);
+        assert_eq!(original_batch_txn_ids, receipt_txn_ids);
     }
 
     /// Process a batch with multiple transactions, one of which is invalid; verify that the
@@ -587,7 +588,7 @@ mod tests {
         // Don't actually get the 3rd task; the scheduler should have invalidated the whole batch
         // and sent the result already, so the 3rd transaction won't be in the iterator.
 
-        let BatchExecutionResult { batch, results } = rx
+        let BatchExecutionResult { batch, receipts } = rx
             .recv()
             .expect("Failed to receive result")
             .expect("Got None result");
@@ -600,15 +601,15 @@ mod tests {
             .map(|txn| txn.header_signature())
             .collect::<Vec<_>>()
             .sort_unstable();
-        let result_txn_ids = results
+        let receipt_txn_ids = receipts
             .iter()
-            .map(|result| match result {
-                TransactionExecutionResult::Invalid(invalid_res) => &invalid_res.transaction_id,
-                res => panic!("Did not get invalid result; got {:?}", res),
+            .map(|receipt| match &receipt.transaction_result {
+                TransactionResult::Invalid { .. } => &receipt.transaction_id,
+                res => panic!("Did not get invalid receipt; got {:?}", res),
             })
             .collect::<Vec<_>>()
             .sort_unstable();
-        assert_eq!(original_batch_txn_ids, result_txn_ids);
+        assert_eq!(original_batch_txn_ids, receipt_txn_ids);
     }
 
     // Send a result to the scheduler for a transaction that it is not processing; verify that an

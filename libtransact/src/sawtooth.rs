@@ -230,12 +230,10 @@ mod xo_compat_test {
     use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
     use crate::protocol::{
         batch::{BatchBuilder, BatchPair},
-        receipt::StateChange,
+        receipt::{StateChange, TransactionResult},
         transaction::{HashMethod, TransactionBuilder},
     };
-    use crate::scheduler::{
-        serial::SerialScheduler, BatchExecutionResult, Scheduler, TransactionExecutionResult,
-    };
+    use crate::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
     use crate::signing::{hash::HashSigner, Signer};
     use crate::state::merkle::{self, MerkleRadixTree, MerkleState};
 
@@ -394,22 +392,20 @@ mod xo_compat_test {
         expected_state_changes: Vec<StateChange>,
         batch_result: BatchExecutionResult,
     ) {
-        assert_eq!(1, batch_result.results.len());
+        assert_eq!(1, batch_result.receipts.len());
 
         let mut batch_result = batch_result;
 
-        let txn_result = batch_result
-            .results
+        let receipt = batch_result
+            .receipts
             .pop()
             .expect("Length 1, but no first element");
-        let receipt = match txn_result {
-            TransactionExecutionResult::Valid(receipt) => receipt,
-            TransactionExecutionResult::Invalid(invalid_result) => {
-                panic!("Transaction failed: {:?}", invalid_result)
+        match receipt.transaction_result {
+            TransactionResult::Valid { state_changes, .. } => {
+                assert_eq!(expected_state_changes, state_changes)
             }
-        };
-
-        assert_eq!(expected_state_changes, receipt.state_changes);
+            TransactionResult::Invalid { .. } => panic!("transaction failed"),
+        }
     }
 
     fn create_batch(signer: &Signer, game_name: &str, payload: &str) -> BatchPair {

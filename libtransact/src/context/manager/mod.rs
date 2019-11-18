@@ -23,7 +23,9 @@ use std::str;
 
 pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
-use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
+use crate::protocol::receipt::{
+    Event, StateChange, TransactionReceipt, ValidTransactionReceiptBuilder,
+};
 use crate::state::Read;
 
 pub struct ContextManager {
@@ -43,14 +45,15 @@ impl ContextLifecycle for ContextManager {
         unimplemented!();
     }
 
-    /// Creates a TransactionReceipt based on the information available within the specified Context.
+    /// Generates a valid `TransactionReceipt` based on the information available within the
+    /// specified `Context`.
     fn get_transaction_receipt(
         &self,
         context_id: &ContextId,
         transaction_id: &str,
     ) -> Result<TransactionReceipt, ContextManagerError> {
         let context = self.get_context(context_id)?;
-        let new_transaction_receipt = TransactionReceiptBuilder::new()
+        let new_transaction_receipt = ValidTransactionReceiptBuilder::new()
             .with_state_changes(context.state_changes().to_vec())
             .with_events(context.events().to_vec())
             .with_data(context.data().to_vec())
@@ -229,7 +232,7 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
 
-    use crate::protocol::receipt::EventBuilder;
+    use crate::protocol::receipt::{EventBuilder, TransactionResult};
     use crate::state;
     use crate::state::hashmap::HashMapState;
     use crate::state::Write;
@@ -276,11 +279,20 @@ mod tests {
     }
 
     fn check_transaction_receipt(transaction_receipt: TransactionReceipt, event: Event) {
-        for state_change in transaction_receipt.state_changes {
-            check_state_change(state_change)
+        match transaction_receipt.transaction_result {
+            TransactionResult::Valid {
+                state_changes,
+                events,
+                data,
+            } => {
+                for state_change in state_changes {
+                    check_state_change(state_change)
+                }
+                assert_eq!(vec!(event), events);
+                assert_eq!(vec!(BYTES2.to_vec()), data);
+            }
+            TransactionResult::Invalid { .. } => panic!("transaction result is invalid"),
         }
-        assert_eq!(vec!(event), transaction_receipt.events);
-        assert_eq!(vec!(BYTES2.to_vec()), transaction_receipt.data);
     }
 
     #[test]

@@ -18,15 +18,35 @@ syntax = "proto3";
 import "events.proto";
 
 message TransactionReceipt {
+  enum Result {
+    RESULT_UNSET = 0;
+    VALID = 1;
+    INVALID = 2;
+  }
+
+  // FIELDS FOR ALL RECEIPTS
+
+  string transaction_id = 4;
+  Result result = 5;
+
+  // FIELDS FOR VALID RECEIPTS
+
   // State changes made by this transaction
   // StateChange is defined in protos/transaction_receipt.proto
   repeated StateChange state_changes = 1;
   // Events fired by this transaction
+  // Event is defined in protos/events.proto
   repeated Event events = 2;
   // Transaction family defined data
   repeated bytes data = 3;
 
-  string transaction_id = 4;
+  // FIELDS FOR INVALID RECEIPTS
+
+  // Human-readable reason for why the transaction was invalid
+  string error_message = 6;
+  // Transaction-specific error data that can be interpreted by clients familiar
+  // with the transaction family
+  bytes error_data = 7;
 }
 
 //  StateChange objects have the type of SET, which is either an insert or

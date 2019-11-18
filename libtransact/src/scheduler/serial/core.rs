@@ -20,13 +20,14 @@
 use crate::context::manager::ContextManagerError;
 use crate::context::{ContextId, ContextLifecycle};
 use crate::protocol::batch::BatchPair;
+use crate::protocol::receipt::TransactionReceipt;
+use crate::protocol::receipt::TransactionResult;
 use crate::protocol::transaction::Transaction;
 use crate::scheduler::BatchExecutionResult;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::scheduler::InvalidTransactionResult;
 use crate::scheduler::SchedulerError;
-use crate::scheduler::TransactionExecutionResult;
 
 use hex;
 use std::collections::VecDeque;
@@ -145,8 +146,8 @@ pub struct SchedulerCore {
     /// A queue of the current batch's transactions that have not been exeucted yet.
     txn_queue: VecDeque<Transaction>,
 
-    /// The results of the current batch's transactions that have already been executed.
-    txn_results: Vec<TransactionExecutionResult>,
+    /// The receipts of the current batch's transactions that have already been executed.
+    txn_receipts: Vec<TransactionReceipt>,
 
     /// The interface for context creation and deletion.
     context_lifecycle: Box<dyn ContextLifecycle>,
@@ -175,7 +176,7 @@ impl SchedulerCore {
             current_batch: None,
             current_txn: None,
             txn_queue: VecDeque::new(),
-            txn_results: vec![],
+            txn_receipts: vec![],
             context_lifecycle,
             state_id,
             previous_context: None,
@@ -264,50 +265,50 @@ impl SchedulerCore {
             .header_signature();
 
         // Invalidate all previously executed transactions in the batch
-        for result in &mut self.txn_results {
-            match result {
-                TransactionExecutionResult::Valid(receipt) => {
-                    let mut new_result =
-                        TransactionExecutionResult::Invalid(InvalidTransactionResult {
-                            transaction_id: receipt.transaction_id.clone(),
+        for receipt in &mut self.txn_receipts {
+            match receipt.transaction_result {
+                TransactionResult::Valid { .. } => {
+                    let mut new_receipt = TransactionReceipt {
+                        transaction_id: receipt.transaction_id.clone(),
+                        transaction_result: TransactionResult::Invalid {
                             error_message: format!(
                                 "containing batch ({}) is invalid",
                                 current_batch_id,
                             ),
                             error_data: vec![],
-                        });
-                    std::mem::swap(result, &mut new_result);
+                        },
+                    };
+                    std::mem::swap(receipt, &mut new_receipt);
                 }
-                TransactionExecutionResult::Invalid(invalid_txn_result) => {
+                TransactionResult::Invalid { .. } => {
                     // When an invalid transaction is encountered, the scheduler should fail-fast
                     // and invalidate the whole batch immediately; this did not happen if an
                     // invalid result is in the previously executed transaction results, so
                     // something has gone wrong.
                     return Err(CoreError::Internal(format!(
                         "previously invalid transaction result ({}) found in batch {}",
-                        invalid_txn_result.transaction_id, current_batch_id
+                        receipt.transaction_id, current_batch_id
                     )));
                 }
             }
         }
 
-        self.txn_results
-            .push(TransactionExecutionResult::Invalid(invalid_result));
+        self.txn_receipts.push(invalid_result.into());
 
         // Invalidate all unexecuted transactions in the batch
-        self.txn_results.append(
+        self.txn_receipts.append(
             &mut self
                 .txn_queue
                 .drain(..)
-                .map(|txn| {
-                    TransactionExecutionResult::Invalid(InvalidTransactionResult {
-                        transaction_id: txn.header_signature().into(),
+                .map(|txn| TransactionReceipt {
+                    transaction_id: txn.header_signature().into(),
+                    transaction_result: TransactionResult::Invalid {
                         error_message: format!(
                             "containing batch ({}) is invalid",
                             current_batch_id
                         ),
                         error_data: vec![],
-                    })
+                    },
                 })
                 .collect(),
         );
@@ -322,10 +323,10 @@ impl SchedulerCore {
             )
         })?;
 
-        let mut results = vec![];
-        std::mem::swap(&mut results, &mut self.txn_results);
+        let mut receipts = vec![];
+        std::mem::swap(&mut receipts, &mut self.txn_receipts);
 
-        let batch_result = BatchExecutionResult { batch, results };
+        let batch_result = BatchExecutionResult { batch, receipts };
 
         self.shared_lock.lock()?.result_callback()(Some(batch_result));
 
@@ -355,12 +356,12 @@ impl SchedulerCore {
                             }
                             self.current_txn = None;
                             self.previous_context = Some(context_id);
-                            self.txn_results.push(TransactionExecutionResult::Valid(
+                            self.txn_receipts.push(
                                 self.context_lifecycle.get_transaction_receipt(
                                     &context_id,
                                     &hex::encode(transaction_id),
                                 )?,
-                            ));
+                            );
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
                             if result.transaction_id != current_txn_id {

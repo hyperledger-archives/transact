@@ -484,13 +484,13 @@ mod tests {
     #[test]
     fn test_done_incorrectly() {
         let batch = mock_batch_with_num_txns(1);
-        let valid_result = valid_result_from_batch(batch.clone());
+        let valid_receipt = valid_receipt_from_batch(batch.clone());
 
         // The first sub-scheduler doens't have a result for the batch
         let sub_schedulers = vec![
-            Box::new(MockSubScheduler::new(vec![valid_result.clone()]))
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
                 as Box<dyn Scheduler + Send>,
-            Box::new(MockSubScheduler::new(vec![valid_result.clone()]))
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
                 as Box<dyn Scheduler + Send>,
             Box::new(MockSubScheduler::new(vec![])) as Box<dyn Scheduler + Send>,
         ];
@@ -542,25 +542,25 @@ mod tests {
 
         // First batch is valid for all schedulers, second batch is invalid for all schedulers,
         // third batch has a different result for one of the schedulers
-        let valid_result_batch_0 = valid_result_from_batch(batches[0].clone());
-        let invalid_result_batch_1 = invalid_result_from_batch(batches[1].clone());
-        let valid_result_batch_2 = valid_result_from_batch(batches[2].clone());
-        let invalid_result_batch_2 = invalid_result_from_batch(batches[2].clone());
+        let valid_receipt_batch_0 = valid_receipt_from_batch(batches[0].clone());
+        let invalid_receipt_batch_1 = invalid_receipt_from_batch(batches[1].clone());
+        let valid_receipt_batch_2 = valid_receipt_from_batch(batches[2].clone());
+        let invalid_receipt_batch_2 = invalid_receipt_from_batch(batches[2].clone());
         let sub_schedulers = vec![
             Box::new(MockSubScheduler::new(vec![
-                valid_result_batch_0.clone(),
-                invalid_result_batch_1.clone(),
-                invalid_result_batch_2.clone(),
+                valid_receipt_batch_0.clone(),
+                invalid_receipt_batch_1.clone(),
+                invalid_receipt_batch_2.clone(),
             ])) as Box<dyn Scheduler + Send>,
             Box::new(MockSubScheduler::new(vec![
-                valid_result_batch_0.clone(),
-                invalid_result_batch_1.clone(),
-                valid_result_batch_2.clone(),
+                valid_receipt_batch_0.clone(),
+                invalid_receipt_batch_1.clone(),
+                valid_receipt_batch_2.clone(),
             ])) as Box<dyn Scheduler + Send>,
             Box::new(MockSubScheduler::new(vec![
-                valid_result_batch_0.clone(),
-                invalid_result_batch_1.clone(),
-                valid_result_batch_2.clone(),
+                valid_receipt_batch_0.clone(),
+                invalid_receipt_batch_1.clone(),
+                valid_receipt_batch_2.clone(),
             ])) as Box<dyn Scheduler + Send>,
         ];
 
@@ -601,11 +601,11 @@ mod tests {
         // the results
         sub_scheduler_handler.next();
         let result = result_rx.recv().expect("Failed to receive 1st result");
-        assert_eq!(result, valid_result_batch_0);
+        assert_eq!(result, valid_receipt_batch_0);
 
         sub_scheduler_handler.next();
         let result = result_rx.recv().expect("Failed to receive 2nd result");
-        assert_eq!(result, invalid_result_batch_1);
+        assert_eq!(result, invalid_receipt_batch_1);
 
         sub_scheduler_handler.next();
         match error_rx.recv().expect("Failed to receive error") {
