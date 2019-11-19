@@ -229,7 +229,7 @@ mod tests {
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
     use crate::protocol::batch::BatchBuilder;
-    use crate::protocol::receipt::ValidTransactionReceiptBuilder;
+    use crate::protocol::receipt::TransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
     use crate::signing::hash::HashSigner;
 
@@ -336,7 +336,8 @@ mod tests {
             _context_id: &ContextId,
             transaction_id: &str,
         ) -> Result<TransactionReceipt, ContextManagerError> {
-            ValidTransactionReceiptBuilder::new()
+            TransactionReceiptBuilder::new()
+                .valid()
                 .with_transaction_id(transaction_id.into())
                 .build()
                 .map_err(|err| ContextManagerError::from(err))

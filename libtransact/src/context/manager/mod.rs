@@ -23,9 +23,7 @@ use std::str;
 
 pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
-use crate::protocol::receipt::{
-    Event, StateChange, TransactionReceipt, ValidTransactionReceiptBuilder,
-};
+use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
 use crate::state::Read;
 
 pub struct ContextManager {
@@ -53,7 +51,8 @@ impl ContextLifecycle for ContextManager {
         transaction_id: &str,
     ) -> Result<TransactionReceipt, ContextManagerError> {
         let context = self.get_context(context_id)?;
-        let new_transaction_receipt = ValidTransactionReceiptBuilder::new()
+        let new_transaction_receipt = TransactionReceiptBuilder::new()
+            .valid()
             .with_state_changes(context.state_changes().to_vec())
             .with_events(context.events().to_vec())
             .with_data(context.data().to_vec())

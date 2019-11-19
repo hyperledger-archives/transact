@@ -468,37 +468,60 @@ impl std::fmt::Display for TransactionReceiptBuilderError {
 }
 
 #[derive(Default, Clone)]
-pub struct ValidTransactionReceiptBuilder {
-    pub state_changes: Vec<StateChange>,
-    pub events: Vec<Event>,
-    pub data: Vec<Vec<u8>>,
-    pub transaction_id: Option<String>,
+pub struct TransactionReceiptBuilder {
+    is_valid: bool,
+    state_changes: Vec<StateChange>,
+    events: Vec<Event>,
+    data: Vec<Vec<u8>>,
+    error_message: String,
+    error_data: Vec<u8>,
+    transaction_id: Option<String>,
 }
 
-impl ValidTransactionReceiptBuilder {
+impl TransactionReceiptBuilder {
     pub fn new() -> Self {
-        ValidTransactionReceiptBuilder::default()
+        TransactionReceiptBuilder::default()
+    }
+
+    pub fn valid(mut self) -> Self {
+        self.is_valid = true;
+        self
+    }
+
+    pub fn invalid(mut self) -> Self {
+        self.is_valid = false;
+        self
     }
 
     pub fn with_state_changes(
         mut self,
         state_changes: Vec<StateChange>,
-    ) -> ValidTransactionReceiptBuilder {
+    ) -> TransactionReceiptBuilder {
         self.state_changes = state_changes;
         self
     }
 
-    pub fn with_events(mut self, events: Vec<Event>) -> ValidTransactionReceiptBuilder {
+    pub fn with_events(mut self, events: Vec<Event>) -> TransactionReceiptBuilder {
         self.events = events;
         self
     }
 
-    pub fn with_data(mut self, data: Vec<Vec<u8>>) -> ValidTransactionReceiptBuilder {
+    pub fn with_data(mut self, data: Vec<Vec<u8>>) -> TransactionReceiptBuilder {
         self.data = data;
         self
     }
 
-    pub fn with_transaction_id(mut self, transaction_id: String) -> ValidTransactionReceiptBuilder {
+    pub fn with_error_message(mut self, error_message: String) -> TransactionReceiptBuilder {
+        self.error_message = error_message;
+        self
+    }
+
+    pub fn with_error_data(mut self, error_data: Vec<u8>) -> TransactionReceiptBuilder {
+        self.error_data = error_data;
+        self
+    }
+
+    pub fn with_transaction_id(mut self, transaction_id: String) -> TransactionReceiptBuilder {
         self.transaction_id = Some(transaction_id);
         self
     }
@@ -510,13 +533,22 @@ impl ValidTransactionReceiptBuilder {
             )
         })?;
 
-        Ok(TransactionReceipt {
-            transaction_id,
-            transaction_result: TransactionResult::Valid {
+        let transaction_result = if self.is_valid {
+            TransactionResult::Valid {
                 state_changes: self.state_changes,
                 events: self.events,
                 data: self.data,
-            },
+            }
+        } else {
+            TransactionResult::Invalid {
+                error_message: self.error_message,
+                error_data: self.error_data,
+            }
+        };
+
+        Ok(TransactionReceipt {
+            transaction_id,
+            transaction_result,
         })
     }
 }
@@ -544,6 +576,8 @@ mod tests {
         "address",
         "5b7349700e158b598043efd6d7610345a75a00b22ac14c9278db53f586179a92b72fbd",
     );
+    static ERROR_MESSAGE: &str = "an error occurred";
+    static ERROR_DATA: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
     static TRANSACTION_ID: &str =
         "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
          7c400d56354dee788191be8e28393c70398906fb467fac8db6279e90e4e61619589d42bf";
@@ -707,6 +741,19 @@ mod tests {
         }
     }
 
+    fn check_invalid_transaction_receipt(transaction_receipt: TransactionReceipt) {
+        match transaction_receipt.transaction_result {
+            TransactionResult::Invalid {
+                error_message,
+                error_data,
+            } => {
+                assert_eq!(ERROR_MESSAGE.to_string(), error_message);
+                assert_eq!(ERROR_DATA.to_vec(), error_data);
+            }
+            _ => panic!("transaction result is not invalid"),
+        }
+    }
+
     #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn transaction_receipt_sawtooth10_compatibility() {
@@ -764,7 +811,8 @@ mod tests {
 
     #[test]
     fn valid_transaction_receipt_builder_chain() {
-        let transaction_receipt = ValidTransactionReceiptBuilder::new()
+        let transaction_receipt = TransactionReceiptBuilder::new()
+            .valid()
             .with_state_changes(vec![
                 StateChange::Set {
                     key: ADDRESS.to_string(),
@@ -784,8 +832,22 @@ mod tests {
     }
 
     #[test]
+    fn invalid_transaction_receipt_builder_chain() {
+        let transaction_receipt = TransactionReceiptBuilder::new()
+            .invalid()
+            .with_error_message(ERROR_MESSAGE.to_string())
+            .with_error_data(ERROR_DATA.to_vec())
+            .with_transaction_id(TRANSACTION_ID.to_string())
+            .build()
+            .unwrap();
+
+        check_invalid_transaction_receipt(transaction_receipt)
+    }
+
+    #[test]
     fn valid_transaction_receipt_builder_separate() {
-        let mut transaction_receipt_builder = ValidTransactionReceiptBuilder::new();
+        let mut transaction_receipt_builder = TransactionReceiptBuilder::new();
+        transaction_receipt_builder = transaction_receipt_builder.valid();
         transaction_receipt_builder = transaction_receipt_builder.with_state_changes(vec![
             StateChange::Set {
                 key: ADDRESS.to_string(),
@@ -807,6 +869,21 @@ mod tests {
         let transaction_receipt = transaction_receipt_builder.build().unwrap();
 
         check_valid_transaction_receipt(transaction_receipt)
+    }
+
+    #[test]
+    fn invalid_transaction_receipt_builder_separate() {
+        let mut transaction_receipt_builder = TransactionReceiptBuilder::new();
+        transaction_receipt_builder = transaction_receipt_builder.invalid();
+        transaction_receipt_builder =
+            transaction_receipt_builder.with_error_message(ERROR_MESSAGE.to_string());
+        transaction_receipt_builder =
+            transaction_receipt_builder.with_error_data(ERROR_DATA.to_vec());
+        transaction_receipt_builder =
+            transaction_receipt_builder.with_transaction_id(TRANSACTION_ID.to_string());
+        let transaction_receipt = transaction_receipt_builder.build().unwrap();
+
+        check_invalid_transaction_receipt(transaction_receipt)
     }
 
     #[test]
@@ -903,7 +980,8 @@ mod benchmarks {
 
     #[bench]
     fn bench_valid_txn_receipt_builder(b: &mut Bencher) {
-        let transaction_receipt = ValidTransactionReceiptBuilder::new()
+        let transaction_receipt = TransactionReceiptBuilder::new()
+            .valid()
             .with_state_changes(vec![
                 StateChange::Set {
                     key: ADDRESS.to_string(),
@@ -915,6 +993,17 @@ mod benchmarks {
             ])
             .with_events(vec![make_event_1(), make_event_2()])
             .with_data(vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()])
+            .with_transaction_id(TRANSACTION_ID.to_string());
+
+        b.iter(|| transaction_receipt.clone().build());
+    }
+
+    #[bench]
+    fn bench_invalid_txn_receipt_builder(b: &mut Bencher) {
+        let transaction_receipt = TransactionReceiptBuilder::new()
+            .invalid()
+            .with_error_message(ERROR_MESSAGE.to_string())
+            .with_error_data(ERROR_DATA.to_vec())
             .with_transaction_id(TRANSACTION_ID.to_string());
 
         b.iter(|| transaction_receipt.clone().build());
