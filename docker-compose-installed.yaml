@@ -16,7 +16,7 @@ version: "2.1"
 
 services:
   validator:
-    image: hyperledger/sawtooth-validator:1.1
+    image: hyperledger/sawtooth-validator:1.2
     container_name: sabre-validator
     volumes:
       - .:/project
@@ -46,7 +46,7 @@ services:
         "
 
   rest-api:
-    image: hyperledger/sawtooth-rest-api:1.1
+    image: hyperledger/sawtooth-rest-api:1.2
     container_name: sabre-sawtooth-rest-api
     expose:
       - 9708
@@ -55,7 +55,7 @@ services:
     entrypoint: sawtooth-rest-api --connect tcp://validator:9704 --bind rest-api:9708 -vv
 
   shell:
-    image: hyperledger/sawtooth-shell:1.1
+    image: hyperledger/sawtooth-shell:1.2
     container_name: sabre-shell
     entrypoint: |
         bash -c "
@@ -64,12 +64,12 @@ services:
         "
 
   settings-tp:
-    image: hyperledger/sawtooth-settings-tp:1.1
+    image: hyperledger/sawtooth-settings-tp:1.2
     container_name: sabre-settings-tp
     entrypoint: settings-tp -vv --connect tcp://validator:9704
 
   devmode-rust:
-    image: hyperledger/sawtooth-devmode-engine-rust:1.1
+    image: hyperledger/sawtooth-devmode-engine-rust:1.2
     container_name: sawtooth-devmode-engine-rust
     depends_on:
       - validator
