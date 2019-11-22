@@ -5,5 +5,5 @@ authors = ["Cargill Incorporated"]
 edition = "2018"
 
 [dev-dependencies]
-subprocess = "0.1.12"
+subprocess = "0.1"
 serde_json = "1.0"
