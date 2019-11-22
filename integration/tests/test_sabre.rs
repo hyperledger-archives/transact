@@ -83,6 +83,7 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
 
     let x = Exec::cmd("sabre")
         .args(&command_vec)
+        .stderr(subprocess::Redirection::Merge)
         .stream_stdout()
         .map_err(|err| TestError::TestError(err.to_string()))?;
     let br = BufReader::new(x);
@@ -90,12 +91,11 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
         let response_string = line.map_err(|err| TestError::TestError(err.to_string()))?;
         println!("Response String from sabre cli: {}", response_string);
         if response_string.starts_with("StatusResponse ") {
-            let json_string = match response_string.get(15..) {
-                Some(x) => x,
-                None => return Err(TestError::TestError("Unable to get response".into())),
-            };
+            let json_string = response_string
+                .get(15..)
+                .ok_or_else(|| TestError::TestError("Unable to get response".into()))?;
             let json: Value = serde_json::from_str(&json_string)
-                .map_err(|err| TestError::TestError(err.to_string()))?;;
+                .map_err(|err| TestError::TestError(err.to_string()))?;
             return Ok(json);
         }
     }
