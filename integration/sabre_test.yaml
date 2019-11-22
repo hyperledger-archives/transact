@@ -25,8 +25,9 @@ services:
     image: hyperledger/sawtooth-shell:1.1
     container_name: sabre-shell
     entrypoint: "bash -c \"\
-        sleep 10 && \
-        sawtooth keygen && \
+        while true; \
+          do curl -s http://rest-api:9708/state | grep -q head; if [ $$? -eq 0 ]; then break; fi; sleep 0.5; done; \
+        sawtooth keygen --force && \
         intkey set C 10 --url http://rest-api:9708 && \
         intkey set B 40 --url http://rest-api:9708 && \
         tail -f /dev/null \
