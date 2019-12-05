@@ -15,14 +15,14 @@
 version: "2.1"
 services:
   intkey-tp-python:
-    image: hyperledger/sawtooth-intkey-tp-python:1.1
+    image: hyperledger/sawtooth-intkey-tp-python:latest
     container_name: sawtooth-intkey-tp-python-default
     depends_on:
       - validator
     entrypoint: intkey-tp-python -vv -C tcp://validator:9704
 
   shell:
-    image: hyperledger/sawtooth-shell:1.1
+    image: hyperledger/sawtooth-shell:latest
     container_name: sabre-shell
     entrypoint: "bash -c \"\
         while true; \

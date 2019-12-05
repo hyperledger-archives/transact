@@ -79,7 +79,7 @@ services:
       \""
 
   validator:
-    image: hyperledger/sawtooth-validator:1.1
+    image: hyperledger/sawtooth-validator:latest
     container_name: pike-validator
     expose:
       - 9004
@@ -103,7 +103,7 @@ services:
         \""
 
   rest-api:
-    image: hyperledger/sawtooth-rest-api:1.1
+    image: hyperledger/sawtooth-rest-api:latest
     container_name: pike-sawtooth-rest-api
     expose:
       - 9008
@@ -112,7 +112,7 @@ services:
     entrypoint: sawtooth-rest-api --connect tcp://validator:9004 --bind rest-api:9008 -vv
 
   shell:
-    image: hyperledger/sawtooth-shell:1.1
+    image: hyperledger/sawtooth-shell:latest
     container_name: pike-shell
     entrypoint: "bash -c \"\
         sawtooth keygen && \
@@ -120,12 +120,12 @@ services:
         \""
 
   settings-tp:
-    image: hyperledger/sawtooth-settings-tp:1.1
+    image: hyperledger/sawtooth-settings-tp:latest
     container_name: pike-settings-tp
     entrypoint: settings-tp -vv --connect tcp://validator:9004
 
   devmode-rust:
-    image: hyperledger/sawtooth-devmode-engine-rust:1.1
+    image: hyperledger/sawtooth-devmode-engine-rust:latest
     container_name: sawtooth-devmode-engine-rust
     depends_on:
       - validator

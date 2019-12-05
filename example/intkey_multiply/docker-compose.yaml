@@ -16,7 +16,7 @@ version: "2.1"
 
 services:
   intkey-tp-python:
-    image: hyperledger/sawtooth-intkey-tp-python:1.1
+    image: hyperledger/sawtooth-intkey-tp-python:latest
     container_name: sawtooth-intkey-tp-python-default
     depends_on:
       - validator
