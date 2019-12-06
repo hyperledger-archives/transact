@@ -19,6 +19,9 @@ mod error;
 
 pub use crate::contract::address::error::AddresserError;
 
+use hex;
+use sha2::{Digest, Sha512};
+
 pub const ADDRESS_LENGTH: usize = 70;
 
 pub trait Addresser<K> {
@@ -37,4 +40,10 @@ pub trait Addresser<K> {
     /// * `key` - A natural key, as defined by K
     ///
     fn normalize(&self, key: &K) -> String;
+}
+
+pub fn hash(hash_length: usize, key: &str) -> String {
+    let mut sha = Sha512::new();
+    sha.input(key.as_bytes());
+    hex::encode(sha.result().to_vec())[..hash_length].to_string()
 }
