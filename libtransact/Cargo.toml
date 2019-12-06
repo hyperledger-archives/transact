@@ -40,7 +40,11 @@ protoc-rust = "2"
 [features]
 default = []
 nightly = []
-experimental = ["redis-db"]
+experimental = [
+    "contract",
+    "redis-db",
+]
 sawtooth-compat = ["sawtooth-sdk"]
 ursa-compat = ["ursa"]
 redis-db = ["redis"]
+contract = []
