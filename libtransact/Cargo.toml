@@ -42,9 +42,11 @@ default = []
 nightly = []
 experimental = [
     "contract",
+    "contract-address",
     "redis-db",
 ]
 sawtooth-compat = ["sawtooth-sdk"]
 ursa-compat = ["ursa"]
 redis-db = ["redis"]
 contract = []
+contract-address = ["contract"]

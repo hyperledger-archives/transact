@@ -15,5 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "contract-address")]
-pub mod address;
+mod error;
+
+pub use crate::contract::address::error::AddresserError;
