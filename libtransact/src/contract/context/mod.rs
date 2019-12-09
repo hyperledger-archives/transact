@@ -15,7 +15,4 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "contract-address")]
-pub mod address;
-#[cfg(feature = "contract-context")]
-pub mod context;
+pub mod error;
