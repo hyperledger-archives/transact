@@ -22,5 +22,7 @@
 
 pub mod batch;
 pub mod command;
+#[cfg(feature = "key-value-state")]
+pub mod key_value_state;
 pub mod receipt;
 pub mod transaction;
