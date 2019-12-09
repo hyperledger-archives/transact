@@ -15,6 +15,7 @@
 use std::error::Error as StdError;
 
 use crate::contract::address::AddresserError;
+use crate::handler::ContextError;
 use crate::protos::ProtoConversionError;
 
 #[derive(Debug)]
@@ -22,6 +23,7 @@ pub enum ContractContextError {
     AddresserError(AddresserError),
     ProtoConversionError(ProtoConversionError),
     ProtocolBuildError(Box<dyn StdError>),
+    TransactionContextError(ContextError),
 }
 
 impl StdError for ContractContextError {
@@ -30,6 +32,7 @@ impl StdError for ContractContextError {
             ContractContextError::AddresserError(_) => None,
             ContractContextError::ProtoConversionError(ref err) => Some(err),
             ContractContextError::ProtocolBuildError(ref err) => Some(&**err),
+            ContractContextError::TransactionContextError(ref err) => Some(err),
         }
     }
 }
@@ -48,6 +51,9 @@ impl std::fmt::Display for ContractContextError {
                 "Error occurred while building native protocol type: {}",
                 err
             ),
+            ContractContextError::TransactionContextError(ref err) => {
+                write!(f, "Error occurred in TransactionContext method: {}", err)
+            }
         }
     }
 }
@@ -61,5 +67,11 @@ impl From<ProtoConversionError> for ContractContextError {
 impl From<AddresserError> for ContractContextError {
     fn from(e: AddresserError) -> Self {
         ContractContextError::AddresserError(e)
+    }
+}
+
+impl From<ContextError> for ContractContextError {
+    fn from(e: ContextError) -> Self {
+        ContractContextError::TransactionContextError(e)
     }
 }
