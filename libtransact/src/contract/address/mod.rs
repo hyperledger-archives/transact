@@ -15,6 +15,8 @@
  * -----------------------------------------------------------------------------
  */
 
+#[cfg(feature = "contract-address-double-key-hash")]
+pub mod double_key_hash;
 mod error;
 #[cfg(feature = "contract-address-key-hash")]
 pub mod key_hash;

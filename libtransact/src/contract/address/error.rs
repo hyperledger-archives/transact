@@ -15,6 +15,7 @@
 #[derive(Debug)]
 pub enum AddresserError {
     KeyHashAddresserError(String),
+    DoubleKeyHashAddresserError(String),
 }
 
 impl std::fmt::Display for AddresserError {
@@ -22,6 +23,9 @@ impl std::fmt::Display for AddresserError {
         match *self {
             AddresserError::KeyHashAddresserError(ref s) => {
                 write!(f, "KeyHashAddresserError: {}", s.to_string())
+            }
+            AddresserError::DoubleKeyHashAddresserError(ref s) => {
+                write!(f, "DoubleKeyHashAddresserError: {}", s.to_string())
             }
         }
     }

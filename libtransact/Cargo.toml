@@ -43,6 +43,7 @@ nightly = []
 experimental = [
     "contract",
     "contract-address",
+    "contract-address-double-key-hash",
     "contract-address-key-hash",
     "redis-db",
 ]
@@ -52,3 +53,4 @@ redis-db = ["redis"]
 contract = []
 contract-address = ["contract"]
 contract-address-key-hash = ["contract-address"]
+contract-address-double-key-hash = ["contract-address"]
