@@ -13,10 +13,16 @@
 // limitations under the License.
 
 #[derive(Debug)]
-pub enum AddresserError {}
+pub enum AddresserError {
+    KeyHashAddresserError(String),
+}
 
 impl std::fmt::Display for AddresserError {
-    fn fmt(&self, _f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {}
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            AddresserError::KeyHashAddresserError(ref s) => {
+                write!(f, "KeyHashAddresserError: {}", s.to_string())
+            }
+        }
     }
 }

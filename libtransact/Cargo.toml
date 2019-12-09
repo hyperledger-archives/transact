@@ -43,6 +43,7 @@ nightly = []
 experimental = [
     "contract",
     "contract-address",
+    "contract-address-key-hash",
     "redis-db",
 ]
 sawtooth-compat = ["sawtooth-sdk"]
@@ -50,3 +51,4 @@ ursa-compat = ["ursa"]
 redis-db = ["redis"]
 contract = []
 contract-address = ["contract"]
+contract-address-key-hash = ["contract-address"]
