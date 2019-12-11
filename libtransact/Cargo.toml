@@ -48,6 +48,7 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
+    "contract-handler",
     "key-value-state",
     "redis-db",
 ]

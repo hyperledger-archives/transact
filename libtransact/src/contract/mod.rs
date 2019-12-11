@@ -19,3 +19,35 @@
 pub mod address;
 #[cfg(feature = "contract-context")]
 pub mod context;
+#[cfg(feature = "contract-handler")]
+pub mod handler;
+
+use std::hash::Hash;
+
+use crate::contract::address::Addresser;
+use crate::handler::{ApplyError, TransactionContext};
+use crate::protocol::transaction::TransactionPair;
+
+pub trait SmartContract: Send {
+    type Key: Eq + Hash;
+    type Addr: Addresser<Self::Key>;
+    type Context;
+
+    fn get_family_name(&self) -> &str;
+
+    fn get_family_versions(&self) -> &[String];
+
+    fn get_addresser(&self) -> Self::Addr;
+
+    fn make_context<'a>(
+        &self,
+        addresser: Self::Addr,
+        context: &'a mut dyn TransactionContext,
+    ) -> &mut Self::Context;
+
+    fn apply(
+        &self,
+        transaction: &TransactionPair,
+        context: &mut Self::Context,
+    ) -> Result<(), ApplyError>;
+}
