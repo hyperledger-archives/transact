@@ -40,7 +40,19 @@ protoc-rust = "2"
 [features]
 default = []
 nightly = []
-experimental = ["redis-db"]
+experimental = [
+    "contract",
+    "contract-address",
+    "contract-address-double-key-hash",
+    "contract-address-key-hash",
+    "contract-address-triple-key-hash",
+    "redis-db",
+]
 sawtooth-compat = ["sawtooth-sdk"]
 ursa-compat = ["ursa"]
 redis-db = ["redis"]
+contract = []
+contract-address = ["contract"]
+contract-address-key-hash = ["contract-address"]
+contract-address-double-key-hash = ["contract-address"]
+contract-address-triple-key-hash = ["contract-address"]
