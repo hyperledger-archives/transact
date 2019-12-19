@@ -1,0 +1,13 @@
+[package]
+name = "simple-key-xo"
+version = "0.1.0"
+authors = ["IBM Corp.", "Cargill Incorporated"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+transact = { path = "../../libtransact", features = ["sawtooth-compat", "contract-address-key-hash"] }
+sawtooth-xo = "0.3"
+hex = "0.3"
+sha2 = "0.8"
