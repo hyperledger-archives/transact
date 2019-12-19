@@ -49,7 +49,7 @@ fn main() {
     let (game_address, value) = get_state_change(current_result);
 
     let state_change = ChangeSet::Set {
-        key: game_address.clone(),
+        key: game_address,
         value: value.clone(),
     };
     let mut state_root = merkle_state.commit(&orig_root, &[state_change]).unwrap();
@@ -152,9 +152,8 @@ fn play_game(
     let executor = create_executor(&context_manager);
     start_executor(&executor);
 
-    let mut scheduler =
-        SerialScheduler::new(Box::new(context_manager.clone()), state_root.to_string())
-            .expect("Failed to create scheduler");
+    let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.to_string())
+        .expect("Failed to create scheduler");
 
     // Create async channel to submit transactions and receive results
     let (result_sender, result_receiver) = std::sync::mpsc::channel();

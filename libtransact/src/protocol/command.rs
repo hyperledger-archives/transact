@@ -150,45 +150,45 @@ impl FromNative<Command> for protos::command::Command {
         match command {
             Command::SetState(payload) => {
                 proto_command.set_command_type(protos::command::Command_CommandType::SET_STATE);
-                proto_command.set_set_state(payload.clone().into_proto()?);
+                proto_command.set_set_state(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::GetState(payload) => {
                 proto_command.set_command_type(protos::command::Command_CommandType::GET_STATE);
-                proto_command.set_get_state(payload.clone().into_proto()?);
+                proto_command.set_get_state(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::DeleteState(payload) => {
                 proto_command.set_command_type(protos::command::Command_CommandType::DELETE_STATE);
-                proto_command.set_delete_state(payload.clone().into_proto()?);
+                proto_command.set_delete_state(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::AddEvent(payload) => {
                 proto_command.set_command_type(protos::command::Command_CommandType::ADD_EVENT);
-                proto_command.set_add_event(payload.clone().into_proto()?);
+                proto_command.set_add_event(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::AddReceiptData(payload) => {
                 proto_command
                     .set_command_type(protos::command::Command_CommandType::ADD_RECEIPT_DATA);
-                proto_command.set_add_receipt_data(payload.clone().into_proto()?);
+                proto_command.set_add_receipt_data(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::Sleep(payload) => {
                 proto_command.set_command_type(protos::command::Command_CommandType::SLEEP);
-                proto_command.set_sleep(payload.clone().into_proto()?);
+                proto_command.set_sleep(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::ReturnInvalid(payload) => {
                 proto_command
                     .set_command_type(protos::command::Command_CommandType::RETURN_INVALID);
-                proto_command.set_return_invalid(payload.clone().into_proto()?);
+                proto_command.set_return_invalid(payload.into_proto()?);
                 Ok(proto_command)
             }
             Command::ReturnInternalError(payload) => {
                 proto_command
                     .set_command_type(protos::command::Command_CommandType::RETURN_INTERNAL_ERROR);
-                proto_command.set_return_internal_error(payload.clone().into_proto()?);
+                proto_command.set_return_internal_error(payload.into_proto()?);
                 Ok(proto_command)
             }
         }

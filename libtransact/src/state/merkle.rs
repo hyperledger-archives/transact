@@ -485,7 +485,7 @@ impl MerkleRadixTree {
         let mut node = self.root_node.clone();
 
         for token in tokens.iter() {
-            node = match node.children.get(&token.to_string()) {
+            node = match node.children.get(*token) {
                 None => {
                     return Err(StateDatabaseError::NotFound(format!(
                         "invalid address {} from root {}",
@@ -526,7 +526,7 @@ impl MerkleRadixTree {
         for token in tokens {
             let node = {
                 // this is safe to unwrap, because we've just inserted the path in the previous loop
-                let child_address = &nodes[&path].children.get(&token.to_string());
+                let child_address = &nodes[&path].children.get(*token);
 
                 match (!new_branch && child_address.is_some(), strict) {
                     (true, _) => get_node_by_hash(&*self.db, child_address.unwrap())?,
@@ -774,12 +774,7 @@ impl Node {
         let children = self
             .children
             .into_iter()
-            .map(|(k, v)| {
-                (
-                    Key::Text(Text::Text(k.to_string())),
-                    Value::Text(Text::Text(v.to_string())),
-                )
-            })
+            .map(|(k, v)| (Key::Text(Text::Text(k)), Value::Text(Text::Text(v))))
             .collect();
 
         map.insert(Key::Text(Text::Text("c".to_string())), Value::Map(children));

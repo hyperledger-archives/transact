@@ -54,7 +54,7 @@ impl BTreeDbInternal {
     fn new(indexes: &[&str]) -> BTreeDbInternal {
         let mut index_dbs = HashMap::with_capacity(indexes.len());
         for name in indexes {
-            index_dbs.insert(name.to_string(), BTreeMap::new());
+            index_dbs.insert((*name).to_string(), BTreeMap::new());
         }
         BTreeDbInternal {
             main: BTreeMap::new(),
