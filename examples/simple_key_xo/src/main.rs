@@ -34,7 +34,6 @@ use transact::state::StateChange as ChangeSet;
 use transact::state::Write;
 
 use hex;
-use sha2::{Digest, Sha512};
 use std::io;
 use std::str;
 use std::sync::{Arc, Mutex};
