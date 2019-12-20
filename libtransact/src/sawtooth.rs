@@ -22,8 +22,6 @@
 //! Note, to use this module, the Transact library must have the `"sawtooth-compat"` feature
 //! enabled.
 
-use std::fmt::Write as FmtWrite;
-
 use sawtooth_sdk::messages::processor::TpProcessRequest;
 use sawtooth_sdk::messages::transaction::TransactionHeader as SawtoothTxnHeader;
 use sawtooth_sdk::processor::handler::{
@@ -70,8 +68,8 @@ impl<H: SawtoothTransactionHandler + Send> SawtoothToTransactHandlerAdapter<H> {
     /// Constructs a new Sawtooth to Transact handler adapter.
     pub fn new(handler: H) -> Self {
         SawtoothToTransactHandlerAdapter {
-            family_name: handler.family_name().clone(),
-            family_versions: handler.family_versions().clone(),
+            family_name: handler.family_name(),
+            family_versions: handler.family_versions(),
             handler,
         }
     }
@@ -109,11 +107,11 @@ impl<H: SawtoothTransactionHandler + Send> TransactionHandler
 }
 
 struct TransactToSawtoothContextAdapter<'a> {
-    transact_context: &'a TransactionContext,
+    transact_context: &'a dyn TransactionContext,
 }
 
 impl<'a> TransactToSawtoothContextAdapter<'a> {
-    fn new(transact_context: &'a TransactionContext) -> Self {
+    fn new(transact_context: &'a dyn TransactionContext) -> Self {
         TransactToSawtoothContextAdapter { transact_context }
     }
 }
