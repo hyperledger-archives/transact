@@ -306,6 +306,7 @@ mod test {
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
     };
+    use crate::protocol::receipt::TransactionResult;
     use crate::scheduler::{ExecutionTaskCompletionNotification, InvalidTransactionResult};
     use crate::state::hashmap::HashMapState;
     use crate::workload::command::{make_command_transaction, CommandTransactionHandler};
@@ -747,7 +748,10 @@ mod test {
         let txn_receipt = context_manager
             .get_transaction_receipt(&context_id, &txn_id)
             .unwrap();
-        let events = txn_receipt.events;
+        let events = match txn_receipt.transaction_result {
+            TransactionResult::Valid { events, .. } => events,
+            _ => panic!("transaction is invalid"),
+        };
         let first_event = events.first().unwrap();
         assert_eq!(first_event.event_type, "First event".to_string());
         assert_eq!(
@@ -820,7 +824,10 @@ mod test {
         let txn_receipt = context_manager
             .get_transaction_receipt(&context_id, &txn_id)
             .unwrap();
-        let receipt_data = txn_receipt.data;
+        let receipt_data = match txn_receipt.transaction_result {
+            TransactionResult::Valid { data, .. } => data,
+            _ => panic!("transaction is invalid"),
+        };
         assert_eq!(receipt_data.first().unwrap(), &b"abc".to_vec());
         assert_eq!(receipt_data.last().unwrap(), &b"def".to_vec());
 
