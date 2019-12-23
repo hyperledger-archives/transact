@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(renamed_and_removed_lints)]
+#![allow(clippy::missing_safety_doc, renamed_and_removed_lints)]
 
 mod externs;
 pub mod log;
