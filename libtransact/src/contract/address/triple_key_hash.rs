@@ -43,9 +43,9 @@ impl Addresser<(String, String, String)> for TripleKeyHashAddresser {
         if (self.prefix.len() + self.first_hash_length + self.second_hash_length + last_hash_length)
             != ADDRESS_LENGTH
         {
-            return Err(AddresserError::TripleKeyHashAddresserError(
-                "Invalid hash length".to_string(),
-            ));
+            return Err(AddresserError {
+                message: format!("Hash length does not equal {}", ADDRESS_LENGTH),
+            });
         }
 
         let first_hash = &hash(self.first_hash_length, &key.0);

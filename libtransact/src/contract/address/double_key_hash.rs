@@ -33,9 +33,9 @@ impl Addresser<(String, String)> for DoubleKeyHashAddresser {
         let hash_length = ADDRESS_LENGTH - self.prefix.len();
         let second_hash_length = hash_length - self.first_hash_length;
         if (self.prefix.len() + self.first_hash_length + second_hash_length) != ADDRESS_LENGTH {
-            return Err(AddresserError::DoubleKeyHashAddresserError(
-                "Invalid hash length".to_string(),
-            ));
+            return Err(AddresserError {
+                message: format!("Hash length does not equal {}", ADDRESS_LENGTH),
+            });
         }
         let first_hash = &hash(self.first_hash_length, &key.0);
         let second_hash = &hash(second_hash_length, &key.1);
