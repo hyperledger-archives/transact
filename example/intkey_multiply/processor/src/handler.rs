@@ -279,7 +279,7 @@ impl IntkeyPayload {
                     "Name A must be a string",
                 )));
             }
-            Some(name_a_raw) => name_a_raw.to_string(),
+            Some(name_a_raw) => (*name_a_raw).to_string(),
         };
 
         if name_a_raw.len() > MAX_NAME_LEN {
@@ -294,7 +294,7 @@ impl IntkeyPayload {
                     "Name B must be a string",
                 )));
             }
-            Some(name_b_raw) => name_b_raw.to_string(),
+            Some(name_b_raw) => (*name_b_raw).to_string(),
         };
 
         if name_b_raw.len() > MAX_NAME_LEN {
@@ -309,7 +309,7 @@ impl IntkeyPayload {
                     "Name C must be a string",
                 )));
             }
-            Some(name_c_raw) => name_c_raw.to_string(),
+            Some(name_c_raw) => (*name_c_raw).to_string(),
         };
 
         if name_c_raw.len() > MAX_NAME_LEN {
@@ -370,7 +370,7 @@ impl<'a> IntkeyState<'a> {
                     Some(x) => Ok(Some(*x)),
                     None => Ok(None),
                 };
-                self.get_cache.insert(address.clone(), map.clone());
+                self.get_cache.insert(address, map);
                 status
             }
             None => Ok(None),
@@ -496,7 +496,7 @@ impl IntkeyMultiplyTransactionHandler {
         IntkeyMultiplyTransactionHandler {
             family_name: "intkey_multiply".to_string(),
             family_versions: vec!["1.0".to_string()],
-            namespaces: vec![get_intkey_prefix().to_string()],
+            namespaces: vec![get_intkey_prefix()],
         }
     }
 }

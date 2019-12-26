@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#![allow(renamed_and_removed_lints)]
+#![allow(clippy::missing_safety_doc, renamed_and_removed_lints)]
 
 mod externs;
 pub mod log;
@@ -331,8 +331,8 @@ pub fn invoke_smart_permission(
         }
         let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
         let name_buffer = WasmBuffer::new(name.as_bytes())?;
-        let org_id_buffer = WasmBuffer::new(org_id.to_string().as_bytes())?;
-        let public_key_buffer = WasmBuffer::new(public_key.to_string().as_bytes())?;
+        let org_id_buffer = WasmBuffer::new(org_id.as_bytes())?;
+        let public_key_buffer = WasmBuffer::new(public_key.as_bytes())?;
         let payload_buffer = WasmBuffer::new(payload)?;
 
         Ok(externs::invoke_smart_permission(

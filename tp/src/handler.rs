@@ -596,7 +596,7 @@ fn delete_contract_registry(
     }
 
     // Check if signer is an owner or an admin
-    can_update_contract_registry(contract_registry.clone(), signer, state)?;
+    can_update_contract_registry(contract_registry, signer, state)?;
 
     state.delete_contract_registry(name)
 }
