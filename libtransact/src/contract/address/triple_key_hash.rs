@@ -444,4 +444,99 @@ mod tests {
         assert_eq!(first_length, (remaining / 3));
         assert_eq!(second_length, (remaining / 3));
     }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of the ADDRESS_LENGTH for the `first_hash_length` and None for the `second_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// length combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with an invalid custom hash
+    /// length and should return an error. Also validates the expected error message.
+    fn test_invalid_first_custom_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and the `first_hash_length`
+        // equal to the ADDRESS_LENGTH const which will return an error as the prefix length and
+        // custom length combined are greater than the ADDRESS_LENGTH.
+        let addresser =
+            TripleKeyHashAddresser::new("prefix".to_string(), Some(ADDRESS_LENGTH), None);
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of the ADDRESS_LENGTH for the `second_hash_length` and None for the `first_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// length combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with an invalid custom hash
+    /// length and should return an error.
+    fn test_invalid_second_custom_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and the `second_hash_length`
+        // equal to the ADDRESS_LENGTH const which will return an error as the prefix length and
+        // custom length combined are greater than the ADDRESS_LENGTH.
+        let addresser =
+            TripleKeyHashAddresser::new("prefix".to_string(), None, Some(ADDRESS_LENGTH));
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of half the ADDRESS_LENGTH const for both `second_hash_length` and `first_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// lengths combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with invalid custom hash
+    /// lengths and should return an error.
+    fn test_invalid_custom_lengths_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and value of half the
+        // ADDRESS_LENGTH const for the `first_hash_length` and `second_hash_length` which will
+        // return an error as the prefixlength and custom lengths combined are greater than the
+        // ADDRESS_LENGTH.
+        let addresser = TripleKeyHashAddresser::new(
+            "prefix".to_string(),
+            Some(ADDRESS_LENGTH / 2),
+            Some(ADDRESS_LENGTH / 2),
+        );
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 72 character `prefix` and a None
+    /// value for both `second_hash_length` and `first_hash_length.` This test ensures that an error
+    /// will be returned as the length of the prefix and the custom lengths combined are greater
+    /// than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with invalid prefix
+    /// length and should return an error.
+    fn test_invalid_prefix_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 72 character `prefix` and value of None for the
+        // `first_hash_length` and `second_hash_length` which will return an error as the prefix
+        //  length is greater than the ADDRESS_LENGTH const.
+        let addresser = TripleKeyHashAddresser::new(
+            "prefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefix".to_string(),
+            None,
+            None,
+        );
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
 }
