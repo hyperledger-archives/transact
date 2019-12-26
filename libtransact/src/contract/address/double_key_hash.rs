@@ -20,23 +20,22 @@ pub struct DoubleKeyHashAddresser {
 }
 
 impl DoubleKeyHashAddresser {
-    pub fn new(prefix: String, first_hash_length: Option<usize>) -> DoubleKeyHashAddresser {
-        DoubleKeyHashAddresser {
+    pub fn new(
+        prefix: String,
+        first_hash_length: Option<usize>,
+    ) -> Result<DoubleKeyHashAddresser, AddresserError> {
+        validate_lengths(prefix.len(), first_hash_length)?;
+        Ok(DoubleKeyHashAddresser {
             prefix: prefix.clone(),
             first_hash_length: first_hash_length.unwrap_or((ADDRESS_LENGTH - prefix.len()) / 2),
-        }
+        })
     }
 }
 
 impl Addresser<(String, String)> for DoubleKeyHashAddresser {
     fn compute(&self, key: &(String, String)) -> Result<String, AddresserError> {
-        let hash_length = ADDRESS_LENGTH - self.prefix.len();
-        let second_hash_length = hash_length - self.first_hash_length;
-        if (self.prefix.len() + self.first_hash_length + second_hash_length) != ADDRESS_LENGTH {
-            return Err(AddresserError {
-                message: format!("Hash length does not equal {}", ADDRESS_LENGTH),
-            });
-        }
+        let second_hash_length = ADDRESS_LENGTH - self.prefix.len() - self.first_hash_length;
+
         let first_hash = &hash(self.first_hash_length, &key.0);
         let second_hash = &hash(second_hash_length, &key.1);
 
@@ -46,6 +45,38 @@ impl Addresser<(String, String)> for DoubleKeyHashAddresser {
     fn normalize(&self, key: &(String, String)) -> String {
         key.0.to_string() + "_" + &key.1
     }
+}
+
+// Used to validate the lengths of the input, including the prefix length and optional hash
+// length, which are used to construct the DoubleKeyHashAddresser.
+fn validate_lengths(
+    prefix_length: usize,
+    first_length: Option<usize>,
+) -> Result<(), AddresserError> {
+    // Validate the length of the prefix is not greater than the ADDRESS_LENGTH.
+    if prefix_length > ADDRESS_LENGTH {
+        return Err(AddresserError {
+            message: format!(
+                "Prefix length ({}) is greater than total address length ({})",
+                prefix_length, ADDRESS_LENGTH
+            ),
+        });
+    }
+
+    // Validate the length of the prefix plus the hash length is not greater than ADDRESS_LENGTH.
+    if let Some(length) = first_length {
+        if length + prefix_length > ADDRESS_LENGTH {
+            return Err(AddresserError {
+                message: format!(
+                    "Length of prefix ({}) plus length of first address segment ({}) combined are \
+                     greater than total address length ({})",
+                    prefix_length, length, ADDRESS_LENGTH,
+                ),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -73,7 +104,8 @@ mod tests {
     fn test_double_key_default_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and None option for the
         // `first_hash_length`
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct DoubleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(32, key1);
@@ -115,7 +147,8 @@ mod tests {
     fn test_double_key_custom_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and value of 16 for the
         // `first_hash_length`
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), Some(16));
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), Some(16))
+            .expect("Unable to construct DoubleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(16, key1);
