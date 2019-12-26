@@ -15,14 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Transact structs for batches, transactions and receipts.
-//!
-//! These structs cover the core protocols of the Transact system.  Batches of transactions are
-//! scheduled and executed.  The resuls of execution are stored in transaction receipts.
-
-pub mod batch;
-pub mod command;
-#[cfg(feature = "key-value-state")]
-pub mod key_value_state;
-pub mod receipt;
-pub mod transaction;
+pub mod error;
+#[cfg(feature = "contract-context-key-value")]
+pub mod key_value;

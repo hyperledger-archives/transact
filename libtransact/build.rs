@@ -44,6 +44,8 @@ fn main() {
                 .unwrap(),
             proto_path.join("merkle.proto").to_str().unwrap(),
             proto_path.join("command.proto").to_str().unwrap(),
+            #[cfg(feature = "key-value-state")]
+            proto_path.join("key_value_state.proto").to_str().unwrap(),
         ],
         includes: &[proto_path.to_str().unwrap()],
         customize: Customize::default(),
@@ -53,6 +55,6 @@ fn main() {
     // Create mod.rs accordingly
     let mut mod_file = File::create(dest_path.join("mod.rs")).unwrap();
     mod_file
-        .write_all(b"pub mod batch;\npub mod events;\npub mod transaction;\npub mod transaction_receipt;\npub mod merkle;\npub mod command;\n")
+        .write_all(b"pub mod batch;\npub mod events;\n#[cfg(feature = \"key-value-state\")]\npub mod key_value_state;\npub mod transaction;\npub mod transaction_receipt;\npub mod merkle;\npub mod command;\n")
         .unwrap();
 }

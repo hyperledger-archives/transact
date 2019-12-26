@@ -23,13 +23,13 @@ impl std::fmt::Display for AddresserError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
             AddresserError::KeyHashAddresserError(ref s) => {
-                write!(f, "KeyHashAddresserError: {}", s.to_string())
+                write!(f, "Unable to compute hash: {}", s.to_string())
             }
             AddresserError::DoubleKeyHashAddresserError(ref s) => {
-                write!(f, "DoubleKeyHashAddresserError: {}", s.to_string())
+                write!(f, "Unable to compute hash: {}", s.to_string())
             }
             AddresserError::TripleKeyHashAddresserError(ref s) => {
-                write!(f, "TripleKeyHashAddresserError: {}", s.to_string())
+                write!(f, "Unable to compute hash: {}", s.to_string())
             }
         }
     }
