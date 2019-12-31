@@ -25,28 +25,21 @@ impl TripleKeyHashAddresser {
         prefix: String,
         first_hash_length: Option<usize>,
         second_hash_length: Option<usize>,
-    ) -> TripleKeyHashAddresser {
+    ) -> Result<TripleKeyHashAddresser, AddresserError> {
         let (first, second) =
-            calculate_hash_lengths(prefix.len(), first_hash_length, second_hash_length);
-        TripleKeyHashAddresser {
+            calculate_hash_lengths(prefix.len(), first_hash_length, second_hash_length)?;
+        Ok(TripleKeyHashAddresser {
             prefix,
             first_hash_length: first,
             second_hash_length: second,
-        }
+        })
     }
 }
 
 impl Addresser<(String, String, String)> for TripleKeyHashAddresser {
     fn compute(&self, key: &(String, String, String)) -> Result<String, AddresserError> {
-        let hash_length = ADDRESS_LENGTH - self.prefix.len();
-        let last_hash_length = hash_length - (self.first_hash_length + self.second_hash_length);
-        if (self.prefix.len() + self.first_hash_length + self.second_hash_length + last_hash_length)
-            != ADDRESS_LENGTH
-        {
-            return Err(AddresserError::TripleKeyHashAddresserError(
-                "Invalid hash length".to_string(),
-            ));
-        }
+        let last_hash_length =
+            ADDRESS_LENGTH - self.prefix.len() - (self.first_hash_length + self.second_hash_length);
 
         let first_hash = &hash(self.first_hash_length, &key.0);
         let second_hash = &hash(self.second_hash_length, &key.1);
@@ -66,15 +59,84 @@ fn calculate_hash_lengths(
     prefix_length: usize,
     first_length: Option<usize>,
     second_length: Option<usize>,
-) -> (usize, usize) {
+) -> Result<(usize, usize), AddresserError> {
+    // Validate the length of the provided prefix is not greater than the ADDRESS_LENGTH.
+    if prefix_length > ADDRESS_LENGTH {
+        return Err(AddresserError {
+            message: format!(
+                "Prefix length ({}) is greater than total address length ({})",
+                prefix_length, ADDRESS_LENGTH
+            ),
+        });
+    }
     match (first_length, second_length) {
-        (Some(first), Some(second)) => (first, second),
-        (None, Some(second)) => (((ADDRESS_LENGTH - prefix_length - second) / 2), second),
-        (Some(first), None) => (first, ((ADDRESS_LENGTH - prefix_length - first) / 2)),
-        (None, None) => (
-            ((ADDRESS_LENGTH - prefix_length) / 3),
-            ((ADDRESS_LENGTH - prefix_length) / 3),
-        ),
+        (Some(first), Some(second)) => {
+            // Validate the hash lengths plus the prefix length is not greater than ADDRESS_LENGTH.
+            if prefix_length + first + second > ADDRESS_LENGTH {
+                return Err(AddresserError {
+                    message: format!(
+                        "Prefix length ({}) and hash lengths ({}) combined are greater than \
+                         total address length ({})",
+                        prefix_length,
+                        (first + second),
+                        ADDRESS_LENGTH
+                    ),
+                });
+            }
+            Ok((first, second))
+        }
+        (None, Some(second)) => {
+            // Validate the hash length plus the prefix length is not greater than ADDRESS_LENGTH.
+            if prefix_length + second > ADDRESS_LENGTH {
+                return Err(AddresserError {
+                    message: format!(
+                        "Prefix length ({}) and hash length ({}) combined are greater than \
+                         total address length ({})",
+                        prefix_length, second, ADDRESS_LENGTH
+                    ),
+                });
+            }
+            // If the prefix length and hash length are not greater than ADDRESS_LENGTH, the
+            // other hash length can be calculated and returned.
+            let calculated_length = (ADDRESS_LENGTH - prefix_length - second) / 2;
+            Ok((calculated_length, second))
+        }
+        (Some(first), None) => {
+            // Validate the hash length plus the prefix length is not greater than ADDRESS_LENGTH.
+            if prefix_length + first > ADDRESS_LENGTH {
+                return Err(AddresserError {
+                    message: format!(
+                        "Prefix length ({}) and hash length ({}) combined are greater than \
+                         total address length ({})",
+                        prefix_length, first, ADDRESS_LENGTH
+                    ),
+                });
+            }
+            // If the prefix length and hash ength are not greater than ADDRESS_LENGTH, the other
+            // hash length can be calculated and returned.
+            let calculated_length = (ADDRESS_LENGTH - prefix_length - first) / 2;
+            Ok((first, calculated_length))
+        }
+        (None, None) => {
+            // Calculate the first and second hash length.
+            let calculated_first = (ADDRESS_LENGTH - prefix_length) / 3;
+            let calculated_second = calculated_first;
+            // Validate the calculated hash lengths plus the prefix length is not greater than the
+            // ADDRESS_LENGTH.
+            if prefix_length + calculated_first + calculated_second > ADDRESS_LENGTH {
+                return Err(AddresserError {
+                    message: format!(
+                        "Prefix length ({}) and hash lengths ({}) combined are greater than \
+                         total address length ({})",
+                        prefix_length,
+                        (calculated_first + calculated_second),
+                        ADDRESS_LENGTH
+                    ),
+                });
+            }
+            // If the validation is passed, return the calculated hash lengths.
+            Ok((calculated_first, calculated_second))
+        }
     }
 }
 
@@ -105,7 +167,8 @@ mod tests {
     fn test_triple_key_default_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and None options for the
         // `first_hash_length` and `second_hash_length`
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct TripleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(21, key1);
@@ -155,7 +218,8 @@ mod tests {
     fn test_triple_key_custom_first_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix,` a Some option for the
         // `first_hash_length` and a None option for the `second_hash_length`
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), Some(14), None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), Some(14), None)
+            .expect("Unable to construct TripleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(14, key1);
@@ -204,7 +268,8 @@ mod tests {
     fn test_triple_key_custom_second_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix,` a Some option for the
         // `second_hash_length` and a None option for the `first_hash_length`
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, Some(14));
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, Some(14))
+            .expect("Unable to construct TripleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(25, key1);
@@ -252,7 +317,8 @@ mod tests {
     fn test_triple_key_custom_lengths() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix,` and Some options for the
         // `first_hash_length` and `second_hash_length`
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), Some(10), Some(10));
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), Some(10), Some(10))
+            .expect("Unable to construct TripleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(10, key1);
@@ -288,17 +354,17 @@ mod tests {
     /// This test validates the correct calculation for the `second_hash_length` and the matching
     /// value of the Some option for the `first_hash_length`
     fn test_calculate_hash_custom_first_length() {
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(21), None);
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(21), None).unwrap();
         assert_eq!(first_length, 21);
         let remaining = ADDRESS_LENGTH - 6 - 21;
         assert_eq!(second_length, (remaining / 2));
 
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(41), None);
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(41), None).unwrap();
         assert_eq!(first_length, 41);
         let remaining = ADDRESS_LENGTH - 6 - 41;
         assert_eq!(second_length, (remaining / 2));
 
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(61), None);
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(61), None).unwrap();
         assert_eq!(first_length, 61);
         let remaining = ADDRESS_LENGTH - 6 - 61;
         assert_eq!(second_length, (remaining / 2));
@@ -315,17 +381,17 @@ mod tests {
     /// This test validates the correct calculation for the `first_hash_length` and the matching
     /// value of the Some option for the `second_hash_length`
     fn test_calculate_hash_custom_second_length() {
-        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(21));
+        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(21)).unwrap();
         let remaining = ADDRESS_LENGTH - 6 - 21;
         assert_eq!(first_length, (remaining / 2));
         assert_eq!(second_length, 21);
 
-        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(41));
+        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(41)).unwrap();
         let remaining = ADDRESS_LENGTH - 6 - 41;
         assert_eq!(first_length, (remaining / 2));
         assert_eq!(second_length, 41);
 
-        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(61));
+        let (first_length, second_length) = calculate_hash_lengths(6, None, Some(61)).unwrap();
         let remaining = ADDRESS_LENGTH - 6 - 61;
         assert_eq!(first_length, (remaining / 2));
         assert_eq!(second_length, 61);
@@ -340,15 +406,15 @@ mod tests {
     /// This test validates the matching value of the Some option for the `first_hash_length` and
     /// `second_hash_length`
     fn test_calculate_hash_custom_lengths() {
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(42), Some(12));
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(42), Some(12)).unwrap();
         assert_eq!(first_length, 42);
         assert_eq!(second_length, 12);
 
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(12), Some(42));
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(12), Some(42)).unwrap();
         assert_eq!(first_length, 12);
         assert_eq!(second_length, 42);
 
-        let (first_length, second_length) = calculate_hash_lengths(6, Some(20), Some(20));
+        let (first_length, second_length) = calculate_hash_lengths(6, Some(20), Some(20)).unwrap();
         assert_eq!(first_length, 20);
         assert_eq!(second_length, 20);
     }
@@ -363,19 +429,114 @@ mod tests {
     ///
     /// This test validates the correct calculation for the `first_hash_length` and `second_hash_length`
     fn test_calculate_hash_no_custom_lengths() {
-        let (first_length, second_length) = calculate_hash_lengths(6, None, None);
+        let (first_length, second_length) = calculate_hash_lengths(6, None, None).unwrap();
         let remaining = ADDRESS_LENGTH - 6;
         assert_eq!(first_length, (remaining / 3));
         assert_eq!(second_length, (remaining / 3));
 
-        let (first_length, second_length) = calculate_hash_lengths(30, None, None);
+        let (first_length, second_length) = calculate_hash_lengths(30, None, None).unwrap();
         let remaining = ADDRESS_LENGTH - 30;
         assert_eq!(first_length, (remaining / 3));
         assert_eq!(second_length, (remaining / 3));
 
-        let (first_length, second_length) = calculate_hash_lengths(50, None, None);
+        let (first_length, second_length) = calculate_hash_lengths(50, None, None).unwrap();
         let remaining = ADDRESS_LENGTH - 50;
         assert_eq!(first_length, (remaining / 3));
         assert_eq!(second_length, (remaining / 3));
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of the ADDRESS_LENGTH for the `first_hash_length` and None for the `second_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// length combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with an invalid custom hash
+    /// length and should return an error. Also validates the expected error message.
+    fn test_invalid_first_custom_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and the `first_hash_length`
+        // equal to the ADDRESS_LENGTH const which will return an error as the prefix length and
+        // custom length combined are greater than the ADDRESS_LENGTH.
+        let addresser =
+            TripleKeyHashAddresser::new("prefix".to_string(), Some(ADDRESS_LENGTH), None);
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of the ADDRESS_LENGTH for the `second_hash_length` and None for the `first_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// length combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with an invalid custom hash
+    /// length and should return an error.
+    fn test_invalid_second_custom_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and the `second_hash_length`
+        // equal to the ADDRESS_LENGTH const which will return an error as the prefix length and
+        // custom length combined are greater than the ADDRESS_LENGTH.
+        let addresser =
+            TripleKeyHashAddresser::new("prefix".to_string(), None, Some(ADDRESS_LENGTH));
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 6 character `prefix` and an optional
+    /// value of half the ADDRESS_LENGTH const for both `second_hash_length` and `first_hash_length.`
+    /// This test ensures that an error will be returned as the length of the prefix and the custom
+    /// lengths combined are greater than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with invalid custom hash
+    /// lengths and should return an error.
+    fn test_invalid_custom_lengths_construction() {
+        // Creating a TripleKeyHashAddresser with a 6 character `prefix` and value of half the
+        // ADDRESS_LENGTH const for the `first_hash_length` and `second_hash_length` which will
+        // return an error as the prefixlength and custom lengths combined are greater than the
+        // ADDRESS_LENGTH.
+        let addresser = TripleKeyHashAddresser::new(
+            "prefix".to_string(),
+            Some(ADDRESS_LENGTH / 2),
+            Some(ADDRESS_LENGTH / 2),
+        );
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a TripleKeyHashAddresser with a 72 character `prefix` and a None
+    /// value for both `second_hash_length` and `first_hash_length.` This test ensures that an error
+    /// will be returned as the length of the prefix and the custom lengths combined are greater
+    /// than the const ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with invalid prefix
+    /// length and should return an error.
+    fn test_invalid_prefix_length_construction() {
+        // Creating a TripleKeyHashAddresser with a 72 character `prefix` and value of None for the
+        // `first_hash_length` and `second_hash_length` which will return an error as the prefix
+        //  length is greater than the ADDRESS_LENGTH const.
+        let addresser = TripleKeyHashAddresser::new(
+            "prefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefix".to_string(),
+            None,
+            None,
+        );
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
     }
 }

@@ -20,23 +20,22 @@ pub struct DoubleKeyHashAddresser {
 }
 
 impl DoubleKeyHashAddresser {
-    pub fn new(prefix: String, first_hash_length: Option<usize>) -> DoubleKeyHashAddresser {
-        DoubleKeyHashAddresser {
+    pub fn new(
+        prefix: String,
+        first_hash_length: Option<usize>,
+    ) -> Result<DoubleKeyHashAddresser, AddresserError> {
+        validate_lengths(prefix.len(), first_hash_length)?;
+        Ok(DoubleKeyHashAddresser {
             prefix: prefix.clone(),
             first_hash_length: first_hash_length.unwrap_or((ADDRESS_LENGTH - prefix.len()) / 2),
-        }
+        })
     }
 }
 
 impl Addresser<(String, String)> for DoubleKeyHashAddresser {
     fn compute(&self, key: &(String, String)) -> Result<String, AddresserError> {
-        let hash_length = ADDRESS_LENGTH - self.prefix.len();
-        let second_hash_length = hash_length - self.first_hash_length;
-        if (self.prefix.len() + self.first_hash_length + second_hash_length) != ADDRESS_LENGTH {
-            return Err(AddresserError::DoubleKeyHashAddresserError(
-                "Invalid hash length".to_string(),
-            ));
-        }
+        let second_hash_length = ADDRESS_LENGTH - self.prefix.len() - self.first_hash_length;
+
         let first_hash = &hash(self.first_hash_length, &key.0);
         let second_hash = &hash(second_hash_length, &key.1);
 
@@ -46,6 +45,38 @@ impl Addresser<(String, String)> for DoubleKeyHashAddresser {
     fn normalize(&self, key: &(String, String)) -> String {
         key.0.to_string() + "_" + &key.1
     }
+}
+
+// Used to validate the lengths of the input, including the prefix length and optional hash
+// length, which are used to construct the DoubleKeyHashAddresser.
+fn validate_lengths(
+    prefix_length: usize,
+    first_length: Option<usize>,
+) -> Result<(), AddresserError> {
+    // Validate the length of the prefix is not greater than the ADDRESS_LENGTH.
+    if prefix_length > ADDRESS_LENGTH {
+        return Err(AddresserError {
+            message: format!(
+                "Prefix length ({}) is greater than total address length ({})",
+                prefix_length, ADDRESS_LENGTH
+            ),
+        });
+    }
+
+    // Validate the length of the prefix plus the hash length is not greater than ADDRESS_LENGTH.
+    if let Some(length) = first_length {
+        if length + prefix_length > ADDRESS_LENGTH {
+            return Err(AddresserError {
+                message: format!(
+                    "Length of prefix ({}) plus length of first address segment ({}) combined are \
+                     greater than total address length ({})",
+                    prefix_length, length, ADDRESS_LENGTH,
+                ),
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -73,7 +104,8 @@ mod tests {
     fn test_double_key_default_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and None option for the
         // `first_hash_length`
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct DoubleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(32, key1);
@@ -115,7 +147,8 @@ mod tests {
     fn test_double_key_custom_length() {
         // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and value of 16 for the
         // `first_hash_length`
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), Some(16));
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), Some(16))
+            .expect("Unable to construct DoubleKeyHashAddresser");
         // Create the hashes of the individual keys to verify the constructed address
         let key1 = "a";
         let key1_hash = hash(16, key1);
@@ -134,5 +167,50 @@ mod tests {
         // Verify the `normalize` method generates the correct single string
         let normalized = addresser.normalize(&(key1.to_string(), key2.to_string()));
         assert_eq!(normalized, "a_b".to_string());
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a DoubleKeyHashAddresser with a 6 character `prefix` and the
+    /// `first_hash_length` equal to the ADDRESS_LENGTH const. This test ensures that an error will
+    /// be returned as the length of the prefix and the custom length combined are greater than the
+    /// ADDRESS_LENGTH.
+    ///
+    /// This test will attempt to construct a DoubleKeyHashAddresser with an invalid custom hash
+    /// length and should return an error.
+    fn test_invalid_hash_length() {
+        // Creating a DoubleKeyHashAddresser with a 6 character `prefix` and `first_hash_length`
+        // equal to the ADDRESS_LENGTH const, which will return an error as the prefix length and
+        // custom length combined are greater than the ADDRESS_LENGTH const.
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), Some(ADDRESS_LENGTH));
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
+    }
+
+    #[test]
+    #[should_panic]
+    /// This test constructs a DoubleKeyHashAddresser with a 72 character `prefix` and a None
+    /// value for the `first_hash_length.` This test ensures that an error will be returned as the
+    /// length of the prefix and the custom lengths combined are greater than the const
+    /// ADDRESS_LENGTH, currently set to 70.
+    ///
+    /// This test will attempt to construct a TripleKeyHashAddresser with invalid prefix
+    /// length and should return an error.
+    fn test_invalid_prefix_length() {
+        // Creating a TripleKeyHashAddresser with a 72 character `prefix` and value of None for the
+        // `first_hash_length`  which will return an error as the prefix length is greater than the
+        //  ADDRESS_LENGTH const.
+        let addresser = DoubleKeyHashAddresser::new(
+            "prefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefixprefix".to_string(),
+            None,
+        );
+
+        // Assert the Addresser constructor returned an error.
+        assert!(addresser.is_err());
+        // Unwrap to validate that this will panic.
+        addresser.unwrap();
     }
 }

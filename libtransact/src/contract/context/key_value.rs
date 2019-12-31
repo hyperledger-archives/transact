@@ -771,7 +771,8 @@ mod tests {
     fn test_double_set_state_entry() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to be set in state
@@ -800,7 +801,8 @@ mod tests {
     fn test_double_get_state_entry() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap, with a string key and ValueType value
@@ -841,7 +843,8 @@ mod tests {
     fn test_double_delete_state_entry() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap, with a string key and ValueType value
@@ -883,7 +886,8 @@ mod tests {
     fn test_double_set_state_entries() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -919,7 +923,8 @@ mod tests {
     fn test_double_get_state_entries() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -974,7 +979,8 @@ mod tests {
     fn test_double_delete_state_entries() {
         // Create a TestContext and DoubleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None);
+        let addresser = DoubleKeyHashAddresser::new("prefix".to_string(), None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -1025,7 +1031,8 @@ mod tests {
     fn test_triple_set_state_entry() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to be set in state
@@ -1057,7 +1064,8 @@ mod tests {
     fn test_triple_get_state_entry() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap, with a string key and ValueType value
@@ -1101,7 +1109,8 @@ mod tests {
     fn test_triple_delete_state_entry() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap, with a string key and ValueType value
@@ -1146,7 +1155,8 @@ mod tests {
     fn test_triple_set_state_entries() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -1183,7 +1193,8 @@ mod tests {
     fn test_triple_get_state_entries() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -1238,7 +1249,8 @@ mod tests {
     fn test_triple_delete_state_entries() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Create a HashMap to contain the multiple entries to set in state
@@ -1280,7 +1292,8 @@ mod tests {
     fn test_add_receipt_data_ok() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Call the `add_receipt_data` method
@@ -1296,7 +1309,8 @@ mod tests {
     fn test_add_event_ok() {
         // Create a TestContext and TripleKeyHashAddresser to construct a KeyValueTransactionContext
         let mut context = TestContext::new();
-        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None);
+        let addresser = TripleKeyHashAddresser::new("prefix".to_string(), None, None)
+            .expect("Unable to construct Addresser");
         let simple_state = KeyValueTransactionContext::new(&mut context, addresser);
 
         // Call the `add_event` method
