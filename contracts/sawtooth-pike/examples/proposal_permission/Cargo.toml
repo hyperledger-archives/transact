@@ -18,7 +18,7 @@ version = "0.1.0"
 authors = ["Cargill, Incorporated"]
 
 [dependencies]
-sabre-sdk = { path = "../../../../sdk" }
+sabre-sdk = { path = "../../../../sdks/rust" }
 protobuf = "1.4"
 
 [build-dependencies]

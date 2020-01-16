@@ -46,7 +46,7 @@ ENV PATH=$PATH:/protoc3/bin:/root/.cargo/bin
 
 WORKDIR /project/sawtooth-sabre
 
-CMD cd sdk \
+CMD cd sdks/rust \
  && cargo login $CARGO_CRED \
  && rm -f Cargo.lock \
  && REPO_VER=$(VERSION=AUTO_STRICT ../bin/get_version) \
