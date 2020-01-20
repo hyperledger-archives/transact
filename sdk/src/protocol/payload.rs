@@ -330,6 +330,11 @@ impl CreateContractActionBuilder {
             contract,
         })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for DeleteContractAction
@@ -430,6 +435,11 @@ impl DeleteContractActionBuilder {
         })?;
 
         Ok(DeleteContractAction { name, version })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -594,6 +604,11 @@ impl ExecuteContractActionBuilder {
             payload,
         })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for CreateContractRegistryAction
@@ -703,6 +718,11 @@ impl CreateContractRegistryActionBuilder {
 
         Ok(CreateContractRegistryAction { name, owners })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for DeleteContractRegistryAction
@@ -786,6 +806,11 @@ impl DeleteContractRegistryActionBuilder {
         })?;
 
         Ok(DeleteContractRegistryAction { name })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -908,6 +933,11 @@ impl UpdateContractRegistryOwnersActionBuilder {
 
         Ok(UpdateContractRegistryOwnersAction { name, owners })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for CreateNamespaceRegistryAction
@@ -1017,6 +1047,11 @@ impl CreateNamespaceRegistryActionBuilder {
 
         Ok(CreateNamespaceRegistryAction { namespace, owners })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for DeleteNamespaceRegistryAction
@@ -1099,6 +1134,11 @@ impl DeleteNamespaceRegistryActionBuilder {
         })?;
 
         Ok(DeleteNamespaceRegistryAction { namespace })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1226,6 +1266,11 @@ impl UpdateNamespaceRegistryOwnersActionBuilder {
         };
 
         Ok(UpdateNamespaceRegistryOwnersAction { namespace, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1386,6 +1431,11 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
             write,
         })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for DeleteNamespaceRegistryPermissionAction
@@ -1513,6 +1563,11 @@ impl DeleteNamespaceRegistryPermissionActionBuilder {
             namespace,
             contract_name,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1642,6 +1697,11 @@ impl CreateSmartPermissionActionBuilder {
             function,
         })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for UpdateSmartPermissionAction
@@ -1770,6 +1830,11 @@ impl UpdateSmartPermissionActionBuilder {
             function,
         })
     }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
 }
 
 /// Native implementation for DeleteSmartPermissionAction
@@ -1870,6 +1935,11 @@ impl DeleteSmartPermissionActionBuilder {
         })?;
 
         Ok(DeleteSmartPermissionAction { name, org_id })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
