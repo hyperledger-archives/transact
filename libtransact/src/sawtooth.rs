@@ -68,8 +68,8 @@ impl<H: SawtoothTransactionHandler + Send> SawtoothToTransactHandlerAdapter<H> {
     /// Constructs a new Sawtooth to Transact handler adapter.
     pub fn new(handler: H) -> Self {
         SawtoothToTransactHandlerAdapter {
-            family_name: handler.family_name().clone(),
-            family_versions: handler.family_versions().clone(),
+            family_name: handler.family_name(),
+            family_versions: handler.family_versions(),
             handler,
         }
     }
