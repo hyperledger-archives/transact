@@ -107,11 +107,11 @@ impl<H: SawtoothTransactionHandler + Send> TransactionHandler
 }
 
 struct TransactToSawtoothContextAdapter<'a> {
-    transact_context: &'a TransactionContext,
+    transact_context: &'a dyn TransactionContext,
 }
 
 impl<'a> TransactToSawtoothContextAdapter<'a> {
-    fn new(transact_context: &'a TransactionContext) -> Self {
+    fn new(transact_context: &'a dyn TransactionContext) -> Self {
         TransactToSawtoothContextAdapter { transact_context }
     }
 }
