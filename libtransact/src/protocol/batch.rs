@@ -245,21 +245,55 @@ impl IntoBytes for Batch {
 impl IntoProto<protos::batch::Batch> for Batch {}
 impl IntoNative<Batch> for protos::batch::Batch {}
 
-impl FromBytes<Vec<Batch>> for Vec<Batch> {
-    fn from_bytes(bytes: &[u8]) -> Result<Vec<Batch>, ProtoConversionError> {
-        let proto: protos::batch::BatchList = protobuf::parse_from_bytes(bytes).map_err(|err| {
-            ProtoConversionError::SerializationError(format!(
-                "unable to get BatchList from bytes: {}",
-                err
-            ))
-        })?;
-        proto
+impl FromProto<protos::batch::BatchList> for Vec<Batch> {
+    fn from_proto(batch_list: protos::batch::BatchList) -> Result<Self, ProtoConversionError> {
+        batch_list
             .batches
             .into_iter()
             .map(|batch| batch.into_native())
             .collect()
     }
 }
+
+impl FromNative<Vec<Batch>> for protos::batch::BatchList {
+    fn from_native(batches: Vec<Batch>) -> Result<Self, ProtoConversionError> {
+        let mut proto_batch_list = protos::batch::BatchList::new();
+        let proto_batches = batches
+            .into_iter()
+            .map(Batch::into_proto)
+            .collect::<Result<_, _>>()?;
+        proto_batch_list.set_batches(proto_batches);
+        Ok(proto_batch_list)
+    }
+}
+
+impl FromBytes<Vec<Batch>> for Vec<Batch> {
+    fn from_bytes(bytes: &[u8]) -> Result<Self, ProtoConversionError> {
+        let proto: protos::batch::BatchList = protobuf::parse_from_bytes(bytes).map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get BatchList from bytes: {}",
+                err
+            ))
+        })?;
+        proto.into_native()
+    }
+}
+
+impl IntoBytes for Vec<Batch> {
+    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
+        let proto = self.into_proto()?;
+        let bytes = proto.write_to_bytes().map_err(|err| {
+            ProtoConversionError::SerializationError(format!(
+                "unable to get bytes from BatchList: {}",
+                err
+            ))
+        })?;
+        Ok(bytes)
+    }
+}
+
+impl IntoProto<protos::batch::BatchList> for Vec<Batch> {}
+impl IntoNative<Vec<Batch>> for protos::batch::BatchList {}
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct BatchPair {
