@@ -70,6 +70,90 @@ impl std::fmt::Display for Action {
     }
 }
 
+impl From<CreateContractAction> for Action {
+    fn from(action: CreateContractAction) -> Self {
+        Action::CreateContract(action)
+    }
+}
+
+impl From<DeleteContractAction> for Action {
+    fn from(action: DeleteContractAction) -> Self {
+        Action::DeleteContract(action)
+    }
+}
+
+impl From<ExecuteContractAction> for Action {
+    fn from(action: ExecuteContractAction) -> Self {
+        Action::ExecuteContract(action)
+    }
+}
+
+impl From<CreateContractRegistryAction> for Action {
+    fn from(action: CreateContractRegistryAction) -> Self {
+        Action::CreateContractRegistry(action)
+    }
+}
+
+impl From<DeleteContractRegistryAction> for Action {
+    fn from(action: DeleteContractRegistryAction) -> Self {
+        Action::DeleteContractRegistry(action)
+    }
+}
+
+impl From<UpdateContractRegistryOwnersAction> for Action {
+    fn from(action: UpdateContractRegistryOwnersAction) -> Self {
+        Action::UpdateContractRegistryOwners(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryAction> for Action {
+    fn from(action: CreateNamespaceRegistryAction) -> Self {
+        Action::CreateNamespaceRegistry(action)
+    }
+}
+
+impl From<DeleteNamespaceRegistryAction> for Action {
+    fn from(action: DeleteNamespaceRegistryAction) -> Self {
+        Action::DeleteNamespaceRegistry(action)
+    }
+}
+
+impl From<UpdateNamespaceRegistryOwnersAction> for Action {
+    fn from(action: UpdateNamespaceRegistryOwnersAction) -> Self {
+        Action::UpdateNamespaceRegistryOwners(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryPermissionAction> for Action {
+    fn from(action: CreateNamespaceRegistryPermissionAction) -> Self {
+        Action::CreateNamespaceRegistryPermission(action)
+    }
+}
+
+impl From<DeleteNamespaceRegistryPermissionAction> for Action {
+    fn from(action: DeleteNamespaceRegistryPermissionAction) -> Self {
+        Action::DeleteNamespaceRegistryPermission(action)
+    }
+}
+
+impl From<CreateSmartPermissionAction> for Action {
+    fn from(action: CreateSmartPermissionAction) -> Self {
+        Action::CreateSmartPermission(action)
+    }
+}
+
+impl From<UpdateSmartPermissionAction> for Action {
+    fn from(action: UpdateSmartPermissionAction) -> Self {
+        Action::UpdateSmartPermission(action)
+    }
+}
+
+impl From<DeleteSmartPermissionAction> for Action {
+    fn from(action: DeleteSmartPermissionAction) -> Self {
+        Action::DeleteSmartPermission(action)
+    }
+}
+
 /// Native implementation for CreateContractAction
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateContractAction {
@@ -2169,77 +2253,80 @@ impl SabrePayload {
 impl FromProto<protos::payload::SabrePayload> for SabrePayload {
     fn from_proto(proto: protos::payload::SabrePayload) -> Result<Self, ProtoConversionError> {
         let action = match proto.get_action() {
-            protos::payload::SabrePayload_Action::CREATE_CONTRACT => Action::CreateContract(
-                CreateContractAction::from_proto(proto.get_create_contract().clone())?,
-            ),
-            protos::payload::SabrePayload_Action::DELETE_CONTRACT => Action::DeleteContract(
-                DeleteContractAction::from_proto(proto.get_delete_contract().clone())?,
-            ),
-            protos::payload::SabrePayload_Action::EXECUTE_CONTRACT => Action::ExecuteContract(
-                ExecuteContractAction::from_proto(proto.get_execute_contract().clone())?,
-            ),
+            protos::payload::SabrePayload_Action::CREATE_CONTRACT => {
+                CreateContractAction::from_proto(proto.get_create_contract().clone())?.into()
+            }
+            protos::payload::SabrePayload_Action::DELETE_CONTRACT => {
+                DeleteContractAction::from_proto(proto.get_delete_contract().clone())?.into()
+            }
+            protos::payload::SabrePayload_Action::EXECUTE_CONTRACT => {
+                ExecuteContractAction::from_proto(proto.get_execute_contract().clone())?.into()
+            }
             protos::payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY => {
-                Action::CreateContractRegistry(CreateContractRegistryAction::from_proto(
+                CreateContractRegistryAction::from_proto(
                     proto.get_create_contract_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY => {
-                Action::DeleteContractRegistry(DeleteContractRegistryAction::from_proto(
+                DeleteContractRegistryAction::from_proto(
                     proto.get_delete_contract_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
-                Action::UpdateContractRegistryOwners(
-                    UpdateContractRegistryOwnersAction::from_proto(
-                        proto.get_update_contract_registry_owners().clone(),
-                    )?,
-                )
+                UpdateContractRegistryOwnersAction::from_proto(
+                    proto.get_update_contract_registry_owners().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY => {
-                Action::CreateNamespaceRegistry(CreateNamespaceRegistryAction::from_proto(
+                CreateNamespaceRegistryAction::from_proto(
                     proto.get_create_namespace_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY => {
-                Action::DeleteNamespaceRegistry(DeleteNamespaceRegistryAction::from_proto(
+                DeleteNamespaceRegistryAction::from_proto(
                     proto.get_delete_namespace_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
-                Action::UpdateNamespaceRegistryOwners(
-                    UpdateNamespaceRegistryOwnersAction::from_proto(
-                        proto.get_update_namespace_registry_owners().clone(),
-                    )?,
-                )
+                UpdateNamespaceRegistryOwnersAction::from_proto(
+                    proto.get_update_namespace_registry_owners().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
-                Action::CreateNamespaceRegistryPermission(
-                    CreateNamespaceRegistryPermissionAction::from_proto(
-                        proto.get_create_namespace_registry_permission().clone(),
-                    )?,
-                )
+                CreateNamespaceRegistryPermissionAction::from_proto(
+                    proto.get_create_namespace_registry_permission().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
-                Action::DeleteNamespaceRegistryPermission(
-                    DeleteNamespaceRegistryPermissionAction::from_proto(
-                        proto.get_delete_namespace_registry_permission().clone(),
-                    )?,
-                )
+                DeleteNamespaceRegistryPermissionAction::from_proto(
+                    proto.get_delete_namespace_registry_permission().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_SMART_PERMISSION => {
-                Action::CreateSmartPermission(CreateSmartPermissionAction::from_proto(
+                CreateSmartPermissionAction::from_proto(
                     proto.get_create_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_SMART_PERMISSION => {
-                Action::UpdateSmartPermission(UpdateSmartPermissionAction::from_proto(
+                UpdateSmartPermissionAction::from_proto(
                     proto.get_update_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_SMART_PERMISSION => {
-                Action::DeleteSmartPermission(DeleteSmartPermissionAction::from_proto(
+                DeleteSmartPermissionAction::from_proto(
                     proto.get_delete_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::ACTION_UNSET => {
                 return Err(ProtoConversionError::InvalidTypeError(
@@ -2863,12 +2950,9 @@ mod tests {
             .unwrap();
 
         let builder = SabrePayloadBuilder::new();
-        let payload = builder
-            .with_action(Action::ExecuteContract(action.clone()))
-            .build()
-            .unwrap();
+        let payload = builder.with_action(action.clone().into()).build().unwrap();
 
-        assert_eq!(payload.action, Action::ExecuteContract(action));
+        assert_eq!(payload.action, Action::from(action));
     }
 
     #[test]
@@ -2885,10 +2969,7 @@ mod tests {
             .unwrap();
 
         let builder = SabrePayloadBuilder::new();
-        let original = builder
-            .with_action(Action::ExecuteContract(action))
-            .build()
-            .unwrap();
+        let original = builder.with_action(action.into()).build().unwrap();
         let bytes = original.clone().into_bytes().unwrap();
 
         let payload = SabrePayload::from_bytes(&bytes).unwrap();
