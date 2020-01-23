@@ -70,6 +70,105 @@ impl std::fmt::Display for Action {
     }
 }
 
+impl From<CreateContractAction> for Action {
+    fn from(action: CreateContractAction) -> Self {
+        Action::CreateContract(action)
+    }
+}
+
+impl From<DeleteContractAction> for Action {
+    fn from(action: DeleteContractAction) -> Self {
+        Action::DeleteContract(action)
+    }
+}
+
+impl From<ExecuteContractAction> for Action {
+    fn from(action: ExecuteContractAction) -> Self {
+        Action::ExecuteContract(action)
+    }
+}
+
+impl From<CreateContractRegistryAction> for Action {
+    fn from(action: CreateContractRegistryAction) -> Self {
+        Action::CreateContractRegistry(action)
+    }
+}
+
+impl From<DeleteContractRegistryAction> for Action {
+    fn from(action: DeleteContractRegistryAction) -> Self {
+        Action::DeleteContractRegistry(action)
+    }
+}
+
+impl From<UpdateContractRegistryOwnersAction> for Action {
+    fn from(action: UpdateContractRegistryOwnersAction) -> Self {
+        Action::UpdateContractRegistryOwners(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryAction> for Action {
+    fn from(action: CreateNamespaceRegistryAction) -> Self {
+        Action::CreateNamespaceRegistry(action)
+    }
+}
+
+impl From<DeleteNamespaceRegistryAction> for Action {
+    fn from(action: DeleteNamespaceRegistryAction) -> Self {
+        Action::DeleteNamespaceRegistry(action)
+    }
+}
+
+impl From<UpdateNamespaceRegistryOwnersAction> for Action {
+    fn from(action: UpdateNamespaceRegistryOwnersAction) -> Self {
+        Action::UpdateNamespaceRegistryOwners(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryPermissionAction> for Action {
+    fn from(action: CreateNamespaceRegistryPermissionAction) -> Self {
+        Action::CreateNamespaceRegistryPermission(action)
+    }
+}
+
+impl From<DeleteNamespaceRegistryPermissionAction> for Action {
+    fn from(action: DeleteNamespaceRegistryPermissionAction) -> Self {
+        Action::DeleteNamespaceRegistryPermission(action)
+    }
+}
+
+impl From<CreateSmartPermissionAction> for Action {
+    fn from(action: CreateSmartPermissionAction) -> Self {
+        Action::CreateSmartPermission(action)
+    }
+}
+
+impl From<UpdateSmartPermissionAction> for Action {
+    fn from(action: UpdateSmartPermissionAction) -> Self {
+        Action::UpdateSmartPermission(action)
+    }
+}
+
+impl From<DeleteSmartPermissionAction> for Action {
+    fn from(action: DeleteSmartPermissionAction) -> Self {
+        Action::DeleteSmartPermission(action)
+    }
+}
+
+#[derive(Debug)]
+pub enum ActionBuildError {
+    MissingField(String),
+}
+
+impl StdError for ActionBuildError {}
+
+impl std::fmt::Display for ActionBuildError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            Self::MissingField(ref s) => write!(f, "missing field: {}", s),
+        }
+    }
+}
+
 /// Native implementation for CreateContractAction
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateContractAction {
@@ -161,27 +260,6 @@ impl IntoBytes for CreateContractAction {
 impl IntoProto<protos::payload::CreateContractAction> for CreateContractAction {}
 impl IntoNative<CreateContractAction> for protos::payload::CreateContractAction {}
 
-#[derive(Debug)]
-pub enum CreateContractActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for CreateContractActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            CreateContractActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for CreateContractActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            CreateContractActionBuildError::MissingField(ref s) => write!(f, "MissingField: {}", s),
-        }
-    }
-}
-
 /// Builder used to create a CreateContractAction
 #[derive(Default, Clone)]
 pub struct CreateContractActionBuilder {
@@ -222,13 +300,13 @@ impl CreateContractActionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<CreateContractAction, CreateContractActionBuildError> {
+    pub fn build(self) -> Result<CreateContractAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            CreateContractActionBuildError::MissingField("'name' field is required".to_string())
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let version = self.version.ok_or_else(|| {
-            CreateContractActionBuildError::MissingField("'version' field is required".to_string())
+            ActionBuildError::MissingField("'version' field is required".to_string())
         })?;
 
         let inputs = self.inputs;
@@ -236,7 +314,7 @@ impl CreateContractActionBuilder {
 
         let contract = {
             if self.contract.is_empty() {
-                return Err(CreateContractActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'contract' field is required".to_string(),
                 ));
             } else {
@@ -251,6 +329,11 @@ impl CreateContractActionBuilder {
             outputs,
             contract,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -320,27 +403,6 @@ impl IntoBytes for DeleteContractAction {
 impl IntoProto<protos::payload::DeleteContractAction> for DeleteContractAction {}
 impl IntoNative<DeleteContractAction> for protos::payload::DeleteContractAction {}
 
-#[derive(Debug)]
-pub enum DeleteContractActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for DeleteContractActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            DeleteContractActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for DeleteContractActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DeleteContractActionBuildError::MissingField(ref s) => write!(f, "MissingField: {}", s),
-        }
-    }
-}
-
 /// Builder used to create a DeleteContractAction
 #[derive(Default, Clone)]
 pub struct DeleteContractActionBuilder {
@@ -363,16 +425,21 @@ impl DeleteContractActionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<DeleteContractAction, DeleteContractActionBuildError> {
+    pub fn build(self) -> Result<DeleteContractAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            DeleteContractActionBuildError::MissingField("'name' field is required".to_string())
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let version = self.version.ok_or_else(|| {
-            DeleteContractActionBuildError::MissingField("'version' field is required".to_string())
+            ActionBuildError::MissingField("'version' field is required".to_string())
         })?;
 
         Ok(DeleteContractAction { name, version })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -467,29 +534,6 @@ impl IntoBytes for ExecuteContractAction {
 impl IntoProto<protos::payload::ExecuteContractAction> for ExecuteContractAction {}
 impl IntoNative<ExecuteContractAction> for protos::payload::ExecuteContractAction {}
 
-#[derive(Debug)]
-pub enum ExecuteContractActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for ExecuteContractActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            ExecuteContractActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for ExecuteContractActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            ExecuteContractActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a ExecuteContractAction
 #[derive(Default, Clone)]
 pub struct ExecuteContractActionBuilder {
@@ -530,13 +574,13 @@ impl ExecuteContractActionBuilder {
         self
     }
 
-    pub fn build(self) -> Result<ExecuteContractAction, ExecuteContractActionBuildError> {
+    pub fn build(self) -> Result<ExecuteContractAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            ExecuteContractActionBuildError::MissingField("'name' field is required".to_string())
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let version = self.version.ok_or_else(|| {
-            ExecuteContractActionBuildError::MissingField("'version' field is required".to_string())
+            ActionBuildError::MissingField("'version' field is required".to_string())
         })?;
 
         let inputs = self.inputs;
@@ -544,7 +588,7 @@ impl ExecuteContractActionBuilder {
 
         let payload = {
             if self.payload.is_empty() {
-                return Err(ExecuteContractActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'payloads' field is required".to_string(),
                 ));
             } else {
@@ -559,6 +603,11 @@ impl ExecuteContractActionBuilder {
             outputs,
             payload,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -630,29 +679,6 @@ impl IntoBytes for CreateContractRegistryAction {
 impl IntoProto<protos::payload::CreateContractRegistryAction> for CreateContractRegistryAction {}
 impl IntoNative<CreateContractRegistryAction> for protos::payload::CreateContractRegistryAction {}
 
-#[derive(Debug)]
-pub enum CreateContractRegistryActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for CreateContractRegistryActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            CreateContractRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for CreateContractRegistryActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            CreateContractRegistryActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a CreateContractRegistryAction
 #[derive(Default, Clone)]
 pub struct CreateContractRegistryActionBuilder {
@@ -675,18 +701,14 @@ impl CreateContractRegistryActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<CreateContractRegistryAction, CreateContractRegistryActionBuildError> {
+    pub fn build(self) -> Result<CreateContractRegistryAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            CreateContractRegistryActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let owners = {
             if self.owners.is_empty() {
-                return Err(CreateContractRegistryActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'owners' field is required".to_string(),
                 ));
             } else {
@@ -695,6 +717,11 @@ impl CreateContractRegistryActionBuilder {
         };
 
         Ok(CreateContractRegistryAction { name, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -757,29 +784,6 @@ impl IntoBytes for DeleteContractRegistryAction {
 impl IntoProto<protos::payload::DeleteContractRegistryAction> for DeleteContractRegistryAction {}
 impl IntoNative<DeleteContractRegistryAction> for protos::payload::DeleteContractRegistryAction {}
 
-#[derive(Debug)]
-pub enum DeleteContractRegistryActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for DeleteContractRegistryActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            DeleteContractRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for DeleteContractRegistryActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DeleteContractRegistryActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a DeleteContractRegistryAction
 #[derive(Default, Clone)]
 pub struct DeleteContractRegistryActionBuilder {
@@ -796,16 +800,17 @@ impl DeleteContractRegistryActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<DeleteContractRegistryAction, DeleteContractRegistryActionBuildError> {
+    pub fn build(self) -> Result<DeleteContractRegistryAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            DeleteContractRegistryActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         Ok(DeleteContractRegistryAction { name })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -889,29 +894,6 @@ impl IntoNative<UpdateContractRegistryOwnersAction>
 {
 }
 
-#[derive(Debug)]
-pub enum UpdateContractRegistryOwnersActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for UpdateContractRegistryOwnersActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            UpdateContractRegistryOwnersActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for UpdateContractRegistryOwnersActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            UpdateContractRegistryOwnersActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a UpdateContractRegistryOwnersAction
 #[derive(Default, Clone)]
 pub struct UpdateContractRegistryOwnersActionBuilder {
@@ -934,19 +916,14 @@ impl UpdateContractRegistryOwnersActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<UpdateContractRegistryOwnersAction, UpdateContractRegistryOwnersActionBuildError>
-    {
+    pub fn build(self) -> Result<UpdateContractRegistryOwnersAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            UpdateContractRegistryOwnersActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let owners = {
             if self.owners.is_empty() {
-                return Err(UpdateContractRegistryOwnersActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'owners' field is required".to_string(),
                 ));
             } else {
@@ -955,6 +932,11 @@ impl UpdateContractRegistryOwnersActionBuilder {
         };
 
         Ok(UpdateContractRegistryOwnersAction { name, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1026,29 +1008,6 @@ impl IntoBytes for CreateNamespaceRegistryAction {
 impl IntoProto<protos::payload::CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {}
 impl IntoNative<CreateNamespaceRegistryAction> for protos::payload::CreateNamespaceRegistryAction {}
 
-#[derive(Debug)]
-pub enum CreateNamespaceRegistryActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for CreateNamespaceRegistryActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            CreateNamespaceRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for CreateNamespaceRegistryActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            CreateNamespaceRegistryActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a CreateNamespaceRegistryAction
 #[derive(Default, Clone)]
 pub struct CreateNamespaceRegistryActionBuilder {
@@ -1071,18 +1030,14 @@ impl CreateNamespaceRegistryActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<CreateNamespaceRegistryAction, CreateNamespaceRegistryActionBuildError> {
+    pub fn build(self) -> Result<CreateNamespaceRegistryAction, ActionBuildError> {
         let namespace = self.namespace.ok_or_else(|| {
-            CreateNamespaceRegistryActionBuildError::MissingField(
-                "'namespace' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
         })?;
 
         let owners = {
             if self.owners.is_empty() {
-                return Err(CreateNamespaceRegistryActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'owners' field is required".to_string(),
                 ));
             } else {
@@ -1091,6 +1046,11 @@ impl CreateNamespaceRegistryActionBuilder {
         };
 
         Ok(CreateNamespaceRegistryAction { namespace, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1152,29 +1112,6 @@ impl IntoBytes for DeleteNamespaceRegistryAction {
 impl IntoProto<protos::payload::DeleteNamespaceRegistryAction> for DeleteNamespaceRegistryAction {}
 impl IntoNative<DeleteNamespaceRegistryAction> for protos::payload::DeleteNamespaceRegistryAction {}
 
-#[derive(Debug)]
-pub enum DeleteNamespaceRegistryActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for DeleteNamespaceRegistryActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            DeleteNamespaceRegistryActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for DeleteNamespaceRegistryActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DeleteNamespaceRegistryActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create a DeleteNamespaceRegistryAction
 #[derive(Default, Clone)]
 pub struct DeleteNamespaceRegistryActionBuilder {
@@ -1191,16 +1128,17 @@ impl DeleteNamespaceRegistryActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<DeleteNamespaceRegistryAction, DeleteNamespaceRegistryActionBuildError> {
+    pub fn build(self) -> Result<DeleteNamespaceRegistryAction, ActionBuildError> {
         let namespace = self.namespace.ok_or_else(|| {
-            DeleteNamespaceRegistryActionBuildError::MissingField(
-                "'namespace' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
         })?;
 
         Ok(DeleteNamespaceRegistryAction { namespace })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1284,29 +1222,6 @@ impl IntoNative<UpdateNamespaceRegistryOwnersAction>
 {
 }
 
-#[derive(Debug)]
-pub enum UpdateNamespaceRegistryOwnersActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for UpdateNamespaceRegistryOwnersActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            UpdateNamespaceRegistryOwnersActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for UpdateNamespaceRegistryOwnersActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            UpdateNamespaceRegistryOwnersActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create UpdateNamespaceRegistryOwnersAction
 #[derive(Default, Clone)]
 pub struct UpdateNamespaceRegistryOwnersActionBuilder {
@@ -1335,19 +1250,14 @@ impl UpdateNamespaceRegistryOwnersActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<UpdateNamespaceRegistryOwnersAction, UpdateNamespaceRegistryOwnersActionBuildError>
-    {
+    pub fn build(self) -> Result<UpdateNamespaceRegistryOwnersAction, ActionBuildError> {
         let namespace = self.namespace.ok_or_else(|| {
-            UpdateNamespaceRegistryOwnersActionBuildError::MissingField(
-                "'namespace' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
         })?;
 
         let owners = {
             if self.owners.is_empty() {
-                return Err(UpdateNamespaceRegistryOwnersActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'owners' field is required".to_string(),
                 ));
             } else {
@@ -1356,6 +1266,11 @@ impl UpdateNamespaceRegistryOwnersActionBuilder {
         };
 
         Ok(UpdateNamespaceRegistryOwnersAction { namespace, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1457,29 +1372,6 @@ impl IntoNative<CreateNamespaceRegistryPermissionAction>
 {
 }
 
-#[derive(Debug)]
-pub enum CreateNamespaceRegistryPermissionActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for CreateNamespaceRegistryPermissionActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            CreateNamespaceRegistryPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for CreateNamespaceRegistryPermissionActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            CreateNamespaceRegistryPermissionActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create CreateNamespaceRegistryPermissionAction
 #[derive(Default, Clone)]
 pub struct CreateNamespaceRegistryPermissionActionBuilder {
@@ -1520,22 +1412,13 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<
-        CreateNamespaceRegistryPermissionAction,
-        CreateNamespaceRegistryPermissionActionBuildError,
-    > {
+    pub fn build(self) -> Result<CreateNamespaceRegistryPermissionAction, ActionBuildError> {
         let namespace = self.namespace.ok_or_else(|| {
-            CreateNamespaceRegistryPermissionActionBuildError::MissingField(
-                "'namespace' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
         })?;
 
         let contract_name = self.contract_name.ok_or_else(|| {
-            CreateNamespaceRegistryPermissionActionBuildError::MissingField(
-                "'contract_name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'contract_name' field is required".to_string())
         })?;
 
         let read = self.read.unwrap_or_default();
@@ -1547,6 +1430,11 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
             read,
             write,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1634,29 +1522,6 @@ impl IntoNative<DeleteNamespaceRegistryPermissionAction>
 {
 }
 
-#[derive(Debug)]
-pub enum DeleteNamespaceRegistryPermissionActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for DeleteNamespaceRegistryPermissionActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            DeleteNamespaceRegistryPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for DeleteNamespaceRegistryPermissionActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DeleteNamespaceRegistryPermissionActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create DeleteNamespaceRegistryPermissionAction
 #[derive(Default, Clone)]
 pub struct DeleteNamespaceRegistryPermissionActionBuilder {
@@ -1685,28 +1550,24 @@ impl DeleteNamespaceRegistryPermissionActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<
-        DeleteNamespaceRegistryPermissionAction,
-        DeleteNamespaceRegistryPermissionActionBuildError,
-    > {
+    pub fn build(self) -> Result<DeleteNamespaceRegistryPermissionAction, ActionBuildError> {
         let namespace = self.namespace.ok_or_else(|| {
-            DeleteNamespaceRegistryPermissionActionBuildError::MissingField(
-                "'namespace' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
         })?;
 
         let contract_name = self.contract_name.ok_or_else(|| {
-            DeleteNamespaceRegistryPermissionActionBuildError::MissingField(
-                "'contract_name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'contract_name' field is required".to_string())
         })?;
 
         Ok(DeleteNamespaceRegistryPermissionAction {
             namespace,
             contract_name,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1783,29 +1644,6 @@ impl IntoBytes for CreateSmartPermissionAction {
 impl IntoProto<protos::payload::CreateSmartPermissionAction> for CreateSmartPermissionAction {}
 impl IntoNative<CreateSmartPermissionAction> for protos::payload::CreateSmartPermissionAction {}
 
-#[derive(Debug)]
-pub enum CreateSmartPermissionActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for CreateSmartPermissionActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            CreateSmartPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for CreateSmartPermissionActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            CreateSmartPermissionActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create CreateSmartPermissionAction
 #[derive(Default, Clone)]
 pub struct CreateSmartPermissionActionBuilder {
@@ -1834,24 +1672,18 @@ impl CreateSmartPermissionActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<CreateSmartPermissionAction, CreateSmartPermissionActionBuildError> {
+    pub fn build(self) -> Result<CreateSmartPermissionAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            CreateSmartPermissionActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let org_id = self.org_id.ok_or_else(|| {
-            CreateSmartPermissionActionBuildError::MissingField(
-                "'org_id' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'org_id' field is required".to_string())
         })?;
 
         let function = {
             if self.function.is_empty() {
-                return Err(CreateSmartPermissionActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'function' field is required".to_string(),
                 ));
             } else {
@@ -1864,6 +1696,11 @@ impl CreateSmartPermissionActionBuilder {
             org_id,
             function,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -1940,29 +1777,6 @@ impl IntoBytes for UpdateSmartPermissionAction {
 impl IntoProto<protos::payload::UpdateSmartPermissionAction> for UpdateSmartPermissionAction {}
 impl IntoNative<UpdateSmartPermissionAction> for protos::payload::UpdateSmartPermissionAction {}
 
-#[derive(Debug)]
-pub enum UpdateSmartPermissionActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for UpdateSmartPermissionActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            UpdateSmartPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for UpdateSmartPermissionActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            UpdateSmartPermissionActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create UpdateSmartPermissionAction
 #[derive(Default, Clone)]
 pub struct UpdateSmartPermissionActionBuilder {
@@ -1991,24 +1805,18 @@ impl UpdateSmartPermissionActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<UpdateSmartPermissionAction, UpdateSmartPermissionActionBuildError> {
+    pub fn build(self) -> Result<UpdateSmartPermissionAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            UpdateSmartPermissionActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let org_id = self.org_id.ok_or_else(|| {
-            UpdateSmartPermissionActionBuildError::MissingField(
-                "'org_id' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'org_id' field is required".to_string())
         })?;
 
         let function = {
             if self.function.is_empty() {
-                return Err(UpdateSmartPermissionActionBuildError::MissingField(
+                return Err(ActionBuildError::MissingField(
                     "'function' field is required".to_string(),
                 ));
             } else {
@@ -2021,6 +1829,11 @@ impl UpdateSmartPermissionActionBuilder {
             org_id,
             function,
         })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -2090,29 +1903,6 @@ impl IntoBytes for DeleteSmartPermissionAction {
 impl IntoProto<protos::payload::DeleteSmartPermissionAction> for DeleteSmartPermissionAction {}
 impl IntoNative<DeleteSmartPermissionAction> for protos::payload::DeleteSmartPermissionAction {}
 
-#[derive(Debug)]
-pub enum DeleteSmartPermissionActionBuildError {
-    MissingField(String),
-}
-
-impl StdError for DeleteSmartPermissionActionBuildError {
-    fn description(&self) -> &str {
-        match *self {
-            DeleteSmartPermissionActionBuildError::MissingField(ref msg) => msg,
-        }
-    }
-}
-
-impl std::fmt::Display for DeleteSmartPermissionActionBuildError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            DeleteSmartPermissionActionBuildError::MissingField(ref s) => {
-                write!(f, "MissingField: {}", s)
-            }
-        }
-    }
-}
-
 /// Builder used to create DeleteSmartPermissionAction
 #[derive(Default, Clone)]
 pub struct DeleteSmartPermissionActionBuilder {
@@ -2135,22 +1925,21 @@ impl DeleteSmartPermissionActionBuilder {
         self
     }
 
-    pub fn build(
-        self,
-    ) -> Result<DeleteSmartPermissionAction, DeleteSmartPermissionActionBuildError> {
+    pub fn build(self) -> Result<DeleteSmartPermissionAction, ActionBuildError> {
         let name = self.name.ok_or_else(|| {
-            DeleteSmartPermissionActionBuildError::MissingField(
-                "'name' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'name' field is required".to_string())
         })?;
 
         let org_id = self.org_id.ok_or_else(|| {
-            DeleteSmartPermissionActionBuildError::MissingField(
-                "'org_id' field is required".to_string(),
-            )
+            ActionBuildError::MissingField("'org_id' field is required".to_string())
         })?;
 
         Ok(DeleteSmartPermissionAction { name, org_id })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -2169,77 +1958,80 @@ impl SabrePayload {
 impl FromProto<protos::payload::SabrePayload> for SabrePayload {
     fn from_proto(proto: protos::payload::SabrePayload) -> Result<Self, ProtoConversionError> {
         let action = match proto.get_action() {
-            protos::payload::SabrePayload_Action::CREATE_CONTRACT => Action::CreateContract(
-                CreateContractAction::from_proto(proto.get_create_contract().clone())?,
-            ),
-            protos::payload::SabrePayload_Action::DELETE_CONTRACT => Action::DeleteContract(
-                DeleteContractAction::from_proto(proto.get_delete_contract().clone())?,
-            ),
-            protos::payload::SabrePayload_Action::EXECUTE_CONTRACT => Action::ExecuteContract(
-                ExecuteContractAction::from_proto(proto.get_execute_contract().clone())?,
-            ),
+            protos::payload::SabrePayload_Action::CREATE_CONTRACT => {
+                CreateContractAction::from_proto(proto.get_create_contract().clone())?.into()
+            }
+            protos::payload::SabrePayload_Action::DELETE_CONTRACT => {
+                DeleteContractAction::from_proto(proto.get_delete_contract().clone())?.into()
+            }
+            protos::payload::SabrePayload_Action::EXECUTE_CONTRACT => {
+                ExecuteContractAction::from_proto(proto.get_execute_contract().clone())?.into()
+            }
             protos::payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY => {
-                Action::CreateContractRegistry(CreateContractRegistryAction::from_proto(
+                CreateContractRegistryAction::from_proto(
                     proto.get_create_contract_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY => {
-                Action::DeleteContractRegistry(DeleteContractRegistryAction::from_proto(
+                DeleteContractRegistryAction::from_proto(
                     proto.get_delete_contract_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
-                Action::UpdateContractRegistryOwners(
-                    UpdateContractRegistryOwnersAction::from_proto(
-                        proto.get_update_contract_registry_owners().clone(),
-                    )?,
-                )
+                UpdateContractRegistryOwnersAction::from_proto(
+                    proto.get_update_contract_registry_owners().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY => {
-                Action::CreateNamespaceRegistry(CreateNamespaceRegistryAction::from_proto(
+                CreateNamespaceRegistryAction::from_proto(
                     proto.get_create_namespace_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY => {
-                Action::DeleteNamespaceRegistry(DeleteNamespaceRegistryAction::from_proto(
+                DeleteNamespaceRegistryAction::from_proto(
                     proto.get_delete_namespace_registry().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
-                Action::UpdateNamespaceRegistryOwners(
-                    UpdateNamespaceRegistryOwnersAction::from_proto(
-                        proto.get_update_namespace_registry_owners().clone(),
-                    )?,
-                )
+                UpdateNamespaceRegistryOwnersAction::from_proto(
+                    proto.get_update_namespace_registry_owners().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
-                Action::CreateNamespaceRegistryPermission(
-                    CreateNamespaceRegistryPermissionAction::from_proto(
-                        proto.get_create_namespace_registry_permission().clone(),
-                    )?,
-                )
+                CreateNamespaceRegistryPermissionAction::from_proto(
+                    proto.get_create_namespace_registry_permission().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
-                Action::DeleteNamespaceRegistryPermission(
-                    DeleteNamespaceRegistryPermissionAction::from_proto(
-                        proto.get_delete_namespace_registry_permission().clone(),
-                    )?,
-                )
+                DeleteNamespaceRegistryPermissionAction::from_proto(
+                    proto.get_delete_namespace_registry_permission().clone(),
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::CREATE_SMART_PERMISSION => {
-                Action::CreateSmartPermission(CreateSmartPermissionAction::from_proto(
+                CreateSmartPermissionAction::from_proto(
                     proto.get_create_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::UPDATE_SMART_PERMISSION => {
-                Action::UpdateSmartPermission(UpdateSmartPermissionAction::from_proto(
+                UpdateSmartPermissionAction::from_proto(
                     proto.get_update_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::DELETE_SMART_PERMISSION => {
-                Action::DeleteSmartPermission(DeleteSmartPermissionAction::from_proto(
+                DeleteSmartPermissionAction::from_proto(
                     proto.get_delete_smart_permission().clone(),
-                )?)
+                )?
+                .into()
             }
             protos::payload::SabrePayload_Action::ACTION_UNSET => {
                 return Err(ProtoConversionError::InvalidTypeError(
@@ -2863,12 +2655,9 @@ mod tests {
             .unwrap();
 
         let builder = SabrePayloadBuilder::new();
-        let payload = builder
-            .with_action(Action::ExecuteContract(action.clone()))
-            .build()
-            .unwrap();
+        let payload = builder.with_action(action.clone().into()).build().unwrap();
 
-        assert_eq!(payload.action, Action::ExecuteContract(action));
+        assert_eq!(payload.action, Action::from(action));
     }
 
     #[test]
@@ -2885,10 +2674,7 @@ mod tests {
             .unwrap();
 
         let builder = SabrePayloadBuilder::new();
-        let original = builder
-            .with_action(Action::ExecuteContract(action))
-            .build()
-            .unwrap();
+        let original = builder.with_action(action.into()).build().unwrap();
         let bytes = original.clone().into_bytes().unwrap();
 
         let payload = SabrePayload::from_bytes(&bytes).unwrap();
