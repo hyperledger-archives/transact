@@ -29,7 +29,6 @@ use crate::scheduler::ExecutionTaskCompletionNotification;
 use crate::scheduler::InvalidTransactionResult;
 use crate::scheduler::SchedulerError;
 
-use hex;
 use std::collections::VecDeque;
 use std::error::Error;
 use std::sync::mpsc::{Receiver, SendError, Sender};
@@ -357,10 +356,8 @@ impl SchedulerCore {
                             self.current_txn = None;
                             self.previous_context = Some(context_id);
                             self.txn_receipts.push(
-                                self.context_lifecycle.get_transaction_receipt(
-                                    &context_id,
-                                    &hex::encode(transaction_id),
-                                )?,
+                                self.context_lifecycle
+                                    .get_transaction_receipt(&context_id, &transaction_id)?,
                             );
                         }
                         ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
