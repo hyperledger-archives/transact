@@ -50,6 +50,7 @@ experimental = [
     "contract-context-key-value",
     "key-value-state",
     "redis-db",
+    "sqlite-db"
 ]
 sawtooth-compat = ["sawtooth-sdk"]
 ursa-compat = ["ursa"]
@@ -62,4 +63,5 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 key-value-state = []
+sqlite-db = []
 state-merkle = ["cbor-codec"]
