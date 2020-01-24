@@ -24,6 +24,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 
+use lmdb::error::LmdbResultExt as _;
 use lmdb_zero as lmdb;
 
 use crate::database::error::DatabaseError;
@@ -145,10 +146,13 @@ pub struct LmdbDatabaseReader<'a> {
 }
 
 impl<'a> DatabaseReader for LmdbDatabaseReader<'a> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let access = self.txn.access();
-        let val: Result<&[u8], _> = access.get(&self.db.main, key);
-        val.ok().map(Vec::from)
+        access
+            .get(&self.db.main, key)
+            .to_opt()
+            .map(|opt: Option<&[u8]>| opt.map(Vec::from))
+            .map_err(|err| DatabaseError::ReaderError(format!("Unable to get value: {}", err)))
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
@@ -309,10 +313,13 @@ impl<'a> DatabaseWriter for LmdbDatabaseWriter<'a> {
 }
 
 impl<'a> DatabaseReader for LmdbDatabaseWriter<'a> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let access = self.txn.access();
-        let val: Result<&[u8], _> = access.get(&self.db.main, key);
-        val.ok().map(Vec::from)
+        access
+            .get(&self.db.main, key)
+            .to_opt()
+            .map(|opt: Option<&[u8]>| opt.map(Vec::from))
+            .map_err(|err| DatabaseError::ReaderError(format!("Unable to get value: {}", err)))
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
@@ -400,7 +407,7 @@ mod tests {
     fn assert_key_value(key: u8, val: u8, db: &LmdbDatabase) {
         let reader = db.reader().unwrap();
 
-        assert_eq!(reader.get(&[key]).unwrap(), [val],);
+        assert_eq!(reader.get(&[key]).unwrap(), Some(vec![val]));
     }
 
     /// Asserts that KEY is associated with VAL in DB's INDEX.
@@ -414,7 +421,7 @@ mod tests {
     fn assert_not_in_database(key: u8, db: &LmdbDatabase) {
         let reader = db.reader().unwrap();
 
-        assert!(reader.get(&[key]).is_none());
+        assert!(reader.get(&[key]).unwrap().is_none());
     }
 
     /// Asserts that KEY is not in DB's INDEX.

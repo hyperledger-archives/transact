@@ -86,11 +86,8 @@ pub struct BTreeReader<'a> {
 }
 
 impl<'a> DatabaseReader for BTreeReader<'a> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        match self.db.main.get(key) {
-            Some(value) => Some(value.to_vec()),
-            None => None,
-        }
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
+        Ok(self.db.main.get(key).map(|v| v.to_vec()))
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
@@ -277,33 +274,30 @@ impl<'a> BTreeWriter<'a> {
 }
 
 impl<'a> DatabaseReader for BTreeWriter<'a> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let key_to_find = key.to_vec();
         for transaction in self.transactions.iter().rev() {
             match transaction {
                 WriterTransaction::Put { key, value } => {
                     if &key_to_find == key {
-                        return Some(value.clone());
+                        return Ok(Some(value.clone()));
                     }
                 }
                 WriterTransaction::Delete { key } => {
                     if &key_to_find == key {
-                        return None;
+                        return Ok(None);
                     }
                 }
                 WriterTransaction::Overwrite { key, value } => {
                     if &key_to_find == key {
-                        return Some(value.clone());
+                        return Ok(Some(value.clone()));
                     }
                 }
                 _ => (),
             };
         }
 
-        match self.db.main.get(key) {
-            Some(value) => Some(value.to_vec()),
-            None => None,
-        }
+        Ok(self.db.main.get(key).cloned())
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
@@ -531,7 +525,7 @@ mod tests {
 
     /// Asserts that KEY is associated with VAL in DB.
     fn assert_key_value<'a>(key: u8, val: u8, reader: &'a dyn DatabaseReader) {
-        assert_eq!(reader.get(&[key]).unwrap(), [val],);
+        assert_eq!(reader.get(&[key]).unwrap(), Some(vec![val]));
     }
 
     /// Asserts that KEY is associated with VAL in DB's INDEX.
@@ -541,7 +535,7 @@ mod tests {
 
     /// Asserts that KEY is not in DB.
     fn assert_not_in_database<'a>(key: u8, reader: &'a dyn DatabaseReader) {
-        assert!(reader.get(&[key]).is_none());
+        assert!(reader.get(&[key]).unwrap().is_none());
     }
 
     /// Asserts that KEY is not in DB's INDEX.

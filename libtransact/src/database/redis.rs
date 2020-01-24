@@ -109,22 +109,10 @@ impl<'db> RedisDatabaseReader<'db> {
 }
 
 impl<'db> DatabaseReader for RedisDatabaseReader<'db> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
-        let mut conn = match unlock_conn!(self, DatabaseError::ReaderError) {
-            Ok(conn) => conn,
-            Err(e) => {
-                error!("{}", e.to_string());
-                return None;
-            }
-        };
-        match conn.hget::<_, _, Option<Vec<u8>>>(&self.db.primary, key) {
-            Ok(Some(bytes)) => Some(bytes),
-            Ok(None) => None,
-            Err(err) => {
-                error!("ignoring read error: {}", err);
-                None
-            }
-        }
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
+        let mut conn = unlock_conn!(self, DatabaseError::ReaderError)?;
+        conn.hget::<_, _, Option<Vec<u8>>>(&self.db.primary, key)
+            .map_err(|err| DatabaseError::ReaderError(format!("unable to retrieve value: {}", err)))
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
@@ -332,34 +320,21 @@ impl<'db> DatabaseWriter for RedisDatabaseWriter<'db> {
 }
 
 impl<'db> DatabaseReader for RedisDatabaseWriter<'db> {
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>> {
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let change_map = self
             .changes
             .get(&self.db.primary)
             .expect("No change map for primary, but should have been set in constructor");
         match change_map.get(key) {
-            Some(Update::Put(data)) => return Some(data.clone()),
-            Some(Update::Overwrite(data)) => return Some(data.clone()),
-            Some(Update::Delete) => return None,
+            Some(Update::Put(data)) => return Ok(Some(data.clone())),
+            Some(Update::Overwrite(data)) => return Ok(Some(data.clone())),
+            Some(Update::Delete) => return Ok(None),
             None => (),
         };
 
-        let mut conn = match unlock_conn!(self, DatabaseError::WriterError) {
-            Ok(conn) => conn,
-            Err(e) => {
-                error!("{}", e.to_string());
-                return None;
-            }
-        };
-
-        match conn.hget::<_, _, Option<Vec<u8>>>(&self.db.primary, key) {
-            Ok(Some(bytes)) => Some(bytes),
-            Ok(None) => None,
-            Err(err) => {
-                error!("ignoring read error: {}", err);
-                None
-            }
-        }
+        let mut conn = unlock_conn!(self, DatabaseError::ReaderError)?;
+        conn.hget::<_, _, Option<Vec<u8>>>(&self.db.primary, key)
+            .map_err(|err| DatabaseError::ReaderError(format!("unable to retrieve value: {}", err)))
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {

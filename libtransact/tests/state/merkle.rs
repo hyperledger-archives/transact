@@ -529,7 +529,10 @@ fn test_merkle_trie_pruning_parent(db: Box<dyn Database>) {
             .get_deletions()
             .to_vec()
         {
-            assert!(reader.get(&deletion).is_none());
+            assert!(reader
+                .get(&deletion)
+                .expect("Could not query for deletion")
+                .is_none());
         }
 
         assert!(reader

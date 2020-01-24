@@ -747,7 +747,7 @@ fn tokenize_address(address: &str) -> Box<[&str]> {
 
 /// Fetch a node by its hash
 fn get_node_by_hash(db: &dyn Database, hash: &str) -> Result<Node, StateDatabaseError> {
-    match db.get_reader()?.get(hash.as_bytes()) {
+    match db.get_reader()?.get(hash.as_bytes())? {
         Some(bytes) => Node::from_bytes(&bytes),
         None => Err(StateDatabaseError::NotFound(hash.to_string())),
     }
