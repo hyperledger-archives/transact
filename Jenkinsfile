@@ -41,7 +41,7 @@ pipeline {
             }
             when {
                 not {
-                    branch 'master'
+                    branch '0-1'
                 }
             }
         }
