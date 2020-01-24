@@ -34,6 +34,8 @@ pub mod error;
 pub mod lmdb;
 #[cfg(feature = "redis-db")]
 pub mod redis;
+#[cfg(feature = "sqlite-db")]
+pub mod sqlite;
 
 pub use crate::database::error::DatabaseError;
 
