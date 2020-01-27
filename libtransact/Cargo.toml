@@ -28,7 +28,10 @@ openssl = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
 sawtooth-sdk = { version = "0.3", optional = true }
 ursa = { version = "0.2.0", optional = true }
+r2d2 = { version = "0.8", optional = true }
+r2d2_sqlite = { version = "0.14", optional = true }
 redis = { version = "0.13.0", default-features = false, optional = true }
+rusqlite = { version = "0.21.0", optional = true }
 
 [dev-dependencies]
 rand_hc = "0.1"
@@ -63,5 +66,5 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 key-value-state = []
-sqlite-db = []
+sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 state-merkle = ["cbor-codec"]
