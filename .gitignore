@@ -16,6 +16,9 @@
 
 /sdks/rust/Cargo.lock
 /sdks/rust/target/
+/sdks/assemblyscript/node_modules
+/sdks/assemblyscript/package-lock.json
+/sdks/assemblyscript/build
 
 /keys
 
