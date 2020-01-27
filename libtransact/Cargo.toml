@@ -13,7 +13,7 @@ description = """\
 repository = "http://github.com/hyperledger/transact"
 
 [package.metadata.docs.rs]
-features = ["sawtooth-compat", "redis-db"]
+features = ["experimental"]
 
 [dependencies]
 hex = "0.3"
