@@ -82,6 +82,21 @@ impl SqliteDatabase {
 
         Ok(Self { pool })
     }
+
+    pub fn vacuum(&self) -> Result<(), SqliteDatabaseError> {
+        let conn = self.pool.get().map_err(|err| SqliteDatabaseError {
+            context: "unable to connect to database".into(),
+            source: Some(Box::new(err)),
+        })?;
+
+        conn.execute("VACUUM", params![])
+            .map_err(|err| SqliteDatabaseError {
+                context: "unable to vacuum database".into(),
+                source: Some(Box::new(err)),
+            })?;
+
+        Ok(())
+    }
 }
 
 impl Database for SqliteDatabase {
@@ -463,6 +478,32 @@ fn execute_index_count(conn: &mut SqliteConnection, index: &str) -> Result<i64, 
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))
 }
 
+#[derive(Debug)]
+pub struct SqliteDatabaseError {
+    context: String,
+    source: Option<Box<dyn std::error::Error + Send>>,
+}
+
+impl std::error::Error for SqliteDatabaseError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        if let Some(ref err) = self.source {
+            Some(&**err)
+        } else {
+            None
+        }
+    }
+}
+
+impl std::fmt::Display for SqliteDatabaseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        if let Some(ref err) = self.source {
+            write!(f, "{}: {}", self.context, err)
+        } else {
+            f.write_str(&self.context)
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -620,6 +661,10 @@ mod test {
             assert_database_count(1, &database);
             assert_key_value(5, 6, &database);
             assert_not_in_database(3, &database);
+
+            database
+                .vacuum()
+                .expect("should have successfully vacuumed");
         })
     }
 
