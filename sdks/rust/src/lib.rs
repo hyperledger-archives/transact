@@ -180,6 +180,23 @@ pub trait TransactionContext {
     ///
     /// * `addresses` - the addresses to delete
     fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, WasmSdkError>;
+
+    /// add_event adds a new event to the execution result for this transaction.
+    ///
+    /// # Arguments
+    ///
+    /// * `event_type` -  This is used to subscribe to events. It should be globally unique and
+    ///          describe what, in general, has occured.
+    /// * `attributes` - Additional information about the event that is transparent to the
+    ///          validator. Attributes can be used by subscribers to filter the type of events
+    ///          they receive.
+    /// * `data` - Additional information about the event that is opaque to the validator.
+    fn add_event(
+        &self,
+        event_type: String,
+        attributes: Vec<(String, String)>,
+        data: &[u8],
+    ) -> Result<(), WasmSdkError>;
 }
 
 #[derive(Default)]
@@ -292,6 +309,51 @@ impl TransactionContext for SabreTransactionContext {
                 result_vec.push(addr);
             }
             Ok(result_vec)
+        }
+    }
+
+    fn add_event(
+        &self,
+        event_type: String,
+        attributes: Vec<(String, String)>,
+        data: &[u8],
+    ) -> Result<(), WasmSdkError> {
+        unsafe {
+            // Get the WasmBuffer of event_type
+            let event_type_buffer = WasmBuffer::new(&event_type.as_bytes())?;
+
+            // Get the WasmBuffer of data
+            let data_buffer = WasmBuffer::new(data)?;
+
+            // Get attributes tuple stored in a collection
+            // List starts with a dummy entry "attributes", this is to allow empty
+            // attributes list from the SDK
+            // Entry at odd index: Key
+            // Entry at even index: Value
+            let attributes_iter = attributes.iter();
+            let attributes_buffer = WasmBuffer::new(b"attributes")?;
+            externs::create_collection(attributes_buffer.to_raw());
+
+            for (key, value) in attributes_iter {
+                let key_buffer = WasmBuffer::new(key.as_bytes())?;
+                externs::add_to_collection(attributes_buffer.to_raw(), key_buffer.to_raw());
+                let value_buffer = WasmBuffer::new(value.as_bytes())?;
+                externs::add_to_collection(attributes_buffer.to_raw(), value_buffer.to_raw());
+            }
+
+            let result = externs::add_event(
+                event_type_buffer.to_raw(),
+                attributes_buffer.to_raw(),
+                data_buffer.to_raw(),
+            );
+
+            if result != 0 {
+                return Err(WasmSdkError::InvalidTransaction(
+                    "Unable to add event".into(),
+                ));
+            }
+
+            Ok(())
         }
     }
 }
