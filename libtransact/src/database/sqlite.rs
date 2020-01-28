@@ -15,6 +15,36 @@
  * ------------------------------------------------------------------------------
  */
 
+//! An Sqlite-backed implementation of the database traits.
+//!
+//! # Note
+//!
+//! When using this feature with an in-memory sqlite instance, `DatabaseReader`s cannot be opened
+//! at the same time as an existing `DatabaseWriter`. This is particularly true when using a
+//! database path like `"file::memory:?cache=shared".  In this case, the underlying connection pool
+//! will use the same database instance.
+//!
+//! For a single, non-shared memory instances, the database should be created with a connection
+//! pool size of 1, such that creating readers or writers across threads will block until a
+//! connection is available.
+//!
+//! This can be accomplished via
+//!
+//! ```
+//! # use std::num::NonZeroU32;
+//! # use transact::database::sqlite::SqliteDatabase;
+//! let database = SqliteDatabase::builder()
+//!     .with_path(":memory:")
+//!     .with_connection_pool_size(NonZeroU32::new(1).unwrap())
+//!     .build()
+//!     .unwrap();
+//! ```
+//!
+//! # Feature
+//!
+//! This is available via the optional feature "sqlite-db".
+//!
+//! _This is currently an experimental feature._
 use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::convert::TryFrom;
@@ -149,12 +179,19 @@ impl SqliteDatabaseBuilder {
     }
 }
 
+/// A Database implementation backed by a Sqlite instance.
 #[derive(Clone)]
 pub struct SqliteDatabase {
     pool: r2d2::Pool<SqliteConnectionManager>,
 }
 
 impl SqliteDatabase {
+    /// Constructs a new database with the given path to the Sqlite store (either in memory or on
+    /// the filesystem) and a provided set of index tables.
+    ///
+    /// # Errors
+    ///
+    /// This will return an error for the same reasons as `SqliteDatabaseBuilder::build`
     pub fn new(path: &str, indexes: &[&'static str]) -> Result<Self, SqliteDatabaseError> {
         SqliteDatabaseBuilder::new()
             .with_path(path)
@@ -162,10 +199,37 @@ impl SqliteDatabase {
             .build()
     }
 
+    /// Constructs a builder with the default settings.
+    ///
+    /// This can be used to construct an instance with finer-grained control over underlying Sqlite
+    /// connections.
+    ///
+    /// For example:
+    ///
+    /// ```
+    /// # use std::num::NonZeroU32;
+    /// # use transact::database::sqlite::SqliteDatabase;
+    /// let database = SqliteDatabase::builder()
+    ///     .with_path(":memory:")
+    ///     .with_connection_pool_size(NonZeroU32::new(1).unwrap())
+    ///     .build()
+    ///     .unwrap();
+    /// ```
     pub fn builder() -> SqliteDatabaseBuilder {
         SqliteDatabaseBuilder::new()
     }
 
+    /// Executes the VACUUM operation on the underlying database instance.
+    ///
+    /// The VACUUM command rebuilds the database file, repacking it into a minimal amount of disk
+    /// space.
+    ///
+    /// # Errors
+    ///
+    /// This will return an error if it cannot
+    ///
+    /// - connect to the database
+    /// - execute the VACUUM command succesfully.
     pub fn vacuum(&self) -> Result<(), SqliteDatabaseError> {
         let conn = self.pool.get().map_err(|err| SqliteDatabaseError {
             context: "unable to connect to database".into(),
@@ -561,9 +625,12 @@ fn execute_index_count(conn: &mut SqliteConnection, index: &str) -> Result<i64, 
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))
 }
 
+/// An error that may be returned during SqliteDatabase-specific operations.
+///
+/// This error type provides a context and the source error.
 #[derive(Debug)]
 pub struct SqliteDatabaseError {
-    context: String,
+    pub context: String,
     source: Option<Box<dyn std::error::Error + Send>>,
 }
 
