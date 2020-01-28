@@ -28,6 +28,8 @@ use super::{
 
 type SqliteConnection = r2d2::PooledConnection<SqliteConnectionManager>;
 
+const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
+
 #[derive(Clone)]
 pub struct SqliteDatabase {
     pool: r2d2::Pool<SqliteConnectionManager>,
@@ -46,6 +48,11 @@ impl SqliteDatabase {
         let conn = pool.get().map_err(|err| {
             DatabaseError::InitError(format!("unable to connect to database: {}", err))
         })?;
+
+        conn.pragma_update(None, "mmap_size", &DEFAULT_MMAP_SIZE)
+            .map_err(|err| {
+                DatabaseError::InitError(format!("unable to configure memory map I/O: {}", err))
+            })?;
 
         let create_table = "CREATE TABLE IF NOT EXISTS transact_primary (\
                             key BLOB PRIMARY KEY, \
