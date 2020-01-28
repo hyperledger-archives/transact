@@ -17,6 +17,8 @@
 
 use std::cell::RefCell;
 use std::collections::VecDeque;
+use std::convert::TryFrom;
+use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use r2d2_sqlite::SqliteConnectionManager;
@@ -28,41 +30,106 @@ use super::{
 
 type SqliteConnection = r2d2::PooledConnection<SqliteConnectionManager>;
 
-const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
+/// The default size
+pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 
-#[derive(Clone)]
-pub struct SqliteDatabase {
-    pool: r2d2::Pool<SqliteConnectionManager>,
+/// A builder for generating SqliteDatabase instances.
+pub struct SqliteDatabaseBuilder {
+    path: Option<String>,
+    indexes: Vec<&'static str>,
+    pool_size: Option<u32>,
+    memory_map_size: i64,
 }
 
-impl SqliteDatabase {
-    pub fn new(path: &str, indexes: &[&str]) -> Result<Self, DatabaseError> {
-        let manager = SqliteConnectionManager::file(path);
-        let pool = r2d2::Pool::new(manager).map_err(|err| {
-            DatabaseError::InitError(format!(
-                "unable to create sqlite connection pool to {}: {}",
-                path, err
-            ))
+impl SqliteDatabaseBuilder {
+    fn new() -> Self {
+        Self {
+            path: None,
+            indexes: vec![],
+            pool_size: None,
+            memory_map_size: DEFAULT_MMAP_SIZE,
+        }
+    }
+
+    /// Set the path for the Sqlite database.
+    pub fn with_path<S: Into<String>>(mut self, path: S) -> Self {
+        self.path = Some(path.into());
+        self
+    }
+
+    /// Set the names of the indexes to include in the database instance.
+    pub fn with_indexes(mut self, indexes: &[&'static str]) -> Self {
+        self.indexes = indexes.to_vec();
+        self
+    }
+
+    /// Set the connection pool size.
+    pub fn with_connection_pool_size(mut self, pool_size: NonZeroU32) -> Self {
+        self.pool_size = Some(pool_size.get());
+        self
+    }
+
+    /// Set the size used for Memory-Mapped I/O.
+    ///
+    /// This can be disabled by setting the value to `0`
+    pub fn with_memory_map_size(mut self, memory_map_size: u64) -> Self {
+        // The try from would fail if the u64 is greater than max i64, so we can unwrap this as
+        // such.
+        self.memory_map_size = i64::try_from(memory_map_size).unwrap_or(std::i64::MAX);
+        self
+    }
+
+    /// Constructs the database instance.
+    ///
+    /// # Errors
+    ///
+    /// This may return a SqliteDatabaseError for a variety of reasons:
+    ///
+    /// * No path provided
+    /// * Unable to connect to the database.
+    /// * Unable to configure the provided memory map size
+    /// * Unable to create tables, as required.
+    pub fn build(self) -> Result<SqliteDatabase, SqliteDatabaseError> {
+        let path = self.path.ok_or_else(|| SqliteDatabaseError {
+            context: "must provide a sqlite database path".into(),
+            source: None,
         })?;
 
-        let conn = pool.get().map_err(|err| {
-            DatabaseError::InitError(format!("unable to connect to database: {}", err))
+        let manager = SqliteConnectionManager::file(&path);
+
+        let mut pool_builder = r2d2::Pool::builder();
+        if let Some(pool_size) = self.pool_size {
+            pool_builder = pool_builder.max_size(pool_size);
+        }
+        let pool = pool_builder
+            .build(manager)
+            .map_err(|err| SqliteDatabaseError {
+                context: format!("unable to create sqlite connection pool to {}", path),
+                source: Some(Box::new(err)),
+            })?;
+
+        let conn = pool.get().map_err(|err| SqliteDatabaseError {
+            context: "unable to connect to database".into(),
+            source: Some(Box::new(err)),
         })?;
 
-        conn.pragma_update(None, "mmap_size", &DEFAULT_MMAP_SIZE)
-            .map_err(|err| {
-                DatabaseError::InitError(format!("unable to configure memory map I/O: {}", err))
+        conn.pragma_update(None, "mmap_size", &self.memory_map_size)
+            .map_err(|err| SqliteDatabaseError {
+                context: "unable to configure memory map I/O".into(),
+                source: Some(Box::new(err)),
             })?;
 
         let create_table = "CREATE TABLE IF NOT EXISTS transact_primary (\
                             key BLOB PRIMARY KEY, \
                             value BLOB NOT NULL\
                             )";
-        conn.execute(create_table, params![]).map_err(|err| {
-            DatabaseError::InitError(format!("unable to create primary table: {}", err))
-        })?;
+        conn.execute(create_table, params![])
+            .map_err(|err| SqliteDatabaseError {
+                context: "unable to create primary table".into(),
+                source: Some(Box::new(err)),
+            })?;
 
-        for index in indexes {
+        for index in self.indexes {
             let create_index_table = format!(
                 "CREATE TABLE IF NOT EXISTS transact_index_{} (\
                  index_key BLOB PRIMARY KEY, \
@@ -72,15 +139,31 @@ impl SqliteDatabase {
             );
 
             conn.execute(&create_index_table, params![])
-                .map_err(|err| {
-                    DatabaseError::InitError(format!(
-                        "unable to create index {} table: {}",
-                        index, err
-                    ))
+                .map_err(|err| SqliteDatabaseError {
+                    context: format!("unable to create index {} table", index),
+                    source: Some(Box::new(err)),
                 })?;
         }
 
-        Ok(Self { pool })
+        Ok(SqliteDatabase { pool })
+    }
+}
+
+#[derive(Clone)]
+pub struct SqliteDatabase {
+    pool: r2d2::Pool<SqliteConnectionManager>,
+}
+
+impl SqliteDatabase {
+    pub fn new(path: &str, indexes: &[&'static str]) -> Result<Self, SqliteDatabaseError> {
+        SqliteDatabaseBuilder::new()
+            .with_path(path)
+            .with_indexes(indexes)
+            .build()
+    }
+
+    pub fn builder() -> SqliteDatabaseBuilder {
+        SqliteDatabaseBuilder::new()
     }
 
     pub fn vacuum(&self) -> Result<(), SqliteDatabaseError> {
