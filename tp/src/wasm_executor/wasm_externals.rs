@@ -157,6 +157,17 @@ const LOG: usize = 13;
 /// Returns the current logleel set on the transaction processor
 const LOG_LEVEL: usize = 14;
 
+/// Args
+///
+/// 1) Event type string, to identify the event
+/// 2) Attributes list, optionally to filter on the received events
+/// 2) Data, that is opaque to the validator when sending to the event listener
+///
+/// Returns - 0 if the add_event() is successful, -1 if failed to get
+/// attributes list from the collection, 1 otherwise
+///
+const ADD_EVENT_IDX: usize = 15;
+
 pub struct WasmExternals<'a> {
     pub memory_ref: MemoryRef,
     context: &'a mut dyn TransactionContext,
@@ -483,6 +494,50 @@ impl<'a> WasmExternals<'a> {
 
         Ok(Some(RuntimeValue::I32(raw_ptr as i32)))
     }
+
+    fn add_event(
+        &mut self,
+        event_type_ptr: u32,
+        attribute_list_ptr: u32,
+        data_ptr: u32,
+    ) -> Result<Option<RuntimeValue>, Trap> {
+        let attribute_list = match self.ptr_collections.get(&attribute_list_ptr) {
+            Some(attributes) => attributes.clone(),
+            None => return Ok(Some(RuntimeValue::I32(-1))),
+        };
+
+        // if the length is even return deserialization error
+        // the list should have a starting element followed by key, value pair
+        if (attribute_list.len() % 2) == 0 {
+            return Ok(Some(RuntimeValue::I32(-1)));
+        }
+
+        let mut attributes = Vec::new();
+        if attribute_list.len() > 1 {
+            for entry in attribute_list[1..].chunks(2) {
+                let key = self.ptr_to_string(entry[0]).map_err(ExternalsError::from)?;
+                let value = self.ptr_to_string(entry[1]).map_err(ExternalsError::from)?;
+                attributes.push((key, value));
+            }
+        }
+
+        let event_type = self.ptr_to_string(event_type_ptr)?;
+
+        let data = self.ptr_to_vec(data_ptr)?;
+
+        info!(
+            "Attempting to add event, event_type: {:?}, attributes: {:?}, data: {:?}",
+            event_type, attributes, data
+        );
+
+        match self.context.add_event(event_type, attributes, &data) {
+            Ok(()) => Ok(Some(RuntimeValue::I32(0))),
+            Err(err) => {
+                error!("Add event Error: {}", err);
+                Ok(Some(RuntimeValue::I32(1)))
+            }
+        }
+    }
 }
 
 impl<'a> Externals for WasmExternals<'a> {
@@ -496,6 +551,12 @@ impl<'a> Externals for WasmExternals<'a> {
             GET_STATE_IDX => self.get_state(args, timer),
             SET_STATE_IDX => self.set_state(args, timer),
             DELETE_STATE_IDX => self.delete_state(args),
+            ADD_EVENT_IDX => {
+                let event_type = args.nth(0);
+                let attributes = args.nth(1);
+                let data = args.nth(2);
+                self.add_event(event_type, attributes, data)
+            }
             GET_PTR_LEN_IDX => {
                 let addr = args.nth(0);
 
@@ -632,6 +693,13 @@ impl<'a> ModuleImportResolver for WasmExternals<'a> {
             "delete_state" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
                 DELETE_STATE_IDX,
+            )),
+            "add_event" => Ok(FuncInstance::alloc_host(
+                Signature::new(
+                    &[ValueType::I32, ValueType::I32, ValueType::I32][..],
+                    Some(ValueType::I32),
+                ),
+                ADD_EVENT_IDX,
             )),
             "invoke_smart_permission" => Ok(FuncInstance::alloc_host(
                 Signature::new(
