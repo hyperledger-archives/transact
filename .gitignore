@@ -14,8 +14,11 @@
 /integration/target/
 /integration/Cargo.lock
 
-/sdk/Cargo.lock
-/sdk/target/
+/sdks/rust/Cargo.lock
+/sdks/rust/target/
+/sdks/assemblyscript/node_modules
+/sdks/assemblyscript/package-lock.json
+/sdks/assemblyscript/build
 
 /keys
 
@@ -59,3 +62,7 @@ contracts/sawtooth-pike/tp/target/
 
 contracts/sawtooth-pike/examples/intkey/Cargo.lock
 contracts/sawtooth-pike/examples/intkey/target/
+
+contracts/inc-dec-key/node_modules
+contracts/inc-dec-key/package-lock.json
+contracts/inc-dec-key/build

@@ -114,7 +114,7 @@ The following is an example for intkey-multiply
 
   [target.'cfg(target_arch = "wasm32")'.dependencies]
   rust-crypto-wasm = "0.3"
-  sabre-sdk = {path = "../../../sdk"}
+  sabre-sdk = {path = "../../../sdks/rust"}
 
   [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
   rust-crypto = "0.2.36"

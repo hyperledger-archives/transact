@@ -26,7 +26,7 @@ addresser = {path = "../addresser"}
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 rust-crypto-wasm = "0.3"
-sabre-sdk = {path = "../../../sdk"}
+sabre-sdk = {path = "../../../sdks/rust"}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}

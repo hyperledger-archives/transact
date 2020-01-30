@@ -1,0 +1,14 @@
+{
+  "main": "assembly/index.ts",
+  "types": "build/index.d.ts",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@chainsafe/as-sha256": "0.1.1",
+    "assemblyscript": "^0.8.1",
+    "sabre-sdk": "file:../../sdks/assemblyscript"
+  },
+  "scripts": {
+    "asbuild:optimized": "asc assembly/index.ts -b build/optimized.wasm -d build/index.d.ts -t build/optimized.wat --use abort= --validate --optimize --explicitStart",
+    "asbuild": "rm -rf build && npm run asbuild:optimized"
+  }
+}

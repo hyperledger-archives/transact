@@ -1,0 +1,11 @@
+{
+  "name": "sabre-sdk",
+  "version": "0.0.1",
+  "main": "assembly/index.ts",
+  "types": "build/index.d.ts",
+  "scripts": {
+    "build:tsd": "asc assembly/index.ts -d build/index.d.ts",
+    "asbuild:optimized": "asc assembly/index.ts -b build/optimized.wasm -t build/optimized.wat --sourceMap --importMemory --noAssert --use abort= --validate --optimize",
+    "asbuild": "npm run asbuild:optimized && npm run build:tsd"
+  }
+}

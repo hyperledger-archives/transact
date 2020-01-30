@@ -42,16 +42,16 @@ RUN curl -OLsS https://github.com/google/protobuf/releases/download/v3.7.1/proto
  && rm protoc-3.7.1-linux-x86_64.zip
 
 # Create empty cargo project for sdk
-WORKDIR /build
-RUN USER=root cargo new --lib sdk
+WORKDIR /build/sdks
+RUN USER=root cargo new --lib rust
 
 # Copy over Cargo.toml, build.rs and protos
-COPY sdk/Cargo.toml /build/sdk/Cargo.toml
-COPY sdk/build.rs /build/sdk/build.rs
-COPY sdk/protos /build/sdk/protos
+COPY sdks/rust/Cargo.toml /build/sdks/rust/Cargo.toml
+COPY sdks/rust/build.rs /build/sdks/rust/build.rs
+COPY sdks/rust/protos /build/sdks/rust/protos
 
 # Do a release build to cache dependencies
-WORKDIR /build/sdk
+WORKDIR /build/sdks/rust
 RUN cargo build --target wasm32-unknown-unknown --release
 
 WORKDIR /build
@@ -73,7 +73,7 @@ RUN rm target/wasm32-unknown-unknown/release/intkey* \
     target/wasm32-unknown-unknown/release/deps/intkey*
 
 # Copy over source files
-COPY sdk/src /build/sdk/src
+COPY sdks/rust/src /build/sdks/rust/src
 COPY example/intkey_multiply/processor/src \
      /build/example/intkey_multiply/processor/src
 
