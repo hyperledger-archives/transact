@@ -16,6 +16,7 @@
  * ------------------------------------------------------------------------------
  */
 
+pub mod change_log;
 mod error;
 
 use std::collections::BTreeMap;
@@ -32,10 +33,10 @@ use openssl;
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
 
-use super::change_log::{ChangeLogEntry, Successor};
 use super::error::{StatePruneError, StateReadError, StateWriteError};
 use super::{Prune, Read, StateChange, Write};
 
+use self::change_log::{ChangeLogEntry, Successor};
 pub use self::error::StateDatabaseError;
 
 const TOKEN_SIZE: usize = 2;

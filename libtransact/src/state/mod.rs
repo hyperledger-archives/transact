@@ -22,7 +22,6 @@
 //! `Write`, `Read`, and `Prune`.  These provide commit, read access,
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
-pub mod change_log;
 pub mod error;
 pub mod hashmap;
 pub mod merkle;

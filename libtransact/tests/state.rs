@@ -22,8 +22,7 @@ mod state_tests {
     use transact::{
         database::{error::DatabaseError, Database},
         state::{
-            change_log::ChangeLogEntry,
-            merkle::{MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
+            merkle::{change_log::ChangeLogEntry, MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
             Prune, StateChange, Write,
         },
     };
