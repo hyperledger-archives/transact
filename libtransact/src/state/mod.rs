@@ -24,6 +24,7 @@
 
 pub mod error;
 pub mod hashmap;
+#[cfg(feature = "state-merkle")]
 pub mod merkle;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
