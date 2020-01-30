@@ -578,8 +578,7 @@ mod tests {
     );
     static ERROR_MESSAGE: &str = "an error occurred";
     static ERROR_DATA: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
-    static TRANSACTION_ID: &str =
-        "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
+    static TRANSACTION_ID: &str = "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
          7c400d56354dee788191be8e28393c70398906fb467fac8db6279e90e4e61619589d42bf";
 
     pub fn make_event_1() -> Event {
@@ -956,8 +955,7 @@ mod benchmarks {
         "address",
         "5b7349700e158b598043efd6d7610345a75a00b22ac14c9278db53f586179a92b72fbd",
     );
-    static TRANSACTION_ID: &str =
-        "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
+    static TRANSACTION_ID: &str = "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
          7c400d56354dee788191be8e28393c70398906fb467fac8db6279e90e4e61619589d42bf";
 
     #[bench]
