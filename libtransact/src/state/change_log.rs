@@ -19,7 +19,7 @@ use crate::protos::merkle;
 use crate::protos::{FromNative, FromProto, IntoNative, IntoProto, ProtoConversionError};
 use protobuf::Message;
 
-use super::merkle_error::StateDatabaseError;
+use super::merkle::StateDatabaseError;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Successor {
