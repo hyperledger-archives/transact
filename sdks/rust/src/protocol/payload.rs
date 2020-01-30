@@ -2186,7 +2186,7 @@ impl SabrePayloadBuilder {
 
     pub fn build(self) -> Result<SabrePayload, SabrePayloadBuildError> {
         let action = self.action.ok_or_else(|| {
-            SabrePayloadBuildError::MissingField("'name' field is required".to_string())
+            SabrePayloadBuildError::MissingField("'action' field is required".to_string())
         })?;
 
         Ok(SabrePayload { action })
