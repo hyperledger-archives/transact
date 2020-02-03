@@ -10,10 +10,11 @@ contracts.
 It would be a good idea to read through the Sabre Transaction Family
 Specification before reading through this guide.
 
-Currently, Sabre smart contracts can only be written in Rust. The following
-guide will use an example smart contract called intkey-multiply. This smart
-contract will take intkey values, multiply them, and store the new intkey key
-value pair in the intkey state.
+Currently, Sabre has a Rust SDK and an AssemblyScript SDK to support writing
+Sabre smart contracts. The following guide will use an example smart contract 
+written in rust called intkey-multiply. This smart contract will take intkey 
+values, multiply them, and store the new intkey key value pair in the intkey 
+state.
 
 .. note:: This guide assumes familiarity with Sawtooth Transaction Processors
   and that cargo/rust is already installed.
@@ -270,6 +271,10 @@ contracts. For example, if the Sabre transaction processor has a log level of
 
 Compiling the Contract
 ======================
+
+Rust
+----
+
 To compile your smart contract into wasm you need to use Rust's nightly tool
 chain and need to add target wasm32-unknown-unknown.
 
@@ -294,6 +299,67 @@ sawtooth-sabre/example/intkey_multiply/processor:
   - Remove any "{:?}" from any format strings, as this pulls in a bunch of stuff
   - Use this script to reduce the size https://www.hellorust.com/news/native-wasm-target.html
 
+AssemblyScript
+--------------
+
+Using asinit
+^^^^^^^^^^^^
+
+`asinit` is a tool for initializing an AssemblyScript project. Run the following
+to create a new AssemblyScript project.
+
+.. code-block:: console
+
+   $ npm install --save-dev assemblyscript
+   $ npx asinit .
+
+Then, edit the `package.json` to generate WebAssembly that imports `abort`.
+
+.. code-block:: json
+   {
+     "name": "my-sc-project",
+     "version": "0.0.1",
+     "main": "assembly/index.ts",
+     "types": "build/index.d.ts",
+     "scripts": {
+       "build:tsd": "asc assembly/index.ts -d build/index.d.ts",
+       "asbuild:optimized": "asc assembly/index.ts \
+           -b build/optimized.wasm \
+           -t build/optimized.wat \
+           --sourceMap \
+           --importMemory \
+           --noAssert \
+           --use abort= \
+           --validate \
+           --optimize",
+       "asbuild": "npm run asbuild:optimized && npm run build:tsd"
+     }
+   }
+
+Build a project run the following
+
+.. code-block:: console
+   npm run asbuild
+
+Without asinit
+^^^^^^^^^^^^^^
+
+In order to produce Sawtooth Sabre compatible WebAssembly install AssemblyScript
+Compiler (asc) and run the following command.
+
+.. code-block:: console
+
+   $ npm install -g asc
+
+   $ asc assembly/index.ts \
+       -b build/optimized.wasm \
+       -t build/optimized.wat \
+       --sourceMap \
+       --importMemory \
+       --noAssert \
+       --use abort= \
+       --validate \
+       --optimize
 
 Running a Sabre Smart Contract
 ==============================
