@@ -22,11 +22,10 @@
 //! `Write`, `Read`, and `Prune`.  These provide commit, read access,
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
-pub mod change_log;
 pub mod error;
 pub mod hashmap;
+#[cfg(feature = "state-merkle")]
 pub mod merkle;
-mod merkle_error;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;

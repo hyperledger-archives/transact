@@ -22,7 +22,7 @@ rand = "0.6"
 sha2 = "0.8"
 lmdb-zero = ">=0.4.1"
 log = { version = "0.4", features = ["std"] }
-cbor-codec = "0.7"
+cbor-codec = { version = "0.7", optional = true }
 libc = ">=0.2.35"
 openssl = "0.10"
 uuid = { version = "0.7", features = ["v4"] }
@@ -38,7 +38,7 @@ sawtooth-xo = "0.3"
 protoc-rust = "2"
 
 [features]
-default = []
+default = ["state-merkle"]
 nightly = []
 experimental = [
     "contract",
@@ -62,3 +62,4 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 key-value-state = []
+state-merkle = ["cbor-codec"]
