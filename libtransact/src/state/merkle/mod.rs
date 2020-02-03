@@ -16,7 +16,7 @@
  * ------------------------------------------------------------------------------
  */
 
-pub mod change_log;
+mod change_log;
 mod error;
 
 use std::collections::BTreeMap;

@@ -20,8 +20,9 @@ use rand::thread_rng;
 
 use transact::{
     database::{error::DatabaseError, Database},
+    protos::merkle::ChangeLogEntry,
     state::{
-        merkle::{change_log::ChangeLogEntry, MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
+        merkle::{MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
         Prune, StateChange, Write,
     },
 };
@@ -66,7 +67,8 @@ fn test_merkle_trie_root_advance(db: Box<dyn Database>) {
             .index_get(CHANGE_LOG_INDEX, new_root_bytes)
             .expect("A database error occurred")
             .expect("Did not return a change log entry");
-        ChangeLogEntry::from_bytes(entry_bytes).expect("Failed to parse change log entry")
+        protobuf::parse_from_bytes::<ChangeLogEntry>(entry_bytes)
+            .expect("Failed to parse change log entry")
     };
 
     assert_eq!(orig_root_bytes, &change_log.parent);
@@ -519,15 +521,15 @@ fn test_merkle_trie_pruning_parent(db: Box<dyn Database>) {
     );
     {
         let reader = db.get_reader().unwrap();
-        for addition in parent_change_log
-            .successors
-            .clone()
+        for deletion in parent_change_log
+            .get_successors()
+            .to_vec()
             .first()
             .unwrap()
-            .deletions
-            .clone()
+            .get_deletions()
+            .to_vec()
         {
-            assert!(reader.get(&addition).is_none());
+            assert!(reader.get(&deletion).is_none());
         }
 
         assert!(reader
@@ -888,7 +890,7 @@ fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_
 
 fn expect_change_log(db: &dyn Database, root_hash: &[u8]) -> ChangeLogEntry {
     let reader = db.get_reader().unwrap();
-    ChangeLogEntry::from_bytes(
+    protobuf::parse_from_bytes::<ChangeLogEntry>(
         &reader
             .index_get(CHANGE_LOG_INDEX, root_hash)
             .expect("No db errors")
@@ -901,7 +903,7 @@ fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]])
     assert_eq!(successor_roots.len(), change_log.successors.len());
     for successor_root in successor_roots {
         let mut has_root = false;
-        for successor in change_log.successors.clone() {
+        for successor in change_log.get_successors().to_vec() {
             if &successor.successor == successor_root {
                 has_root = true;
                 break;
