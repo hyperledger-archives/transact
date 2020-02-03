@@ -244,15 +244,15 @@ impl<'db> DatabaseWriter for RedisDatabaseWriter<'db> {
             }
             Some(_) => return Err(DatabaseError::DuplicateEntry),
             None => {
-                if unlock_conn!(self, DatabaseError::WriterError)?
+                let entry_exists = unlock_conn!(self, DatabaseError::WriterError)?
                     .hexists::<_, _, bool>(&self.db.primary, key)
                     .map_err(|e| {
                         DatabaseError::WriterError(format!(
                             "unable to check for existing entry: {}",
                             e
                         ))
-                    })?
-                {
+                    })?;
+                if entry_exists {
                     return Err(DatabaseError::DuplicateEntry);
                 }
 

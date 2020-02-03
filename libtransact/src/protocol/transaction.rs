@@ -35,6 +35,8 @@ use crate::protos::{
 };
 use crate::signing;
 
+use super::batch::BatchBuilder;
+
 static DEFAULT_NONCE_SIZE: usize = 32;
 
 #[derive(Debug, PartialEq, Clone)]
@@ -560,6 +562,13 @@ impl TransactionBuilder {
 
     pub fn build(self, signer: &dyn signing::Signer) -> Result<Transaction, TransactionBuildError> {
         Ok(self.build_pair(signer)?.transaction)
+    }
+
+    pub fn into_batch_builder(
+        self,
+        signer: &dyn signing::Signer,
+    ) -> Result<BatchBuilder, TransactionBuildError> {
+        Ok(BatchBuilder::new().with_transactions(vec![self.build(signer)?]))
     }
 }
 
