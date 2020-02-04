@@ -8,7 +8,10 @@ RUN apt-get update && \
     libssl-dev \
     pkg-config \
     protobuf-compiler \
-    libzmq3-dev
+    libzmq3-dev \
+    libsqlite3-dev \
+    sqlite3
+
 
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
     chmod +x /usr/bin/rustup-init && \

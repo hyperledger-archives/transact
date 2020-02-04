@@ -34,6 +34,8 @@ pub mod error;
 pub mod lmdb;
 #[cfg(feature = "redis-db")]
 pub mod redis;
+#[cfg(feature = "sqlite-db")]
+pub mod sqlite;
 
 pub use crate::database::error::DatabaseError;
 
@@ -54,7 +56,7 @@ impl Clone for Box<dyn Database> {
 /// A DatabaseReader provides read access to a database instance.
 pub trait DatabaseReader {
     /// Returns the bytes stored at the given key, if found.
-    fn get(&self, key: &[u8]) -> Option<Vec<u8>>;
+    fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError>;
 
     /// Returns the bytes stored at the given key on a specified index, if found.
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError>;

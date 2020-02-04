@@ -529,7 +529,10 @@ fn test_merkle_trie_pruning_parent(db: Box<dyn Database>) {
             .get_deletions()
             .to_vec()
         {
-            assert!(reader.get(&deletion).is_none());
+            assert!(reader
+                .get(&deletion)
+                .expect("Could not query for deletion")
+                .is_none());
         }
 
         assert!(reader
@@ -1333,5 +1336,165 @@ mod redisdb {
             .map_err(|e| e.to_string())?;
 
         Ok(())
+    }
+}
+
+#[cfg(feature = "sqlite-db")]
+mod sqlitedb {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use transact::{
+        database::{btree::BTreeDatabase, sqlite::SqliteDatabase},
+        state::merkle::INDEXES,
+    };
+
+    use super::*;
+
+    #[test]
+    fn merkle_trie_root_advance() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_root_advance(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_delete() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_delete(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_update() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_update(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_update_same_address_space() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_update_same_address_space(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_update_same_address_space_with_no_children() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_update_same_address_space_with_no_children(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_pruning_parent() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_pruning_parent(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_pruning_successors() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_pruning_successors(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_pruning_duplicate_leaves() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_pruning_duplicate_leaves(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_pruning_successor_duplicate_leaves() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_pruning_successor_duplicate_leaves(db);
+        })
+    }
+
+    #[test]
+    fn leaf_iteration() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_leaf_iteration(db);
+        })
+    }
+
+    /// Verifies that a state tree backed by lmdb and btree give the same root hashes
+    #[test]
+    fn sqlite_btree_comparison() {
+        run_test(|db_path| {
+            let sqlite_db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+
+            test_same_results(sqlite_db, btree_db);
+        })
+    }
+
+    #[test]
+    fn btree_sqlite_comparison() {
+        run_test(|db_path| {
+            let sqlite_db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+
+            test_same_results(btree_db, sqlite_db);
+        })
+    }
+
+    fn run_test<T>(test: T) -> ()
+    where
+        T: FnOnce(&str) -> () + std::panic::UnwindSafe,
+    {
+        let dbpath = temp_db_path();
+
+        let testpath = dbpath.clone();
+        let result = std::panic::catch_unwind(move || test(&testpath));
+
+        std::fs::remove_file(dbpath).unwrap();
+
+        assert!(result.is_ok())
+    }
+    static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
+
+    fn temp_db_path() -> String {
+        let mut temp_dir = std::env::temp_dir();
+
+        let thread_id = GLOBAL_THREAD_COUNT.fetch_add(1, Ordering::SeqCst);
+        temp_dir.push(format!("sqlite-test-{:?}.db", thread_id));
+        temp_dir.to_str().unwrap().to_string()
     }
 }
