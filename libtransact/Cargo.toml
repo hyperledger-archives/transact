@@ -48,6 +48,7 @@ experimental = [
     "contract-address-double-key-hash",
     "contract-address-key-hash",
     "contract-address-triple-key-hash",
+    "contract-archive",
     "contract-context",
     "contract-context-key-value",
     "key-value-state",
@@ -60,6 +61,7 @@ contract-address = ["contract"]
 contract-address-key-hash = ["contract-address"]
 contract-address-double-key-hash = ["contract-address"]
 contract-address-triple-key-hash = ["contract-address"]
+contract-archive = ["contract"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 key-value-state = []
