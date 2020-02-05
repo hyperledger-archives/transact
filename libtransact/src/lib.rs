@@ -134,3 +134,6 @@ pub mod workload;
 
 #[macro_use]
 extern crate log;
+#[cfg(feature = "contract-archive")]
+#[macro_use]
+extern crate serde_derive;
