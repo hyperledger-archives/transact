@@ -27,6 +27,7 @@ edition = "2018"
 
 [dependencies]
 protobuf = "2"
+sha2 = "0.8"
 
 [build-dependencies]
 protoc-rust = "2"
