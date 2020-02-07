@@ -17,5 +17,7 @@
 
 #[cfg(feature = "contract-address")]
 pub mod address;
+#[cfg(feature = "contract-archive")]
+pub mod archive;
 #[cfg(feature = "contract-context")]
 pub mod context;
