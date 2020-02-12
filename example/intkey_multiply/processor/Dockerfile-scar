@@ -91,4 +91,4 @@ RUN cp target/wasm32-unknown-unknown/release/intkey-multiply.wasm \
 WORKDIR /build/example/intkey_multiply/processor/packaging/scar
 
 # Create .scar file
-RUN tar -jcvf /tmp/intkey-multiply_0.5.0.scar .
+RUN tar -jcvf /tmp/intkey-multiply_0.5.1.scar .
