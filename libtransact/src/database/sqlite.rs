@@ -66,6 +66,7 @@ pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 /// A builder for generating SqliteDatabase instances.
 pub struct SqliteDatabaseBuilder {
     path: Option<String>,
+    prefix: Option<String>,
     indexes: Vec<&'static str>,
     pool_size: Option<u32>,
     memory_map_size: i64,
@@ -75,6 +76,7 @@ impl SqliteDatabaseBuilder {
     fn new() -> Self {
         Self {
             path: None,
+            prefix: None,
             indexes: vec![],
             pool_size: None,
             memory_map_size: DEFAULT_MMAP_SIZE,
@@ -84,6 +86,17 @@ impl SqliteDatabaseBuilder {
     /// Set the path for the Sqlite database.
     pub fn with_path<S: Into<String>>(mut self, path: S) -> Self {
         self.path = Some(path.into());
+        self
+    }
+
+    /// Set the prefix for all table names in the database.
+    ///
+    /// This prefix results in table names such as `"<prefix>_primary"` and
+    /// `"<prefix>_index_<index-name>"`.
+    ///
+    /// Defaults to "transact".
+    pub fn with_prefix<S: Into<String>>(mut self, prefix: S) -> Self {
+        self.prefix = Some(prefix.into());
         self
     }
 
@@ -149,11 +162,19 @@ impl SqliteDatabaseBuilder {
                 source: Some(Box::new(err)),
             })?;
 
-        let create_table = "CREATE TABLE IF NOT EXISTS transact_primary (\
-                            key BLOB PRIMARY KEY, \
-                            value BLOB NOT NULL\
-                            )";
-        conn.execute(create_table, params![])
+        let prefix = self
+            .prefix
+            .map(|s| s + "_")
+            .unwrap_or_else(|| "transact_".into());
+
+        let create_table = format!(
+            "CREATE TABLE IF NOT EXISTS {}primary (\
+            key BLOB PRIMARY KEY, \
+            value BLOB NOT NULL\
+            )",
+            &prefix,
+        );
+        conn.execute(&create_table, params![])
             .map_err(|err| SqliteDatabaseError {
                 context: "unable to create primary table".into(),
                 source: Some(Box::new(err)),
@@ -161,11 +182,11 @@ impl SqliteDatabaseBuilder {
 
         for index in self.indexes {
             let create_index_table = format!(
-                "CREATE TABLE IF NOT EXISTS transact_index_{} (\
+                "CREATE TABLE IF NOT EXISTS {}index_{} (\
                  index_key BLOB PRIMARY KEY, \
                  value BLOB NOT NULL\
                  )",
-                index,
+                &prefix, index,
             );
 
             conn.execute(&create_index_table, params![])
@@ -175,13 +196,14 @@ impl SqliteDatabaseBuilder {
                 })?;
         }
 
-        Ok(SqliteDatabase { pool })
+        Ok(SqliteDatabase { prefix, pool })
     }
 }
 
 /// A Database implementation backed by a Sqlite instance.
 #[derive(Clone)]
 pub struct SqliteDatabase {
+    prefix: String,
     pool: r2d2::Pool<SqliteConnectionManager>,
 }
 
@@ -253,6 +275,7 @@ impl Database for SqliteDatabase {
         })?;
 
         Ok(Box::new(SqliteDatabaseReader {
+            prefix: &self.prefix,
             conn: Rc::new(RefCell::new(conn)),
         }))
     }
@@ -267,6 +290,7 @@ impl Database for SqliteDatabase {
         })?;
 
         Ok(Box::new(SqliteDatabaseWriter {
+            prefix: &self.prefix,
             conn: Rc::new(RefCell::new(conn)),
         }))
     }
@@ -276,30 +300,34 @@ impl Database for SqliteDatabase {
     }
 }
 
-struct SqliteDatabaseReader {
+struct SqliteDatabaseReader<'db> {
+    prefix: &'db str,
     conn: Rc<RefCell<SqliteConnection>>,
 }
 
-impl DatabaseReader for SqliteDatabaseReader {
+impl<'db> DatabaseReader for SqliteDatabaseReader<'db> {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_get(&mut conn, key)
+        execute_get(&mut conn, self.prefix, key)
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_index_get(&mut conn, index, key)
+        execute_index_get(&mut conn, self.prefix, index, key)
     }
 
     fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
         let total = {
             let mut conn = self.conn.borrow_mut();
-            execute_count(&mut conn)?
+            execute_count(&mut conn, self.prefix)?
         };
 
         Ok(Box::new(SqliteCursor::new(
             self.conn.clone(),
-            "SELECT key, value from transact_primary LIMIT ? OFFSET ?",
+            &format!(
+                "SELECT key, value from {}primary LIMIT ? OFFSET ?",
+                self.prefix,
+            ),
             total,
         )?))
     }
@@ -307,14 +335,14 @@ impl DatabaseReader for SqliteDatabaseReader {
     fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError> {
         let total = {
             let mut conn = self.conn.borrow_mut();
-            execute_index_count(&mut conn, index)?
+            execute_index_count(&mut conn, self.prefix, index)?
         };
 
         Ok(Box::new(SqliteCursor::new(
             self.conn.clone(),
             &format!(
-                "SELECT index_key, value from transact_index_{} LIMIT ? OFFSET ?",
-                index
+                "SELECT index_key, value from {}index_{} LIMIT ? OFFSET ?",
+                self.prefix, index,
             ),
             total,
         )?))
@@ -322,20 +350,21 @@ impl DatabaseReader for SqliteDatabaseReader {
 
     fn count(&self) -> Result<usize, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_count(&mut conn).map(|count| count as usize)
+        execute_count(&mut conn, self.prefix).map(|count| count as usize)
     }
 
     fn index_count(&self, index: &str) -> Result<usize, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_index_count(&mut conn, index).map(|count| count as usize)
+        execute_index_count(&mut conn, self.prefix, index).map(|count| count as usize)
     }
 }
 
-struct SqliteDatabaseWriter {
+struct SqliteDatabaseWriter<'db> {
+    prefix: &'db str,
     conn: Rc<RefCell<SqliteConnection>>,
 }
 
-impl Drop for SqliteDatabaseWriter {
+impl<'db> Drop for SqliteDatabaseWriter<'db> {
     fn drop(&mut self) {
         if let Err(err) = self.conn.borrow_mut().execute_batch("ROLLBACK") {
             warn!("Unable to rollback writer transaction: {}", err);
@@ -343,11 +372,14 @@ impl Drop for SqliteDatabaseWriter {
     }
 }
 
-impl DatabaseWriter for SqliteDatabaseWriter {
+impl<'db> DatabaseWriter for SqliteDatabaseWriter<'db> {
     fn put(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         let conn = self.conn.borrow_mut();
         let mut stmt = conn
-            .prepare_cached("INSERT INTO transact_primary (key, value) VALUES (?, ?)")
+            .prepare_cached(&format!(
+                "INSERT INTO {}primary (key, value) VALUES (?, ?)",
+                self.prefix,
+            ))
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
         match stmt.execute(params![key, value]) {
@@ -365,9 +397,10 @@ impl DatabaseWriter for SqliteDatabaseWriter {
     fn overwrite(&mut self, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         let conn = self.conn.borrow_mut();
         let mut stmt = conn
-            .prepare_cached(
-                "INSERT OR REPLACE INTO transact_primary (key, value) VALUES (:key, :value)",
-            )
+            .prepare_cached(&format!(
+                "INSERT OR REPLACE INTO {}primary (key, value) VALUES (:key, :value)",
+                self.prefix,
+            ))
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
         stmt.execute_named(named_params! {":key": key, ":value": value})
@@ -379,7 +412,7 @@ impl DatabaseWriter for SqliteDatabaseWriter {
     fn delete(&mut self, key: &[u8]) -> Result<(), DatabaseError> {
         let conn = self.conn.borrow_mut();
         let mut stmt = conn
-            .prepare_cached("DELETE FROM transact_primary WHERE key = ?")
+            .prepare_cached(&format!("DELETE FROM {}primary WHERE key = ?", self.prefix,))
             .map_err(|err| {
                 DatabaseError::WriterError(format!("unable to delete value: {}", err))
             })?;
@@ -392,8 +425,8 @@ impl DatabaseWriter for SqliteDatabaseWriter {
 
     fn index_put(&mut self, index: &str, key: &[u8], value: &[u8]) -> Result<(), DatabaseError> {
         let sql = format!(
-            "INSERT OR REPLACE INTO transact_index_{} (index_key, value) VALUES (:key, :value)",
-            index
+            "INSERT OR REPLACE INTO {}index_{} (index_key, value) VALUES (:key, :value)",
+            self.prefix, index,
         );
         let conn = self.conn.borrow_mut();
         let mut stmt = conn
@@ -406,7 +439,10 @@ impl DatabaseWriter for SqliteDatabaseWriter {
         Ok(())
     }
     fn index_delete(&mut self, index: &str, key: &[u8]) -> Result<(), DatabaseError> {
-        let sql = format!("DELETE FROM transact_index_{} WHERE index_key = ?", index);
+        let sql = format!(
+            "DELETE FROM {}index_{} WHERE index_key = ?",
+            self.prefix, index
+        );
         let conn = self.conn.borrow_mut();
         let mut stmt = conn.prepare_cached(&sql).map_err(|err| {
             DatabaseError::WriterError(format!("unable to delete value: {}", err))
@@ -430,15 +466,15 @@ impl DatabaseWriter for SqliteDatabaseWriter {
     }
 }
 
-impl DatabaseReader for SqliteDatabaseWriter {
+impl<'db> DatabaseReader for SqliteDatabaseWriter<'db> {
     fn get(&self, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_get(&mut conn, key)
+        execute_get(&mut conn, self.prefix, key)
     }
 
     fn index_get(&self, index: &str, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_index_get(&mut conn, index, key)
+        execute_index_get(&mut conn, self.prefix, index, key)
     }
 
     fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
@@ -451,12 +487,12 @@ impl DatabaseReader for SqliteDatabaseWriter {
 
     fn count(&self) -> Result<usize, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_count(&mut conn).map(|count| count as usize)
+        execute_count(&mut conn, self.prefix).map(|count| count as usize)
     }
 
     fn index_count(&self, index: &str) -> Result<usize, DatabaseError> {
         let mut conn = self.conn.borrow_mut();
-        execute_index_count(&mut conn, index).map(|count| count as usize)
+        execute_index_count(&mut conn, self.prefix, index).map(|count| count as usize)
     }
 }
 
@@ -568,9 +604,16 @@ impl DatabaseReaderCursor for SqliteCursor {
     }
 }
 
-fn execute_get(conn: &mut SqliteConnection, key: &[u8]) -> Result<Option<Vec<u8>>, DatabaseError> {
+fn execute_get(
+    conn: &mut SqliteConnection,
+    prefix: &str,
+    key: &[u8],
+) -> Result<Option<Vec<u8>>, DatabaseError> {
     let mut stmt = conn
-        .prepare_cached("SELECT value FROM transact_primary WHERE key = ?")
+        .prepare_cached(&format!(
+            "SELECT value FROM {}primary WHERE key = ?",
+            prefix
+        ))
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))?;
 
     let mut value_iter = stmt
@@ -583,9 +626,9 @@ fn execute_get(conn: &mut SqliteConnection, key: &[u8]) -> Result<Option<Vec<u8>
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))
 }
 
-fn execute_count(conn: &mut SqliteConnection) -> Result<i64, DatabaseError> {
+fn execute_count(conn: &mut SqliteConnection, prefix: &str) -> Result<i64, DatabaseError> {
     let mut stmt = conn
-        .prepare_cached("SELECT COUNT(key) FROM transact_primary")
+        .prepare_cached(&format!("SELECT COUNT(key) FROM {}primary", prefix))
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))?;
 
     stmt.query_row(params![], |row| row.get(0))
@@ -594,12 +637,13 @@ fn execute_count(conn: &mut SqliteConnection) -> Result<i64, DatabaseError> {
 
 fn execute_index_get(
     conn: &mut SqliteConnection,
+    prefix: &str,
     index: &str,
     key: &[u8],
 ) -> Result<Option<Vec<u8>>, DatabaseError> {
     let query = format!(
-        "SELECT value FROM transact_index_{} WHERE index_key = ?",
-        index
+        "SELECT value FROM {}index_{} WHERE index_key = ?",
+        prefix, index
     );
     let mut stmt = conn
         .prepare_cached(&query)
@@ -615,8 +659,12 @@ fn execute_index_get(
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))
 }
 
-fn execute_index_count(conn: &mut SqliteConnection, index: &str) -> Result<i64, DatabaseError> {
-    let query = format!("SELECT COUNT(index_key) FROM transact_index_{}", index);
+fn execute_index_count(
+    conn: &mut SqliteConnection,
+    prefix: &str,
+    index: &str,
+) -> Result<i64, DatabaseError> {
+    let query = format!("SELECT COUNT(index_key) FROM {}index_{}", prefix, index);
     let mut stmt = conn
         .prepare_cached(&query)
         .map_err(|err| DatabaseError::ReaderError(format!("unable to read value: {}", err)))?;
@@ -963,6 +1011,74 @@ mod test {
                 (0..PAGE_SIZE * 2).into_iter().collect::<Vec<i64>>(),
                 record_ids
             );
+        })
+    }
+
+    #[test]
+    fn test_multi_prefix() {
+        run_test(|db_path| {
+            let db_alpha = SqliteDatabase::builder()
+                .with_path(db_path)
+                .with_prefix("alpha")
+                .with_indexes(&["idx_one"])
+                .build()
+                .expect("Could not instantiate database");
+
+            let db_beta = SqliteDatabase::builder()
+                .with_path(db_path)
+                .with_prefix("beta")
+                .with_indexes(&["idx_one", "idx_two"])
+                .build()
+                .expect("Could not instantiate database");
+
+            let mut writer = db_alpha
+                .get_writer()
+                .expect("Unable to create alpha writer");
+            writer
+                .put(b"rec-1", b"alpha value")
+                .expect("unable to write to alpha primary");
+            writer
+                .index_put("idx_one", b"idx-1", b"alpha index value")
+                .expect("Unable to write to alpha index");
+            writer.commit().expect("Unable to commit to alpha");
+
+            let mut writer = db_beta.get_writer().expect("Unable to create beta writer");
+            writer
+                .put(b"rec-1", b"beta value")
+                .expect("unable to write to beta primary");
+            writer
+                .index_put("idx_two", b"idx-1", b"beta index value")
+                .expect("Unable to write to alpha index");
+            writer.commit().expect("Unable to commit to beta");
+
+            let alpha_reader = db_alpha
+                .get_reader()
+                .expect("unable to get an alpha reader");
+            let alpha_value = alpha_reader
+                .get(b"rec-1")
+                .expect("Unable to read value from alpha primary");
+            assert_eq!(Some(b"alpha value".to_vec()), alpha_value);
+
+            let alpha_idx_value = alpha_reader
+                .index_get("idx_one", b"idx-1")
+                .expect("unable to read value from alpha index");
+            assert_eq!(Some(b"alpha index value".to_vec()), alpha_idx_value);
+
+            let beta_reader = db_beta.get_reader().expect("unable to get an beta reader");
+            let beta_value = beta_reader
+                .get(b"rec-1")
+                .expect("Unable to read value from beta primary");
+            assert_eq!(Some(b"beta value".to_vec()), beta_value);
+
+            let beta_idx_value = beta_reader
+                .index_get("idx_one", b"idx-1")
+                .expect("unable to read value from beta index");
+            assert_eq!(None, beta_idx_value);
+
+            let beta_idx_value = beta_reader
+                .index_get("idx_two", b"idx-1")
+                .expect("unable to read value from beta index");
+            assert_eq!(Some(b"beta index value".to_vec()), beta_idx_value);
         })
     }
 
