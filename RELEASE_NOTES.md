@@ -1,5 +1,12 @@
 # Release Notes
 
+## Changes in Transact 0.2.1:
+
+### Highlights:
+
+* Enable loading a .scar file into a native `SmartContractArchive` with the
+  experimental feature "contract-archive"
+
 ## Changes in Transact 0.2.0:
 
 ### Highlights:
