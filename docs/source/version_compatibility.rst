@@ -49,3 +49,9 @@ the Sabre transaction processor image.
 |            |          |           |         |   Sabre Transaction Processor  |
 |            |          |           |         |   where it will be logged.     |
 +------------+----------+-----------+---------+--------------------------------+
+| 0.5        | 0.5      | 0.5       |  0.3    | - Replaces all `*ActionBuilder`|
+|            |          |           |         |   errors with a single         |
+|            |          |           |         |   ActionBuildError and adds the|
+|            |          |           |         |   `into_payload_builder` method|
+|            |          |           |         |   to all `*ActionBuilders`.    |
++------------+----------+-----------+---------+--------------------------------+
