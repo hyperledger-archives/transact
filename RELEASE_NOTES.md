@@ -1,5 +1,11 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.5.1
+
+* Update the family version for Sabre transactions in the Sabre transaction
+  processor and Sabre CLI
+* Fix a broken path in the Dockerfile for publishing the Sabre SDK to crates.io
+
 ## Changes in Sawtooth Sabre 0.5
 
 ### Highlights
