@@ -49,7 +49,7 @@ WORKDIR /project/sawtooth-sabre
 CMD cd sdks/rust \
  && cargo login $CARGO_CRED \
  && rm -f Cargo.lock \
- && REPO_VER=$(VERSION=AUTO_STRICT ../bin/get_version) \
+ && REPO_VER=$(VERSION=AUTO_STRICT ../../bin/get_version) \
  && sed -i'' -e "s/version.*$/version\ =\ \"$REPO_VER\"/" Cargo.toml \
  && cargo clean \
  && cargo test \
