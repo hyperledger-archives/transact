@@ -478,11 +478,35 @@ impl<'db> DatabaseReader for SqliteDatabaseWriter<'db> {
     }
 
     fn cursor(&self) -> Result<DatabaseCursor, DatabaseError> {
-        unimplemented!()
+        let total = {
+            let mut conn = self.conn.borrow_mut();
+            execute_count(&mut conn, self.prefix)?
+        };
+
+        Ok(Box::new(SqliteCursor::new(
+            self.conn.clone(),
+            &format!(
+                "SELECT key, value from {}primary LIMIT ? OFFSET ?",
+                self.prefix,
+            ),
+            total,
+        )?))
     }
 
-    fn index_cursor(&self, _index: &str) -> Result<DatabaseCursor, DatabaseError> {
-        unimplemented!()
+    fn index_cursor(&self, index: &str) -> Result<DatabaseCursor, DatabaseError> {
+        let total = {
+            let mut conn = self.conn.borrow_mut();
+            execute_index_count(&mut conn, self.prefix, index)?
+        };
+
+        Ok(Box::new(SqliteCursor::new(
+            self.conn.clone(),
+            &format!(
+                "SELECT index_key, value from {}index_{} LIMIT ? OFFSET ?",
+                self.prefix, index,
+            ),
+            total,
+        )?))
     }
 
     fn count(&self) -> Result<usize, DatabaseError> {
@@ -1011,6 +1035,68 @@ mod test {
                 (0..PAGE_SIZE * 2).into_iter().collect::<Vec<i64>>(),
                 record_ids
             );
+        })
+    }
+
+    #[test]
+    fn test_writer_cursors() {
+        run_test(|db_path| {
+            let db =
+                SqliteDatabase::new(&db_path, &["a", "b"]).expect("Could not instantiate database");
+
+            {
+                let writer = db.get_writer().expect("unable to get a database writer");
+                let cursor = writer.index_cursor("a").expect("unable to open cursor");
+
+                assert!(cursor.collect::<Vec<_>>().is_empty());
+            }
+
+            let mut writer = db.get_writer().expect("unable to get db writer");
+            writer.put(b"a", b"first").expect("unable to put value");
+            writer.put(b"b", b"second").expect("unable to put value");
+
+            writer
+                .index_put("a", &[1], b"hello")
+                .expect("unable to put value");
+            writer
+                .index_put("a", &[2], b"bonjour")
+                .expect("unable to put value");
+            writer
+                .index_put("a", &[3], b"guten tag")
+                .expect("unable to put value");
+            writer
+                .index_put("b", &[44], b"goodbye")
+                .expect("unable to put value");
+
+            writer.commit().expect("unable to commit");
+
+            {
+                let writer = db.get_writer().expect("unable to get a database writer");
+                let mut cursor = writer.cursor().expect("unable to open cursor");
+                assert_eq!(Some((b"a".to_vec(), b"first".to_vec())), cursor.next());
+                assert_eq!(Some((b"b".to_vec(), b"second".to_vec())), cursor.next());
+
+                assert_eq!(None, cursor.next());
+
+                let mut index_cursor = writer
+                    .index_cursor("a")
+                    .expect("unable to open index_cursor");
+
+                assert_eq!(Some((vec![1u8], b"hello".to_vec())), index_cursor.next());
+                assert_eq!(Some((vec![2u8], b"bonjour".to_vec())), index_cursor.next());
+
+                assert_eq!(
+                    Some((vec![1u8], b"hello".to_vec())),
+                    index_cursor.seek_first()
+                );
+
+                assert_eq!(
+                    Some((vec![3u8], b"guten tag".to_vec())),
+                    index_cursor.seek_last()
+                );
+
+                assert_eq!(None, index_cursor.next());
+            }
         })
     }
 
