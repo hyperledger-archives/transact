@@ -30,8 +30,7 @@
 //! ```no_run
 //! use transact::contract::archive::{default_scar_path, SmartContractArchive};
 //!
-//! let default_paths = default_scar_path();
-//! let archive = SmartContractArchive::from_scar_file("xo", "0.1", &default_paths[0])
+//! let archive = SmartContractArchive::from_scar_file("xo", "0.1", &default_scar_path())
 //!     .expect("failed to load .scar file");
 //! ```
 
@@ -70,7 +69,7 @@ pub struct SmartContractArchive {
 }
 
 impl SmartContractArchive {
-    /// Attempt to load a `SmartContractArchive` from a .scar file in the given `path`.
+    /// Attempt to load a `SmartContractArchive` from a .scar file in one of the given `paths`.
     ///
     /// The .scar file to load will be named `<name>_<version>.scar`, where `<name>` is the name
     /// specified for this method and `<version>` is a valid semver string.
@@ -83,14 +82,18 @@ impl SmartContractArchive {
     ///
     /// # Example
     ///
-    /// If there are two files `/usr/share/scar/xo_1.2.3.scar` and `/usr/share/scar/xo_1.2.4`, you
+    /// If there are two files `/usr/share/scar/xo_1.2.3.scar` and `/some/other/dir/xo_1.2.4`, you
     /// can load v1.2.4 with:
     ///
     /// ```no_run
     /// use transact::contract::archive::SmartContractArchive;
     ///
-    /// let archive = SmartContractArchive::from_scar_file("xo", "1.2", "/usr/share/scar")
-    ///     .expect("failed to load .scar file");
+    /// let archive = SmartContractArchive::from_scar_file(
+    ///     "xo",
+    ///     "1.2",
+    ///     &["/usr/share/scar", "/some/other/dir"],
+    /// )
+    /// .expect("failed to load .scar file");
     /// assert_eq!(&archive.metadata.version, "1.2.4");
     /// ```
     ///
@@ -99,16 +102,20 @@ impl SmartContractArchive {
     /// ```no_run
     /// use transact::contract::archive::SmartContractArchive;
     ///
-    /// let archive = SmartContractArchive::from_scar_file("xo", "1.2.3", "/usr/share/scar")
-    ///     .expect("failed to load .scar file");
+    /// let archive = SmartContractArchive::from_scar_file(
+    ///     "xo",
+    ///     "1.2.3",
+    ///     &["/usr/share/scar", "/some/other/dir"],
+    /// )
+    /// .expect("failed to load .scar file");
     /// assert_eq!(&archive.metadata.version, "1.2.3");
     /// ```
     pub fn from_scar_file<P: AsRef<Path>>(
         name: &str,
         version: &str,
-        path: P,
+        paths: &[P],
     ) -> Result<SmartContractArchive, Error> {
-        let file_path = find_scar(name, version, path)?;
+        let file_path = find_scar(name, version, paths)?;
 
         let scar_file = File::open(&file_path).map_err(|err| {
             Error::new_with_source(
@@ -204,17 +211,23 @@ pub struct SmartContractMetadata {
     pub outputs: Vec<String>,
 }
 
-fn find_scar<P: AsRef<Path>>(name: &str, version: &str, path: P) -> Result<PathBuf, Error> {
+fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<PathBuf, Error> {
     let file_name_pattern = format!("{}_*.scar", name);
-    let file_path_pattern = path.as_ref().join(&file_name_pattern);
-    let pattern_string = file_path_pattern
-        .to_str()
-        .ok_or_else(|| Error::new("name is not valid UTF-8"))?;
-
     let version_req = VersionReq::parse(version)?;
 
-    // Start with all .scar files that match the name
-    glob(pattern_string)?
+    // Start with all .scar files that match the name, from all paths
+    paths
+        .iter()
+        .map(|path| {
+            let file_path_pattern = path.as_ref().join(&file_name_pattern);
+            let pattern_string = file_path_pattern
+                .to_str()
+                .ok_or_else(|| Error::new("name is not valid UTF-8"))?;
+            Ok(glob(pattern_string)?)
+        })
+        .collect::<Result<Vec<_>, Error>>()?
+        .into_iter()
+        .flatten()
         // Filter out any files that can't be read
         .filter_map(|path_res| path_res.ok())
         // Filter out any files that don't meet the version requirements
@@ -232,11 +245,13 @@ fn find_scar<P: AsRef<Path>>(name: &str, version: &str, path: P) -> Result<PathB
         .max_by(|(_, x_version), (_, y_version)| x_version.cmp(y_version))
         .map(|(path, _)| path)
         .ok_or_else(|| {
+            let paths = paths
+                .iter()
+                .map(|path| path.as_ref().display())
+                .collect::<Vec<_>>();
             Error::new(&format!(
-                "could not find contract '{}' that meets version requirement '{}' in path '{}'",
-                name,
-                version_req,
-                path.as_ref().display(),
+                "could not find contract '{}' that meets version requirement '{}' in paths '{:?}'",
+                name, version_req, paths,
             ))
         })
 }
@@ -307,7 +322,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("nonexistent", "0.1.0", &dir).is_err());
+        assert!(find_scar("nonexistent", "0.1.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when no matching contract is found in the given path.
@@ -316,7 +331,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.1.0", "/some/other/dir").is_err());
+        assert!(find_scar("mock", "0.1.0", &["/some/other/dir"]).is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient patch version
@@ -326,7 +341,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0-dev");
 
-        assert!(find_scar("mock", "0.1.0", &dir).is_err());
+        assert!(find_scar("mock", "0.1.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient patch version.
@@ -335,7 +350,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.1.1", &dir).is_err());
+        assert!(find_scar("mock", "0.1.1", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient minor version.
@@ -344,7 +359,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.2.0", &dir).is_err());
+        assert!(find_scar("mock", "0.2.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient major version.
@@ -353,7 +368,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "1.0.0", &dir).is_err());
+        assert!(find_scar("mock", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that a .scar file is correctly found when any version (`*`) is requested.
@@ -363,7 +378,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.0");
 
         assert_eq!(
-            find_scar("mock", "*", &dir).expect("failed to find .scar"),
+            find_scar("mock", "*", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -375,7 +390,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2-dev");
 
         assert_eq!(
-            find_scar("mock", "0.1.2-dev", &dir).expect("failed to find .scar"),
+            find_scar("mock", "0.1.2-dev", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -387,7 +402,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &dir).expect("failed to find .scar"),
+            find_scar("mock", "0.1", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -399,7 +414,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "1.2.3");
 
         assert_eq!(
-            find_scar("mock", "1", &dir).expect("failed to find .scar"),
+            find_scar("mock", "1", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -413,7 +428,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1.2", &dir).expect("failed to find .scar"),
+            find_scar("mock", "0.1.2", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -427,7 +442,7 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &dir).expect("failed to find .scar"),
+            find_scar("mock", "0.1", &[&dir]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -441,7 +456,23 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "1.2.0");
 
         assert_eq!(
-            find_scar("mock", "1", &dir).expect("failed to find .scar"),
+            find_scar("mock", "1", &[&dir]).expect("failed to find .scar"),
+            scar_path
+        );
+    }
+
+    /// Verify that the .scar file with the highest matching version is returned when there are
+    /// versions in different paths.
+    #[test]
+    fn find_scar_highest_matching_across_paths() {
+        let thread_id = format!("{:?}", std::thread::current().id());
+        let dir1 = TempDir::new(&format!("{}1", thread_id)).expect("failed to create temp dir1");
+        let dir2 = TempDir::new(&format!("{}2", thread_id)).expect("failed to create temp dir2");
+        write_mock_scar(&dir1, "mock", "1.2.3");
+        let scar_path = write_mock_scar(&dir2, "mock", "1.2.4");
+
+        assert_eq!(
+            find_scar("mock", "1", &[&dir1, &dir2]).expect("failed to find .scar"),
             scar_path
         );
     }
@@ -452,7 +483,7 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "1.0.0");
 
-        let scar = SmartContractArchive::from_scar_file("mock", "1.0.0", &dir)
+        let scar = SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir])
             .expect("failed to load .scar");
 
         assert_eq!(scar.contract, MOCK_CONTRACT_BYTES);
@@ -483,7 +514,7 @@ mod tests {
             Some(contract_file_path.as_path()),
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &dir).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when attempting to load a .scar file whose `manifest.yaml`
@@ -502,7 +533,7 @@ mod tests {
             Some(contract_file_path.as_path()),
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &dir).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when attempting to load a .scar file that does not contain
@@ -520,7 +551,7 @@ mod tests {
             None,
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &dir).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
     fn new_temp_dir() -> TempDir {
