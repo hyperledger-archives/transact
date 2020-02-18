@@ -1,5 +1,14 @@
 # Release Notes
 
+## Changes in Transact 0.2.2
+
+### Experimental Changes
+
+* Update the `SmartContractArchive::from_scar_file` constructor to take multiple
+  search paths for .scar files.
+* Add a configurable prefix for table names in SQLite databases.
+* Enable reading state via the cursor when using the SQLite database writer.
+
 ## Changes in Transact 0.2.1:
 
 ### Highlights:
