@@ -1371,10 +1371,25 @@ mod sqlitedb {
     }
 
     #[test]
-    fn merkle_trie_update() {
+    fn merkle_trie_update_atomic_commit_rollback() {
         run_test(|db_path| {
             let db = Box::new(
                 SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_update(db);
+        })
+    }
+
+    #[test]
+    fn merkle_trie_update_with_wal_mode() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::builder()
+                    .with_path(db_path)
+                    .with_indexes(&INDEXES)
+                    .with_write_ahead_log_mode()
+                    .build()
+                    .expect("Unable to create Sqlite database"),
             );
             test_merkle_trie_update(db);
         })
