@@ -286,7 +286,7 @@ impl Database for SqliteDatabase {
         })?;
 
         conn.execute_batch("BEGIN DEFERRED").map_err(|err| {
-            DatabaseError::WriterError(format!("Unable to begin read transaction: {}", err))
+            DatabaseError::WriterError(format!("Unable to begin write transaction: {}", err))
         })?;
 
         Ok(Box::new(SqliteDatabaseWriter {
