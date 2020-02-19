@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::error::Error as StdError;
+
 use protobuf::Message;
 use protobuf::RepeatedField;
 
-use std::error::Error as StdError;
-
-use crate::protos;
 use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 
 /// Native implementation for ValueType

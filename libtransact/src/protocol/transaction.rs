@@ -20,18 +20,17 @@
 //! A transaction is a signed, opaque payload that acts as a fundamental operation inducing a state
 //! change via a smart contract engine.  They are executed as part of a batch.
 
-use hex;
-use protobuf::Message;
-use sha2::{Digest, Sha512};
 use std::error::Error as StdError;
 use std::fmt;
 
+use hex;
+use protobuf::Message;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
+use sha2::{Digest, Sha512};
 
-use crate::protos;
 use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 use crate::signing;
 

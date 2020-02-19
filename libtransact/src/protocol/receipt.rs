@@ -14,17 +14,19 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+
 //! The `receipts` module contains structs that supply information on the processing
 //! of `Transaction`s
-use protobuf::Message;
 
-use crate::protos;
-use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
-};
-use crate::state;
 use std::error::Error as StdError;
 use std::fmt;
+
+use protobuf::Message;
+
+use crate::protos::{
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+};
+use crate::state;
 
 /// A change to be applied to state, in terms of keys and values.
 ///

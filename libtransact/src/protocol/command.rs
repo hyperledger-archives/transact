@@ -18,9 +18,8 @@
 use protobuf::Message;
 use protobuf::RepeatedField;
 
-use crate::protos;
 use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 
 #[derive(Debug)]
