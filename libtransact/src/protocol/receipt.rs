@@ -50,10 +50,9 @@ impl StateChange {
     }
 }
 
-impl Into<state::StateChange> for StateChange {
-    /// Converts this modules StateChange into state::StateChange enum
-    fn into(self) -> state::StateChange {
-        match self {
+impl From<StateChange> for state::StateChange {
+    fn from(state_change: StateChange) -> Self {
+        match state_change {
             StateChange::Set { key, value } => state::StateChange::Set { key, value },
             StateChange::Delete { key } => state::StateChange::Delete { key },
         }
