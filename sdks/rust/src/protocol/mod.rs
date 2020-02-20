@@ -47,7 +47,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
         }
     };
     let hash = sha512_hash(prefix.as_bytes());
-    Ok([&parse_hex(NAMESPACE_REGISTRY_ADDRESS_PREFIX)?, &hash[..64]].concat())
+    Ok([&parse_hex(NAMESPACE_REGISTRY_ADDRESS_PREFIX)?, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given contract registry.
@@ -57,7 +57,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
 /// * `name` - the name of the contract registry
 pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(name.as_bytes());
-    Ok([&parse_hex(CONTRACT_REGISTRY_ADDRESS_PREFIX)?, &hash[..64]].concat())
+    Ok([&parse_hex(CONTRACT_REGISTRY_ADDRESS_PREFIX)?, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given contract.
@@ -69,7 +69,7 @@ pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, Addressi
 pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, AddressingError> {
     let s = String::from(name) + "," + version;
     let hash = sha512_hash(s.as_bytes());
-    Ok([&parse_hex(CONTRACT_ADDRESS_PREFIX)?, &hash[..64]].concat())
+    Ok([&parse_hex(CONTRACT_ADDRESS_PREFIX)?, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given smart permission.
@@ -86,8 +86,8 @@ pub fn compute_smart_permission_address(
     let name_hash = sha512_hash(name.as_bytes());
     Ok([
         &parse_hex(SMART_PERMISSION_ADDRESS_PREFIX)?,
-        &org_id_hash[..6],
-        &name_hash[..58],
+        &org_id_hash[..3],
+        &name_hash[..29],
     ]
     .concat())
 }
@@ -99,7 +99,7 @@ pub fn compute_smart_permission_address(
 /// * `name` - the agent's name
 pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(name);
-    Ok([&parse_hex(AGENT_ADDRESS_PREFIX)?, &hash[..62]].concat())
+    Ok([&parse_hex(AGENT_ADDRESS_PREFIX)?, &hash[..31]].concat())
 }
 
 /// Compute a state address for a given organization id.
@@ -109,7 +109,7 @@ pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
 /// * `id` - the organization's id
 pub fn compute_org_address(id: &str) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(id.as_bytes());
-    Ok([&parse_hex(ORG_ADDRESS_PREFIX)?, &hash[..62]].concat())
+    Ok([&parse_hex(ORG_ADDRESS_PREFIX)?, &hash[..31]].concat())
 }
 
 fn sha512_hash(bytes: &[u8]) -> Vec<u8> {
