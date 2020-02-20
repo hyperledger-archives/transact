@@ -14,17 +14,20 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+
 //! The `receipts` module contains structs that supply information on the processing
 //! of `Transaction`s
-use protobuf::Message;
 
-use crate::protos;
-use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
-};
-use crate::state;
+use std::convert::{TryFrom, TryInto};
 use std::error::Error as StdError;
 use std::fmt;
+
+use protobuf::Message;
+
+use crate::protos::{
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+};
+use crate::state;
 
 /// A change to be applied to state, in terms of keys and values.
 ///
@@ -50,13 +53,98 @@ impl StateChange {
     }
 }
 
-impl Into<state::StateChange> for StateChange {
-    /// Converts this modules StateChange into state::StateChange enum
-    fn into(self) -> state::StateChange {
-        match self {
+impl From<StateChange> for state::StateChange {
+    fn from(state_change: StateChange) -> Self {
+        match state_change {
             StateChange::Set { key, value } => state::StateChange::Set { key, value },
             StateChange::Delete { key } => state::StateChange::Delete { key },
         }
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidTransactionResultConversion;
+
+impl StdError for InvalidTransactionResultConversion {}
+
+impl std::fmt::Display for InvalidTransactionResultConversion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str("cannot convert `Invalid` transaction result to state changes")
+    }
+}
+
+impl TryFrom<TransactionResult> for Vec<StateChange> {
+    type Error = InvalidTransactionResultConversion;
+
+    fn try_from(result: TransactionResult) -> Result<Self, Self::Error> {
+        match result {
+            TransactionResult::Valid { state_changes, .. } => Ok(state_changes),
+            TransactionResult::Invalid { .. } => Err(InvalidTransactionResultConversion),
+        }
+    }
+}
+
+impl TryFrom<TransactionResult> for Vec<state::StateChange> {
+    type Error = InvalidTransactionResultConversion;
+
+    fn try_from(result: TransactionResult) -> Result<Self, Self::Error> {
+        let state_changes: Vec<StateChange> = result.try_into()?;
+        Ok(state_changes
+            .into_iter()
+            .map(state::StateChange::from)
+            .collect())
+    }
+}
+
+#[derive(Debug)]
+pub struct InvalidTransactionReceiptConversion {
+    transaction_id: String,
+}
+
+impl InvalidTransactionReceiptConversion {
+    pub fn transaction_id(&self) -> &str {
+        &self.transaction_id
+    }
+}
+
+impl StdError for InvalidTransactionReceiptConversion {}
+
+impl std::fmt::Display for InvalidTransactionReceiptConversion {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "cannot convert `Invalid` transaction receipt ({}) to state changes",
+            self.transaction_id
+        )
+    }
+}
+
+impl TryFrom<TransactionReceipt> for Vec<StateChange> {
+    type Error = InvalidTransactionReceiptConversion;
+
+    fn try_from(receipt: TransactionReceipt) -> Result<Self, Self::Error> {
+        let TransactionReceipt {
+            transaction_result,
+            transaction_id,
+        } = receipt;
+
+        transaction_result.try_into().map_err(|err| match err {
+            InvalidTransactionResultConversion => {
+                InvalidTransactionReceiptConversion { transaction_id }
+            }
+        })
+    }
+}
+
+impl TryFrom<TransactionReceipt> for Vec<state::StateChange> {
+    type Error = InvalidTransactionReceiptConversion;
+
+    fn try_from(receipt: TransactionReceipt) -> Result<Self, Self::Error> {
+        let state_changes: Vec<StateChange> = receipt.try_into()?;
+        Ok(state_changes
+            .into_iter()
+            .map(state::StateChange::from)
+            .collect())
     }
 }
 
@@ -651,6 +739,98 @@ mod tests {
                 assert_eq!(ADDRESS, key);
             }
         }
+    }
+
+    #[test]
+    fn valid_result_to_state_change_conversions() {
+        let result = TransactionResult::Valid {
+            state_changes: vec![
+                StateChange::Set {
+                    key: ADDRESS.to_string(),
+                    value: BYTES1.to_vec(),
+                },
+                StateChange::Delete {
+                    key: ADDRESS.to_string(),
+                },
+            ],
+            events: vec![],
+            data: vec![],
+        };
+
+        let changes: Vec<StateChange> = result
+            .clone()
+            .try_into()
+            .expect("failed to convert result to state changes");
+        for change in changes {
+            check_state_change(change);
+        }
+
+        let changes: Vec<state::StateChange> = result
+            .try_into()
+            .expect("failed to convert result to state state changes");
+        for change in changes {
+            check_state_state_change(change);
+        }
+    }
+
+    #[test]
+    fn invalid_result_to_state_change_conversions() {
+        let result = TransactionResult::Invalid {
+            error_message: ERROR_MESSAGE.into(),
+            error_data: ERROR_DATA.to_vec(),
+        };
+
+        assert!(Vec::<StateChange>::try_from(result.clone()).is_err());
+        assert!(Vec::<state::StateChange>::try_from(result).is_err());
+    }
+
+    #[test]
+    fn valid_receipt_to_state_change_conversions() {
+        let txn = TransactionReceipt {
+            transaction_id: TRANSACTION_ID.into(),
+            transaction_result: TransactionResult::Valid {
+                state_changes: vec![
+                    StateChange::Set {
+                        key: ADDRESS.to_string(),
+                        value: BYTES1.to_vec(),
+                    },
+                    StateChange::Delete {
+                        key: ADDRESS.to_string(),
+                    },
+                ],
+                events: vec![],
+                data: vec![],
+            },
+        };
+
+        let changes: Vec<StateChange> = txn
+            .clone()
+            .try_into()
+            .expect("failed to convert result to state changes");
+        for change in changes {
+            check_state_change(change);
+        }
+
+        let changes: Vec<state::StateChange> = txn
+            .try_into()
+            .expect("failed to convert result to state state changes");
+        for change in changes {
+            check_state_state_change(change);
+        }
+    }
+
+    #[test]
+    fn invalid_receipt_to_state_change_conversions() {
+        let result = TransactionReceipt {
+            transaction_id: TRANSACTION_ID.into(),
+            transaction_result: TransactionResult::Invalid {
+                error_message: ERROR_MESSAGE.into(),
+                error_data: ERROR_DATA.to_vec(),
+            },
+        };
+
+        assert!(Vec::<StateChange>::try_from(result.clone()).is_err());
+        assert!(Vec::<state::StateChange>::try_from(result).is_err());
     }
 
     #[test]

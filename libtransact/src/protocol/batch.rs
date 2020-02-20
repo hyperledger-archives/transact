@@ -21,14 +21,14 @@
 //! execution, in order for the batch to be considered valid.  Only valid batches produce state
 //! changes.
 
-use hex;
-use protobuf::Message;
 use std::error::Error as StdError;
 use std::fmt;
 
-use crate::protos;
+use hex;
+use protobuf::Message;
+
 use crate::protos::{
-    FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
+    self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 use crate::signing;
 
