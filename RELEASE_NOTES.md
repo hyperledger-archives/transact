@@ -1,5 +1,18 @@
 # Release Notes
 
+## Changes in Transact 0.2.3
+
+### Experimental Changes
+
+* Allow configuring "Write-Ahead Logging" (WAL) journal mode for SQLite
+  databases. This mode offers significant performance improvements over the
+  standard atomic commit and rollback mode.
+
+### Other Changes
+
+* Add `TryFrom` implementations to convert `TransactionResult` enums and
+  `TransactionReceipt` structs into `StateChange` structs.
+
 ## Changes in Transact 0.2.2
 
 ### Experimental Changes
