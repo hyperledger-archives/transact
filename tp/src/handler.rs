@@ -36,7 +36,7 @@ use sabre_sdk::protocol::payload::{
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
     UpdateSmartPermissionAction,
 };
-use sabre_sdk::protocol::ADMINISTRATORS_SETTING_KEY;
+use sabre_sdk::protocol::{ADMINISTRATORS_SETTING_KEY, SABRE_PROTOCOL_VERSION};
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
@@ -68,7 +68,7 @@ impl SabreTransactionHandler {
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
-            family_versions: vec!["0.5".into()],
+            family_versions: vec![SABRE_PROTOCOL_VERSION.into()],
             namespaces: vec![
                 NAMESPACE_REGISTRY_PREFIX.into(),
                 CONTRACT_REGISTRY_PREFIX.into(),
