@@ -1033,7 +1033,7 @@ mod lmdb {
     }
 
     #[test]
-    fn merkle_trie_update() {
+    fn merkle_trie_update_multiple_entries() {
         run_test(|merkle_path| {
             let db = make_lmdb(&merkle_path);
             test_merkle_trie_update(db);
