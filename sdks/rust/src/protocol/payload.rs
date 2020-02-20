@@ -32,7 +32,7 @@ use super::AddressingError;
 use super::{
     compute_agent_address, compute_contract_address, compute_contract_registry_address,
     compute_namespace_registry_address, compute_org_address, compute_smart_permission_address,
-    parse_hex, ADMINISTRATORS_SETTING_ADDRESS,
+    ADMINISTRATORS_SETTING_ADDRESS_BYTES,
 };
 
 /// Native implementation for SabrePayload_Action
@@ -2295,7 +2295,7 @@ impl SabrePayloadBuilder {
             }) => {
                 let addresses = vec![
                     compute_contract_registry_address(&name)?,
-                    ADMINISTRATORS_SETTING_ADDRESS.into(),
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)
             }
@@ -2317,7 +2317,7 @@ impl SabrePayloadBuilder {
             ) => {
                 let addresses = vec![
                     compute_namespace_registry_address(&namespace)?,
-                    ADMINISTRATORS_SETTING_ADDRESS.into(),
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)
             }
@@ -2348,6 +2348,24 @@ impl SabrePayloadBuilder {
             .with_payload_hash_method(HashMethod::SHA512)
             .with_payload(payload_bytes))
     }
+}
+
+fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
+    if hex.len() % 2 != 0 {
+        return Err(AddressingError::InvalidInput(format!(
+            "hex string has odd number of digits: {}",
+            hex
+        )));
+    }
+
+    let mut res = vec![];
+    for i in (0..hex.len()).step_by(2) {
+        res.push(u8::from_str_radix(&hex[i..i + 2], 16).map_err(|_| {
+            AddressingError::InvalidInput(format!("string contains invalid hex: {}", hex))
+        })?);
+    }
+
+    Ok(res)
 }
 
 #[cfg(test)]

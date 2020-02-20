@@ -20,16 +20,27 @@ use std::error::Error;
 
 use sha2::{Digest, Sha512};
 
-pub const ADMINISTRATORS_SETTING_ADDRESS: &str =
-    "000000a87cb5eafdcca6a814e4add97c4b517d3c530c2f44b31d18e3b0c44298fc1c14";
 pub const ADMINISTRATORS_SETTING_KEY: &str = "sawtooth.swa.administrators";
 
+pub const ADMINISTRATORS_SETTING_ADDRESS: &str =
+    "000000a87cb5eafdcca6a814e4add97c4b517d3c530c2f44b31d18e3b0c44298fc1c14";
 pub const NAMESPACE_REGISTRY_ADDRESS_PREFIX: &str = "00ec00";
 pub const CONTRACT_REGISTRY_ADDRESS_PREFIX: &str = "00ec01";
 pub const CONTRACT_ADDRESS_PREFIX: &str = "00ec02";
 pub const SMART_PERMISSION_ADDRESS_PREFIX: &str = "00ec03";
 pub const AGENT_ADDRESS_PREFIX: &str = "cad11d00";
 pub const ORG_ADDRESS_PREFIX: &str = "cad11d01";
+
+pub const ADMINISTRATORS_SETTING_ADDRESS_BYTES: &[u8] = &[
+    0, 0, 0, 168, 124, 181, 234, 253, 204, 166, 168, 20, 228, 173, 217, 124, 75, 81, 125, 60, 83,
+    12, 47, 68, 179, 29, 24, 227, 176, 196, 66, 152, 252, 28, 20,
+];
+pub const NAMESPACE_REGISTRY_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 0];
+pub const CONTRACT_REGISTRY_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 1];
+pub const CONTRACT_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 2];
+pub const SMART_PERMISSION_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 3];
+pub const AGENT_ADDRESS_PREFIX_BYTES: &[u8] = &[202, 209, 29, 0];
+pub const ORG_ADDRESS_PREFIX_BYTES: &[u8] = &[202, 209, 29, 1];
 
 /// Compute a state address for a given namespace registry.
 ///
@@ -47,7 +58,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
         }
     };
     let hash = sha512_hash(prefix.as_bytes());
-    Ok([&parse_hex(NAMESPACE_REGISTRY_ADDRESS_PREFIX)?, &hash[..32]].concat())
+    Ok([NAMESPACE_REGISTRY_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given contract registry.
@@ -57,7 +68,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
 /// * `name` - the name of the contract registry
 pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(name.as_bytes());
-    Ok([&parse_hex(CONTRACT_REGISTRY_ADDRESS_PREFIX)?, &hash[..32]].concat())
+    Ok([CONTRACT_REGISTRY_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given contract.
@@ -69,7 +80,7 @@ pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, Addressi
 pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, AddressingError> {
     let s = String::from(name) + "," + version;
     let hash = sha512_hash(s.as_bytes());
-    Ok([&parse_hex(CONTRACT_ADDRESS_PREFIX)?, &hash[..32]].concat())
+    Ok([CONTRACT_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
 /// Compute a state address for a given smart permission.
@@ -85,7 +96,7 @@ pub fn compute_smart_permission_address(
     let org_id_hash = sha512_hash(org_id.as_bytes());
     let name_hash = sha512_hash(name.as_bytes());
     Ok([
-        &parse_hex(SMART_PERMISSION_ADDRESS_PREFIX)?,
+        SMART_PERMISSION_ADDRESS_PREFIX_BYTES,
         &org_id_hash[..3],
         &name_hash[..29],
     ]
@@ -99,7 +110,7 @@ pub fn compute_smart_permission_address(
 /// * `name` - the agent's name
 pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(name);
-    Ok([&parse_hex(AGENT_ADDRESS_PREFIX)?, &hash[..31]].concat())
+    Ok([AGENT_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
 }
 
 /// Compute a state address for a given organization id.
@@ -109,32 +120,13 @@ pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
 /// * `id` - the organization's id
 pub fn compute_org_address(id: &str) -> Result<Vec<u8>, AddressingError> {
     let hash = sha512_hash(id.as_bytes());
-    Ok([&parse_hex(ORG_ADDRESS_PREFIX)?, &hash[..31]].concat())
+    Ok([ORG_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
 }
 
 fn sha512_hash(bytes: &[u8]) -> Vec<u8> {
     let mut hasher = Sha512::new();
     hasher.input(bytes);
     hasher.result().to_vec()
-}
-
-/// Convert a hex string to bytes.
-fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
-    if hex.len() % 2 != 0 {
-        return Err(AddressingError::InvalidInput(format!(
-            "hex string has odd number of digits: {}",
-            hex
-        )));
-    }
-
-    let mut res = vec![];
-    for i in (0..hex.len()).step_by(2) {
-        res.push(u8::from_str_radix(&hex[i..i + 2], 16).map_err(|_| {
-            AddressingError::InvalidInput(format!("string contains invalid hex: {}", hex))
-        })?);
-    }
-
-    Ok(res)
 }
 
 #[derive(Debug)]
