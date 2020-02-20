@@ -70,6 +70,7 @@ pub struct SqliteDatabaseBuilder {
     indexes: Vec<&'static str>,
     pool_size: Option<u32>,
     memory_map_size: i64,
+    write_ahead_log_mode: bool,
 }
 
 impl SqliteDatabaseBuilder {
@@ -80,6 +81,7 @@ impl SqliteDatabaseBuilder {
             indexes: vec![],
             pool_size: None,
             memory_map_size: DEFAULT_MMAP_SIZE,
+            write_ahead_log_mode: false,
         }
     }
 
@@ -122,6 +124,19 @@ impl SqliteDatabaseBuilder {
         self
     }
 
+    /// Enable "Write-Ahead Log" (WAL) journal mode.
+    ///
+    /// In SQLite, WAL journal mode provides considerable performance improvements in most
+    /// scenarios.  See [https://sqlite.org/wal.html](https://sqlite.org/wal.html) for more
+    /// details on this mode.
+    ///
+    /// While many of the disadvantages of this mode are unlikely to effect transact and its
+    /// use-cases, WAL mode cannot be used with a database file on a networked file system.
+    pub fn with_write_ahead_log_mode(mut self) -> Self {
+        self.write_ahead_log_mode = true;
+        self
+    }
+
     /// Constructs the database instance.
     ///
     /// # Errors
@@ -131,6 +146,7 @@ impl SqliteDatabaseBuilder {
     /// * No path provided
     /// * Unable to connect to the database.
     /// * Unable to configure the provided memory map size
+    /// * Unable to configure the WAL journal mode, if requested
     /// * Unable to create tables, as required.
     pub fn build(self) -> Result<SqliteDatabase, SqliteDatabaseError> {
         let path = self.path.ok_or_else(|| SqliteDatabaseError {
@@ -161,6 +177,14 @@ impl SqliteDatabaseBuilder {
                 context: "unable to configure memory map I/O".into(),
                 source: Some(Box::new(err)),
             })?;
+
+        if self.write_ahead_log_mode {
+            conn.pragma_update(None, "journal_mode", &String::from("WAL"))
+                .map_err(|err| SqliteDatabaseError {
+                    context: "unable to configure WAL journal mode".into(),
+                    source: Some(Box::new(err)),
+                })?;
+        }
 
         let prefix = self
             .prefix
@@ -286,7 +310,7 @@ impl Database for SqliteDatabase {
         })?;
 
         conn.execute_batch("BEGIN DEFERRED").map_err(|err| {
-            DatabaseError::WriterError(format!("Unable to begin read transaction: {}", err))
+            DatabaseError::WriterError(format!("Unable to begin write transaction: {}", err))
         })?;
 
         Ok(Box::new(SqliteDatabaseWriter {
