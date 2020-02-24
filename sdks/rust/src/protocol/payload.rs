@@ -2326,7 +2326,10 @@ impl SabrePayloadBuilder {
             | Action::DeleteSmartPermission(DeleteSmartPermissionAction { org_id, name, .. }) => {
                 let addresses = vec![
                     compute_smart_permission_address(&org_id, &name)?,
-                    compute_agent_address(signer.public_key())?,
+                    // This converts the public key to a hex string and gets the raw bytes of that
+                    // string; this is required because it is how the agent addresses is calculated
+                    // by the Sabre transaction processor.
+                    compute_agent_address(bytes_to_hex_str(signer.public_key()).as_bytes())?,
                     compute_org_address(&org_id)?,
                 ];
                 (addresses.clone(), addresses)
@@ -2366,6 +2369,13 @@ fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
     }
 
     Ok(res)
+}
+
+fn bytes_to_hex_str(b: &[u8]) -> String {
+    b.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 #[cfg(test)]
