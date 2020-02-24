@@ -30,6 +30,72 @@ import {
     get_ptr_from_collection
 } from "./env";
 
+export class Void {
+    constructor () {}
+
+    static make(): Void {
+        return new Void();
+    }
+}
+
+export class Err {
+    message: string;
+
+    constructor(message: string) {
+        this.message = message;
+    }
+
+    getMessage(): string {
+        return this.message;
+    }
+}
+
+export class Result<T> {
+    _ok: T | null;
+    _err: Err | null;
+
+    constructor(ok: T | null, err: Err | null) {
+        this._ok = ok;
+        this._err = err;
+    }
+
+    static ok<T>(ok: T): Result<T> {
+        return new Result(ok, null);
+    }
+
+    static okVoid(): Result<Void> {
+        return new Result(Void.make(), null);
+    }
+
+    static err<T>(message: string): Result<T> {
+        return new Result(null, new Err(message));
+    }
+
+    isErr(): bool {
+        return this._err != null;
+    }
+
+    isOk(): bool {
+        return this._ok != null;
+    }
+
+    getOk<T>(): T | null {
+        if (this._ok != null) {
+            return this._ok;
+        } else {
+            throw new Error("Unreachable");
+        }
+    }
+
+    getErr(): Err | null {
+        if (this._err != null) {
+            return this._err;
+        } else {
+            throw new Error("Unreachable");
+        }
+    }
+}
+
 /**
  * An entry in state containing the address and corresponding data.
  */
