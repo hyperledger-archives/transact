@@ -20,7 +20,10 @@ import {
     StateEntry,
     executeEntryPoint,
     toHexString,
-    info
+    info,
+    error,
+    Result,
+    Void,
 } from "sabre-sdk";
 
 const NAMESPACE = "12cd3c"; 
@@ -36,9 +39,15 @@ function apply(req: TpProcessRequest, ctx: TransactionContext): bool {
     if (action == "init") {
         init(name, ctx);
     } else if (action == "inc") {
-        inc(name, ctx);
+        const result = inc(name, ctx);
+        if (result.isErr()) {
+            error(result.getErr().getMessage());
+        }
     } else if (action == "dec") {
-        dec(name, ctx);
+        const result = dec(name, ctx);
+        if (result.isErr()) {
+            error(result.getErr().getMessage());
+        }
     } else if (action == "remove") {
         remove(name, ctx);
     } else {
@@ -72,7 +81,7 @@ function init(name: string, ctx: TransactionContext): void {
     info("Counter: " + name + " initialized!");
 }
 
-function inc(name: string, ctx: TransactionContext): void {
+function inc(name: string, ctx: TransactionContext): Result<Void> {
     const getStateArray = new Array<string>();
     const address = computeAddress(name);
     getStateArray.push(address);
@@ -80,7 +89,7 @@ function inc(name: string, ctx: TransactionContext): void {
     const entries = ctx.getStateEntries(getStateArray);
     
     if (!entries.length) {
-        throw new Error(`No state entries found for ${name}`);
+        return Result.err<Void>("No state entries found for " + name);
     }
 
     let value = extractValue(entries[0]);
@@ -94,9 +103,11 @@ function inc(name: string, ctx: TransactionContext): void {
     ctx.setStateEntries(setStateArray);
 
     info(name + " new value: " + value.toString());
+
+    return Result.okVoid();
 }
 
-function dec(name: string, ctx: TransactionContext): void {
+function dec(name: string, ctx: TransactionContext): Result<Void> {
     const getStateArray = new Array<string>();
     const address = computeAddress(name);
     getStateArray.push(address);
@@ -104,7 +115,7 @@ function dec(name: string, ctx: TransactionContext): void {
     const entries = ctx.getStateEntries(getStateArray);
     
     if (!entries.length) {
-        throw new Error(`No state entries found for ${name}`);
+        return Result.err<Void>("No state entries found for " + name);
     }
 
     let value = extractValue(entries[0]);
@@ -118,6 +129,8 @@ function dec(name: string, ctx: TransactionContext): void {
     ctx.setStateEntries(setStateArray);
 
     info(name + " new value: " + value.toString());
+
+    return Result.okVoid();
 }
 
 function remove(name: string, ctx: TransactionContext): void {
