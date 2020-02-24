@@ -52,7 +52,10 @@ use std::num::NonZeroU32;
 use std::rc::Rc;
 
 use r2d2_sqlite::SqliteConnectionManager;
-use rusqlite::{named_params, params};
+use rusqlite::{
+    named_params, params,
+    types::{ToSql, ToSqlOutput, ValueRef},
+};
 
 use super::{
     Database, DatabaseCursor, DatabaseError, DatabaseReader, DatabaseReaderCursor, DatabaseWriter,
@@ -63,6 +66,46 @@ type SqliteConnection = r2d2::PooledConnection<SqliteConnectionManager>;
 /// The default size
 pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 
+/// Synchronous setting values.
+///
+/// See the [PRAGMA "synchronous"](https://sqlite.org/pragma.html#pragma_journal_mode)
+/// documentation for more details.
+#[derive(Debug)]
+pub enum Synchronous {
+    /// With synchronous Off, SQLite continues without syncing as soon as it has handed data
+    /// off to the operating system. If the application running SQLite crashes, the data will be
+    /// safe, but the database might become corrupted if the operating system crashes or the
+    /// computer loses power before that data has been written to the disk surface. On the other
+    /// hand, commits can be orders of magnitude faster with synchronous Off.
+    ///
+    /// Not Recommended for production use.
+    Off,
+    /// When synchronous is Normal, the SQLite database engine will still sync at the most
+    /// critical moments, but less often than in FULL mode.  WAL mode is safe from corruption with
+    /// Normal. WAL mode is always consistent with Normal, but WAL mode does lose durability. A
+    /// transaction committed in WAL mode with Normal might roll back following a power loss or
+    /// system crash. Transactions are durable across application crashes regardless of the
+    /// synchronous setting or journal mode. The Normal setting is a good choice for most
+    /// applications running in WAL mode.
+    Normal,
+    /// When synchronous is Full, the SQLite database engine will use the xSync method of the VFS
+    /// to ensure that all content is safely written to the disk surface prior to continuing. This
+    /// ensures that an operating system crash or power failure will not corrupt the database. Full
+    /// synchronous is very safe, but it is also slower. Full is the most commonly used synchronous
+    /// setting when not in WAL mode.
+    Full,
+}
+
+impl ToSql for Synchronous {
+    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error> {
+        match self {
+            Synchronous::Off => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"OFF"))),
+            Synchronous::Normal => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"NORMAL"))),
+            Synchronous::Full => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"FULL"))),
+        }
+    }
+}
+
 /// A builder for generating SqliteDatabase instances.
 pub struct SqliteDatabaseBuilder {
     path: Option<String>,
@@ -71,6 +114,7 @@ pub struct SqliteDatabaseBuilder {
     pool_size: Option<u32>,
     memory_map_size: i64,
     write_ahead_log_mode: bool,
+    synchronous: Option<Synchronous>,
 }
 
 impl SqliteDatabaseBuilder {
@@ -82,6 +126,7 @@ impl SqliteDatabaseBuilder {
             pool_size: None,
             memory_map_size: DEFAULT_MMAP_SIZE,
             write_ahead_log_mode: false,
+            synchronous: None,
         }
     }
 
@@ -137,6 +182,18 @@ impl SqliteDatabaseBuilder {
         self
     }
 
+    /// Modify the "synchronous" setting for the SQLite connection.
+    ///
+    /// This setting changes the mode of how the transaction journal is synchronized to disk. See
+    /// the [pragma synchronouse documentation](https://sqlite.org/pragma.html#pragma_synchronous)
+    /// for more information.
+    ///
+    /// If unchanged, the default value is left to underlying SQLite installation.
+    pub fn with_synchronous(mut self, synchronous: Synchronous) -> Self {
+        self.synchronous = Some(synchronous);
+        self
+    }
+
     /// Constructs the database instance.
     ///
     /// # Errors
@@ -182,6 +239,14 @@ impl SqliteDatabaseBuilder {
             conn.pragma_update(None, "journal_mode", &String::from("WAL"))
                 .map_err(|err| SqliteDatabaseError {
                     context: "unable to configure WAL journal mode".into(),
+                    source: Some(Box::new(err)),
+                })?;
+        }
+
+        if let Some(synchronous) = self.synchronous {
+            conn.pragma_update(None, "synchronous", &synchronous)
+                .map_err(|err| SqliteDatabaseError {
+                    context: "unable to modify synchronous setting".into(),
                     source: Some(Box::new(err)),
                 })?;
         }
