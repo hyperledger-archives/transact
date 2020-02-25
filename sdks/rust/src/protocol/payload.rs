@@ -32,7 +32,7 @@ use super::AddressingError;
 use super::{
     compute_agent_address, compute_contract_address, compute_contract_registry_address,
     compute_namespace_registry_address, compute_org_address, compute_smart_permission_address,
-    parse_hex, ADMINISTRATORS_SETTING_ADDRESS,
+    ADMINISTRATORS_SETTING_ADDRESS_BYTES, SABRE_PROTOCOL_VERSION,
 };
 
 /// Native implementation for SabrePayload_Action
@@ -2295,7 +2295,7 @@ impl SabrePayloadBuilder {
             }) => {
                 let addresses = vec![
                     compute_contract_registry_address(&name)?,
-                    ADMINISTRATORS_SETTING_ADDRESS.into(),
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)
             }
@@ -2317,7 +2317,7 @@ impl SabrePayloadBuilder {
             ) => {
                 let addresses = vec![
                     compute_namespace_registry_address(&namespace)?,
-                    ADMINISTRATORS_SETTING_ADDRESS.into(),
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)
             }
@@ -2326,7 +2326,10 @@ impl SabrePayloadBuilder {
             | Action::DeleteSmartPermission(DeleteSmartPermissionAction { org_id, name, .. }) => {
                 let addresses = vec![
                     compute_smart_permission_address(&org_id, &name)?,
-                    compute_agent_address(signer.public_key())?,
+                    // This converts the public key to a hex string and gets the raw bytes of that
+                    // string; this is required because it is how the agent addresses is calculated
+                    // by the Sabre transaction processor.
+                    compute_agent_address(bytes_to_hex_str(signer.public_key()).as_bytes())?,
                     compute_org_address(&org_id)?,
                 ];
                 (addresses.clone(), addresses)
@@ -2342,12 +2345,37 @@ impl SabrePayloadBuilder {
 
         Ok(TransactionBuilder::new()
             .with_family_name("sabre".into())
-            .with_family_version(env!("CARGO_PKG_VERSION").into())
+            .with_family_version(SABRE_PROTOCOL_VERSION.into())
             .with_inputs(input_addresses)
             .with_outputs(output_addresses)
             .with_payload_hash_method(HashMethod::SHA512)
             .with_payload(payload_bytes))
     }
+}
+
+fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
+    if hex.len() % 2 != 0 {
+        return Err(AddressingError::InvalidInput(format!(
+            "hex string has odd number of digits: {}",
+            hex
+        )));
+    }
+
+    let mut res = vec![];
+    for i in (0..hex.len()).step_by(2) {
+        res.push(u8::from_str_radix(&hex[i..i + 2], 16).map_err(|_| {
+            AddressingError::InvalidInput(format!("string contains invalid hex: {}", hex))
+        })?);
+    }
+
+    Ok(res)
+}
+
+fn bytes_to_hex_str(b: &[u8]) -> String {
+    b.iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<Vec<_>>()
+        .join("")
 }
 
 #[cfg(test)]
@@ -2862,7 +2890,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -2885,7 +2916,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -2911,7 +2945,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -2934,7 +2971,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -2956,7 +2996,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -2979,7 +3022,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3002,7 +3048,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3024,7 +3073,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3047,7 +3099,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3072,7 +3127,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3095,7 +3153,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3119,7 +3180,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3143,7 +3207,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 
@@ -3166,7 +3233,10 @@ mod tests {
         let txn_header = txn_pair.header();
 
         assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(txn_header.family_version(), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            txn_header.family_version(),
+            SABRE_PROTOCOL_VERSION.to_string()
+        );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
     }
 }
