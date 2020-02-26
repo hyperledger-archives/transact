@@ -1,5 +1,21 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.5.2
+
+* Add `Result` class to the AssemblyScript SDK for basic error handling
+* Update inc-dec example AssemblyScript smart contract to use `Result` for
+  errors
+* Fix bug where the Rust SDK was computing addresses with incorrect lengths
+* Add address prefixes and the administrators setting address as bytes constants
+  to the Rust SDK
+* Fix a bug where the administrators setting address was being converted to
+  bytes incorrectly
+* Add the Sabre protocol version to the Rust SDK as a constant to ensure the SDK
+  builds transactions for the equivalent version of the Sabre transaction
+  processor
+* Fix bug where the agent address was calculated incorrectly by the
+  `SabrePayloadBuilder::into_transaction_builder` method
+
 ## Changes in Sawtooth Sabre 0.5.1
 
 * Update the family version for Sabre transactions in the Sabre transaction
