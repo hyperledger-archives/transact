@@ -99,6 +99,7 @@ pipeline {
 
         stage('Test Sabre') {
             steps {
+                sh 'docker-compose -f docker/unit-test.yaml up --build --exit-code-from unit-test-sabre'
                 sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml up --build --abort-on-container-exit --exit-code-from test_sabre'
             }
         }
@@ -132,6 +133,7 @@ pipeline {
     }
     post {
         always {
+            sh 'docker-compose -f docker/unit-test.yaml down'
             sh 'docker-compose -f docker-compose.yaml -f integration/sabre_test.yaml down'
             sh 'docker-compose -f docs/docker-compose.yaml down'
         }
