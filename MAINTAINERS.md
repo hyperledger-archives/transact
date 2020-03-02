@@ -13,4 +13,6 @@
 | Shawn Amundson | vaporos | amundson |
 
 ### Retired Maintainers
+| Name | GitHub | RocketChat |
+| --- | --- | --- |
 | Adam Ludvik | aludvik | adamludvik |
