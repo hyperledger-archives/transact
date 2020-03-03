@@ -6,6 +6,7 @@
 | Andi Gunderson | agunde406 | agunde |
 | Dan Middleton | dcmiddle | Dan |
 | James Mitchell | jsmitchell | jsmitchell |
+| Logan Seeley | ltseeley | ltseeley |
 | Peter Schwarz | peterschwarz | pschwarz |
 | Richard Berg | rberg2 | rberg2 |
 | Ryan Banks | RyanLassigBanks | RobinBanks |
