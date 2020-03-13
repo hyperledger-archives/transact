@@ -13,7 +13,6 @@
 // limitations under the License.
 
 use std;
-use std::borrow::Borrow;
 use std::error::Error as StdError;
 
 use hyper;
@@ -32,23 +31,13 @@ pub enum CliError {
 }
 
 impl StdError for CliError {
-    fn description(&self) -> &str {
-        match *self {
-            CliError::UserError(ref s) => &s,
-            CliError::IoError(ref err) => err.description(),
-            CliError::SigningError(ref err) => err.description(),
-            CliError::ProtobufError(ref err) => err.description(),
-            CliError::HyperError(ref err) => err.description(),
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn StdError> {
-        match *self {
-            CliError::UserError(ref _s) => None,
-            CliError::IoError(ref err) => Some(err.borrow()),
-            CliError::SigningError(ref err) => Some(err.borrow()),
-            CliError::ProtobufError(ref err) => Some(err.borrow()),
-            CliError::HyperError(ref err) => Some(err.borrow()),
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            CliError::UserError(_) => None,
+            CliError::IoError(err) => Some(err),
+            CliError::SigningError(err) => Some(err),
+            CliError::ProtobufError(err) => Some(err),
+            CliError::HyperError(err) => Some(err),
         }
     }
 }
@@ -58,9 +47,9 @@ impl std::fmt::Display for CliError {
         match *self {
             CliError::UserError(ref s) => write!(f, "Error: {}", s),
             CliError::IoError(ref err) => write!(f, "IoError: {}", err),
-            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err.description()),
-            CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err.description()),
-            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err.description()),
+            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err),
+            CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err),
+            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err),
         }
     }
 }

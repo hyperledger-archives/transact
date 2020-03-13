@@ -14,7 +14,6 @@
 
 use std::boxed::Box;
 use std::collections::HashMap;
-use std::error::Error as StdError;
 use std::fmt;
 use std::string::FromUtf8Error;
 use std::time::Instant;
@@ -768,7 +767,7 @@ impl From<String> for ExternalsError {
 impl From<FromUtf8Error> for ExternalsError {
     fn from(e: FromUtf8Error) -> Self {
         ExternalsError {
-            message: e.description().to_string(),
+            message: e.to_string(),
         }
     }
 }
