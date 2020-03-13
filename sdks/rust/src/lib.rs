@@ -20,7 +20,6 @@ pub mod protocol;
 pub mod protos;
 
 use std::collections::HashMap;
-use std::error::Error;
 use std::string::FromUtf8Error;
 
 pub use crate::externs::{WasmPtr, WasmPtrList};
@@ -633,10 +632,10 @@ impl std::fmt::Display for WasmSdkError {
             WasmSdkError::MemoryWriteError(ref s) => write!(f, "MemoryWriteError: {}", s),
             WasmSdkError::MemoryRetrievalError(ref s) => write!(f, "MemoryRetrievalError: {}", s),
             WasmSdkError::Utf8EncodeError(ref err) => {
-                write!(f, "Utf8EncodeError: {}", err.description())
+                write!(f, "Utf8EncodeError: {}", err)
             }
             WasmSdkError::ProtobufError(ref err) => {
-                write!(f, "ProtobufError: {}", err.description())
+                write!(f, "ProtobufError: {}", err)
             }
         }
     }

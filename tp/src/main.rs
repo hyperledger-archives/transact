@@ -34,7 +34,7 @@ fn main() {
         0 => simple_logger::init_with_level(Level::Warn),
         1 => simple_logger::init_with_level(Level::Info),
         2 => simple_logger::init_with_level(Level::Debug),
-        3 | _ => simple_logger::init_with_level(Level::Trace),
+        _ => simple_logger::init_with_level(Level::Trace),
     };
 
     logger.expect("Failed to create logger");
