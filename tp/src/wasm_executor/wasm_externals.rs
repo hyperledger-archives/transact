@@ -602,7 +602,7 @@ impl<'a> Externals for WasmExternals<'a> {
                 LevelFilter::Debug => Ok(Some(RuntimeValue::I32(3))),
                 LevelFilter::Info => Ok(Some(RuntimeValue::I32(2))),
                 LevelFilter::Warn => Ok(Some(RuntimeValue::I32(1))),
-                LevelFilter::Error | _ => Ok(Some(RuntimeValue::I32(0))),
+                _ => Ok(Some(RuntimeValue::I32(0))),
             },
             _ => Err(ExternalsError::trap("Function does not exist".into())),
         }
