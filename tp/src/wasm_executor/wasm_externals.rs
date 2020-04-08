@@ -450,7 +450,7 @@ impl<'a> WasmExternals<'a> {
                 Ok(Some(RuntimeValue::I32(1)))
             }
             Err(err) => {
-                info!("Set Error: {}", err);
+                error!("Set Error: {}", err);
                 info!(
                     "SET_STATE Execution time: {} secs {} ms",
                     timer.elapsed().as_secs(),
