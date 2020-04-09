@@ -226,8 +226,18 @@ impl<'a> WasmExternals<'a> {
 
         let raw_ptr = ptr.raw;
 
+        // In case the data to be added is empty, keep the memory_write_offset
+        // moving to the next location.
+        let offset_to_add = if data.capacity() == 0 {
+            1 as u32
+        } else {
+            data.capacity() as u32
+        };
+
         self.ptrs.insert(self.memory_write_offset, ptr);
-        self.memory_write_offset += data.capacity() as u32;
+        self.memory_write_offset += offset_to_add;
+
+        debug!("moved the pointer to {:?}", self.memory_write_offset);
 
         Ok(raw_ptr)
     }
