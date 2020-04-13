@@ -33,5 +33,5 @@ sha2 = "0.8"
 transact = "0.2"
 
 [build-dependencies]
-protoc-rust = "2"
+protoc-rust = "2.14"
 glob = "0.2"
