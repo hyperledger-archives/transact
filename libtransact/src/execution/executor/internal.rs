@@ -363,6 +363,8 @@ impl ExecutorThread {
                                 ea_senders.insert(sender);
                                 None
                             } else {
+                                // ignore clippy error, must match type of ea_senders
+                                #[allow(clippy::mutable_key_type)]
                                 let mut s = HashSet::new();
                                 s.insert(sender);
                                 Some(s)
@@ -420,7 +422,7 @@ impl ExecutorThread {
     ) {
         let tf = TransactionFamily::from_pair(&execution_event.1.pair());
         if let Some(ea_senders) = fanout_threads.get(&tf) {
-            if let Some(sender) = ea_senders.iter().nth(0) {
+            if let Some(sender) = ea_senders.iter().next() {
                 if let Err(err) = sender.sender.send(ExecutionCommand::Event(execution_event)) {
                     warn!("During send of ExecutionCommand: {}", err);
                 }

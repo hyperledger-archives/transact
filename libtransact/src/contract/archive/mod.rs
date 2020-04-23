@@ -15,9 +15,9 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Enables loading smart contract archives from .scar files.
+//! Enables loading smart contract archives from scar files.
 //!
-//! A .scar file is a tar bzip2 archive that contains two required files:
+//! A scar file is a tar bzip2 archive that contains two required files:
 //! - A `.wasm` file that contains a WASM smart contract
 //! - A `manifest.yaml` file that contains, at a minimum:
 //!   - The contract `name`
@@ -31,7 +31,7 @@
 //! use transact::contract::archive::{default_scar_path, SmartContractArchive};
 //!
 //! let archive = SmartContractArchive::from_scar_file("xo", "0.1", &default_scar_path())
-//!     .expect("failed to load .scar file");
+//!     .expect("failed to load scar file");
 //! ```
 
 mod error;
@@ -51,7 +51,7 @@ pub use error::Error;
 const DEFAULT_SCAR_PATH: &str = "/usr/share/scar";
 const SCAR_PATH_ENV_VAR: &str = "SCAR_PATH";
 
-/// Load default location(s) for .scar files.
+/// Load default location(s) for scar files.
 pub fn default_scar_path() -> Vec<PathBuf> {
     match var_os(SCAR_PATH_ENV_VAR) {
         Some(paths) => split_paths(&paths).collect(),
@@ -69,9 +69,9 @@ pub struct SmartContractArchive {
 }
 
 impl SmartContractArchive {
-    /// Attempt to load a `SmartContractArchive` from a .scar file in one of the given `paths`.
+    /// Attempt to load a `SmartContractArchive` from a scar file in one of the given `paths`.
     ///
-    /// The .scar file to load will be named `<name>_<version>.scar`, where `<name>` is the name
+    /// The scar file to load will be named `<name>_<version>.scar`, where `<name>` is the name
     /// specified for this method and `<version>` is a valid semver string.
     ///
     /// The `version` argument for this method must be a valid semver requirement string. The
@@ -93,7 +93,7 @@ impl SmartContractArchive {
     ///     "1.2",
     ///     &["/usr/share/scar", "/some/other/dir"],
     /// )
-    /// .expect("failed to load .scar file");
+    /// .expect("failed to load scar file");
     /// assert_eq!(&archive.metadata.version, "1.2.4");
     /// ```
     ///
@@ -107,7 +107,7 @@ impl SmartContractArchive {
     ///     "1.2.3",
     ///     &["/usr/share/scar", "/some/other/dir"],
     /// )
-    /// .expect("failed to load .scar file");
+    /// .expect("failed to load scar file");
     /// assert_eq!(&archive.metadata.version, "1.2.3");
     /// ```
     pub fn from_scar_file<P: AsRef<Path>>(
@@ -138,7 +138,7 @@ impl SmartContractArchive {
             let mut entry = entry.map_err(|err| {
                 Error::new_with_source(
                     &format!(
-                        "invalid .scar file: failed to read archive entry from {}",
+                        "invalid scar file: failed to read archive entry from {}",
                         file_path.display()
                     ),
                     err.into(),
@@ -149,7 +149,7 @@ impl SmartContractArchive {
                 .map_err(|err| {
                     Error::new_with_source(
                         &format!(
-                            "invalid .scar file: failed to get path of archive entry from {}",
+                            "invalid scar file: failed to get path of archive entry from {}",
                             file_path.display()
                         ),
                         err.into(),
@@ -160,7 +160,7 @@ impl SmartContractArchive {
                 metadata = Some(serde_yaml::from_reader(entry).map_err(|err| {
                     Error::new_with_source(
                         &format!(
-                            "invalid .scar file: manifest.yaml invalid in {}",
+                            "invalid scar file: manifest.yaml invalid in {}",
                             file_path.display()
                         ),
                         err.into(),
@@ -171,7 +171,7 @@ impl SmartContractArchive {
                 entry.read_to_end(&mut contract_bytes).map_err(|err| {
                     Error::new_with_source(
                         &format!(
-                            "invalid .scar file: failed to read smart contract in {}",
+                            "invalid scar file: failed to read smart contract in {}",
                             file_path.display()
                         ),
                         err.into(),
@@ -215,7 +215,7 @@ fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<P
     let file_name_pattern = format!("{}_*.scar", name);
     let version_req = VersionReq::parse(version)?;
 
-    // Start with all .scar files that match the name, from all paths
+    // Start with all scar files that match the name, from all paths
     paths
         .iter()
         .map(|path| {
@@ -371,55 +371,55 @@ mod tests {
         assert!(find_scar("mock", "1.0.0", &[&dir]).is_err());
     }
 
-    /// Verify that a .scar file is correctly found when any version (`*`) is requested.
+    /// Verify that a scar file is correctly found when any version (`*`) is requested.
     #[test]
     fn find_scar_any_version() {
         let dir = new_temp_dir();
         let scar_path = write_mock_scar(&dir, "mock", "0.1.0");
 
         assert_eq!(
-            find_scar("mock", "*", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "*", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that a .scar file is correctly found when the exact version is requested.
+    /// Verify that a scar file is correctly found when the exact version is requested.
     #[test]
     fn find_scar_exact_version() {
         let dir = new_temp_dir();
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2-dev");
 
         assert_eq!(
-            find_scar("mock", "0.1.2-dev", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "0.1.2-dev", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that a .scar file is correctly found when it meets the minimum minor version.
+    /// Verify that a scar file is correctly found when it meets the minimum minor version.
     #[test]
     fn find_scar_minimum_minor() {
         let dir = new_temp_dir();
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "0.1", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that a .scar file is correctly found when it meets the minimum major version.
+    /// Verify that a scar file is correctly found when it meets the minimum major version.
     #[test]
     fn find_scar_minimum_major() {
         let dir = new_temp_dir();
         let scar_path = write_mock_scar(&dir, "mock", "1.2.3");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "1", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that the .scar file with no pre-release tag is returned rather than the same patch
+    /// Verify that the scar file with no pre-release tag is returned rather than the same patch
     /// version with a pre-release tag.
     #[test]
     fn find_scar_highest_matching_patch() {
@@ -428,12 +428,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1.2", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "0.1.2", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that the .scar file with the highest patch version is returned for the specified
+    /// Verify that the scar file with the highest patch version is returned for the specified
     /// minor version.
     #[test]
     fn find_scar_highest_matching_minor() {
@@ -442,12 +442,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "0.1", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that the .scar file with the highest minor version is returned for the specified
+    /// Verify that the scar file with the highest minor version is returned for the specified
     /// major version.
     #[test]
     fn find_scar_highest_matching_major() {
@@ -456,12 +456,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "1.2.0");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir]).expect("failed to find .scar"),
+            find_scar("mock", "1", &[&dir]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that the .scar file with the highest matching version is returned when there are
+    /// Verify that the scar file with the highest matching version is returned when there are
     /// versions in different paths.
     #[test]
     fn find_scar_highest_matching_across_paths() {
@@ -472,19 +472,19 @@ mod tests {
         let scar_path = write_mock_scar(&dir2, "mock", "1.2.4");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir1, &dir2]).expect("failed to find .scar"),
+            find_scar("mock", "1", &[&dir1, &dir2]).expect("failed to find scar"),
             scar_path
         );
     }
 
-    /// Verify that a valid .scar file is successfully loaded.
+    /// Verify that a valid scar file is successfully loaded.
     #[test]
     fn load_scar_file_successful() {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "1.0.0");
 
         let scar = SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir])
-            .expect("failed to load .scar");
+            .expect("failed to load scar");
 
         assert_eq!(scar.contract, MOCK_CONTRACT_BYTES);
         assert_eq!(scar.metadata.name, mock_smart_contract_metadata().name);
@@ -499,7 +499,7 @@ mod tests {
         );
     }
 
-    /// Verify that an error is returned when attempting to load a .scar file that does not contain
+    /// Verify that an error is returned when attempting to load a scar file that does not contain
     /// a `manifest.yaml` file.
     #[test]
     fn load_scar_manifest_not_found() {
@@ -517,7 +517,7 @@ mod tests {
         assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
-    /// Verify that an error is returned when attempting to load a .scar file whose `manifest.yaml`
+    /// Verify that an error is returned when attempting to load a scar file whose `manifest.yaml`
     /// is invalidly formatted.
     #[test]
     fn load_scar_manifest_invalid() {
@@ -536,7 +536,7 @@ mod tests {
         assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
-    /// Verify that an error is returned when attempting to load a .scar file that does not contain
+    /// Verify that an error is returned when attempting to load a scar file that does not contain
     /// a .wasm smart contract.
     #[test]
     fn load_scar_contract_not_found() {
