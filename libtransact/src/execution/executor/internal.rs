@@ -363,6 +363,8 @@ impl ExecutorThread {
                                 ea_senders.insert(sender);
                                 None
                             } else {
+                                // ignore clippy error, must match type of ea_senders
+                                #[allow(clippy::mutable_key_type)]
                                 let mut s = HashSet::new();
                                 s.insert(sender);
                                 Some(s)
