@@ -19,8 +19,7 @@ pub struct AddresserError {
 
 impl std::fmt::Display for AddresserError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            AddresserError { message } => write!(f, "Addresser Error occurred: {}", message),
-        }
+        let AddresserError { message } = self;
+        write!(f, "Addresser Error occurred: {}", message)
     }
 }
