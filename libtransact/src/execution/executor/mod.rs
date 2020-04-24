@@ -27,7 +27,6 @@ use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
 use std::collections::HashMap;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 
 pub struct Executor {
@@ -55,9 +54,7 @@ impl Executor {
 
             reader
                 .start(task_iterator, notifier, sender)
-                .map_err(|err| {
-                    ExecutorError::ResourcesUnavailable(err.description().to_string())
-                })?;
+                .map_err(|err| ExecutorError::ResourcesUnavailable(err.to_string()))?;
 
             debug!("Execute called, creating execution adapter {}", index);
 

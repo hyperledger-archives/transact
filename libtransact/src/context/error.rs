@@ -27,14 +27,6 @@ pub enum ContextManagerError {
 }
 
 impl Error for ContextManagerError {
-    fn description(&self) -> &str {
-        match *self {
-            ContextManagerError::MissingContextError(ref msg) => msg,
-            ContextManagerError::TransactionReceiptBuilderError(ref err) => err.description(),
-            ContextManagerError::StateReadError(ref err) => err.description(),
-        }
-    }
-
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             ContextManagerError::MissingContextError(_) => Some(self),

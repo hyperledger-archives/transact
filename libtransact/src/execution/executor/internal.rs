@@ -26,7 +26,6 @@
 //
 
 use std::collections::{HashMap, HashSet};
-use std::error::Error;
 use std::hash::{Hash, Hasher};
 use std::sync::{
     atomic::{AtomicBool, Ordering},
@@ -119,29 +118,14 @@ pub enum ExecutorThreadError {
     ResourcesUnavailable,
 }
 
-impl std::error::Error for ExecutorThreadError {
-    fn cause(&self) -> Option<&dyn std::error::Error> {
-        None
-    }
-
-    fn description(&self) -> &str {
-        match *self {
-            ExecutorThreadError::InvalidState => {
-                "ExecutorThread in an invalid state when 'start' was called"
-            }
-            ExecutorThreadError::ResourcesUnavailable => {
-                "ExecutorThread unable to access a resource needed for operation"
-            }
-        }
-    }
-}
+impl std::error::Error for ExecutorThreadError {}
 
 impl std::fmt::Display for ExecutorThreadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ExecutorThreadError::InvalidState => write!(f, "Invalid State: {}", self.description()),
+            ExecutorThreadError::InvalidState => write!(f, "Invalid State: ExecutorThread in an invalid state when 'start' was called"),
             ExecutorThreadError::ResourcesUnavailable => {
-                write!(f, "ResourcesUnavailable: {}", self.description())
+                write!(f, "ResourcesUnavailable: ExecutorThread unable to access a resource needed for operation")
             }
         }
     }

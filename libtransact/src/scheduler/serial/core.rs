@@ -30,7 +30,6 @@ use crate::scheduler::InvalidTransactionResult;
 use crate::scheduler::SchedulerError;
 
 use std::collections::VecDeque;
-use std::error::Error;
 use std::sync::mpsc::{Receiver, SendError, Sender};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -69,14 +68,6 @@ enum CoreError {
 }
 
 impl std::error::Error for CoreError {
-    fn description(&self) -> &str {
-        match *self {
-            CoreError::ExecutionSend(ref err) => err.description(),
-            CoreError::ContextManager(ref err) => err.description(),
-            CoreError::Internal(ref err) => err,
-        }
-    }
-
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             CoreError::ExecutionSend(ref err) => Some(err),
@@ -89,13 +80,11 @@ impl std::error::Error for CoreError {
 impl std::fmt::Display for CoreError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CoreError::ExecutionSend(ref err) => write!(
-                f,
-                "failed to send transaction to executor: {}",
-                err.description()
-            ),
+            CoreError::ExecutionSend(ref err) => {
+                write!(f, "failed to send transaction to executor: {}", err)
+            }
             CoreError::ContextManager(ref err) => {
-                write!(f, "call to ContextManager failed: {}", err.description())
+                write!(f, "call to ContextManager failed: {}", err)
             }
             CoreError::Internal(ref err) => write!(f, "internal error occurred: {}", err),
         }

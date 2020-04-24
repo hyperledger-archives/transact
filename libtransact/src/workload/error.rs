@@ -1,6 +1,3 @@
-use std;
-use std::error::Error as StdError;
-
 use crate::protocol::batch::BatchBuildError;
 use crate::protocol::transaction::TransactionBuildError;
 
@@ -14,13 +11,6 @@ pub enum WorkloadError {
 }
 
 impl std::error::Error for WorkloadError {
-    fn description(&self) -> &str {
-        match *self {
-            WorkloadError::BatchBuildError(ref err) => err.description(),
-            WorkloadError::TransactionBuildError(ref err) => err.description(),
-        }
-    }
-
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             WorkloadError::BatchBuildError(ref err) => Some(err),
@@ -32,11 +22,9 @@ impl std::error::Error for WorkloadError {
 impl std::fmt::Display for WorkloadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            WorkloadError::BatchBuildError(ref err) => {
-                write!(f, "BatchBuildError: {}", err.description())
-            }
+            WorkloadError::BatchBuildError(ref err) => write!(f, "BatchBuildError: {}", err),
             WorkloadError::TransactionBuildError(ref err) => {
-                write!(f, "TransactionBuildError: {}", err.description())
+                write!(f, "TransactionBuildError: {}", err)
             }
         }
     }
