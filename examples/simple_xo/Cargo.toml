@@ -11,3 +11,18 @@ transact = { version = "0.1.6", features = ["sawtooth-compat"] }
 sawtooth-xo = "0.3"
 hex = "0.3"
 sha2 = "0.8"
+
+[features]
+default = []
+
+stable = [
+    # The stable feature extends default:
+    "default",
+    # The following features are stable:
+]
+
+experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
+]

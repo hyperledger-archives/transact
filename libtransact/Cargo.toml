@@ -47,11 +47,20 @@ tempdir = "0.3"
 protoc-rust = "2"
 
 [features]
-default = ["state-merkle"]
+default = [
+    "state-merkle",
+]
 
-nightly = []
+stable = [
+    # The stable feature extends default:
+    "default",
+    # The following features are stable:
+]
 
 experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
     "contract",
     "contract-address",
     "contract-address-double-key-hash",
@@ -62,8 +71,10 @@ experimental = [
     "contract-context-key-value",
     "key-value-state",
     "redis-db",
-    "sqlite-db"
+    "sqlite-db",
 ]
+
+nightly = []
 
 contract = []
 contract-address = ["contract"]
@@ -86,4 +97,5 @@ features = [
   "nightly",
   "experimental",
   "sawtooth-compat",
+  "stable",
 ]
