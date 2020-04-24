@@ -25,7 +25,6 @@ pub mod triple_key_hash;
 
 pub use crate::contract::address::error::AddresserError;
 
-use hex;
 use sha2::{Digest, Sha512};
 
 pub const ADDRESS_LENGTH: usize = 70;

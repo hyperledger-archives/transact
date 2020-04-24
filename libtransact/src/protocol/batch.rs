@@ -24,7 +24,6 @@
 use std::error::Error as StdError;
 use std::fmt;
 
-use hex;
 use protobuf::Message;
 
 use crate::protos::{
