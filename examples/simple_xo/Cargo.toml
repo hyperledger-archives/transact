@@ -4,8 +4,6 @@ version = "0.1.0"
 authors = ["IBM Corp.", "Cargill Incorporated"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
 [dependencies]
 transact = { version = "0.1.6", features = ["sawtooth-compat"] }
 sawtooth-xo = "0.3"
