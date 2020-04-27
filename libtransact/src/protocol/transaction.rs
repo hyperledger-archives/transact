@@ -23,7 +23,6 @@
 use std::error::Error as StdError;
 use std::fmt;
 
-use hex;
 use protobuf::Message;
 use rand::distributions::Alphanumeric;
 use rand::Rng;

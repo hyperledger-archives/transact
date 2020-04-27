@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2020 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -32,9 +33,9 @@ fn main() {
     fs::create_dir_all(&dest_path).unwrap();
 
     // Run protoc
-    protoc_rust::run(protoc_rust::Args {
-        out_dir: &dest_path.to_str().unwrap(),
-        input: &[
+    protoc_rust::Codegen::new()
+        .out_dir(&dest_path.to_str().unwrap())
+        .inputs(&[
             proto_path.join("batch.proto").to_str().unwrap(),
             proto_path.join("transaction.proto").to_str().unwrap(),
             proto_path.join("events.proto").to_str().unwrap(),
@@ -46,11 +47,11 @@ fn main() {
             proto_path.join("command.proto").to_str().unwrap(),
             #[cfg(feature = "key-value-state")]
             proto_path.join("key_value_state.proto").to_str().unwrap(),
-        ],
-        includes: &[proto_path.to_str().unwrap()],
-        customize: Customize::default(),
-    })
-    .expect("Protoc Error");
+        ])
+        .includes(&[proto_path.to_str().unwrap()])
+        .customize(Customize::default())
+        .run()
+        .expect("Protoc Error");
 
     // Create mod.rs accordingly
     let mut mod_file = File::create(dest_path.join("mod.rs")).unwrap();

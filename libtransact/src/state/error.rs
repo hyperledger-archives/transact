@@ -32,22 +32,13 @@ impl fmt::Display for StateWriteError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             StateWriteError::InvalidStateId(msg) => write!(f, "Invalid State Id: {}", msg),
-            StateWriteError::StorageError(err) => write!(f, "Storage Error: {}", err.description()),
+            StateWriteError::StorageError(err) => write!(f, "Storage Error: {}", err),
         }
     }
 }
 
 impl Error for StateWriteError {
-    fn description(&self) -> &str {
-        match self {
-            StateWriteError::InvalidStateId(_) => "An invalid State Id was provided.",
-            StateWriteError::StorageError(_) => {
-                "An error occurred with the underlying storage layer."
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             StateWriteError::InvalidStateId(_) => None,
             StateWriteError::StorageError(err) => Some(err.as_ref()),
@@ -72,23 +63,13 @@ impl fmt::Display for StateReadError {
         match self {
             StateReadError::InvalidStateId(msg) => write!(f, "Invalid State Id: {}", msg),
             StateReadError::InvalidKey(key) => write!(f, "Invalid Key: {}", key),
-            StateReadError::StorageError(err) => write!(f, "Storage Error: {}", err.description()),
+            StateReadError::StorageError(err) => write!(f, "Storage Error: {}", err),
         }
     }
 }
 
 impl Error for StateReadError {
-    fn description(&self) -> &str {
-        match self {
-            StateReadError::InvalidStateId(_) => "An invalid State Id was provided.",
-            StateReadError::InvalidKey(_) => "A provided key was invalid",
-            StateReadError::StorageError(_) => {
-                "An error occurred with the underlying storage layer."
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             StateReadError::InvalidStateId(_) | StateReadError::InvalidKey(_) => None,
             StateReadError::StorageError(err) => Some(err.as_ref()),
@@ -109,22 +90,13 @@ impl fmt::Display for StatePruneError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             StatePruneError::InvalidStateId(msg) => write!(f, "Invalid State Id: {}", msg),
-            StatePruneError::StorageError(err) => write!(f, "Storage Error: {}", err.description()),
+            StatePruneError::StorageError(err) => write!(f, "Storage Error: {}", err),
         }
     }
 }
 
 impl Error for StatePruneError {
-    fn description(&self) -> &str {
-        match self {
-            StatePruneError::InvalidStateId(_) => "An invalid State Id was provided.",
-            StatePruneError::StorageError(_) => {
-                "An error occurred with the underlying storage layer."
-            }
-        }
-    }
-
-    fn cause(&self) -> Option<&dyn Error> {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
             StatePruneError::InvalidStateId(_) => None,
             StatePruneError::StorageError(err) => Some(err.as_ref()),

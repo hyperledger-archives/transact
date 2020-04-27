@@ -79,11 +79,9 @@ impl std::fmt::Display for ContextError {
             ContextError::TransactionReceiptError(ref s) => {
                 write!(f, "TransactionReceiptError: {}", s)
             }
-            ContextError::SerializationError(ref err) => {
-                write!(f, "SerializationError: {}", err.description())
-            }
-            ContextError::SendError(ref err) => write!(f, "SendError: {}", err.description()),
-            ContextError::ReceiveError(ref err) => write!(f, "ReceiveError: {}", err.description()),
+            ContextError::SerializationError(ref err) => write!(f, "SerializationError: {}", err),
+            ContextError::SendError(ref err) => write!(f, "SendError: {}", err),
+            ContextError::ReceiveError(ref err) => write!(f, "ReceiveError: {}", err),
         }
     }
 }

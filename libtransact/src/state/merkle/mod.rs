@@ -23,12 +23,9 @@ use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Cursor;
 
-use cbor;
 use cbor::decoder::GenericDecoder;
 use cbor::encoder::GenericEncoder;
 use cbor::value::{Bytes, Key, Text, Value};
-
-use openssl;
 
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
