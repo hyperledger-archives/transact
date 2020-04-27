@@ -693,12 +693,8 @@ impl std::fmt::Display for WasmSdkError {
             WasmSdkError::AllocError(ref s) => write!(f, "AllocError: {}", s),
             WasmSdkError::MemoryWriteError(ref s) => write!(f, "MemoryWriteError: {}", s),
             WasmSdkError::MemoryRetrievalError(ref s) => write!(f, "MemoryRetrievalError: {}", s),
-            WasmSdkError::Utf8EncodeError(ref err) => {
-                write!(f, "Utf8EncodeError: {}", err)
-            }
-            WasmSdkError::ProtobufError(ref err) => {
-                write!(f, "ProtobufError: {}", err)
-            }
+            WasmSdkError::Utf8EncodeError(ref err) => write!(f, "Utf8EncodeError: {}", err),
+            WasmSdkError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err),
         }
     }
 }
