@@ -1,5 +1,24 @@
 # Release Notes
 
+## Changes in Transact 0.2.4
+
+### Experimental Changes
+
+* Add a field to the `SqliteDatabaseBuilder` to modify the "synchronous" setting
+  via PRAGMA statement. This setting provides different guarantees of data
+  safety for situations such as OS crash or power loss.
+* Make the `transact::workload` module publicly available with the experimental
+  feature "workload".
+* Make the xo workload tools publicly available with the
+  `transact::families::xo` module and the experimental feature "family-xo".
+* Make the `CommandTransactionHandler` and associated methods for the command
+  transaction family publicly available with the `transact::families::command`
+  module and the experimental feature "family-command".
+
+### Other Changes
+
+* Add a justfile to enable running `just build`, `just lint`, and `just test`
+
 ## Changes in Transact 0.2.3
 
 ### Experimental Changes
