@@ -18,7 +18,6 @@
 
 pub mod command;
 pub mod error;
-pub mod xo;
 
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
@@ -33,7 +32,7 @@ pub trait BatchWorkload {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use super::*;
 
     pub fn test_transaction_workload(workload: &mut dyn TransactionWorkload) {
