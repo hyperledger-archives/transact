@@ -87,6 +87,7 @@ experimental = [
     "key-value-state",
     "redis-db",
     "sqlite-db",
+    "workload",
 ]
 
 nightly = []
@@ -105,6 +106,7 @@ sawtooth-compat = ["sawtooth-sdk"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 state-merkle = ["cbor-codec"]
 ursa-compat = ["ursa"]
+workload = []
 
 [package.metadata.docs.rs]
 features = [
