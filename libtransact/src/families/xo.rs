@@ -24,6 +24,12 @@ pub struct XoTransactionWorkload {
     signer: Box<dyn Signer>,
 }
 
+impl Default for XoTransactionWorkload {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl XoTransactionWorkload {
     pub fn new() -> Self {
         let rng = Hc128Rng::from_entropy();
@@ -72,6 +78,12 @@ impl TransactionWorkload for XoTransactionWorkload {
 pub struct XoBatchWorkload {
     transaction_workload: XoTransactionWorkload,
     signer: Box<dyn Signer>,
+}
+
+impl Default for XoBatchWorkload {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl XoBatchWorkload {
@@ -136,7 +148,7 @@ impl Payload {
 
     pub fn bytes(&self) -> Vec<u8> {
         match self.action {
-            Action::CREATE => String::from(format!("create,{},", self.name)),
+            Action::CREATE => format!("create,{},", self.name),
         }
         .into_bytes()
     }

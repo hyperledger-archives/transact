@@ -14,7 +14,9 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+
 //! A basic Command Transaction Family
+
 use std::{thread, time};
 
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
