@@ -16,7 +16,6 @@
  * -----------------------------------------------------------------------------
  */
 
-pub mod command;
 pub mod error;
 
 use crate::protocol::batch::BatchPair;

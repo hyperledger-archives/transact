@@ -84,6 +84,7 @@ experimental = [
     "contract-archive",
     "contract-context",
     "contract-context-key-value",
+    "family-command",
     "family-xo",
     "key-value-state",
     "redis-db",
@@ -101,6 +102,7 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_derive", "serde_yaml", "tar"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
+family-command = []
 family-xo = ["rand_hc", "workload"]
 key-value-state = []
 redis-db = ["redis"]

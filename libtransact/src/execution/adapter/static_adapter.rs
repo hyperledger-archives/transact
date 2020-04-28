@@ -302,6 +302,7 @@ mod test {
     use std::time;
 
     use crate::context::ContextLifecycle;
+    use crate::families::command::{make_command_transaction, CommandTransactionHandler};
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
@@ -309,7 +310,6 @@ mod test {
     use crate::protocol::receipt::TransactionResult;
     use crate::scheduler::{ExecutionTaskCompletionNotification, InvalidTransactionResult};
     use crate::state::hashmap::HashMapState;
-    use crate::workload::command::{make_command_transaction, CommandTransactionHandler};
 
     fn create_bytes_entry(state_writes: Vec<(String, Vec<u8>)>) -> Vec<BytesEntry> {
         state_writes
