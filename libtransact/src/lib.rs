@@ -120,6 +120,7 @@ pub mod context;
 pub mod contract;
 pub mod database;
 pub mod execution;
+pub mod families;
 pub mod handler;
 pub mod protocol;
 #[allow(renamed_and_removed_lints)]
