@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: intkey_multiply
+name: intkey-multiply
 version: '1.0'
 inputs:
   - '00ec03'
