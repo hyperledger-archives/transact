@@ -164,7 +164,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Contract does not exist
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
             + " --inputs 1cf126 --outputs 1cf126",
     ) {
@@ -202,7 +202,7 @@ fn test_sabre() {
     //      Owners: signing key
     //
     // Result: Committed.
-    let response = match sabre_cli("cr --create intkey_multiply --owner ".to_string() + &signer) {
+    let response = match sabre_cli("cr --create intkey-multiply --owner ".to_string() + &signer) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
     };
@@ -236,7 +236,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Namespace Registry does not exist
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
             + " --inputs 1cf126 --outputs 1cf126",
     ) {
@@ -286,7 +286,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Contract does not have permission
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
             + " --inputs 1cf126 --outputs 1cf126",
     ) {
@@ -308,7 +308,7 @@ fn test_sabre() {
     //      Write: true
     //
     // Result: Committed
-    let response = match sabre_cli("perm 1cf126 intkey_multiply --read --write".to_string()) {
+    let response = match sabre_cli("perm 1cf126 intkey-multiply --read --write".to_string()) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
     };
@@ -324,7 +324,7 @@ fn test_sabre() {
     //      Write: true
     //
     // Result: Committed
-    let response = match sabre_cli("perm cad11d intkey_multiply --read --write".to_string()) {
+    let response = match sabre_cli("perm cad11d intkey-multiply --read --write".to_string()) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
     };
@@ -340,7 +340,7 @@ fn test_sabre() {
     //      Write: true
     //
     // Result: Committed
-    let response = match sabre_cli("perm 00ec03 intkey_multiply --read --write".to_string()) {
+    let response = match sabre_cli("perm 00ec03 intkey-multiply --read --write".to_string()) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
     };
@@ -382,7 +382,7 @@ fn test_sabre() {
     //
     // Result: Committed. Set Inktey State.
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
             + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
     ) {
@@ -403,7 +403,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Wasm contract returned invalid transaction
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
             + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
     ) {
@@ -427,7 +427,7 @@ fn test_sabre() {
     //
     // Result: Invalid Transaction, Wasm contract returned invalid transaction
     let response = match sabre_cli(
-        "exec --contract intkey_multiply:1.0 --payload ".to_string()
+        "exec --contract intkey-multiply:1.0 --payload ".to_string()
             + &BAD_PAYLOAD
             + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
     ) {

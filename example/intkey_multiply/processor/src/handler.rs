@@ -494,7 +494,7 @@ impl IntkeyMultiplyTransactionHandler {
     #[allow(clippy::new_without_default)]
     pub fn new() -> IntkeyMultiplyTransactionHandler {
         IntkeyMultiplyTransactionHandler {
-            family_name: "intkey_multiply".to_string(),
+            family_name: "intkey-multiply".to_string(),
             family_versions: vec!["1.0".to_string()],
             namespaces: vec![get_intkey_prefix()],
         }
