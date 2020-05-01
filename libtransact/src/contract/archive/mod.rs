@@ -117,7 +117,8 @@ impl SmartContractArchive {
         version: &str,
         paths: &[P],
     ) -> Result<SmartContractArchive, Error> {
-        let file_path = find_scar(name, version, paths)?;
+        let version_req = VersionReq::parse(version)?;
+        let file_path = find_scar(name, &version_req, paths)?;
 
         let scar_file = File::open(&file_path).map_err(|err| {
             Error::new_with_source(
@@ -189,12 +190,25 @@ impl SmartContractArchive {
                 file_path.display()
             ))
         })?;
-        let metadata = metadata.ok_or_else(|| {
+        let metadata: SmartContractMetadata = metadata.ok_or_else(|| {
             Error::new(&format!(
                 "invalid scar file: manifest.yaml not found in {}",
                 file_path.display()
             ))
         })?;
+
+        let metadata_version = Version::parse(&metadata.version).map_err(|err| {
+            Error::new_with_source(
+                &format!("invalid metadata version: {}", &metadata.version),
+                err.into(),
+            )
+        })?;
+        if !version_req.matches(&metadata_version) {
+            return Err(Error::new(&format!(
+                "scar file version '{}' does not match manifest version '{}'",
+                version, metadata_version,
+            )));
+        }
 
         Ok(SmartContractArchive { contract, metadata })
     }
@@ -213,12 +227,14 @@ pub struct SmartContractMetadata {
     pub outputs: Vec<String>,
 }
 
-fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<PathBuf, Error> {
+fn find_scar<P: AsRef<Path>>(
+    name: &str,
+    version_req: &VersionReq,
+    paths: &[P],
+) -> Result<PathBuf, Error> {
     let file_name_pattern = format!("{}_*.scar", name);
 
     validate_contract_name(name)?;
-
-    let version_req = VersionReq::parse(version)?;
 
     // Start with all scar files that match the name, from all paths
     paths
@@ -335,9 +351,14 @@ mod tests {
     #[test]
     fn find_scar_invalid_name() {
         let dir = new_temp_dir();
-        write_mock_scar(&dir, "non_existent", "0.1.0");
+        write_mock_scar(&dir, "non_existent", "1.0.0");
 
-        assert!(find_scar("non_existent", "0.1.0", &[&dir]).is_err());
+        assert!(find_scar(
+            "non_existent",
+            &VersionReq::parse("0.1.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when the contract version is an invalid semver string.
@@ -346,7 +367,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "nonexistent", "0.1..0");
 
-        assert!(find_scar("nonexistent", "0.1..0", &[&dir]).is_err());
+        assert!(find_scar(
+            "nonexistent",
+            &VersionReq::parse("0.1.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no contract with the given name exists.
@@ -355,7 +381,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("nonexistent", "0.1.0", &[&dir]).is_err());
+        assert!(find_scar(
+            "nonexistent",
+            &VersionReq::parse("0.1.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no matching contract is found in the given path.
@@ -364,7 +395,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.1.0", &["/some/other/dir"]).is_err());
+        assert!(find_scar(
+            "mock",
+            &VersionReq::parse("0.1.0").expect("unable to parse version"),
+            &["/some/other/dir"]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient patch version
@@ -374,7 +410,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0-dev");
 
-        assert!(find_scar("mock", "0.1.0", &[&dir]).is_err());
+        assert!(find_scar(
+            "mock",
+            &VersionReq::parse("0.1.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient patch version.
@@ -383,7 +424,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.1.1", &[&dir]).is_err());
+        assert!(find_scar(
+            "mock",
+            &VersionReq::parse("0.1.1").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient minor version.
@@ -392,7 +438,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "0.2.0", &[&dir]).is_err());
+        assert!(find_scar(
+            "mock",
+            &VersionReq::parse("0.2.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that an error is returned when no contract is found with a sufficient major version.
@@ -401,7 +452,12 @@ mod tests {
         let dir = new_temp_dir();
         write_mock_scar(&dir, "mock", "0.1.0");
 
-        assert!(find_scar("mock", "1.0.0", &[&dir]).is_err());
+        assert!(find_scar(
+            "mock",
+            &VersionReq::parse("1.0.0").expect("unable to parse version"),
+            &[&dir]
+        )
+        .is_err());
     }
 
     /// Verify that a scar file is correctly found when any version (`*`) is requested.
@@ -411,7 +467,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.0");
 
         assert_eq!(
-            find_scar("mock", "*", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("*").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -423,7 +484,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2-dev");
 
         assert_eq!(
-            find_scar("mock", "0.1.2-dev", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("0.1.2-dev").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -435,7 +501,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("0.1").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -447,7 +518,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "1.2.3");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("1").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -461,7 +537,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1.2", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("0.1.2").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -475,7 +556,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "0.1.2");
 
         assert_eq!(
-            find_scar("mock", "0.1", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("0.1").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -489,7 +575,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir, "mock", "1.2.0");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("1").expect("unable to parse version"),
+                &[&dir]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -505,7 +596,12 @@ mod tests {
         let scar_path = write_mock_scar(&dir2, "mock", "1.2.4");
 
         assert_eq!(
-            find_scar("mock", "1", &[&dir1, &dir2]).expect("failed to find scar"),
+            find_scar(
+                "mock",
+                &VersionReq::parse("1").expect("unable to parse version"),
+                &[&dir1, &dir2]
+            )
+            .expect("failed to find scar"),
             scar_path
         );
     }
@@ -514,22 +610,47 @@ mod tests {
     #[test]
     fn load_scar_file_successful() {
         let dir = new_temp_dir();
-        write_mock_scar(&dir, "mock", "1.0.0");
+        let version = "1.0.0";
+        write_mock_scar(&dir, "mock", version);
 
-        let scar = SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir])
+        let scar = SmartContractArchive::from_scar_file("mock", version, &[&dir])
             .expect("failed to load scar");
 
         assert_eq!(scar.contract, MOCK_CONTRACT_BYTES);
-        assert_eq!(scar.metadata.name, mock_smart_contract_metadata().name);
+        assert_eq!(
+            scar.metadata.name,
+            mock_smart_contract_metadata(version).name
+        );
         assert_eq!(
             scar.metadata.version,
-            mock_smart_contract_metadata().version
+            mock_smart_contract_metadata(version).version
         );
-        assert_eq!(scar.metadata.inputs, mock_smart_contract_metadata().inputs);
+        assert_eq!(
+            scar.metadata.inputs,
+            mock_smart_contract_metadata(version).inputs
+        );
         assert_eq!(
             scar.metadata.outputs,
-            mock_smart_contract_metadata().outputs
+            mock_smart_contract_metadata(version).outputs
         );
+    }
+
+    /// Verify that a valid scar file loaded, but an invalid manifest version causes an error.
+    #[test]
+    fn load_scar_file_invalid_manifest_version() {
+        let dir = new_temp_dir();
+
+        let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata("2.0.0"));
+        let contract_file_path = write_contract(&dir);
+        write_scar_file::<&Path>(
+            dir.as_ref(),
+            "mock",
+            "1.0.0",
+            Some(manifest_file_path.as_path()),
+            Some(contract_file_path.as_path()),
+        );
+
+        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when attempting to load a scar file that does not contain
@@ -574,17 +695,18 @@ mod tests {
     #[test]
     fn load_scar_contract_not_found() {
         let dir = new_temp_dir();
+        let version = "1.0.0";
 
-        let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata());
+        let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata(version));
         write_scar_file::<&Path>(
             dir.as_ref(),
             "mock",
-            "1.0.0",
+            version,
             Some(manifest_file_path.as_path()),
             None,
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock", version, &[&dir]).is_err());
     }
 
     fn new_temp_dir() -> TempDir {
@@ -593,7 +715,7 @@ mod tests {
     }
 
     fn write_mock_scar<P: AsRef<Path>>(dir: P, name: &str, version: &str) -> PathBuf {
-        let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata());
+        let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata(&version));
         let contract_file_path = write_contract(&dir);
         write_scar_file::<&Path>(
             dir.as_ref(),
@@ -652,10 +774,10 @@ mod tests {
         scar_file_path
     }
 
-    fn mock_smart_contract_metadata() -> SmartContractMetadata {
+    fn mock_smart_contract_metadata(version: &str) -> SmartContractMetadata {
         SmartContractMetadata {
             name: "mock".into(),
-            version: "1.0".into(),
+            version: version.to_string(),
             inputs: vec!["abcdef".into()],
             outputs: vec!["012345".into()],
         }
