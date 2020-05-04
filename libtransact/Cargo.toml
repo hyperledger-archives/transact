@@ -70,6 +70,7 @@ stable = [
     # The stable feature extends default:
     "default",
     # The following features are stable:
+    "contract-archive",
 ]
 
 experimental = [
@@ -81,7 +82,6 @@ experimental = [
     "contract-address-double-key-hash",
     "contract-address-key-hash",
     "contract-address-triple-key-hash",
-    "contract-archive",
     "contract-context",
     "contract-context-key-value",
     "family-command",
