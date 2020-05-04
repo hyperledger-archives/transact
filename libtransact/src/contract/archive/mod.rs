@@ -189,12 +189,14 @@ impl SmartContractArchive {
                 file_path.display()
             ))
         })?;
-        let metadata = metadata.ok_or_else(|| {
+        let metadata: SmartContractMetadata = metadata.ok_or_else(|| {
             Error::new(&format!(
                 "invalid scar file: manifest.yaml not found in {}",
                 file_path.display()
             ))
         })?;
+
+        validate_metadata(&name, &metadata.name)?;
 
         Ok(SmartContractArchive { contract, metadata })
     }
@@ -267,6 +269,19 @@ fn validate_scar_file_name(name: &str) -> Result<(), Error> {
         return Err(Error::new(&format!(
             "invalid scar file name, must not include '_': {}",
             name
+        )));
+    }
+    Ok(())
+}
+
+// Validate that the metadata collected from the manifest contains a contract name which matches
+// the name of the scar file. This includes swapping any underscores which appear in the contract
+// name with dashes, as underscores are not allowed in scar file names.
+fn validate_metadata(file_name: &str, contract_name: &str) -> Result<(), Error> {
+    if file_name != contract_name.replace("_", "-") {
+        return Err(Error::new(&format!(
+            "scar file name `{}` does not match contract name in manifest `{}`",
+            file_name, contract_name,
         )));
     }
     Ok(())
@@ -515,9 +530,9 @@ mod tests {
     #[test]
     fn load_scar_file_successful() {
         let dir = new_temp_dir();
-        write_mock_scar(&dir, "mock", "1.0.0");
+        write_mock_scar(&dir, "mock-scar", "1.0.0");
 
-        let scar = SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir])
+        let scar = SmartContractArchive::from_scar_file("mock-scar", "1.0.0", &[&dir])
             .expect("failed to load scar");
 
         assert_eq!(scar.contract, MOCK_CONTRACT_BYTES);
@@ -542,13 +557,13 @@ mod tests {
         let contract_file_path = write_contract(&dir);
         write_scar_file::<&Path>(
             dir.as_ref(),
-            "mock",
+            "mock-scar",
             "1.0.0",
             None,
             Some(contract_file_path.as_path()),
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock-scar", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when attempting to load a scar file whose `manifest.yaml`
@@ -561,13 +576,13 @@ mod tests {
         let contract_file_path = write_contract(&dir);
         write_scar_file::<&Path>(
             dir.as_ref(),
-            "mock",
+            "mock-scar",
             "1.0.0",
             Some(manifest_file_path.as_path()),
             Some(contract_file_path.as_path()),
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock-scar", "1.0.0", &[&dir]).is_err());
     }
 
     /// Verify that an error is returned when attempting to load a scar file that does not contain
@@ -579,13 +594,31 @@ mod tests {
         let manifest_file_path = write_manifest(&dir, &mock_smart_contract_metadata());
         write_scar_file::<&Path>(
             dir.as_ref(),
-            "mock",
+            "mock-scar",
             "1.0.0",
             Some(manifest_file_path.as_path()),
             None,
         );
 
-        assert!(SmartContractArchive::from_scar_file("mock", "1.0.0", &[&dir]).is_err());
+        assert!(SmartContractArchive::from_scar_file("mock-scar", "1.0.0", &[&dir]).is_err());
+    }
+
+    /// Verify that an error is returned when attempting to load a scar file that does not contain
+    /// a smart contract with a name that matches the file name.
+    #[test]
+    fn load_scar_manifest_not_matching() {
+        let dir = new_temp_dir();
+        let manifest_file_path = write_manifest(&dir, &mock_invalid_smart_contract_metadata());
+
+        write_scar_file::<&Path>(
+            dir.as_ref(),
+            "mock-scar",
+            "1.0.0",
+            Some(&manifest_file_path),
+            None,
+        );
+
+        assert!(SmartContractArchive::from_scar_file("mock-scar", "1.0.0", &[&dir]).is_err());
     }
 
     fn new_temp_dir() -> TempDir {
@@ -655,7 +688,16 @@ mod tests {
 
     fn mock_smart_contract_metadata() -> SmartContractMetadata {
         SmartContractMetadata {
-            name: "mock".into(),
+            name: "mock_scar".into(),
+            version: "1.0".into(),
+            inputs: vec!["abcdef".into()],
+            outputs: vec!["012345".into()],
+        }
+    }
+
+    fn mock_invalid_smart_contract_metadata() -> SmartContractMetadata {
+        SmartContractMetadata {
+            name: "invalid_scar".into(),
             version: "1.0".into(),
             inputs: vec!["abcdef".into()],
             outputs: vec!["012345".into()],
