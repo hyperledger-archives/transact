@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: intkey-multiply
+name: intkey_multiply
 version: '1.0'
 wasm: processor/target/wasm32-unknown-unknown/release/intkey-multiply.wasm
 inputs:

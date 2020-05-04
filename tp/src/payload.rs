@@ -38,12 +38,6 @@ impl SabreRequestPayload {
                         "Contract name cannot be an empty string",
                     )));
                 }
-                if create_contract.name().contains('_') {
-                    return Err(ApplyError::InvalidTransaction(format!(
-                        "Contract name cannot contain '_': {}",
-                        create_contract.name(),
-                    )));
-                }
                 if create_contract.version().is_empty() {
                     return Err(ApplyError::InvalidTransaction(String::from(
                         "Contract version cannot be an empty string",
