@@ -216,7 +216,7 @@ pub struct SmartContractMetadata {
 fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<PathBuf, Error> {
     let file_name_pattern = format!("{}_*.scar", name);
 
-    validate_contract_name(name)?;
+    validate_scar_file_name(name)?;
 
     let version_req = VersionReq::parse(version)?;
 
@@ -261,7 +261,8 @@ fn find_scar<P: AsRef<Path>>(name: &str, version: &str, paths: &[P]) -> Result<P
         })
 }
 
-fn validate_contract_name(name: &str) -> Result<(), Error> {
+// Validate that the scar file name does not contain underscores, otherwise return an error.
+fn validate_scar_file_name(name: &str) -> Result<(), Error> {
     if name.contains('_') {
         return Err(Error::new(&format!(
             "invalid scar file name, must not include '_': {}",
