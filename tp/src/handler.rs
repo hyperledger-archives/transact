@@ -530,7 +530,7 @@ fn create_contract_registry(
         Ok(Some(setting)) => setting,
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Only admins can create a contract registry: {}",
+                "Admins not set and only admins can create a contract registry: {}",
                 signer,
             )));
         }
@@ -671,7 +671,7 @@ fn create_namespace_registry(
         Ok(Some(setting)) => setting,
         Ok(None) => {
             return Err(ApplyError::InvalidTransaction(format!(
-                "Only admins can create a namespace registry: {}",
+                "Admins not set and only admins can create a namespace registry: {}",
                 signer,
             )));
         }
@@ -1068,7 +1068,7 @@ fn can_update_namespace_registry(
             Ok(Some(setting)) => setting,
             Ok(None) => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "Only owners or admins can update or delete a namespace registry: {}",
+                    "Owners or admins not set. Only owners or admins can update or delete a namespace registry: {}",
                     signer,
                 )));
             }
