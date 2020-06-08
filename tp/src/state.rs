@@ -445,7 +445,7 @@ impl<'a> SabreState<'a> {
 
     pub fn delete_smart_permission(&mut self, org_id: &str, name: &str) -> Result<(), ApplyError> {
         let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.delete_state_entry(&address.clone())?;
+        let d = self.context.delete_state_entry(&address)?;
         let deleted = match d {
             Some(deleted) => deleted,
             None => {
