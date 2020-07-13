@@ -1135,23 +1135,27 @@ mod benchmarks {
         "address",
         "5b7349700e158b598043efd6d7610345a75a00b22ac14c9278db53f586179a92b72fbd",
     );
+    static ERROR_MESSAGE: &str = "an error occurred";
+    static ERROR_DATA: [u8; 4] = [0x00, 0x01, 0x02, 0x03];
     static TRANSACTION_ID: &str = "24b168aaf5ea4a76a6c316924a1c26df0878908682ea5740dd70814e \
          7c400d56354dee788191be8e28393c70398906fb467fac8db6279e90e4e61619589d42bf";
 
     #[bench]
     fn bench_txn_receipt_creation(b: &mut Bencher) {
         b.iter(|| TransactionReceipt {
-            state_changes: vec![
-                StateChange::Set {
-                    key: ADDRESS.to_string(),
-                    value: BYTES1.to_vec(),
-                },
-                StateChange::Delete {
-                    key: ADDRESS.to_string(),
-                },
-            ],
-            events: vec![make_event_1(), make_event_2()],
-            data: vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()],
+            transaction_result: TransactionResult::Valid {
+                state_changes: vec![
+                    StateChange::Set {
+                        key: ADDRESS.to_string(),
+                        value: BYTES1.to_vec(),
+                    },
+                    StateChange::Delete {
+                        key: ADDRESS.to_string(),
+                    },
+                ],
+                events: vec![make_event_1(), make_event_2()],
+                data: vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()],
+            },
             transaction_id: TRANSACTION_ID.to_string(),
         });
     }
@@ -1219,17 +1223,19 @@ mod benchmarks {
     #[bench]
     fn bench_txn_receipt_into_proto(b: &mut Bencher) {
         let transaction_receipt = TransactionReceipt {
-            state_changes: vec![
-                StateChange::Set {
-                    key: ADDRESS.to_string(),
-                    value: BYTES1.to_vec(),
-                },
-                StateChange::Delete {
-                    key: ADDRESS.to_string(),
-                },
-            ],
-            events: vec![make_event_1(), make_event_2()],
-            data: vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()],
+            transaction_result: TransactionResult::Valid {
+                state_changes: vec![
+                    StateChange::Set {
+                        key: ADDRESS.to_string(),
+                        value: BYTES1.to_vec(),
+                    },
+                    StateChange::Delete {
+                        key: ADDRESS.to_string(),
+                    },
+                ],
+                events: vec![make_event_1(), make_event_2()],
+                data: vec![BYTES1.to_vec(), BYTES2.to_vec(), BYTES3.to_vec()],
+            },
             transaction_id: TRANSACTION_ID.to_string(),
         };
 
