@@ -694,7 +694,7 @@ impl FromProto<protos::command::Sleep> for Sleep {
 impl FromNative<Sleep> for protos::command::Sleep {
     fn from_native(sleep: Sleep) -> Result<Self, ProtoConversionError> {
         let mut proto_sleep = protos::command::Sleep::new();
-        proto_sleep.set_duration_millis(sleep.duration_millis().clone());
+        proto_sleep.set_duration_millis(*sleep.duration_millis());
         proto_sleep.set_sleep_type(sleep.sleep_type().clone().into_proto()?);
         Ok(proto_sleep)
     }
