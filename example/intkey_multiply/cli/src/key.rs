@@ -63,11 +63,11 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
                 "Could not load signing key: unable to determine home directory",
             ))
         })
-        .and_then(|mut p| {
+        .map(|mut p| {
             p.push(".sawtooth");
             p.push("keys");
             p.push(format!("{}.priv", &username));
-            Ok(p)
+            p
         })?;
 
     if !private_key_filename.as_path().exists() {
