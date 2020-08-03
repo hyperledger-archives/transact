@@ -17,16 +17,14 @@ use sawtooth_xo::handler::XoTransactionHandler;
 use transact::context::manager::sync::ContextManager;
 use transact::database::{btree::BTreeDatabase, Database};
 use transact::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
-use transact::protocol::receipt::TransactionReceipt;
+use transact::protocol::receipt::{Event, TransactionResult};
 use transact::protocol::{
     batch::{BatchBuilder, BatchPair},
     receipt::StateChange,
     transaction::{HashMethod, TransactionBuilder},
 };
 use transact::sawtooth::SawtoothToTransactHandlerAdapter;
-use transact::scheduler::{
-    serial::SerialScheduler, BatchExecutionResult, Scheduler, TransactionExecutionResult,
-};
+use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
 use transact::signing::{hash::HashSigner, Signer};
 use transact::state::merkle::{self, MerkleRadixTree, MerkleState};
 use transact::state::StateChange as ChangeSet;
@@ -122,10 +120,10 @@ fn get_next_tx() -> String {
 }
 
 fn get_state_change(result: BatchExecutionResult) -> (String, Vec<u8>) {
-    let mut receipt = get_receipt(result);
+    let (mut state_changes, _, _) = get_result(result);
 
-    assert_eq!(receipt.state_changes.len(), 1);
-    let state_change = receipt.state_changes.pop();
+    assert_eq!(state_changes.len(), 1);
+    let state_change = state_changes.pop();
 
     match state_change {
         Some(c) => match c {
@@ -241,19 +239,24 @@ fn run_schedule(executor: &Arc<Mutex<Option<Executor>>>, scheduler: &mut dyn Sch
         .expect("Failed to execute schedule");
 }
 
-fn get_receipt(batch_result: BatchExecutionResult) -> TransactionReceipt {
-    assert_eq!(1, batch_result.results.len());
+fn get_result(batch_result: BatchExecutionResult) -> (Vec<StateChange>, Vec<Event>, Vec<Vec<u8>>) {
+    assert_eq!(1, batch_result.receipts.len());
 
     let mut batch_result = batch_result;
 
     let txn_result = batch_result
-        .results
+        .receipts
         .pop()
-        .expect("Length 1, but no first element");
+        .expect("Length 1, but no first element")
+        .transaction_result;
     match txn_result {
-        TransactionExecutionResult::Valid(receipt) => receipt,
-        TransactionExecutionResult::Invalid(invalid_result) => {
-            panic!("Transaction failed: {:?}", invalid_result)
+        TransactionResult::Valid {
+            state_changes,
+            events,
+            data,
+        } => (state_changes, events, data),
+        TransactionResult::Invalid { error_message, .. } => {
+            panic!("Transaction failed: {:?}", error_message)
         }
     }
 }
