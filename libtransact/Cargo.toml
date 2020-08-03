@@ -54,7 +54,7 @@ ursa = { version = "0.2.0", optional = true }
 uuid = { version = "0.7", features = ["v4"] }
 
 [dev-dependencies]
-sawtooth-xo = "0.3"
+sawtooth-xo = "0.4"
 serial_test = "0.3"
 tempdir = "0.3"
 
