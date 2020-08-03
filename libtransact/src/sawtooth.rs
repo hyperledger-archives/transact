@@ -406,7 +406,7 @@ mod xo_compat_test {
         }
     }
 
-    fn create_batch(signer: &Signer, game_name: &str, payload: &str) -> BatchPair {
+    fn create_batch(signer: &dyn Signer, game_name: &str, payload: &str) -> BatchPair {
         let game_address = calculate_game_address(game_name);
         let txn_pair = TransactionBuilder::new()
             .with_batcher_public_key(signer.public_key().to_vec())
