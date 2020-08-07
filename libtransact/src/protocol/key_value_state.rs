@@ -88,31 +88,31 @@ impl FromProto<protos::key_value_state::StateEntryValue> for StateEntryValue {
 impl FromNative<StateEntryValue> for protos::key_value_state::StateEntryValue {
     fn from_native(native: StateEntryValue) -> Result<Self, ProtoConversionError> {
         let mut proto = protos::key_value_state::StateEntryValue::new();
-        proto.set_key(native.key().to_string());
-        match native.value() {
+        proto.set_key(native.key);
+        match native.value {
             ValueType::Int64(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::INT64);
-                proto.set_int64_value(value.clone());
+                proto.set_int64_value(value);
             }
             ValueType::Int32(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::INT32);
-                proto.set_int32_value(value.clone());
+                proto.set_int32_value(value);
             }
             ValueType::UInt64(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::UINT64);
-                proto.set_uint64_value(value.clone());
+                proto.set_uint64_value(value);
             }
             ValueType::UInt32(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::UINT32);
-                proto.set_uint32_value(value.clone());
+                proto.set_uint32_value(value);
             }
             ValueType::String(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::STRING);
-                proto.set_string_value(value.clone());
+                proto.set_string_value(value);
             }
             ValueType::Bytes(value) => {
                 proto.set_value_type(protos::key_value_state::StateEntryValue_ValueType::BYTES);
-                proto.set_bytes_value(value.clone());
+                proto.set_bytes_value(value);
             }
         }
 
