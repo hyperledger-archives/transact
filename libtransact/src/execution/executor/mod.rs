@@ -201,7 +201,7 @@ mod tests {
     fn create_txn(signer: &dyn Signer, family_name: &str) -> TransactionPair {
         TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
-            .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
+            .with_dependencies(vec![KEY2.to_string(), KEY3.to_string()])
             .with_family_name(family_name.to_string())
             .with_family_version(FAMILY_VERSION.to_string())
             .with_inputs(vec![

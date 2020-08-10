@@ -52,7 +52,7 @@ pub enum HashMethod {
 #[derive(PartialEq, Clone)]
 pub struct TransactionHeader {
     batcher_public_key: Vec<u8>,
-    dependencies: Vec<Vec<u8>>,
+    dependencies: Vec<String>,
     family_name: String,
     family_version: String,
     inputs: Vec<Vec<u8>>,
@@ -68,7 +68,7 @@ impl TransactionHeader {
         &self.batcher_public_key
     }
 
-    pub fn dependencies(&self) -> &[Vec<u8>] {
+    pub fn dependencies(&self) -> &[String] {
         &self.dependencies
     }
 
@@ -162,11 +162,7 @@ impl FromProto<protos::transaction::TransactionHeader> for TransactionHeader {
             family_name: header.get_family_name().to_string(),
             family_version: header.get_family_version().to_string(),
             batcher_public_key: hex::decode(header.get_batcher_public_key())?,
-            dependencies: header
-                .get_dependencies()
-                .iter()
-                .map(|d| hex::decode(d).map_err(ProtoConversionError::from))
-                .collect::<Result<_, _>>()?,
+            dependencies: header.get_dependencies().to_vec(),
             inputs: header
                 .get_inputs()
                 .iter()
@@ -191,7 +187,7 @@ impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
         proto_header.set_family_name(header.family_name().to_string());
         proto_header.set_family_version(header.family_version().to_string());
         proto_header.set_batcher_public_key(hex::encode(header.batcher_public_key()));
-        proto_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
+        proto_header.set_dependencies(header.dependencies().into());
         proto_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
         proto_header.set_nonce(String::from_utf8(header.nonce().to_vec())?);
         proto_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
@@ -425,7 +421,7 @@ impl From<SigningError> for TransactionBuildError {
 #[derive(Default, Clone)]
 pub struct TransactionBuilder {
     batcher_public_key: Option<Vec<u8>>,
-    dependencies: Option<Vec<Vec<u8>>>,
+    dependencies: Option<Vec<String>>,
     family_name: Option<String>,
     family_version: Option<String>,
     inputs: Option<Vec<Vec<u8>>>,
@@ -446,7 +442,7 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn with_dependencies(mut self, dependencies: Vec<Vec<u8>>) -> TransactionBuilder {
+    pub fn with_dependencies(mut self, dependencies: Vec<String>) -> TransactionBuilder {
         self.dependencies = Some(dependencies);
         self
     }
@@ -627,7 +623,7 @@ mod tests {
 
         assert_eq!(KEY1, hex::encode(pair.header().batcher_public_key()));
         assert_eq!(
-            vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap(),],
+            vec![KEY2.to_string(), KEY3.to_string()],
             pair.header().dependencies()
         );
         assert_eq!(FAMILY_NAME, pair.header.family_name());
@@ -658,7 +654,7 @@ mod tests {
 
         let pair = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
-            .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
+            .with_dependencies(vec![KEY2.to_string(), KEY3.to_string()])
             .with_family_name(FAMILY_NAME.to_string())
             .with_family_version(FAMILY_VERSION.to_string())
             .with_inputs(vec![
@@ -685,8 +681,7 @@ mod tests {
 
         let mut builder = TransactionBuilder::new();
         builder = builder.with_batcher_public_key(hex::decode(KEY1).unwrap());
-        builder =
-            builder.with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()]);
+        builder = builder.with_dependencies(vec![KEY2.to_string(), KEY3.to_string()]);
         builder = builder.with_family_name(FAMILY_NAME.to_string());
         builder = builder.with_family_version(FAMILY_VERSION.to_string());
         builder = builder.with_inputs(vec![
@@ -709,7 +704,7 @@ mod tests {
     fn transaction_header_fields() {
         let header = TransactionHeader {
             batcher_public_key: hex::decode(KEY1).unwrap(),
-            dependencies: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            dependencies: vec![KEY2.to_string(), KEY3.to_string()],
             family_name: FAMILY_NAME.to_string(),
             family_version: FAMILY_VERSION.to_string(),
             inputs: vec![
@@ -727,7 +722,7 @@ mod tests {
         };
         assert_eq!(KEY1, hex::encode(header.batcher_public_key()));
         assert_eq!(
-            vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap(),],
+            vec![KEY2.to_string(), KEY3.to_string()],
             header.dependencies()
         );
         assert_eq!(FAMILY_NAME, header.family_name());
@@ -756,7 +751,7 @@ mod tests {
     fn transaction_header_bytes() {
         let original = TransactionHeader {
             batcher_public_key: hex::decode(KEY1).unwrap(),
-            dependencies: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            dependencies: vec![KEY2.to_string(), KEY3.to_string()],
             family_name: FAMILY_NAME.to_string(),
             family_version: FAMILY_VERSION.to_string(),
             inputs: vec![
@@ -833,7 +828,7 @@ mod tests {
 
         assert_eq!(KEY1, hex::encode(header.batcher_public_key()));
         assert_eq!(
-            vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            vec![KEY2.to_string(), KEY3.to_string()],
             header.dependencies()
         );
         assert_eq!(FAMILY_NAME, header.family_name());
@@ -933,7 +928,7 @@ mod benchmarks {
         let signer = new_signer();
         let transaction = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
-            .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
+            .with_dependencies(vec![KEY2.to_string(), KEY3.to_string()])
             .with_family_name(FAMILY_NAME.to_string())
             .with_family_version(FAMILY_VERSION.to_string())
             .with_inputs(vec![
@@ -964,7 +959,7 @@ mod benchmarks {
     fn bench_txn_header_into_proto(b: &mut Bencher) {
         let header = TransactionHeader {
             batcher_public_key: hex::decode(KEY1).unwrap(),
-            dependencies: vec![hex::decode(KEY2).unwrap()],
+            dependencies: vec![KEY2.to_string()],
             family_name: FAMILY_NAME.to_string(),
             family_version: FAMILY_VERSION.to_string(),
             inputs: vec![

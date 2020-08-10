@@ -57,7 +57,7 @@ impl SmallbankTransactionWorkload {
     fn add_signature_if_create_account(
         &mut self,
         payload: &SmallbankTransactionPayload,
-        signature: Vec<u8>,
+        signature: String,
     ) {
         if payload.get_payload_type() == SmallbankTransactionPayload_PayloadType::CREATE_ACCOUNT {
             self.dependencies
@@ -65,7 +65,7 @@ impl SmallbankTransactionWorkload {
         }
     }
 
-    fn get_dependencies_for_customer_ids(&self, customer_ids: &[u32]) -> Vec<Vec<u8>> {
+    fn get_dependencies_for_customer_ids(&self, customer_ids: &[u32]) -> Vec<String> {
         customer_ids
             .iter()
             .filter_map(|id| self.dependencies.get_signature(id))
@@ -73,7 +73,7 @@ impl SmallbankTransactionWorkload {
             .collect()
     }
 
-    fn get_dependencies(&self, payload: &SmallbankTransactionPayload) -> Vec<Vec<u8>> {
+    fn get_dependencies(&self, payload: &SmallbankTransactionPayload) -> Vec<String> {
         match payload.get_payload_type() {
             SmallbankTransactionPayload_PayloadType::DEPOSIT_CHECKING => self
                 .get_dependencies_for_customer_ids(&[payload
@@ -138,9 +138,7 @@ impl TransactionWorkload for SmallbankTransactionWorkload {
 
         self.add_signature_if_create_account(
             &payload,
-            hex::decode(txn_pair.transaction().header_signature()).map_err(|_| {
-                WorkloadError::InvalidState("Unable to decode header signature".to_string())
-            })?,
+            txn_pair.transaction().header_signature().to_owned(),
         );
 
         Ok(txn_pair)
@@ -176,7 +174,7 @@ struct SignatureTracker<T>
 where
     T: Eq + Hash,
 {
-    signature_by_id: HashMap<T, Vec<u8>>,
+    signature_by_id: HashMap<T, String>,
 }
 
 impl<T> SignatureTracker<T>
@@ -189,11 +187,11 @@ where
         }
     }
 
-    pub fn get_signature(&self, id: &T) -> Option<&Vec<u8>> {
+    pub fn get_signature(&self, id: &T) -> Option<&String> {
         self.signature_by_id.get(id)
     }
 
-    pub fn add_signature(&mut self, id: T, signature: Vec<u8>) {
+    pub fn add_signature(&mut self, id: T, signature: String) {
         self.signature_by_id.insert(id, signature);
     }
 }
@@ -258,7 +256,7 @@ mod tests {
             if header
                 .dependencies()
                 .iter()
-                .any(|dep| !create_account_txn_ids.contains(&hex::encode(dep)))
+                .any(|dep| !create_account_txn_ids.contains(&dep))
             {
                 acc = acc + 1;
             }

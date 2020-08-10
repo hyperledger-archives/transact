@@ -203,7 +203,7 @@ fn as_sawtooth_header(header: &TransactionHeader) -> SawtoothTxnHeader {
     sawtooth_header.set_family_version(header.family_version().to_owned());
     sawtooth_header.set_signer_public_key(hex::encode(&header.signer_public_key()));
     sawtooth_header.set_batcher_public_key(hex::encode(&header.batcher_public_key()));
-    sawtooth_header.set_dependencies(header.dependencies().iter().map(hex::encode).collect());
+    sawtooth_header.set_dependencies(header.dependencies().into());
     sawtooth_header.set_inputs(header.inputs().iter().map(hex::encode).collect());
     sawtooth_header.set_outputs(header.outputs().iter().map(hex::encode).collect());
     sawtooth_header.set_nonce(hex::encode(&header.nonce()));

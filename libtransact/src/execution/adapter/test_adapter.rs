@@ -233,7 +233,7 @@ mod tests {
     fn make_transaction(signer: &dyn Signer) -> TransactionPair {
         TransactionBuilder::new()
             .with_batcher_public_key(vec![])
-            .with_dependencies(vec![vec![]])
+            .with_dependencies(vec!["".to_string()])
             .with_family_name("test".to_string())
             .with_family_version(FAMILY_VERSION.to_string())
             .with_inputs(vec![vec![]])
