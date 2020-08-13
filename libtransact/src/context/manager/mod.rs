@@ -26,6 +26,7 @@ use crate::context::{Context, ContextId, ContextLifecycle};
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
 use crate::state::Read;
 
+#[derive(Clone)]
 pub struct ContextManager {
     contexts: HashMap<ContextId, Context>,
     database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
@@ -59,6 +60,10 @@ impl ContextLifecycle for ContextManager {
             .with_transaction_id(transaction_id.to_string())
             .build()?;
         Ok(new_transaction_receipt)
+    }
+
+    fn clone_box(&self) -> Box<dyn ContextLifecycle> {
+        Box::new(self.clone())
     }
 }
 

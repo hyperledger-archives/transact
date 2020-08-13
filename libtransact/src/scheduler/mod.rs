@@ -344,6 +344,10 @@ mod tests {
         }
 
         fn drop_context(&mut self, _context_id: ContextId) {}
+
+        fn clone_box(&self) -> Box<dyn ContextLifecycle> {
+            Box::new(self.clone())
+        }
     }
 
     /// Attempt to add a batch to the scheduler; attempt to add the batch again and verify that a

@@ -45,6 +45,16 @@ pub trait ContextLifecycle: Send {
         context_id: &ContextId,
         transaction_id: &str,
     ) -> Result<TransactionReceipt, ContextManagerError>;
+
+    /// Clone implementation for `ContextLifecycle`. The implementation of the `Clone` trait for
+    /// `Box<dyn ContextLifecycle>` calls this method.
+    fn clone_box(&self) -> Box<dyn ContextLifecycle>;
+}
+
+impl Clone for Box<dyn ContextLifecycle> {
+    fn clone(&self) -> Box<dyn ContextLifecycle> {
+        self.clone_box()
+    }
 }
 
 #[derive(Debug, Clone, Default)]
