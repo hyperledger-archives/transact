@@ -379,9 +379,7 @@ mod tests {
             .add_batch(batches[1].clone())
             .expect("Failed to add 2nd batch");
 
-        for batch in scheduler.cancel().expect("Failed 1st cancel") {
-            assert!(batches.contains(&batch));
-        }
+        assert_eq!(scheduler.cancel().expect("Failed 1st cancel"), batches);
         assert!(scheduler.cancel().expect("Failed 2nd cancel").is_empty());
     }
 
