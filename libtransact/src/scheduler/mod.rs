@@ -192,6 +192,9 @@ pub trait Scheduler {
     /// sending a notification to the scheduler that indicates the task has
     /// been executed.
     fn new_notifier(&mut self) -> Result<Box<dyn ExecutionTaskCompletionNotifier>, SchedulerError>;
+
+    /// Shuts the scheduler down and performs any necessary cleanup.
+    fn shutdown(self: Box<Self>);
 }
 
 /// Allows sending a notification to the scheduler that execution of a task

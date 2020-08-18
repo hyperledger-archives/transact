@@ -154,21 +154,8 @@ impl MultiScheduler {
         })
     }
 
-    pub fn shutdown(mut self) {
-        match self.core_tx.send(core::MultiSchedulerCoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().unwrap_or_else(|err| {
-                        // This should not never happen, because the core thread should never panic
-                        error!(
-                            "failed to join scheduler thread because it panicked: {:?}",
-                            err
-                        )
-                    });
-                }
-            }
-            Err(err) => warn!("failed to send to scheduler thread during drop: {}", err),
-        }
+    pub fn shutdown(self) {
+        Box::new(self).shutdown()
     }
 }
 
@@ -222,6 +209,23 @@ impl Scheduler for MultiScheduler {
         // The MultiScheduler passes all sub-schedulers' notifiers directly to the
         // SubSchedulerHandler except for the first sub-scheduler's, which it returns here.
         self.shared_lock.lock()?.schedulers_mut()[0].new_notifier()
+    }
+
+    fn shutdown(mut self: Box<Self>) {
+        match self.core_tx.send(core::MultiSchedulerCoreMessage::Shutdown) {
+            Ok(_) => {
+                if let Some(join_handle) = self.core_handle.take() {
+                    join_handle.join().unwrap_or_else(|err| {
+                        // This should never happen, because the core thread should never panic
+                        error!(
+                            "failed to join scheduler thread because it panicked: {:?}",
+                            err
+                        )
+                    });
+                }
+            }
+            Err(err) => warn!("failed to send to scheduler thread during drop: {}", err),
+        }
     }
 }
 
@@ -345,6 +349,8 @@ mod tests {
                 callback: Arc::clone(&self.callback),
             }))
         }
+
+        fn shutdown(self: Box<Self>) {}
     }
 
     struct MockSubSchedulerHandler {

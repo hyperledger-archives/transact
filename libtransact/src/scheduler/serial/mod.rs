@@ -91,23 +91,8 @@ impl SerialScheduler {
         })
     }
 
-    pub fn shutdown(mut self) {
-        match self.core_tx.send(core::CoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().unwrap_or_else(|err| {
-                        // This should not never happen, because the core thread should never panic
-                        error!(
-                            "failed to join scheduler thread because it panicked: {:?}",
-                            err
-                        )
-                    });
-                }
-            }
-            Err(err) => {
-                warn!("failed to send to scheduler thread during drop: {}", err);
-            }
-        }
+    pub fn shutdown(self) {
+        Box::new(self).shutdown()
     }
 }
 
@@ -174,6 +159,25 @@ impl Scheduler for SerialScheduler {
         Ok(Box::new(
             execution::SerialExecutionTaskCompletionNotifier::new(self.core_tx.clone()),
         ))
+    }
+
+    fn shutdown(mut self: Box<Self>) {
+        match self.core_tx.send(core::CoreMessage::Shutdown) {
+            Ok(_) => {
+                if let Some(join_handle) = self.core_handle.take() {
+                    join_handle.join().unwrap_or_else(|err| {
+                        // This should never happen, because the core thread should never panic
+                        error!(
+                            "failed to join scheduler thread because it panicked: {:?}",
+                            err
+                        )
+                    });
+                }
+            }
+            Err(err) => {
+                warn!("failed to send to scheduler thread during drop: {}", err);
+            }
+        }
     }
 }
 
