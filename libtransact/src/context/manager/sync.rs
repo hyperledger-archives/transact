@@ -139,4 +139,8 @@ impl ContextLifecycle for ContextManager {
             .expect("Lock in get_transaction_receipt was poisoned")
             .get_transaction_receipt(context_id, transaction_id)
     }
+
+    fn clone_box(&self) -> Box<dyn ContextLifecycle> {
+        Box::new(self.clone())
+    }
 }
