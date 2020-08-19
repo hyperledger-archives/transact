@@ -73,7 +73,7 @@ pub struct MultiScheduler {
 impl MultiScheduler {
     /// Returns a newly created `MultiScheduler` that runs the specified sub-schedulers.
     pub fn new(
-        mut schedulers: Vec<Box<dyn Scheduler + Send>>,
+        mut schedulers: Vec<Box<dyn Scheduler>>,
         sub_scheduler_handler: &mut dyn SubSchedulerHandler,
     ) -> Result<MultiScheduler, SchedulerError> {
         let (core_tx, core_rx) = mpsc::channel();
@@ -389,7 +389,7 @@ mod tests {
     ) -> MultiScheduler {
         let sub_schedulers = sub_schedulers
             .iter()
-            .map(|sub_scheduler| sub_scheduler.clone() as Box<dyn Scheduler + Send>)
+            .map(|sub_scheduler| sub_scheduler.clone() as Box<dyn Scheduler>)
             .collect();
         MultiScheduler::new(sub_schedulers, &mut MockSubSchedulerHandler::new())
             .expect("Failed to create scheduler")
@@ -488,11 +488,9 @@ mod tests {
 
         // The first sub-scheduler doens't have a result for the batch
         let sub_schedulers = vec![
-            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
-                as Box<dyn Scheduler + Send>,
-            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
-                as Box<dyn Scheduler + Send>,
-            Box::new(MockSubScheduler::new(vec![])) as Box<dyn Scheduler + Send>,
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()])) as Box<dyn Scheduler>,
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()])) as Box<dyn Scheduler>,
+            Box::new(MockSubScheduler::new(vec![])) as Box<dyn Scheduler>,
         ];
         let mut sub_scheduler_handler = MockSubSchedulerHandler::new();
         let mut multi_scheduler = MultiScheduler::new(sub_schedulers, &mut sub_scheduler_handler)
@@ -551,17 +549,17 @@ mod tests {
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 invalid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
             Box::new(MockSubScheduler::new(vec![
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 valid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
             Box::new(MockSubScheduler::new(vec![
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 valid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
         ];
 
         let mut sub_scheduler_handler = MockSubSchedulerHandler::new();

@@ -151,7 +151,7 @@ impl std::fmt::Display for SchedulerError {
 }
 
 /// Schedules batches and transactions and returns execution results.
-pub trait Scheduler {
+pub trait Scheduler: Send {
     /// Sets a callback to receive results from processing batches. The order
     /// the results are received is not guarenteed to be the same order as the
     /// batches were added with `add_batch`. If callback is called with None,
