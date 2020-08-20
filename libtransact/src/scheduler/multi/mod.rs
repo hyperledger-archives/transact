@@ -24,7 +24,8 @@ mod shared;
 
 use crate::protocol::batch::BatchPair;
 use crate::scheduler::{
-    BatchExecutionResult, ExecutionTask, ExecutionTaskCompletionNotifier, Scheduler, SchedulerError,
+    BatchExecutionResult, ExecutionTask, ExecutionTaskCompletionNotifier, Scheduler,
+    SchedulerError, SchedulerFactory,
 };
 
 use std::sync::mpsc;
@@ -222,6 +223,46 @@ impl Scheduler for MultiScheduler {
         // The MultiScheduler passes all sub-schedulers' notifiers directly to the
         // SubSchedulerHandler except for the first sub-scheduler's, which it returns here.
         self.shared_lock.lock()?.schedulers_mut()[0].new_notifier()
+    }
+}
+
+/// Factory for creating `MultiScheduler`s
+pub struct MultiSchedulerFactory {
+    sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
+    sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+}
+
+impl MultiSchedulerFactory {
+    /// Creates a new `MultiSchedulerFactory`
+    ///
+    /// # Arguments
+    ///
+    /// `sub_scheduler_factories` - List of factories for creating subschedulers, along with number
+    /// of schedulers to create from each factory
+    /// `sub_scheduler_handler` - The handler that will execute transactions for the sub-schedulers
+    pub fn new(
+        sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
+        sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+    ) -> Self {
+        Self {
+            sub_scheduler_factories,
+            sub_scheduler_handler,
+        }
+    }
+}
+
+impl SchedulerFactory for MultiSchedulerFactory {
+    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
+        let schedulers = self
+            .sub_scheduler_factories
+            .iter_mut()
+            .flat_map(|(factory, num)| {
+                let state_id = state_id.clone();
+                (0..*num).map(move |_| factory.create_scheduler(state_id.clone()))
+            })
+            .collect::<Result<_, _>>()?;
+        MultiScheduler::new(schedulers, &mut *self.sub_scheduler_handler)
+            .map(|scheduler| Box::new(scheduler) as Box<dyn Scheduler>)
     }
 }
 

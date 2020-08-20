@@ -23,15 +23,15 @@ mod shared;
 
 use crate::context::ContextLifecycle;
 use crate::protocol::batch::BatchPair;
-use crate::scheduler::BatchExecutionResult;
-use crate::scheduler::ExecutionTask;
-use crate::scheduler::ExecutionTaskCompletionNotifier;
-use crate::scheduler::Scheduler;
-use crate::scheduler::SchedulerError;
 
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
+
+use super::{
+    BatchExecutionResult, ExecutionTask, ExecutionTaskCompletionNotifier, Scheduler,
+    SchedulerError, SchedulerFactory,
+};
 
 // If the shared lock is poisoned, report an internal error since the scheduler cannot recover.
 impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, shared::Shared>>> for SchedulerError {
@@ -174,6 +174,25 @@ impl Scheduler for SerialScheduler {
         Ok(Box::new(
             execution::SerialExecutionTaskCompletionNotifier::new(self.core_tx.clone()),
         ))
+    }
+}
+
+/// Factory for creating `SerialScheduler`s
+pub struct SerialSchedulerFactory {
+    context_lifecycle: Box<dyn ContextLifecycle>,
+}
+
+impl SerialSchedulerFactory {
+    /// Creates a new `SerialSchedulerFactory` that uses the given `context_lifecycle`
+    pub fn new(context_lifecycle: Box<dyn ContextLifecycle>) -> Self {
+        Self { context_lifecycle }
+    }
+}
+
+impl SchedulerFactory for SerialSchedulerFactory {
+    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
+        SerialScheduler::new(self.context_lifecycle.clone(), state_id)
+            .map(|scheduler| Box::new(scheduler) as Box<dyn Scheduler>)
     }
 }
 
