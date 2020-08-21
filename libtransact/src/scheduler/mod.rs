@@ -445,7 +445,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 
@@ -488,7 +493,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 
@@ -569,7 +579,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 

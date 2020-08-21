@@ -284,8 +284,6 @@ mod xo_compat_test {
                 .expect("Unable to receive result from executor")
                 .expect("Should not have received None from the executor");
 
-            scheduler.shutdown();
-
             assert_state_changes(
                 vec![StateChange::Set {
                     key: calculate_game_address("my_game"),
@@ -357,8 +355,6 @@ mod xo_compat_test {
                 .recv()
                 .expect("Unable to receive result from executor")
                 .expect("Should not have received None from the executor");
-
-            scheduler.shutdown();
 
             assert_state_changes(
                 vec![StateChange::Set {

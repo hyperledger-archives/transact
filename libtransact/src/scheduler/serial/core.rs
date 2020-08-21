@@ -59,10 +59,6 @@ pub enum CoreMessage {
 
     /// An indicator to the `SchedulerCore` thread that the scheduler has been finalized
     Finalized,
-
-    /// An indicator to the `SchedulerCore` thread that it should exit its
-    /// loop.
-    Shutdown,
 }
 
 #[derive(Debug)]
@@ -176,13 +172,14 @@ impl SchedulerCore {
         }
     }
 
-    fn try_schedule_next(&mut self) -> Result<(), CoreError> {
+    /// Returns `true` if the scheduler should shutdown; returns `false` otherwise.
+    fn try_schedule_next(&mut self) -> Result<bool, CoreError> {
         if !self.next_ready {
-            return Ok(());
+            return Ok(false);
         }
 
         if self.current_txn.is_some() {
-            return Ok(());
+            return Ok(false);
         }
 
         if self.current_batch.is_none() {
@@ -195,11 +192,12 @@ impl SchedulerCore {
                 }
                 None => {
                     // If the scheduler is finalized, no more batches will be added; send a `None`
-                    // result to let the calling code know that all results have been sent.
+                    // result to let the calling code know that all results have been sent, then
+                    // return `true` to indicate that the scheduler should shutdown.
                     if shared.finalized() {
                         shared.result_callback()(None);
                     }
-                    return Ok(());
+                    return Ok(true);
                 }
             }
         }
@@ -223,7 +221,7 @@ impl SchedulerCore {
                     error_data: vec![],
                 })?;
                 self.send_batch_result()?;
-                return Ok(());
+                return Ok(false);
             }
         };
 
@@ -239,7 +237,7 @@ impl SchedulerCore {
             .send(Some(ExecutionTask::new(transaction_pair, context_id)))?;
         self.next_ready = false;
 
-        Ok(())
+        Ok(false)
     }
 
     fn invalidate_current_batch(
@@ -335,7 +333,9 @@ impl SchedulerCore {
         loop {
             match self.rx.recv() {
                 Ok(CoreMessage::BatchAdded) => {
-                    self.try_schedule_next()?;
+                    if self.try_schedule_next()? {
+                        break;
+                    }
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
                     let current_txn_id = self.current_txn.clone().unwrap_or_else(|| "".into());
@@ -370,7 +370,9 @@ impl SchedulerCore {
                         self.send_batch_result()?;
                     }
 
-                    self.try_schedule_next()?;
+                    if self.try_schedule_next()? {
+                        break;
+                    }
                 }
                 Ok(CoreMessage::Next) => {
                     // If the scheduler is finalized, there are no unscheduled batches, and there
@@ -388,7 +390,10 @@ impl SchedulerCore {
                     }
 
                     self.next_ready = true;
-                    self.try_schedule_next()?;
+
+                    if self.try_schedule_next()? {
+                        break;
+                    }
                 }
                 Ok(CoreMessage::Cancelled(sender)) => {
                     // If a batch is currently executing, return it using the provided sender
@@ -411,15 +416,12 @@ impl SchedulerCore {
                 Ok(CoreMessage::Finalized) => {
                     // If there are no unscheduled batches and no batch is currently executing, the
                     // scheduler is done; send a `None` result to let the calling code know that
-                    // all results have been sent.
+                    // all results have been sent, then shutdown.
                     let shared = self.shared_lock.lock()?;
                     if self.current_batch.is_none() && shared.unscheduled_batches_is_empty() {
                         shared.result_callback()(None);
                         break;
                     }
-                }
-                Ok(CoreMessage::Shutdown) => {
-                    break;
                 }
                 Err(err) => {
                     // This is expected if the other side shuts down

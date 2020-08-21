@@ -33,8 +33,6 @@ pub enum MultiSchedulerCoreMessage {
     BatchResult(usize, Option<BatchExecutionResult>),
     /// The sub-scheduler at the given index in the sub-schedulers list encountered an error
     SubSchedulerError(usize, SchedulerError),
-    /// An indicator to the `SchedulerCore` thread that it should exit its loop.
-    Shutdown,
 }
 
 pub struct MultiSchedulerCore {
@@ -167,9 +165,6 @@ impl MultiSchedulerCore {
                         "scheduler {} encountered error: {}",
                         scheduler_index, err,
                     )));
-                }
-                Ok(MultiSchedulerCoreMessage::Shutdown) => {
-                    break;
                 }
                 Err(err) => {
                     // This is expected if the other side shuts down

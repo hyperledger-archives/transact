@@ -29,7 +29,6 @@ use crate::scheduler::{
 };
 
 use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 // If the shared lock is poisoned, report an internal error since the scheduler cannot recover.
@@ -67,8 +66,6 @@ pub trait SubSchedulerHandler {
 /// A `Scheduler` implementation which runs multiple sub-schedulers.
 pub struct MultiScheduler {
     shared_lock: Arc<Mutex<shared::MultiSchedulerShared>>,
-    core_handle: Option<std::thread::JoinHandle<()>>,
-    core_tx: Sender<core::MultiSchedulerCoreMessage>,
 }
 
 impl MultiScheduler {
@@ -146,30 +143,9 @@ impl MultiScheduler {
 
         let shared_lock = Arc::new(Mutex::new(shared::MultiSchedulerShared::new(schedulers)));
 
-        let core_handle = core::MultiSchedulerCore::new(shared_lock.clone(), core_rx).start()?;
+        core::MultiSchedulerCore::new(shared_lock.clone(), core_rx).start()?;
 
-        Ok(MultiScheduler {
-            shared_lock,
-            core_handle: Some(core_handle),
-            core_tx,
-        })
-    }
-
-    pub fn shutdown(mut self) {
-        match self.core_tx.send(core::MultiSchedulerCoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().unwrap_or_else(|err| {
-                        // This should not never happen, because the core thread should never panic
-                        error!(
-                            "failed to join scheduler thread because it panicked: {:?}",
-                            err
-                        )
-                    });
-                }
-            }
-            Err(err) => warn!("failed to send to scheduler thread during drop: {}", err),
-        }
+        Ok(MultiScheduler { shared_lock })
     }
 }
 
@@ -459,7 +435,8 @@ mod tests {
             .expect("shared lock is poisoned")
             .batch_already_pending(&batch));
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_cancel`, this test
@@ -483,7 +460,8 @@ mod tests {
             .pending_results()
             .is_empty());
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_finalize`, this test
@@ -507,18 +485,11 @@ mod tests {
             .expect("shared lock is poisoned")
             .finalized());
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     // MultiScheduler-specific tests
-
-    /// This test will hang if join() fails within the scheduler.
-    #[test]
-    fn test_scheduler_thread_cleanup() {
-        MultiScheduler::new(vec![], &mut MockSubSchedulerHandler::new())
-            .expect("Failed to create scheduler")
-            .shutdown();
-    }
 
     /// This test verifies that when all sub-schedulers report that they are done, but one or more
     /// sub-scheduler(s) did not return a result for a batch, the MultiScheduler returns an error
@@ -568,7 +539,8 @@ mod tests {
             e => panic!("Wrong error type received: {:?}", e),
         }
 
-        multi_scheduler.shutdown();
+        // Scheduler has been finalized and all sub-schedulers have completed, so scheduler has
+        // already shutdown
     }
 
     /// This test verifies that the MultiScheduler properly returns results (valid and invalid)
@@ -626,7 +598,12 @@ mod tests {
         let (result_tx, result_rx) = mpsc::channel();
         multi_scheduler
             .set_result_callback(Box::new(move |result| {
-                result_tx.send(result).expect("Failed to send result");
+                // The scheduler will be finalized/cancelled later, at which point the scheduler
+                // will send a `None` result, but the receiver may already have been dropped at that
+                // point.
+                if result.is_some() {
+                    result_tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
         let (error_tx, error_rx) = mpsc::channel();
@@ -654,6 +631,7 @@ mod tests {
             e => panic!("Wrong error type received: {:?}", e),
         }
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 }

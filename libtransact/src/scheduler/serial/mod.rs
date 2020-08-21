@@ -54,7 +54,6 @@ impl From<std::sync::mpsc::SendError<core::CoreMessage>> for SchedulerError {
 /// one at a time.
 pub struct SerialScheduler {
     shared_lock: Arc<Mutex<shared::Shared>>,
-    core_handle: Option<std::thread::JoinHandle<()>>,
     core_tx: Sender<core::CoreMessage>,
     task_iterator: Option<Box<dyn Iterator<Item = ExecutionTask> + Send>>,
 }
@@ -71,7 +70,7 @@ impl SerialScheduler {
         let shared_lock = Arc::new(Mutex::new(shared::Shared::new()));
 
         // Start the thread to accept and process CoreMessage messages
-        let core_handle = core::SchedulerCore::new(
+        core::SchedulerCore::new(
             shared_lock.clone(),
             core_rx,
             execution_tx,
@@ -82,32 +81,12 @@ impl SerialScheduler {
 
         Ok(SerialScheduler {
             shared_lock,
-            core_handle: Some(core_handle),
             core_tx: core_tx.clone(),
             task_iterator: Some(Box::new(execution::SerialExecutionTaskIterator::new(
                 core_tx,
                 execution_rx,
             ))),
         })
-    }
-
-    pub fn shutdown(mut self) {
-        match self.core_tx.send(core::CoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().unwrap_or_else(|err| {
-                        // This should not never happen, because the core thread should never panic
-                        error!(
-                            "failed to join scheduler thread because it panicked: {:?}",
-                            err
-                        )
-                    });
-                }
-            }
-            Err(err) => {
-                warn!("failed to send to scheduler thread during drop: {}", err);
-            }
-        }
     }
 }
 
@@ -237,7 +216,8 @@ mod tests {
             .expect("shared lock is poisoned")
             .batch_already_queued(&batch));
 
-        scheduler.shutdown();
+        scheduler.cancel().expect("Failed to cancel");
+        scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_cancel`, this test
@@ -257,7 +237,8 @@ mod tests {
             .expect("shared lock is poisoned")
             .unscheduled_batches_is_empty());
 
-        scheduler.shutdown();
+        scheduler.cancel().expect("Failed to cancel");
+        scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_finalize`, this test
@@ -277,7 +258,7 @@ mod tests {
             .expect("shared lock is poisoned")
             .finalized());
 
-        scheduler.shutdown();
+        // Scheduler was finalized with no batches, so it has already shutdown
     }
 
     /// Tests that the serial scheduler can process a batch with a single transaction.
@@ -288,7 +269,9 @@ mod tests {
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_flow_with_one_transaction(&mut scheduler);
-        scheduler.shutdown();
+
+        scheduler.cancel().expect("Failed to cancel");
+        scheduler.finalize().expect("Failed to finalize");
     }
 
     /// Tests that the serial scheduler can process a batch with multiple transactions.
@@ -299,7 +282,9 @@ mod tests {
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_flow_with_multiple_transactions(&mut scheduler);
-        scheduler.shutdown();
+
+        scheduler.cancel().expect("Failed to cancel");
+        scheduler.finalize().expect("Failed to finalize");
     }
 
     /// Tests that the serial scheduler invalidates the whole batch when one of its transactions is
@@ -311,20 +296,12 @@ mod tests {
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_invalid_transaction_invalidates_batch(&mut scheduler);
-        scheduler.shutdown();
+
+        scheduler.cancel().expect("Failed to cancel");
+        scheduler.finalize().expect("Failed to finalize");
     }
 
     // SerialScheduler-specific tests
-
-    /// This test will hang if join() fails within the scheduler.
-    #[test]
-    fn test_scheduler_thread_cleanup() {
-        let state_id = String::from("state0");
-        let context_lifecycle = Box::new(MockContextLifecycle::new());
-        SerialScheduler::new(context_lifecycle, state_id)
-            .expect("Failed to create scheduler")
-            .shutdown();
-    }
 
     /// This test verifies that the SerialScheduler executes transactions strictly in order, and
     /// does not return the next execution task until the previous one is completed.
@@ -427,6 +404,7 @@ mod tests {
             }
         }
 
-        scheduler.shutdown();
+        // Scheduler was finalized and all batches/transactions have "executed", so it has already
+        // shutdown
     }
 }
