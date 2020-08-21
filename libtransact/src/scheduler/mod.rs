@@ -172,10 +172,10 @@ pub trait Scheduler: Send {
     /// Adds a BatchPair to the scheduler.
     fn add_batch(&mut self, batch: BatchPair) -> Result<(), SchedulerError>;
 
-    /// Drops any unscheduled transactions from this scheduler. Any already
-    /// scheduled transactions will continue to execute.
+    /// Drops any unexecuted batches from this scheduler and immediately aborts any batches that are
+    /// currently executing.
     ///
-    /// Returns a `Vec` of the dropped `BatchPair`s.
+    /// Returns a `Vec` of the unscheduled and aborted `BatchPair`s.
     fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError>;
 
     /// Finalizes the scheduler, which will disable the ability to add more
@@ -622,35 +622,5 @@ mod tests {
             .collect::<Vec<_>>()
             .sort_unstable();
         assert_eq!(original_batch_txn_ids, receipt_txn_ids);
-    }
-
-    // Send a result to the scheduler for a transaction that it is not processing; verify that an
-    // `UnexpectedNotification` is sent using the error callback.
-    pub fn test_scheduler_unexpected_notification(scheduler: &mut dyn Scheduler) {
-        // Use a channel to pass the error to this test
-        let (tx, rx) = mpsc::channel();
-        scheduler
-            .set_error_callback(Box::new(move |err| {
-                tx.send(err).expect("Failed to send error");
-            }))
-            .expect("Failed to set error callback");
-
-        // Simulate retrieving the unexpected notification
-        let txn_id = "mock-id".to_string();
-        let notifier = scheduler
-            .new_notifier()
-            .expect("Failed to get new notifier");
-        notifier.notify(ExecutionTaskCompletionNotification::Valid(
-            mock_context_id(),
-            txn_id.clone(),
-        ));
-
-        // Verify that the error is returned
-        match rx.recv().expect("Failed to receive result") {
-            SchedulerError::UnexpectedNotification(unexpected_id) => {
-                assert_eq!(unexpected_id, txn_id)
-            }
-            err => panic!("Received unexpected error: {}", err),
-        }
     }
 }

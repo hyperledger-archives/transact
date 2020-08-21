@@ -153,7 +153,23 @@ impl Scheduler for SerialScheduler {
     }
 
     fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError> {
-        Ok(self.shared_lock.lock()?.drain_unscheduled_batches())
+        let mut unscheduled_batches = self.shared_lock.lock()?.drain_unscheduled_batches();
+
+        // Notify the core thread to cancel and wait for it to return an aborted batch
+        let (sender, receiver) = mpsc::channel();
+        self.core_tx.send(core::CoreMessage::Cancelled(sender))?;
+        let aborted_batch = receiver.recv().map_err(|_| {
+            SchedulerError::Internal("scheduler's core thread did not return aborted batch".into())
+        })?;
+
+        // If there was an aborted batch, add it to the front of the list of unscheduled batches
+        if let Some(batch) = aborted_batch {
+            let mut new_list = vec![batch];
+            new_list.append(&mut unscheduled_batches);
+            unscheduled_batches = new_list;
+        }
+
+        Ok(unscheduled_batches)
     }
 
     fn finalize(&mut self) -> Result<(), SchedulerError> {
@@ -295,18 +311,6 @@ mod tests {
         let mut scheduler =
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
         test_scheduler_invalid_transaction_invalidates_batch(&mut scheduler);
-        scheduler.shutdown();
-    }
-
-    /// Tests that the serial scheduler returns the appropriate error via the error callback when
-    /// an unexpected task completion notification is received.
-    #[test]
-    pub fn test_serial_scheduler_unexpected_notification() {
-        let state_id = String::from("state0");
-        let context_lifecycle = Box::new(MockContextLifecycle::new());
-        let mut scheduler =
-            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
-        test_scheduler_unexpected_notification(&mut scheduler);
         scheduler.shutdown();
     }
 

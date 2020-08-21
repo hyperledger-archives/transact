@@ -52,6 +52,11 @@ pub enum CoreMessage {
     /// ExecuteTask message.
     Next,
 
+    /// An indicator to the `SchedulerCore` thread that the scheduler has been cancelled; if a
+    /// batch is currently executing, it should be aborted and batch returned using the given
+    /// sender.
+    Cancelled(Sender<Option<BatchPair>>),
+
     /// An indicator to the `SchedulerCore` thread that the scheduler has been finalized
     Finalized,
 
@@ -384,6 +389,14 @@ impl SchedulerCore {
 
                     self.next_ready = true;
                     self.try_schedule_next()?;
+                }
+                Ok(CoreMessage::Cancelled(sender)) => {
+                    // If a batch is currently executing, return it using the provided sender
+                    sender.send(self.current_batch.take()).map_err(|_| {
+                        CoreError::Internal("aborted batch receiver dropped".into())
+                    })?;
+                    // Also remove the current transaction
+                    self.current_txn.take();
                 }
                 Ok(CoreMessage::Finalized) => {
                     // If there are no unscheduled batches and no batch is currently executing, the
