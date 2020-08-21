@@ -151,6 +151,19 @@ impl std::fmt::Display for SchedulerError {
 }
 
 /// Schedules batches and transactions and returns execution results.
+///
+/// # Cleanup
+///
+/// Implementations of the `Scheduler` trait may need to perform some cleanup before they are
+/// dropped (shutting down background threads, for example). If required, implementors of this trait
+/// should perform cleanup when the scheduler is finalized and all batch results have been sent
+/// using the result callback. This will happen for a finalized scheduler when all scheduled batches
+/// are executed, or when the finalized scheduler is cancelled.
+///
+/// This ensures that the scheduler returns all batches to the caller before cleaning itself up.
+/// Consumers of this trait must ensure that the scheduler is finalized and all batch results have
+/// been received (by cancelling and/or waiting for a `None` result on the callback) before dropping
+/// the scheduler, otherwise system resources may be leaked.
 pub trait Scheduler: Send {
     /// Sets a callback to receive results from processing batches. The order
     /// the results are received is not guarenteed to be the same order as the
@@ -173,7 +186,8 @@ pub trait Scheduler: Send {
     fn add_batch(&mut self, batch: BatchPair) -> Result<(), SchedulerError>;
 
     /// Drops any unexecuted batches from this scheduler and immediately aborts any batches that are
-    /// currently executing.
+    /// currently executing. If already finalized, the scheduler should indicate that no more batch
+    /// results will be sent by passing a `None` result to the callback.
     ///
     /// Returns a `Vec` of the unscheduled and aborted `BatchPair`s.
     fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError>;

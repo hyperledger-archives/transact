@@ -397,6 +397,16 @@ impl SchedulerCore {
                     })?;
                     // Also remove the current transaction
                     self.current_txn.take();
+
+                    // If already finalized, the scheduler can shutdown because no more batches will
+                    // be added
+                    let shared = self.shared_lock.lock()?;
+                    if shared.finalized() {
+                        // Send a `None` result before shutting down to let the caller know that all
+                        // batches have been completed or descheduled
+                        shared.result_callback()(None);
+                        break;
+                    }
                 }
                 Ok(CoreMessage::Finalized) => {
                     // If there are no unscheduled batches and no batch is currently executing, the

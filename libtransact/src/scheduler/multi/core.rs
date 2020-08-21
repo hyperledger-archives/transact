@@ -79,19 +79,20 @@ impl MultiSchedulerCore {
                             // If a sub-scheduler returns a None result, it has completed all of
                             // its batches
                             self.done_schedulers.insert(scheduler_index);
-                            // If all sub-schedulers are done, make sure all pending results have
-                            // been returned, then return None result to indicate MultiScheduler is
-                            // done.
+                            // If all sub-schedulers are done, return `None` result to indicate that
+                            // the MultiScheduler is also done.
                             if self.done_schedulers.len() == num_schedulers {
+                                // All pending results should have been returned if they executed
+                                // or drained if the scheduler was cancelled; if not, a subscheduler
+                                // must have failed to return an execution result.
                                 if !shared.pending_results().is_empty() {
                                     shared.error_callback()(SchedulerError::Internal(format!(
                                         "all sub-schedulers are done, but some results not \
                                          returned: {:?}",
                                         shared.pending_results(),
                                     )));
-                                } else {
-                                    shared.result_callback()(None);
                                 }
+                                shared.result_callback()(None);
                                 break;
                             }
                             continue;
