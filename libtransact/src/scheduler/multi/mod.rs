@@ -52,7 +52,7 @@ impl From<std::sync::mpsc::SendError<core::MultiSchedulerCoreMessage>> for Sched
 
 /// The MultiScheduler will send the task iterators and notifiers of its sub-schedulers to the
 /// struct that implements this trait.
-pub trait SubSchedulerHandler {
+pub trait SubSchedulerHandler: Send {
     /// Gives the task iterator and notifier of a sub-scheduler to the sub-scheduler handler; the
     /// sub-scheduler handler will get tasks directly from the sub-scheduler and send task
     /// execution reults back to the sub-scheduler.
