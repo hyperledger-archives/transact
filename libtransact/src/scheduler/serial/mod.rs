@@ -185,7 +185,7 @@ impl SerialSchedulerFactory {
 }
 
 impl SchedulerFactory for SerialSchedulerFactory {
-    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
+    fn create_scheduler(&self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
         SerialScheduler::new(self.context_lifecycle.clone(), state_id)
             .map(|scheduler| Box::new(scheduler) as Box<dyn Scheduler>)
     }

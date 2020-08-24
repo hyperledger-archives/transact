@@ -209,9 +209,9 @@ pub trait Scheduler: Send {
 }
 
 /// Creates new schedulers
-pub trait SchedulerFactory {
+pub trait SchedulerFactory: Send {
     /// Returns a new scheduler with the given state ID
-    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError>;
+    fn create_scheduler(&self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError>;
 }
 
 /// Allows sending a notification to the scheduler that execution of a task
