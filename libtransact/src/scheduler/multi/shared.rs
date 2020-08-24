@@ -35,11 +35,11 @@ pub struct MultiSchedulerShared {
     /// Tracks which sub-schedulers have returned results for the given batch pair.
     pending_results: HashMap<BatchPair, HashMap<usize, BatchExecutionResult>>,
     /// The sub-schedulers of this MultiScheduler.
-    schedulers: Vec<Box<dyn Scheduler + Send>>,
+    schedulers: Vec<Box<dyn Scheduler>>,
 }
 
 impl MultiSchedulerShared {
-    pub fn new(schedulers: Vec<Box<dyn Scheduler + Send>>) -> Self {
+    pub fn new(schedulers: Vec<Box<dyn Scheduler>>) -> Self {
         MultiSchedulerShared {
             finalized: false,
             result_callback: Box::new(default_result_callback),
@@ -122,11 +122,11 @@ impl MultiSchedulerShared {
         &mut self.pending_results
     }
 
-    pub fn schedulers(&self) -> &Vec<Box<dyn Scheduler + Send>> {
+    pub fn schedulers(&self) -> &Vec<Box<dyn Scheduler>> {
         &self.schedulers
     }
 
-    pub fn schedulers_mut(&mut self) -> &mut Vec<Box<dyn Scheduler + Send>> {
+    pub fn schedulers_mut(&mut self) -> &mut Vec<Box<dyn Scheduler>> {
         &mut self.schedulers
     }
 }

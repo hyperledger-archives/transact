@@ -151,7 +151,20 @@ impl std::fmt::Display for SchedulerError {
 }
 
 /// Schedules batches and transactions and returns execution results.
-pub trait Scheduler {
+///
+/// # Cleanup
+///
+/// Implementations of the `Scheduler` trait may need to perform some cleanup before they are
+/// dropped (shutting down background threads, for example). If required, implementors of this trait
+/// should perform cleanup when the scheduler is finalized and all batch results have been sent
+/// using the result callback. This will happen for a finalized scheduler when all scheduled batches
+/// are executed, or when the finalized scheduler is cancelled.
+///
+/// This ensures that the scheduler returns all batches to the caller before cleaning itself up.
+/// Consumers of this trait must ensure that the scheduler is finalized and all batch results have
+/// been received (by cancelling and/or waiting for a `None` result on the callback) before dropping
+/// the scheduler, otherwise system resources may be leaked.
+pub trait Scheduler: Send {
     /// Sets a callback to receive results from processing batches. The order
     /// the results are received is not guarenteed to be the same order as the
     /// batches were added with `add_batch`. If callback is called with None,
@@ -172,10 +185,11 @@ pub trait Scheduler {
     /// Adds a BatchPair to the scheduler.
     fn add_batch(&mut self, batch: BatchPair) -> Result<(), SchedulerError>;
 
-    /// Drops any unscheduled transactions from this scheduler. Any already
-    /// scheduled transactions will continue to execute.
+    /// Drops any unexecuted batches from this scheduler and immediately aborts any batches that are
+    /// currently executing. If already finalized, the scheduler should indicate that no more batch
+    /// results will be sent by passing a `None` result to the callback.
     ///
-    /// Returns a `Vec` of the dropped `BatchPair`s.
+    /// Returns a `Vec` of the unscheduled and aborted `BatchPair`s.
     fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError>;
 
     /// Finalizes the scheduler, which will disable the ability to add more
@@ -192,6 +206,12 @@ pub trait Scheduler {
     /// sending a notification to the scheduler that indicates the task has
     /// been executed.
     fn new_notifier(&mut self) -> Result<Box<dyn ExecutionTaskCompletionNotifier>, SchedulerError>;
+}
+
+/// Creates new schedulers
+pub trait SchedulerFactory {
+    /// Returns a new scheduler with the given state ID
+    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError>;
 }
 
 /// Allows sending a notification to the scheduler that execution of a task
@@ -425,7 +445,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 
@@ -468,7 +493,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 
@@ -549,7 +579,12 @@ mod tests {
         let (tx, rx) = mpsc::channel();
         scheduler
             .set_result_callback(Box::new(move |result| {
-                tx.send(result).expect("Failed to send result");
+                // The scheduler should be finalized/cancelled by the test that calls this method;
+                // when that happens, the scheduler will send a `None` result, but the receiver will
+                // already have been dropped.
+                if result.is_some() {
+                    tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
 
@@ -616,35 +651,5 @@ mod tests {
             .collect::<Vec<_>>()
             .sort_unstable();
         assert_eq!(original_batch_txn_ids, receipt_txn_ids);
-    }
-
-    // Send a result to the scheduler for a transaction that it is not processing; verify that an
-    // `UnexpectedNotification` is sent using the error callback.
-    pub fn test_scheduler_unexpected_notification(scheduler: &mut dyn Scheduler) {
-        // Use a channel to pass the error to this test
-        let (tx, rx) = mpsc::channel();
-        scheduler
-            .set_error_callback(Box::new(move |err| {
-                tx.send(err).expect("Failed to send error");
-            }))
-            .expect("Failed to set error callback");
-
-        // Simulate retrieving the unexpected notification
-        let txn_id = "mock-id".to_string();
-        let notifier = scheduler
-            .new_notifier()
-            .expect("Failed to get new notifier");
-        notifier.notify(ExecutionTaskCompletionNotification::Valid(
-            mock_context_id(),
-            txn_id.clone(),
-        ));
-
-        // Verify that the error is returned
-        match rx.recv().expect("Failed to receive result") {
-            SchedulerError::UnexpectedNotification(unexpected_id) => {
-                assert_eq!(unexpected_id, txn_id)
-            }
-            err => panic!("Received unexpected error: {}", err),
-        }
     }
 }

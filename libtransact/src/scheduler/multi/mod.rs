@@ -24,11 +24,11 @@ mod shared;
 
 use crate::protocol::batch::BatchPair;
 use crate::scheduler::{
-    BatchExecutionResult, ExecutionTask, ExecutionTaskCompletionNotifier, Scheduler, SchedulerError,
+    BatchExecutionResult, ExecutionTask, ExecutionTaskCompletionNotifier, Scheduler,
+    SchedulerError, SchedulerFactory,
 };
 
 use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 
 // If the shared lock is poisoned, report an internal error since the scheduler cannot recover.
@@ -66,14 +66,12 @@ pub trait SubSchedulerHandler {
 /// A `Scheduler` implementation which runs multiple sub-schedulers.
 pub struct MultiScheduler {
     shared_lock: Arc<Mutex<shared::MultiSchedulerShared>>,
-    core_handle: Option<std::thread::JoinHandle<()>>,
-    core_tx: Sender<core::MultiSchedulerCoreMessage>,
 }
 
 impl MultiScheduler {
     /// Returns a newly created `MultiScheduler` that runs the specified sub-schedulers.
     pub fn new(
-        mut schedulers: Vec<Box<dyn Scheduler + Send>>,
+        mut schedulers: Vec<Box<dyn Scheduler>>,
         sub_scheduler_handler: &mut dyn SubSchedulerHandler,
     ) -> Result<MultiScheduler, SchedulerError> {
         let (core_tx, core_rx) = mpsc::channel();
@@ -145,30 +143,9 @@ impl MultiScheduler {
 
         let shared_lock = Arc::new(Mutex::new(shared::MultiSchedulerShared::new(schedulers)));
 
-        let core_handle = core::MultiSchedulerCore::new(shared_lock.clone(), core_rx).start()?;
+        core::MultiSchedulerCore::new(shared_lock.clone(), core_rx).start()?;
 
-        Ok(MultiScheduler {
-            shared_lock,
-            core_handle: Some(core_handle),
-            core_tx,
-        })
-    }
-
-    pub fn shutdown(mut self) {
-        match self.core_tx.send(core::MultiSchedulerCoreMessage::Shutdown) {
-            Ok(_) => {
-                if let Some(join_handle) = self.core_handle.take() {
-                    join_handle.join().unwrap_or_else(|err| {
-                        // This should not never happen, because the core thread should never panic
-                        error!(
-                            "failed to join scheduler thread because it panicked: {:?}",
-                            err
-                        )
-                    });
-                }
-            }
-            Err(err) => warn!("failed to send to scheduler thread during drop: {}", err),
-        }
+        Ok(MultiScheduler { shared_lock })
     }
 }
 
@@ -222,6 +199,46 @@ impl Scheduler for MultiScheduler {
         // The MultiScheduler passes all sub-schedulers' notifiers directly to the
         // SubSchedulerHandler except for the first sub-scheduler's, which it returns here.
         self.shared_lock.lock()?.schedulers_mut()[0].new_notifier()
+    }
+}
+
+/// Factory for creating `MultiScheduler`s
+pub struct MultiSchedulerFactory {
+    sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
+    sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+}
+
+impl MultiSchedulerFactory {
+    /// Creates a new `MultiSchedulerFactory`
+    ///
+    /// # Arguments
+    ///
+    /// `sub_scheduler_factories` - List of factories for creating subschedulers, along with number
+    /// of schedulers to create from each factory
+    /// `sub_scheduler_handler` - The handler that will execute transactions for the sub-schedulers
+    pub fn new(
+        sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
+        sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+    ) -> Self {
+        Self {
+            sub_scheduler_factories,
+            sub_scheduler_handler,
+        }
+    }
+}
+
+impl SchedulerFactory for MultiSchedulerFactory {
+    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
+        let schedulers = self
+            .sub_scheduler_factories
+            .iter_mut()
+            .flat_map(|(factory, num)| {
+                let state_id = state_id.clone();
+                (0..*num).map(move |_| factory.create_scheduler(state_id.clone()))
+            })
+            .collect::<Result<_, _>>()?;
+        MultiScheduler::new(schedulers, &mut *self.sub_scheduler_handler)
+            .map(|scheduler| Box::new(scheduler) as Box<dyn Scheduler>)
     }
 }
 
@@ -389,7 +406,7 @@ mod tests {
     ) -> MultiScheduler {
         let sub_schedulers = sub_schedulers
             .iter()
-            .map(|sub_scheduler| sub_scheduler.clone() as Box<dyn Scheduler + Send>)
+            .map(|sub_scheduler| sub_scheduler.clone() as Box<dyn Scheduler>)
             .collect();
         MultiScheduler::new(sub_schedulers, &mut MockSubSchedulerHandler::new())
             .expect("Failed to create scheduler")
@@ -418,7 +435,8 @@ mod tests {
             .expect("shared lock is poisoned")
             .batch_already_pending(&batch));
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_cancel`, this test
@@ -442,7 +460,8 @@ mod tests {
             .pending_results()
             .is_empty());
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     /// In addition to the basic functionality verified by `test_scheduler_finalize`, this test
@@ -466,18 +485,11 @@ mod tests {
             .expect("shared lock is poisoned")
             .finalized());
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 
     // MultiScheduler-specific tests
-
-    /// This test will hang if join() fails within the scheduler.
-    #[test]
-    fn test_scheduler_thread_cleanup() {
-        MultiScheduler::new(vec![], &mut MockSubSchedulerHandler::new())
-            .expect("Failed to create scheduler")
-            .shutdown();
-    }
 
     /// This test verifies that when all sub-schedulers report that they are done, but one or more
     /// sub-scheduler(s) did not return a result for a batch, the MultiScheduler returns an error
@@ -488,11 +500,9 @@ mod tests {
 
         // The first sub-scheduler doens't have a result for the batch
         let sub_schedulers = vec![
-            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
-                as Box<dyn Scheduler + Send>,
-            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()]))
-                as Box<dyn Scheduler + Send>,
-            Box::new(MockSubScheduler::new(vec![])) as Box<dyn Scheduler + Send>,
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()])) as Box<dyn Scheduler>,
+            Box::new(MockSubScheduler::new(vec![valid_receipt.clone()])) as Box<dyn Scheduler>,
+            Box::new(MockSubScheduler::new(vec![])) as Box<dyn Scheduler>,
         ];
         let mut sub_scheduler_handler = MockSubSchedulerHandler::new();
         let mut multi_scheduler = MultiScheduler::new(sub_schedulers, &mut sub_scheduler_handler)
@@ -529,7 +539,8 @@ mod tests {
             e => panic!("Wrong error type received: {:?}", e),
         }
 
-        multi_scheduler.shutdown();
+        // Scheduler has been finalized and all sub-schedulers have completed, so scheduler has
+        // already shutdown
     }
 
     /// This test verifies that the MultiScheduler properly returns results (valid and invalid)
@@ -551,17 +562,17 @@ mod tests {
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 invalid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
             Box::new(MockSubScheduler::new(vec![
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 valid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
             Box::new(MockSubScheduler::new(vec![
                 valid_receipt_batch_0.clone(),
                 invalid_receipt_batch_1.clone(),
                 valid_receipt_batch_2.clone(),
-            ])) as Box<dyn Scheduler + Send>,
+            ])) as Box<dyn Scheduler>,
         ];
 
         let mut sub_scheduler_handler = MockSubSchedulerHandler::new();
@@ -587,7 +598,12 @@ mod tests {
         let (result_tx, result_rx) = mpsc::channel();
         multi_scheduler
             .set_result_callback(Box::new(move |result| {
-                result_tx.send(result).expect("Failed to send result");
+                // The scheduler will be finalized/cancelled later, at which point the scheduler
+                // will send a `None` result, but the receiver may already have been dropped at that
+                // point.
+                if result.is_some() {
+                    result_tx.send(result).expect("Failed to send result");
+                }
             }))
             .expect("Failed to set result callback");
         let (error_tx, error_rx) = mpsc::channel();
@@ -615,6 +631,7 @@ mod tests {
             e => panic!("Wrong error type received: {:?}", e),
         }
 
-        multi_scheduler.shutdown();
+        multi_scheduler.cancel().expect("Failed to cancel");
+        multi_scheduler.finalize().expect("Failed to finalize");
     }
 }
