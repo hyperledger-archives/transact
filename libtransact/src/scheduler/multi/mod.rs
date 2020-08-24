@@ -28,6 +28,7 @@ use crate::scheduler::{
     SchedulerError, SchedulerFactory,
 };
 
+use std::cell::RefCell;
 use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 
@@ -205,7 +206,7 @@ impl Scheduler for MultiScheduler {
 /// Factory for creating `MultiScheduler`s
 pub struct MultiSchedulerFactory {
     sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
-    sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+    sub_scheduler_handler: RefCell<Box<dyn SubSchedulerHandler>>,
 }
 
 impl MultiSchedulerFactory {
@@ -218,7 +219,7 @@ impl MultiSchedulerFactory {
     /// `sub_scheduler_handler` - The handler that will execute transactions for the sub-schedulers
     pub fn new(
         sub_scheduler_factories: Vec<(Box<dyn SchedulerFactory>, usize)>,
-        sub_scheduler_handler: Box<dyn SubSchedulerHandler>,
+        sub_scheduler_handler: RefCell<Box<dyn SubSchedulerHandler>>,
     ) -> Self {
         Self {
             sub_scheduler_factories,
@@ -228,16 +229,22 @@ impl MultiSchedulerFactory {
 }
 
 impl SchedulerFactory for MultiSchedulerFactory {
-    fn create_scheduler(&mut self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
+    fn create_scheduler(&self, state_id: String) -> Result<Box<dyn Scheduler>, SchedulerError> {
         let schedulers = self
             .sub_scheduler_factories
-            .iter_mut()
+            .iter()
             .flat_map(|(factory, num)| {
                 let state_id = state_id.clone();
                 (0..*num).map(move |_| factory.create_scheduler(state_id.clone()))
             })
             .collect::<Result<_, _>>()?;
-        MultiScheduler::new(schedulers, &mut *self.sub_scheduler_handler)
+        let mut sub_scheduler_handler =
+            self.sub_scheduler_handler.try_borrow_mut().map_err(|_| {
+                SchedulerError::Internal(
+                    "Sub-scheduler handler cell is already mutably borrowed".into(),
+                )
+            })?;
+        MultiScheduler::new(schedulers, &mut **sub_scheduler_handler)
             .map(|scheduler| Box::new(scheduler) as Box<dyn Scheduler>)
     }
 }
