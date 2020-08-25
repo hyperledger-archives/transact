@@ -15,6 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
+mod error;
 mod internal;
 mod reader;
 
@@ -28,6 +29,8 @@ use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+pub use self::error::ExecutorError;
 
 pub struct Executor {
     readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
@@ -105,32 +108,6 @@ impl SubSchedulerHandler for Executor {
     ) -> Result<(), String> {
         self.execute(task_iterator, notifier)
             .map_err(|err| format!("{}", err))
-    }
-}
-
-#[derive(Debug)]
-pub enum ExecutorError {
-    // The Executor has not been started, and so calling `execute` will return an error.
-    NotStarted,
-    // The Executor has had start called more than once.
-    AlreadyStarted(String),
-
-    ResourcesUnavailable(String),
-}
-
-impl std::error::Error for ExecutorError {}
-
-impl std::fmt::Display for ExecutorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ExecutorError::NotStarted => f.write_str("Executor not started"),
-            ExecutorError::AlreadyStarted(ref msg) => {
-                write!(f, "Executor already started: {}", msg)
-            }
-            ExecutorError::ResourcesUnavailable(ref msg) => {
-                write!(f, "Resource Unavailable: {}", msg)
-            }
-        }
     }
 }
 
