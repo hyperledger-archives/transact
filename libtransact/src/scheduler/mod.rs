@@ -251,11 +251,13 @@ mod tests {
     use crate::protocol::batch::BatchBuilder;
     use crate::protocol::receipt::TransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
-    use crate::signing::hash::HashSigner;
 
     use std::sync::mpsc;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+
     pub fn mock_transactions(num: u8) -> Vec<Transaction> {
+        let signer = new_signer();
         (0..num)
             .map(|i| {
                 TransactionBuilder::new()
@@ -266,16 +268,17 @@ mod tests {
                     .with_nonce(vec![i])
                     .with_payload(vec![])
                     .with_payload_hash_method(HashMethod::SHA512)
-                    .build(&HashSigner::default())
+                    .build(&*signer)
                     .expect("Failed to build transaction")
             })
             .collect()
     }
 
     pub fn mock_batch(transactions: Vec<Transaction>) -> BatchPair {
+        let signer = new_signer();
         BatchBuilder::new()
             .with_transactions(transactions)
-            .build_pair(&HashSigner::default())
+            .build_pair(&*signer)
             .expect("Failed to build batch pair")
     }
 
@@ -288,6 +291,12 @@ mod tests {
             .into_iter()
             .map(|txn| mock_batch(vec![txn]))
             .collect()
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 
     pub fn valid_receipt_from_batch(batch: BatchPair) -> Option<BatchExecutionResult> {

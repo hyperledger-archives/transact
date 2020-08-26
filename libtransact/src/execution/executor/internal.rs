@@ -419,11 +419,14 @@ impl ExecutorThread {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use std::{self, collections::HashSet, sync::mpsc::channel};
+
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
     use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTaskCompletionNotification;
-    use crate::signing::{hash::HashSigner, Signer};
-    use std::{self, collections::HashSet, sync::mpsc::channel};
 
     static FAMILY_NAME: &str = "test";
     static FAMILY_VERSION: &str = "1.0";
@@ -671,12 +674,18 @@ mod tests {
     }
 
     fn create_iterator() -> impl Iterator<Item = ExecutionTask> {
-        let signer = HashSigner::default();
         let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let signer = new_signer();
 
         (0..NUMBER_OF_TRANSACTIONS)
-            .map(move |_| create_txn(&signer))
+            .map(move |_| create_txn(&*signer))
             .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 
     #[derive(Clone)]

@@ -24,12 +24,12 @@
 use std::error::Error as StdError;
 use std::fmt;
 
+use cylinder::{Signer, SigningError};
 use protobuf::Message;
 
 use crate::protos::{
     self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
-use crate::signing;
 
 use super::transaction::Transaction;
 
@@ -400,6 +400,12 @@ impl From<ProtoConversionError> for BatchBuildError {
     }
 }
 
+impl From<SigningError> for BatchBuildError {
+    fn from(err: SigningError) -> Self {
+        Self::SigningError(err.to_string())
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct BatchBuilder {
     transactions: Option<Vec<Transaction>>,
@@ -421,7 +427,7 @@ impl BatchBuilder {
         self
     }
 
-    pub fn build_pair(self, signer: &dyn signing::Signer) -> Result<BatchPair, BatchBuildError> {
+    pub fn build_pair(self, signer: &dyn Signer) -> Result<BatchPair, BatchBuildError> {
         let transactions = self.transactions.ok_or_else(|| {
             BatchBuildError::MissingField("'transactions' field is required".to_string())
         })?;
@@ -434,7 +440,7 @@ impl BatchBuilder {
             })
             .collect::<Result<_, _>>()?;
 
-        let signer_public_key = signer.public_key().to_vec();
+        let signer_public_key = signer.public_key()?.as_slice().to_vec();
 
         let header = BatchHeader {
             signer_public_key,
@@ -449,11 +455,10 @@ impl BatchBuilder {
             .write_to_bytes()
             .map_err(|e| BatchBuildError::SerializationError(format!("{}", e)))?;
 
-        let header_signature = hex::encode(
-            signer
-                .sign(&header_bytes)
-                .map_err(|e| BatchBuildError::SigningError(format!("{}", e)))?,
-        );
+        let header_signature = signer
+            .sign(&header_bytes)
+            .map_err(|e| BatchBuildError::SigningError(format!("{}", e)))?
+            .as_hex();
 
         let batch = Batch {
             header: header_bytes,
@@ -465,7 +470,7 @@ impl BatchBuilder {
         Ok(BatchPair { batch, header })
     }
 
-    pub fn build(self, signer: &dyn signing::Signer) -> Result<Batch, BatchBuildError> {
+    pub fn build(self, signer: &dyn Signer) -> Result<Batch, BatchBuildError> {
         Ok(self.build_pair(signer)?.batch)
     }
 }
@@ -473,11 +478,10 @@ impl BatchBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::signing::hash::HashSigner;
-    use crate::signing::Signer;
+
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     #[cfg(feature = "sawtooth-compat")]
     use protobuf::Message;
-
     #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
@@ -497,6 +501,9 @@ mod tests {
         "sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3sig3";
 
     fn check_builder_batch(signer: &dyn Signer, pair: &BatchPair) {
+        let signer_pub_key = signer
+            .public_key()
+            .expect("Failed to get signer public key");
         assert_eq!(
             vec![
                 SIGNATURE2.as_bytes().to_vec(),
@@ -504,7 +511,7 @@ mod tests {
             ],
             pair.header().transaction_ids()
         );
-        assert_eq!(signer.public_key(), pair.header().signer_public_key());
+        assert_eq!(signer_pub_key.as_slice(), pair.header().signer_public_key());
         assert_eq!(
             vec![
                 Transaction::new(
@@ -525,7 +532,7 @@ mod tests {
 
     #[test]
     fn batch_builder_chain() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let pair = BatchBuilder::new()
             .with_transactions(vec![
@@ -541,15 +548,15 @@ mod tests {
                 ),
             ])
             .with_trace(true)
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .unwrap();
 
-        check_builder_batch(&signer, &pair);
+        check_builder_batch(&*signer, &pair);
     }
 
     #[test]
     fn batch_builder_separate() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let mut builder = BatchBuilder::new();
         builder = builder.with_transactions(vec![
@@ -565,9 +572,9 @@ mod tests {
             ),
         ]);
         builder = builder.with_trace(true);
-        let pair = builder.build_pair(&signer).unwrap();
+        let pair = builder.build_pair(&*signer).unwrap();
 
-        check_builder_batch(&signer, &pair);
+        check_builder_batch(&*signer, &pair);
     }
 
     #[test]
@@ -655,13 +662,18 @@ mod tests {
     #[cfg(feature = "sawtooth-compat")]
     #[test]
     fn batch_sawtooth10_compatibility() {}
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
+    }
 }
 
 #[cfg(all(feature = "nightly", test))]
 mod benchmarks {
     extern crate test;
     use super::*;
-    use crate::signing::hash::HashSigner;
     use test::Bencher;
 
     static KEY1: &str = "111111111111111111111111111111111111111111111111111111111111111111";
@@ -694,7 +706,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_batch_builder(b: &mut Bencher) {
-        let signer = HashSigner::default();
+        let signer = new_signer();
         let batch = BatchBuilder::new()
             .with_transactions(vec![
                 Transaction::new(
@@ -709,7 +721,7 @@ mod benchmarks {
                 ),
             ])
             .with_trace(true);
-        b.iter(|| batch.clone().build_pair(&signer));
+        b.iter(|| batch.clone().build_pair(&*signer));
     }
 
     #[bench]

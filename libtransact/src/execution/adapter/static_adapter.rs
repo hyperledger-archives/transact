@@ -301,6 +301,8 @@ mod test {
     };
     use std::time;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+
     use crate::context::ContextLifecycle;
     use crate::families::command::{make_command_transaction, CommandTransactionHandler};
     use crate::protocol::command::{
@@ -337,9 +339,12 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a simple transaction.
-        let txn_pair = make_command_transaction(&[Command::SetState(SetState::new(
-            create_bytes_entry(vec![("abc".into(), b"abc".to_vec())]),
-        ))]);
+        let txn_pair = make_command_transaction(
+            &[Command::SetState(SetState::new(create_bytes_entry(vec![
+                ("abc".into(), b"abc".to_vec()),
+            ])))],
+            &*new_signer(),
+        );
         let txn_id = txn_pair.transaction().header_signature().into();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -388,10 +393,13 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a failing transaction, resulting in an invalid error.
-        let txn_pair = make_command_transaction(&[
-            Command::GetState(GetState::new(vec!["abc".into()])),
-            Command::ReturnInvalid(ReturnInvalid::new("Test Fail Succeeded".into())),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::GetState(GetState::new(vec!["abc".into()])),
+                Command::ReturnInvalid(ReturnInvalid::new("Test Fail Succeeded".into())),
+            ],
+            &*new_signer(),
+        );
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
@@ -442,12 +450,15 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a failing transaction, resulting in an internal error.
-        let txn_pair = make_command_transaction(&[
-            Command::GetState(GetState::new(vec!["abc".into()])),
-            Command::ReturnInternalError(ReturnInternalError::new(
-                "Test Internal Fail Succeeded".into(),
-            )),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::GetState(GetState::new(vec!["abc".into()])),
+                Command::ReturnInternalError(ReturnInternalError::new(
+                    "Test Internal Fail Succeeded".into(),
+                )),
+            ],
+            &*new_signer(),
+        );
 
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -487,14 +498,17 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a valid delete transaction.
-        let txn_pair = make_command_transaction(&[
-            Command::SetState(SetState::new(create_bytes_entry(vec![(
-                "abc".into(),
-                b"abc".to_vec(),
-            )]))),
-            Command::GetState(GetState::new(vec!["abc".into()])),
-            Command::DeleteState(DeleteState::new(vec!["abc".into()])),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::SetState(SetState::new(create_bytes_entry(vec![(
+                    "abc".into(),
+                    b"abc".to_vec(),
+                )]))),
+                Command::GetState(GetState::new(vec!["abc".into()])),
+                Command::DeleteState(DeleteState::new(vec!["abc".into()])),
+            ],
+            &*new_signer(),
+        );
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -543,8 +557,10 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a busy wait transaction.
-        let txn_pair =
-            make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::BusyWait))]);
+        let txn_pair = make_command_transaction(
+            &[Command::Sleep(Sleep::new(100, SleepType::BusyWait))],
+            &*new_signer(),
+        );
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -592,8 +608,10 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a sleep transaction.
-        let txn_pair =
-            make_command_transaction(&[Command::Sleep(Sleep::new(100, SleepType::Wait))]);
+        let txn_pair = make_command_transaction(
+            &[Command::Sleep(Sleep::new(100, SleepType::Wait))],
+            &*new_signer(),
+        );
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -643,19 +661,22 @@ mod test {
 
         // Create and execute a Set transaction, followed by an Internal error. This will cause
         // the rest of the commands to be short-circuited.
-        let txn_pair = make_command_transaction(&[
-            Command::SetState(SetState::new(create_bytes_entry(vec![(
-                "abc".into(),
-                b"abc".to_vec(),
-            )]))),
-            Command::ReturnInternalError(ReturnInternalError::new(
-                "Return internal error between transactions".into(),
-            )),
-            Command::SetState(SetState::new(create_bytes_entry(vec![(
-                "def".into(),
-                b"def".to_vec(),
-            )]))),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::SetState(SetState::new(create_bytes_entry(vec![(
+                    "abc".into(),
+                    b"abc".to_vec(),
+                )]))),
+                Command::ReturnInternalError(ReturnInternalError::new(
+                    "Return internal error between transactions".into(),
+                )),
+                Command::SetState(SetState::new(create_bytes_entry(vec![(
+                    "def".into(),
+                    b"def".to_vec(),
+                )]))),
+            ],
+            &*new_signer(),
+        );
 
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -707,24 +728,27 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute an Add Event transaction.
-        let txn_pair = make_command_transaction(&[
-            Command::AddEvent(AddEvent::new(
-                "First event".to_string(),
-                create_bytes_entry(vec![
-                    ("key1".to_string(), "value1".as_bytes().to_vec()),
-                    ("key2".to_string(), "value2".as_bytes().to_vec()),
-                ]),
-                b"abc".to_vec(),
-            )),
-            Command::AddEvent(AddEvent::new(
-                "Second event".to_string(),
-                create_bytes_entry(vec![
-                    ("key1".to_string(), "value1".as_bytes().to_vec()),
-                    ("key2".to_string(), "value2".as_bytes().to_vec()),
-                ]),
-                b"def".to_vec(),
-            )),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::AddEvent(AddEvent::new(
+                    "First event".to_string(),
+                    create_bytes_entry(vec![
+                        ("key1".to_string(), "value1".as_bytes().to_vec()),
+                        ("key2".to_string(), "value2".as_bytes().to_vec()),
+                    ]),
+                    b"abc".to_vec(),
+                )),
+                Command::AddEvent(AddEvent::new(
+                    "Second event".to_string(),
+                    create_bytes_entry(vec![
+                        ("key1".to_string(), "value1".as_bytes().to_vec()),
+                        ("key2".to_string(), "value2".as_bytes().to_vec()),
+                    ]),
+                    b"def".to_vec(),
+                )),
+            ],
+            &*new_signer(),
+        );
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -796,10 +820,13 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute an Add Receipt Data transaction.
-        let txn_pair = make_command_transaction(&[
-            Command::AddReceiptData(AddReceiptData::new(b"abc".to_vec())),
-            Command::AddReceiptData(AddReceiptData::new(b"def".to_vec())),
-        ]);
+        let txn_pair = make_command_transaction(
+            &[
+                Command::AddReceiptData(AddReceiptData::new(b"abc".to_vec())),
+                Command::AddReceiptData(AddReceiptData::new(b"def".to_vec())),
+            ],
+            &*new_signer(),
+        );
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
@@ -832,6 +859,12 @@ mod test {
         assert_eq!(receipt_data.last().unwrap(), &b"def".to_vec());
 
         assert!(Box::new(static_adapter).stop().is_ok());
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 
     #[derive(Clone, Default)]

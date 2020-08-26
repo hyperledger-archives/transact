@@ -128,7 +128,6 @@ pub mod protos;
 #[cfg(feature = "sawtooth-compat")]
 pub mod sawtooth;
 pub mod scheduler;
-pub mod signing;
 pub mod state;
 #[cfg(feature = "workload")]
 pub mod workload;

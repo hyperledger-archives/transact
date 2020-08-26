@@ -148,14 +148,16 @@ impl Default for TestExecutionAdapter {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
-    use crate::protocol::transaction::{HashMethod, TransactionBuilder};
-    use crate::signing::hash::HashSigner;
+
     use std::sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     };
+
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+
+    use crate::protocol::transaction::{HashMethod, TransactionBuilder};
 
     static FAMILY_VERSION: &str = "1.0";
 
@@ -164,8 +166,9 @@ mod tests {
         let mut noop_adapter = TestExecutionAdapter::new();
         let registry = MockRegistry::default();
 
-        let transaction_pair1 = make_transaction();
-        let transaction_pair2 = make_transaction();
+        let signer = new_signer();
+        let transaction_pair1 = make_transaction(&*signer);
+        let transaction_pair2 = make_transaction(&*signer);
 
         noop_adapter
             .start(Box::new(registry.clone()))
@@ -227,9 +230,7 @@ mod tests {
             .expect("Unable to execute transaction with test adapter");
     }
 
-    fn make_transaction() -> TransactionPair {
-        let signer = HashSigner::default();
-
+    fn make_transaction(signer: &dyn Signer) -> TransactionPair {
         TransactionBuilder::new()
             .with_batcher_public_key(vec![])
             .with_dependencies(vec![vec![]])
@@ -240,8 +241,14 @@ mod tests {
             .with_nonce(vec![])
             .with_payload(vec![])
             .with_payload_hash_method(HashMethod::SHA512)
-            .build_pair(&signer)
+            .build_pair(signer)
             .expect("The TransactionBuilder was supplied all the options")
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 
     #[derive(Clone, Default)]

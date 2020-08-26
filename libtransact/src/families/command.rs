@@ -19,12 +19,13 @@
 
 use std::{thread, time};
 
+use cylinder::Signer;
+
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
 use crate::protocol;
 use crate::protocol::command::{Command, CommandPayload, SleepType};
 use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
 use crate::protos::{FromBytes, IntoBytes};
-use crate::signing::hash::HashSigner;
 
 const COMMAND_FAMILY_NAME: &str = "command";
 const COMMAND_VERSION: &str = "0.1";
@@ -121,8 +122,7 @@ impl TransactionHandler for CommandTransactionHandler {
     }
 }
 
-pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
-    let signer = HashSigner::default();
+pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
     let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()
         .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
@@ -184,7 +184,7 @@ pub fn make_command_transaction(commands: &[Command]) -> TransactionPair {
                 .into_bytes()
                 .expect("Unable to get bytes from Command Payload"),
         )
-        .build_pair(&signer)
+        .build_pair(signer)
         .unwrap()
 }
 

@@ -23,6 +23,7 @@
 use std::error::Error as StdError;
 use std::fmt;
 
+use cylinder::{Signer, SigningError};
 use protobuf::Message;
 use rand::distributions::Alphanumeric;
 use rand::Rng;
@@ -31,7 +32,6 @@ use sha2::{Digest, Sha512};
 use crate::protos::{
     self, FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
-use crate::signing;
 
 use super::batch::BatchBuilder;
 
@@ -407,6 +407,12 @@ impl From<ProtoConversionError> for TransactionBuildError {
     }
 }
 
+impl From<SigningError> for TransactionBuildError {
+    fn from(err: SigningError) -> Self {
+        Self::SigningError(err.to_string())
+    }
+}
+
 #[derive(Default, Clone)]
 pub struct TransactionBuilder {
     batcher_public_key: Option<Vec<u8>>,
@@ -473,13 +479,11 @@ impl TransactionBuilder {
         self
     }
 
-    pub fn build_pair(
-        self,
-        signer: &dyn signing::Signer,
-    ) -> Result<TransactionPair, TransactionBuildError> {
+    pub fn build_pair(self, signer: &dyn Signer) -> Result<TransactionPair, TransactionBuildError> {
+        let signer_public_key = signer.public_key()?.as_slice().to_vec();
         let batcher_public_key = self
             .batcher_public_key
-            .unwrap_or_else(|| signer.public_key().to_vec());
+            .unwrap_or_else(|| signer_public_key.clone());
         let dependencies = self.dependencies.unwrap_or_else(Vec::new);
         let family_name = self.family_name.ok_or_else(|| {
             TransactionBuildError::MissingField("'family_name' field is required".to_string())
@@ -509,7 +513,6 @@ impl TransactionBuilder {
         let payload = self.payload.ok_or_else(|| {
             TransactionBuildError::MissingField("'payload' field is required".to_string())
         })?;
-        let signer_public_key = signer.public_key().to_vec();
 
         let payload_hash = match payload_hash_method {
             HashMethod::SHA512 => {
@@ -540,11 +543,10 @@ impl TransactionBuilder {
             .write_to_bytes()
             .map_err(|e| TransactionBuildError::SerializationError(format!("{}", e)))?;
 
-        let header_signature = hex::encode(
-            signer
-                .sign(&header_bytes)
-                .map_err(|e| TransactionBuildError::SigningError(format!("{}", e)))?,
-        );
+        let header_signature = signer
+            .sign(&header_bytes)
+            .map_err(|e| TransactionBuildError::SigningError(format!("{}", e)))?
+            .as_hex();
 
         let transaction = Transaction {
             header: header_bytes,
@@ -558,13 +560,13 @@ impl TransactionBuilder {
         })
     }
 
-    pub fn build(self, signer: &dyn signing::Signer) -> Result<Transaction, TransactionBuildError> {
+    pub fn build(self, signer: &dyn Signer) -> Result<Transaction, TransactionBuildError> {
         Ok(self.build_pair(signer)?.transaction)
     }
 
     pub fn into_batch_builder(
         self,
-        signer: &dyn signing::Signer,
+        signer: &dyn Signer,
     ) -> Result<BatchBuilder, TransactionBuildError> {
         Ok(BatchBuilder::new().with_transactions(vec![self.build(signer)?]))
     }
@@ -576,12 +578,10 @@ mod tests {
 
     #[cfg(feature = "sawtooth-compat")]
     use crate::protos;
-    use crate::signing::hash::HashSigner;
-    use crate::signing::Signer;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     #[cfg(feature = "sawtooth-compat")]
     use protobuf::Message;
-
     #[cfg(feature = "sawtooth-compat")]
     use sawtooth_sdk;
 
@@ -603,6 +603,10 @@ mod tests {
         "sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1sig1";
 
     fn check_builder_transaction(signer: &dyn Signer, pair: &TransactionPair) {
+        let signer_pub_key = signer
+            .public_key()
+            .expect("Failed to get signer public key");
+
         let payload_hash = match pair.header().payload_hash_method() {
             HashMethod::SHA512 => {
                 let mut hasher = Sha512::new();
@@ -634,12 +638,12 @@ mod tests {
         );
         assert_eq!(payload_hash, pair.header().payload_hash());
         assert_eq!(HashMethod::SHA512, *pair.header().payload_hash_method());
-        assert_eq!(signer.public_key(), pair.header().signer_public_key());
+        assert_eq!(signer_pub_key.as_slice(), pair.header().signer_public_key());
     }
 
     #[test]
     fn transaction_builder_chain() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let pair = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
@@ -657,15 +661,15 @@ mod tests {
             ])
             .with_payload_hash_method(HashMethod::SHA512)
             .with_payload(BYTES2.to_vec())
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .unwrap();
 
-        check_builder_transaction(&signer, &pair);
+        check_builder_transaction(&*signer, &pair);
     }
 
     #[test]
     fn transaction_builder_seperate() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let mut builder = TransactionBuilder::new();
         builder = builder.with_batcher_public_key(hex::decode(KEY1).unwrap());
@@ -684,9 +688,9 @@ mod tests {
         ]);
         builder = builder.with_payload_hash_method(HashMethod::SHA512);
         builder = builder.with_payload(BYTES2.to_vec());
-        let pair = builder.build_pair(&signer).unwrap();
+        let pair = builder.build_pair(&*signer).unwrap();
 
-        check_builder_transaction(&signer, &pair);
+        check_builder_transaction(&*signer, &pair);
     }
 
     #[test]
@@ -878,6 +882,12 @@ mod tests {
         assert_eq!(SIGNATURE1, transaction.header_signature());
         assert_eq!(BYTES2.to_vec(), transaction.payload());
     }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
+    }
 }
 
 #[cfg(all(feature = "nightly", test))]
@@ -887,7 +897,6 @@ mod benchmarks {
     use test::Bencher;
 
     use crate::protos;
-    use crate::signing::hash::HashSigner;
 
     static FAMILY_NAME: &str = "test_family";
     static FAMILY_VERSION: &str = "0.1";
@@ -908,7 +917,7 @@ mod benchmarks {
 
     #[bench]
     fn bench_transaction_builder(b: &mut Bencher) {
-        let signer = HashSigner::default();
+        let signer = new_signer();
         let transaction = TransactionBuilder::new()
             .with_batcher_public_key(hex::decode(KEY1).unwrap())
             .with_dependencies(vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()])
@@ -926,7 +935,7 @@ mod benchmarks {
             .with_payload_hash_method(HashMethod::SHA512)
             .with_payload(BYTES2.to_vec());
 
-        b.iter(|| transaction.clone().build_pair(&signer));
+        b.iter(|| transaction.clone().build_pair(&*signer));
     }
 
     #[bench]

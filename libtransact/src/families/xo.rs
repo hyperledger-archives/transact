@@ -3,16 +3,14 @@ use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::HashMethod;
 use crate::protocol::transaction::TransactionBuilder;
 use crate::protocol::transaction::TransactionPair;
-use crate::signing::hash::HashSigner;
-use crate::signing::Signer;
 use crate::workload::error::WorkloadError;
 use crate::workload::BatchWorkload;
 use crate::workload::TransactionWorkload;
 
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 use rand::distributions::Alphanumeric;
 use rand::prelude::*;
 use rand_hc::Hc128Rng;
-
 use sha2::{Digest, Sha512};
 
 static FAMILY_NAME: &str = "xo";
@@ -26,29 +24,19 @@ pub struct XoTransactionWorkload {
 
 impl Default for XoTransactionWorkload {
     fn default() -> Self {
-        Self::new()
+        Self::new(None, None)
     }
 }
 
 impl XoTransactionWorkload {
-    pub fn new() -> Self {
-        let rng = Hc128Rng::from_entropy();
-        let signer = HashSigner::default();
+    pub fn new(seed: Option<u64>, signer: Option<Box<dyn Signer>>) -> Self {
+        let rng = match seed {
+            Some(seed) => Hc128Rng::seed_from_u64(seed),
+            None => Hc128Rng::from_entropy(),
+        };
+        let signer = signer.unwrap_or_else(new_signer);
 
-        XoTransactionWorkload {
-            rng,
-            signer: Box::new(signer),
-        }
-    }
-
-    pub fn new_with_seed(seed: u64) -> XoTransactionWorkload {
-        let rng = Hc128Rng::seed_from_u64(seed);
-        let signer = HashSigner::default();
-
-        XoTransactionWorkload {
-            rng,
-            signer: Box::new(signer),
-        }
+        XoTransactionWorkload { rng, signer }
     }
 }
 
@@ -82,26 +70,16 @@ pub struct XoBatchWorkload {
 
 impl Default for XoBatchWorkload {
     fn default() -> Self {
-        Self::new()
+        Self::new(None, None)
     }
 }
 
 impl XoBatchWorkload {
-    pub fn new() -> XoBatchWorkload {
-        let signer = HashSigner::default();
-
+    pub fn new(seed: Option<u64>, signer: Option<Box<dyn Signer>>) -> Self {
+        let signer = signer.unwrap_or_else(new_signer);
         XoBatchWorkload {
-            transaction_workload: XoTransactionWorkload::new(),
-            signer: Box::new(signer),
-        }
-    }
-
-    pub fn new_with_seed(seed: u64) -> XoBatchWorkload {
-        let signer = HashSigner::default();
-
-        XoBatchWorkload {
-            transaction_workload: XoTransactionWorkload::new_with_seed(seed),
-            signer: Box::new(signer),
+            transaction_workload: XoTransactionWorkload::new(seed, Some(signer.clone())),
+            signer,
         }
     }
 }
@@ -176,6 +154,12 @@ impl Payload {
     }
 }
 
+fn new_signer() -> Box<dyn Signer> {
+    let context = Secp256k1Context::new();
+    let key = context.new_random_private_key();
+    context.new_signer(key)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -184,13 +168,13 @@ mod tests {
 
     #[test]
     fn test_xo_transaction_workload() {
-        let mut workload = XoTransactionWorkload::new();
+        let mut workload = XoTransactionWorkload::default();
         test_transaction_workload(&mut workload)
     }
 
     #[test]
     fn test_xo_batch_workload() {
-        let mut workload = XoBatchWorkload::new();
+        let mut workload = XoBatchWorkload::default();
         test_batch_workload(&mut workload)
     }
 }
