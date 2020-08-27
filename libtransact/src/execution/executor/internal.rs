@@ -27,11 +27,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::sync::{
-    atomic::{AtomicBool, Ordering},
-    mpsc::{channel, Receiver, Sender},
-    Arc,
-};
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
 
 use log::warn;
@@ -136,7 +132,6 @@ pub struct ExecutorThread {
     join_handles: Vec<JoinHandle<()>>,
     internal_thread: Option<JoinHandle<()>>,
     sender: Option<ExecutorCommandSender>,
-    stop: Arc<AtomicBool>,
 }
 
 impl ExecutorThread {
@@ -146,7 +141,6 @@ impl ExecutorThread {
             join_handles: vec![],
             internal_thread: None,
             sender: None,
-            stop: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -171,7 +165,6 @@ impl ExecutorThread {
                 }
 
                 match Self::start_execution_adapter_thread(
-                    Arc::clone(&self.stop),
                     execution_adapter,
                     adapter_receiver,
                     &registry_sender,
@@ -206,8 +199,6 @@ impl ExecutorThread {
 
     pub fn stop(mut self) {
         if let Some(sender) = self.sender.take() {
-            self.stop.store(true, Ordering::Relaxed);
-
             if let Err(err) = sender.send(ExecutorCommand::Shutdown) {
                 warn!("Unable to send shutdown signal to executor thread: {}", err);
             }
@@ -221,7 +212,6 @@ impl ExecutorThread {
     }
 
     fn start_execution_adapter_thread(
-        stop: Arc<AtomicBool>,
         execution_adapter: Box<dyn ExecutionAdapter>,
         receiver: ExecutionEventReceiver,
         sender: &ExecutorCommandSender,
@@ -231,8 +221,8 @@ impl ExecutorThread {
 
         std::thread::Builder::new()
             .name(format!("execution_adapter_thread_{}", index))
-            .spawn(move || loop {
-                if let Ok(execution_command) = receiver.recv() {
+            .spawn(move || {
+                while let Ok(execution_command) = receiver.recv() {
                     match execution_command {
                         ExecutionCommand::Event(execution_event) => {
                             let sender = sender.clone();
@@ -279,17 +269,13 @@ impl ExecutorThread {
                             }
                         }
                         ExecutionCommand::Sentinel => {
-                            if let Err(err) = execution_adapter.stop() {
-                                error!("Unable to cleanly stop adapter {}: {}", index, err);
-                            }
                             break;
                         }
                     }
-                } else if stop.load(Ordering::Relaxed) {
-                    if let Err(err) = execution_adapter.stop() {
-                        error!("Unable to cleanly stop adapter {}: {}", index, err);
-                    }
-                    break;
+                }
+
+                if let Err(err) = execution_adapter.stop() {
+                    error!("Unable to cleanly stop adapter {}: {}", index, err);
                 }
             })
     }
@@ -298,7 +284,6 @@ impl ExecutorThread {
         &self,
         receiver: ExecutorCommandReceiver,
     ) -> Result<JoinHandle<()>, std::io::Error> {
-        let stop = Arc::clone(&self.stop);
         std::thread::Builder::new()
             .name("internal_executor_thread".to_string())
             .spawn(move || {
@@ -319,10 +304,6 @@ impl ExecutorThread {
 
                     match receiver.recv() {
                         Ok(ExecutorCommand::Execution(execution_event)) => {
-                            if stop.load(Ordering::Relaxed) {
-                                Self::shutdown_fanout_threads(&fanout_threads);
-                                break;
-                            }
                             Self::try_send_execution_event(
                                 execution_event,
                                 &fanout_threads,
@@ -332,11 +313,6 @@ impl ExecutorThread {
                         Ok(ExecutorCommand::RegistrationChange(
                             RegistrationChange::RegisterRequest((transaction_family, sender)),
                         )) => {
-                            if stop.load(Ordering::Relaxed) {
-                                Self::shutdown_fanout_threads(&fanout_threads);
-                                break;
-                            }
-
                             if let Some(p) = parked.get_mut(&transaction_family) {
                                 unparked.append(p);
                             }
