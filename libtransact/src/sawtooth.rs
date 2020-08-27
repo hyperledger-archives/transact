@@ -218,14 +218,16 @@ fn to_context_error(err: ContextError) -> SawtoothContextError {
 #[cfg(test)]
 mod xo_compat_test {
     use std::panic;
-    use std::sync::{Arc, Mutex};
 
     use sawtooth_xo::handler::XoTransactionHandler;
     use sha2::{Digest, Sha512};
 
     use crate::context::manager::sync::ContextManager;
     use crate::database::{btree::BTreeDatabase, Database};
-    use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
+    use crate::execution::{
+        adapter::static_adapter::StaticExecutionAdapter,
+        executor::{ExecutionTaskSubmitter, Executor},
+    };
     use crate::protocol::{
         batch::{BatchBuilder, BatchPair},
         receipt::{StateChange, TransactionResult},
@@ -248,54 +250,52 @@ mod xo_compat_test {
         let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
         let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
 
-        let executor = create_executor(&context_manager);
-        start_executor(&executor);
+        let mut executor = create_executor(&context_manager);
+        executor.start().expect("Start should not have failed");
 
-        let test_executor = executor.clone();
+        let task_submitter = executor
+            .execution_task_submitter()
+            .expect("Unable to get task submitter form started executor");
 
-        let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = HashSigner::new(vec![00u8, 01, 02]);
 
-            let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+        let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
 
-            let state_root = initial_db_root(&*db);
+        let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+        let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+            .expect("Failed to create scheduler");
 
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler
-                .set_result_callback(Box::new(move |batch_result| {
-                    result_tx
-                        .send(batch_result)
-                        .expect("Unable to send batch result")
-                }))
-                .expect("Failed to set result callback");
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }))
+            .expect("Failed to set result callback");
 
-            scheduler
-                .add_batch(batch_pair)
-                .expect("Failed to add batch");
-            scheduler.finalize().expect("Failed to finalize scheduler");
+        scheduler
+            .add_batch(batch_pair)
+            .expect("Failed to add batch");
+        scheduler.finalize().expect("Failed to finalize scheduler");
 
-            run_schedule(&test_executor, &mut scheduler);
+        run_schedule(&task_submitter, &mut scheduler);
 
-            let batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
-                }],
-                batch_result,
-            );
-        });
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
+            }],
+            batch_result,
+        );
 
-        stop_executor(&executor);
-
-        assert!(panic_check.is_ok());
+        executor.stop();
     }
 
     ///
@@ -311,75 +311,73 @@ mod xo_compat_test {
         let db = Box::new(BTreeDatabase::new(&merkle::INDEXES));
         let context_manager = ContextManager::new(Box::new(MerkleState::new(db.clone())));
 
-        let executor = create_executor(&context_manager);
-        start_executor(&executor);
+        let mut executor = create_executor(&context_manager);
+        executor.start().expect("Start should not have failed");
 
-        let test_executor = executor.clone();
+        let task_submitter = executor
+            .execution_task_submitter()
+            .expect("Unable to get task submitter form started executor");
 
-        let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = HashSigner::new(vec![00u8, 01, 02]);
 
-            let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
-            let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
+        let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+        let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
 
-            let state_root = initial_db_root(&*db);
+        let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+        let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+            .expect("Failed to create scheduler");
 
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler
-                .set_result_callback(Box::new(move |batch_result| {
-                    result_tx
-                        .send(batch_result)
-                        .expect("Unable to send batch result")
-                }))
-                .expect("Failed to set result callback");
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }))
+            .expect("Failed to set result callback");
 
-            scheduler
-                .add_batch(create_batch_pair)
-                .expect("Failed to add 1st batch");
-            scheduler
-                .add_batch(take_batch_pair)
-                .expect("Failed to add 2nd batch");
-            scheduler.finalize().expect("Failed to finalize scheduler");
+        scheduler
+            .add_batch(create_batch_pair)
+            .expect("Failed to add 1st batch");
+        scheduler
+            .add_batch(take_batch_pair)
+            .expect("Failed to add 2nd batch");
+        scheduler.finalize().expect("Failed to finalize scheduler");
 
-            run_schedule(&test_executor, &mut scheduler);
+        run_schedule(&task_submitter, &mut scheduler);
 
-            let create_batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let create_batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            let take_batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let take_batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
-                }],
-                create_batch_result,
-            );
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
+            }],
+            create_batch_result,
+        );
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: format!(
-                        "my_game,X--------,P2-NEXT,{},",
-                        hex::encode(signer.public_key())
-                    )
-                    .into_bytes(),
-                }],
-                take_batch_result,
-            );
-        });
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: format!(
+                    "my_game,X--------,P2-NEXT,{},",
+                    hex::encode(signer.public_key())
+                )
+                .into_bytes(),
+            }],
+            take_batch_result,
+        );
 
-        stop_executor(&executor);
-
-        assert!(panic_check.is_ok());
+        executor.stop();
     }
 
     fn assert_state_changes(
@@ -422,8 +420,8 @@ mod xo_compat_test {
             .expect("Unable to build batch a pair")
     }
 
-    fn create_executor(context_manager: &ContextManager) -> Arc<Mutex<Option<Executor>>> {
-        Arc::new(Mutex::new(Some(Executor::new(vec![Box::new(
+    fn create_executor(context_manager: &ContextManager) -> Executor {
+        Executor::new(vec![Box::new(
             StaticExecutionAdapter::new_adapter(
                 vec![Box::new(SawtoothToTransactHandlerAdapter::new(
                     XoTransactionHandler::new(),
@@ -431,42 +429,19 @@ mod xo_compat_test {
                 context_manager.clone(),
             )
             .expect("Unable to create static execution adapter"),
-        )]))))
+        )])
     }
 
-    fn start_executor(executor: &Arc<Mutex<Option<Executor>>>) {
-        executor
-            .lock()
-            .expect("Should not have poisoned the lock")
-            .as_mut()
-            .expect("Should not be None")
-            .start()
-            .expect("Start should not have failed");
-    }
-
-    fn run_schedule(executor: &Arc<Mutex<Option<Executor>>>, scheduler: &mut dyn Scheduler) {
+    fn run_schedule(task_submitter: &ExecutionTaskSubmitter, scheduler: &mut dyn Scheduler) {
         let task_iterator = scheduler
             .take_task_iterator()
             .expect("Failed to take task iterator");
-        executor
-            .lock()
-            .expect("Should not have poisoned the lock")
-            .as_ref()
-            .expect("Should not be None")
-            .execute(
+        task_submitter
+            .submit(
                 task_iterator,
                 scheduler.new_notifier().expect("Failed to get notifier"),
             )
             .expect("Failed to execute schedule");
-    }
-
-    fn stop_executor(executor: &Arc<Mutex<Option<Executor>>>) {
-        let stoppable = executor
-            .lock()
-            .expect("Should not have poisoned the lock")
-            .take()
-            .expect("Should not be None");
-        stoppable.stop();
     }
 
     fn calculate_game_address<S: AsRef<[u8]>>(name: S) -> String {
