@@ -19,6 +19,7 @@
 mod change_log;
 mod error;
 
+use std::cmp::Reverse;
 use std::collections::BTreeMap;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::io::Cursor;
@@ -381,7 +382,7 @@ impl MerkleRadixTree {
 
         let mut sorted_paths: Vec<_> = path_map.keys().cloned().collect();
         // Sort by longest to shortest
-        sorted_paths.sort_by(|a, b| b.len().cmp(&a.len()));
+        sorted_paths.sort_by_key(|a| Reverse(a.len()));
 
         // initializing this to empty, to make the compiler happy
         let mut key_hash = Vec::with_capacity(0);
