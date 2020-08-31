@@ -15,8 +15,6 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-pub mod sync;
-
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str;
