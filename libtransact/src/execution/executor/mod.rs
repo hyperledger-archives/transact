@@ -15,6 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
+mod error;
 mod internal;
 mod reader;
 
@@ -27,7 +28,10 @@ use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
 use log::debug;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{mpsc::Sender, Arc, Mutex};
+
+pub use self::error::ExecutorError;
+use self::internal::ExecutorCommand;
 
 pub struct Executor {
     readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
@@ -40,32 +44,21 @@ impl Executor {
         task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
         notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), ExecutorError> {
+        self.execution_task_submitter()?
+            .submit(task_iterator, notifier)
+    }
+
+    /// Returns a new ExecutionTaskSubmitter.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ExecutorError` if the Executor has not been started.
+    pub fn execution_task_submitter(&self) -> Result<ExecutionTaskSubmitter, ExecutorError> {
         if let Some(sender) = self.executor_thread.sender() {
-            let index = self
-                .readers
-                .lock()
-                .expect("The iterator adapters map lock is poisoned")
-                .keys()
-                .max()
-                .cloned()
-                .unwrap_or(0);
-
-            let mut reader = ExecutionTaskReader::new(index);
-
-            reader
-                .start(task_iterator, notifier, sender)
-                .map_err(|err| ExecutorError::ResourcesUnavailable(err.to_string()))?;
-
-            debug!("Execute called, creating execution adapter {}", index);
-
-            let mut readers = self
-                .readers
-                .lock()
-                .expect("The iterator adapter map lock is poisoned");
-
-            readers.insert(index, reader);
-
-            Ok(())
+            Ok(ExecutionTaskSubmitter {
+                readers: Arc::clone(&self.readers),
+                sender,
+            })
         } else {
             Err(ExecutorError::NotStarted)
         }
@@ -97,40 +90,63 @@ impl Executor {
     }
 }
 
-impl SubSchedulerHandler for Executor {
+/// The interface for submitting execution tasks to the Executor.
+#[derive(Clone)]
+pub struct ExecutionTaskSubmitter {
+    sender: Sender<ExecutorCommand>,
+    readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
+}
+
+impl ExecutionTaskSubmitter {
+    /// Submits an Iterator of Execution tasks and a completion notifier to the Executor for
+    /// processing.  The iterator provided will be consumed until either it is exhausted or the
+    /// Executor is shutdown.
+    ///
+    /// # Errors
+    ///
+    /// Returns an `ExecutorError` if the tasks cannot be successfully sent to the Executor, due to
+    /// the `Executor` being disconnected from this `ExecutionTaskSubmitter`.
+    pub fn submit(
+        &self,
+        task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        notifier: Box<dyn ExecutionTaskCompletionNotifier>,
+    ) -> Result<(), ExecutorError> {
+        let index = self
+            .readers
+            .lock()
+            .expect("The iterator adapters map lock is poisoned")
+            .keys()
+            .max()
+            .cloned()
+            .unwrap_or(0);
+
+        let mut reader = ExecutionTaskReader::new(index);
+
+        reader
+            .start(task_iterator, notifier, self.sender.clone())
+            .map_err(|err| ExecutorError::ResourcesUnavailable(err.to_string()))?;
+
+        debug!("Execute called, creating execution adapter {}", index);
+
+        let mut readers = self
+            .readers
+            .lock()
+            .expect("The iterator adapter map lock is poisoned");
+
+        readers.insert(index, reader);
+
+        Ok(())
+    }
+}
+
+impl SubSchedulerHandler for ExecutionTaskSubmitter {
     fn pass_scheduler(
         &mut self,
         task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
         notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), String> {
-        self.execute(task_iterator, notifier)
+        self.submit(task_iterator, notifier)
             .map_err(|err| format!("{}", err))
-    }
-}
-
-#[derive(Debug)]
-pub enum ExecutorError {
-    // The Executor has not been started, and so calling `execute` will return an error.
-    NotStarted,
-    // The Executor has had start called more than once.
-    AlreadyStarted(String),
-
-    ResourcesUnavailable(String),
-}
-
-impl std::error::Error for ExecutorError {}
-
-impl std::fmt::Display for ExecutorError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            ExecutorError::NotStarted => f.write_str("Executor not started"),
-            ExecutorError::AlreadyStarted(ref msg) => {
-                write!(f, "Executor already started: {}", msg)
-            }
-            ExecutorError::ResourcesUnavailable(ref msg) => {
-                write!(f, "Resource Unavailable: {}", msg)
-            }
-        }
     }
 }
 
@@ -178,6 +194,9 @@ mod tests {
         ]);
 
         executor.start().expect("Executor did not correctly start");
+        let task_submitter = executor
+            .execution_task_submitter()
+            .expect("Unable to create a task executor.");
 
         let iterator1 = MockTaskExecutionIterator::new();
         let notifier1 = MockExecutionTaskCompletionNotifier::new();
@@ -185,12 +204,12 @@ mod tests {
         let iterator2 = MockTaskExecutionIterator::new();
         let notifier2 = MockExecutionTaskCompletionNotifier::new();
 
-        executor
-            .execute(Box::new(iterator1), Box::new(notifier1.clone()))
+        task_submitter
+            .submit(Box::new(iterator1), Box::new(notifier1.clone()))
             .expect("Start has been called so the executor can execute");
 
-        executor
-            .execute(Box::new(iterator2), Box::new(notifier2.clone()))
+        task_submitter
+            .submit(Box::new(iterator2), Box::new(notifier2.clone()))
             .expect("Start has been called so the executor can execute");
 
         adapter1.register("test1", "1.0");
