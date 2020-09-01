@@ -1,6 +1,6 @@
 **/*.rs.bk
 
-/target
+**/target
 /Cargo.lock
 
 # Editor files
