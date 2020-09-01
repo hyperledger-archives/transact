@@ -487,6 +487,85 @@ mod tests {
         assert_eq!(result, invalid_receipt_from_batch(batch));
     }
 
+    /// Tests a simple scheduler workflow of processing two batches; this tests the
+    /// scheduler's task iterator, notifier, and result callback functionality.
+    ///
+    /// For the purposes of this test, we simply return an invalid transactions
+    /// as we are not testing the actual execution of the transactions but
+    /// rather the flow of getting a result after adding the batch.
+    ///
+    /// Also verifies that a None is sent to the result callback, once all batches are handled
+    /// if the scheduler is finalized
+    pub fn test_scheduler_flow_with_two_batches(scheduler: &mut dyn Scheduler) {
+        // Use a channel to pass the result to this test
+        let (tx, rx) = mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |result| {
+                tx.send(result).expect("Failed to send result");
+            }))
+            .expect("Failed to set result callback");
+
+        // Add batches to scheduler
+        let batches = mock_batches_with_one_transaction(2);
+        for batch in batches.iter() {
+            scheduler
+                .add_batch(batch.clone())
+                .expect("Failed to add batch");
+        }
+
+        // finalize scheduler so a None will be returned when the batches complete
+        scheduler.finalize().expect("Unable to finalize scheduler");
+
+        // Simulate retrieving the execution task, executing it, and sending the notification
+        let mut task_iterator = scheduler
+            .take_task_iterator()
+            .expect("Failed to get task iterator");
+        let notifier = scheduler
+            .new_notifier()
+            .expect("Failed to get new notifier");
+
+        // set first batch to invalid
+        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+            mock_context_id(),
+            InvalidTransactionResult {
+                transaction_id: task_iterator
+                    .next()
+                    .expect("Failed to get task")
+                    .pair()
+                    .transaction()
+                    .header_signature()
+                    .into(),
+                error_message: String::new(),
+                error_data: vec![],
+            },
+        ));
+
+        // set second batch to invalid
+        notifier.notify(ExecutionTaskCompletionNotification::Invalid(
+            mock_context_id(),
+            InvalidTransactionResult {
+                transaction_id: task_iterator
+                    .next()
+                    .expect("Failed to get task")
+                    .pair()
+                    .transaction()
+                    .header_signature()
+                    .into(),
+                error_message: String::new(),
+                error_data: vec![],
+            },
+        ));
+
+        // Verify that the correct result is returned for each batch
+        for batch in batches {
+            let result = rx.recv().expect("Failed to receive result");
+            assert_eq!(result, invalid_receipt_from_batch(batch));
+        }
+        // Verify that None is returned since all batches have been completed
+        let result = rx.recv().expect("Failed to receive result");
+        assert_eq!(result, None);
+    }
+
     /// Tests a simple scheduler workflow of processing a single batch with three transactions.
     pub fn test_scheduler_flow_with_multiple_transactions(scheduler: &mut dyn Scheduler) {
         // Use a channel to pass the result to this test

@@ -174,16 +174,30 @@ impl SchedulerCore {
 
     /// Returns `true` if the scheduler should shutdown; returns `false` otherwise.
     fn try_schedule_next(&mut self) -> Result<bool, CoreError> {
-        if !self.next_ready {
-            return Ok(false);
-        }
-
         if self.current_txn.is_some() {
             return Ok(false);
         }
 
         if self.current_batch.is_none() {
             let mut shared = self.shared_lock.lock()?;
+
+            // If their are no unscheduled batches, check if scheduler should shutdown
+            if shared.unscheduled_batches_is_empty() {
+                // If the scheduler is finalized, no more batches will be added; send a `None`
+                // result to let the calling code know that all results have been sent, then
+                // return `true` to indicate that the scheduler should shutdown.
+                if shared.finalized() {
+                    shared.result_callback()(None);
+                    return Ok(true);
+                }
+                // if not finalized, don't shutdown
+                return Ok(false);
+            }
+
+            if !self.next_ready {
+                return Ok(false);
+            }
+
             match shared.pop_unscheduled_batch() {
                 Some(unscheduled_batch) => {
                     self.txn_queue =
@@ -191,13 +205,9 @@ impl SchedulerCore {
                     self.current_batch = Some(unscheduled_batch);
                 }
                 None => {
-                    // If the scheduler is finalized, no more batches will be added; send a `None`
-                    // result to let the calling code know that all results have been sent, then
-                    // return `true` to indicate that the scheduler should shutdown.
-                    if shared.finalized() {
-                        shared.result_callback()(None);
-                    }
-                    return Ok(true);
+                    return Err(CoreError::Internal(
+                        "No batch returned from non empty unscheduled batches".to_string(),
+                    ))
                 }
             }
         }

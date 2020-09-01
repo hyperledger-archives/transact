@@ -274,6 +274,20 @@ mod tests {
         scheduler.finalize().expect("Failed to finalize");
     }
 
+    /// Tests that a finalized serial scheduler can process two batches with a single transaction
+    /// and return None when finished
+    #[test]
+    pub fn test_serial_scheduler_flow_with_two_batches() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+        test_scheduler_flow_with_two_batches(&mut scheduler);
+
+        // Scheduler was finalized and all batches/transactions have "executed", so it has already
+        // shutdown
+    }
+
     /// Tests that the serial scheduler can process a batch with multiple transactions.
     #[test]
     pub fn test_serial_scheduler_flow_with_multiple_transactions() {
