@@ -24,6 +24,7 @@ pub enum ContextManagerError {
     MissingContextError(String),
     TransactionReceiptBuilderError(TransactionReceiptBuilderError),
     StateReadError(StateReadError),
+    PoisonedLock,
 }
 
 impl Error for ContextManagerError {
@@ -32,6 +33,7 @@ impl Error for ContextManagerError {
             ContextManagerError::MissingContextError(_) => Some(self),
             ContextManagerError::TransactionReceiptBuilderError(ref err) => Some(err),
             ContextManagerError::StateReadError(ref err) => Some(err),
+            ContextManagerError::PoisonedLock => None,
         }
     }
 }
@@ -43,10 +45,13 @@ impl std::fmt::Display for ContextManagerError {
                 write!(f, "Unable to find specified Context: {:?}", s)
             }
             ContextManagerError::TransactionReceiptBuilderError(ref err) => {
-                write!(f, "A TransactionReceiptBuilder error occured: {}", err)
+                write!(f, "A TransactionReceiptBuilder error occurred: {}", err)
             }
             ContextManagerError::StateReadError(ref err) => {
-                write!(f, "A State Read error occured: {}", err)
+                write!(f, "A State Read error occurred: {}", err)
+            }
+            ContextManagerError::PoisonedLock => {
+                f.write_str("A lock was poisoned while executing a context management operation")
             }
         }
     }
