@@ -21,7 +21,7 @@
 use std::sync::mpsc::{channel, Sender};
 use std::thread;
 
-use crate::context::manager::sync::ContextManager;
+use crate::context::manager::ContextManager;
 use crate::context::manager::ContextManagerError;
 use crate::context::ContextId;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError, ExecutionOperationError};

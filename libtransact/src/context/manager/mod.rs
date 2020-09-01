@@ -20,6 +20,7 @@ pub mod sync;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str;
+use std::sync::{Arc, RwLock};
 
 pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
@@ -28,7 +29,7 @@ use crate::state::Read;
 
 #[derive(Clone)]
 pub struct ContextManager {
-    contexts: HashMap<ContextId, Context>,
+    contexts: Arc<RwLock<HashMap<ContextId, Context>>>,
     database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
 }
 
@@ -36,12 +37,18 @@ impl ContextLifecycle for ContextManager {
     /// Creates a Context, and returns the resulting ContextId.
     fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId {
         let new_context = Context::new(state_id, dependent_contexts.to_vec());
-        self.contexts.insert(*new_context.id(), new_context.clone());
+        self.contexts
+            .write()
+            .expect("The context RwLock has been poisoned")
+            .insert(*new_context.id(), new_context.clone());
         *new_context.id()
     }
 
-    fn drop_context(&mut self, _context_id: ContextId) {
-        unimplemented!();
+    fn drop_context(&mut self, context_id: ContextId) {
+        self.contexts
+            .write()
+            .expect("The context RwLock has been poisoned")
+            .remove(&context_id);
     }
 
     /// Generates a valid `TransactionReceipt` based on the information available within the
@@ -51,15 +58,16 @@ impl ContextLifecycle for ContextManager {
         context_id: &ContextId,
         transaction_id: &str,
     ) -> Result<TransactionReceipt, ContextManagerError> {
-        let context = self.get_context(context_id)?;
-        let new_transaction_receipt = TransactionReceiptBuilder::new()
-            .valid()
-            .with_state_changes(context.state_changes().to_vec())
-            .with_events(context.events().to_vec())
-            .with_data(context.data().to_vec())
-            .with_transaction_id(transaction_id.to_string())
-            .build()?;
-        Ok(new_transaction_receipt)
+        self.get_context(context_id, |context| {
+            let new_transaction_receipt = TransactionReceiptBuilder::new()
+                .valid()
+                .with_state_changes(context.state_changes().to_vec())
+                .with_events(context.events().to_vec())
+                .with_data(context.data().to_vec())
+                .with_transaction_id(transaction_id.to_string())
+                .build()?;
+            Ok(new_transaction_receipt)
+        })
     }
 
     fn clone_box(&self) -> Box<dyn ContextLifecycle> {
@@ -70,17 +78,39 @@ impl ContextLifecycle for ContextManager {
 impl ContextManager {
     pub fn new(database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>) -> Self {
         ContextManager {
-            contexts: HashMap::new(),
+            contexts: Arc::new(RwLock::new(HashMap::new())),
             database,
         }
     }
 
-    /// Returns a mutable Context within the ContextManager's Context list specified by the ContextId
-    fn get_context_mut(
-        &mut self,
+    fn with_contexts<F, T>(&self, f: F) -> Result<T, ContextManagerError>
+    where
+        F: Fn(&HashMap<ContextId, Context>) -> Result<T, ContextManagerError>,
+    {
+        let contexts = self
+            .contexts
+            .read()
+            .map_err(|_| ContextManagerError::PoisonedLock)?;
+        f(&contexts)
+    }
+
+    fn with_contexts_mut<F, T>(&self, f: F) -> Result<T, ContextManagerError>
+    where
+        F: FnOnce(&mut HashMap<ContextId, Context>) -> Result<T, ContextManagerError>,
+    {
+        let mut contexts = self
+            .contexts
+            .write()
+            .map_err(|_| ContextManagerError::PoisonedLock)?;
+
+        f(&mut contexts)
+    }
+
+    fn inner_get_context<'a>(
+        contexts: &'a HashMap<ContextId, Context>,
         context_id: &ContextId,
-    ) -> Result<&mut Context, ContextManagerError> {
-        self.contexts.get_mut(context_id).ok_or_else(|| {
+    ) -> Result<&'a Context, ContextManagerError> {
+        contexts.get(context_id).ok_or_else(|| {
             ContextManagerError::MissingContextError(
                 str::from_utf8(context_id)
                     .expect("Unable to generate string from ContextId")
@@ -89,15 +119,33 @@ impl ContextManager {
         })
     }
 
-    /// Returns a Context within the ContextManager's Context list specified by the ContextId
-    fn get_context(&self, context_id: &ContextId) -> Result<&Context, ContextManagerError> {
-        self.contexts.get(context_id).ok_or_else(|| {
+    fn inner_get_context_mut<'a>(
+        contexts: &'a mut HashMap<ContextId, Context>,
+        context_id: &ContextId,
+    ) -> Result<&'a mut Context, ContextManagerError> {
+        contexts.get_mut(context_id).ok_or_else(|| {
             ContextManagerError::MissingContextError(
                 str::from_utf8(context_id)
                     .expect("Unable to generate string from ContextId")
                     .to_string(),
             )
         })
+    }
+
+    /// Returns a mutable Context within the ContextManager's Context list specified by the ContextId
+    fn get_context_mut<F, T>(&self, context_id: &ContextId, f: F) -> Result<T, ContextManagerError>
+    where
+        F: FnOnce(&mut Context) -> Result<T, ContextManagerError>,
+    {
+        self.with_contexts_mut(|contexts| f(Self::inner_get_context_mut(contexts, context_id)?))
+    }
+
+    /// Returns a Context within the ContextManager's Context list specified by the ContextId
+    fn get_context<F, T>(&self, context_id: &ContextId, f: F) -> Result<T, ContextManagerError>
+    where
+        F: Fn(&Context) -> Result<T, ContextManagerError>,
+    {
+        self.with_contexts(|contexts| f(Self::inner_get_context(contexts, context_id)?))
     }
 
     /// Get the values associated with list of keys, from a specific Context.
@@ -108,126 +156,135 @@ impl ContextManager {
         context_id: &ContextId,
         keys: &[String],
     ) -> Result<Vec<(String, Vec<u8>)>, ContextManagerError> {
-        let mut key_values = Vec::new();
-        for key in keys.iter().rev() {
-            let mut context = self.get_context(context_id)?;
-            let mut contexts = VecDeque::new();
-            for context_id in context.base_contexts().iter() {
-                contexts.push_back(self.get_context(context_id)?);
-            }
-            if !context.contains(&key) && !contexts.is_empty() {
-                while let Some(current_context) = contexts.pop_front() {
-                    if current_context.contains(&key) {
-                        context = current_context;
-                        break;
-                    } else {
-                        context = current_context;
-                        for context_id in context.base_contexts().iter() {
-                            contexts.push_back(self.get_context(context_id)?);
+        self.with_contexts(|context_map| {
+            let mut key_values = Vec::new();
+            for key in keys.iter().rev() {
+                let mut context = Self::inner_get_context(context_map, context_id)?;
+                let mut contexts = VecDeque::new();
+                for context_id in context.base_contexts().iter() {
+                    contexts.push_back(Self::inner_get_context(context_map, context_id)?);
+                }
+                if !context.contains(&key) && !contexts.is_empty() {
+                    while let Some(current_context) = contexts.pop_front() {
+                        if current_context.contains(&key) {
+                            context = current_context;
+                            break;
+                        } else {
+                            context = current_context;
+                            for context_id in context.base_contexts().iter() {
+                                contexts
+                                    .push_back(Self::inner_get_context(context_map, context_id)?);
+                            }
                         }
                     }
                 }
-            }
-            if context.contains(&key) {
-                if let Some(StateChange::Set { key: k, value: v }) = context
-                    .state_changes()
-                    .iter()
-                    .rev()
-                    .find(|state_change| state_change.has_key(&key))
+                if context.contains(&key) {
+                    if let Some(StateChange::Set { key: k, value: v }) = context
+                        .state_changes()
+                        .iter()
+                        .rev()
+                        .find(|state_change| state_change.has_key(&key))
+                    {
+                        key_values.push((k.clone(), v.clone()));
+                    }
+                } else if let Some(v) = self
+                    .database
+                    .get(context.state_id(), &[key.to_string()])?
+                    .get(&key.to_string())
                 {
-                    key_values.push((k.clone(), v.clone()));
+                    key_values.push((key.to_string(), v.clone()));
                 }
-            } else if let Some(v) = self
-                .database
-                .get(context.state_id(), &[key.to_string()])?
-                .get(&key.to_string())
-            {
-                key_values.push((key.to_string(), v.clone()));
             }
-        }
-        Ok(key_values)
+            Ok(key_values)
+        })
     }
 
     /// Adds a StateChange::Set to the specified Context
     pub fn set_state(
-        &mut self,
+        &self,
         context_id: &ContextId,
         key: String,
         value: Vec<u8>,
     ) -> Result<(), ContextManagerError> {
-        let context = self.get_context_mut(context_id)?;
-        context.set_state(key, value);
-        Ok(())
+        self.get_context_mut(context_id, move |context| {
+            context.set_state(key, value);
+            Ok(())
+        })
     }
 
     /// Adds a StateChange::Delete to the specified Context, returning the value, if found, that is
     /// associated with the specified key.
     pub fn delete_state(
-        &mut self,
+        &self,
         context_id: &ContextId,
         key: &str,
     ) -> Result<Option<Vec<u8>>, ContextManagerError> {
         // Adding a StateChange::Delete to the specified Context, which will occur no matter which
         // Context or State the key and associated value is found in.
-        let context_value = self.get_context_mut(context_id)?.delete_state(key);
-        if let Some(value) = context_value {
-            return Ok(Some(value));
-        }
+        self.with_contexts_mut(|context_map| {
+            let context_value =
+                Self::inner_get_context_mut(context_map, context_id)?.delete_state(key);
+            if let Some(value) = context_value {
+                return Ok(Some(value));
+            }
 
-        let current_context = self.get_context(context_id)?;
-        let mut containing_context = self.get_context(context_id)?;
+            let current_context = Self::inner_get_context(context_map, context_id)?;
+            let mut containing_context = Self::inner_get_context(context_map, context_id)?;
 
-        let mut contexts = VecDeque::new();
-        contexts.push_front(containing_context);
-        // Adding dependent Contexts to search for the Key
-        for context_id in containing_context.base_contexts().iter() {
-            contexts.push_back(self.get_context(context_id)?);
-        }
+            let mut contexts = VecDeque::new();
+            contexts.push_front(containing_context);
+            // Adding dependent Contexts to search for the Key
+            for context_id in containing_context.base_contexts().iter() {
+                contexts.push_back(Self::inner_get_context(context_map, context_id)?);
+            }
 
-        while let Some(context) = contexts.pop_front() {
-            if context.contains(&key) {
-                containing_context = context;
-                break;
-            } else {
-                for context_id in context.base_contexts().iter() {
-                    contexts.push_back(self.get_context(context_id)?);
+            while let Some(context) = contexts.pop_front() {
+                if context.contains(&key) {
+                    containing_context = context;
+                    break;
+                } else {
+                    for context_id in context.base_contexts().iter() {
+                        contexts.push_back(Self::inner_get_context(context_map, context_id)?);
+                    }
                 }
             }
-        }
-        if containing_context.contains(&key) {
-            if let Some(v) = containing_context.get_state(&key) {
-                return Ok(Some(v.to_vec()));
+            if containing_context.contains(&key) {
+                if let Some(v) = containing_context.get_state(&key) {
+                    return Ok(Some(v.to_vec()));
+                }
+            } else if let Some(value) = self
+                .database
+                .get(current_context.state_id(), &[key.to_string()])?
+                .get(&key.to_string())
+            {
+                return Ok(Some(value.to_vec()));
             }
-        } else if let Some(value) = self
-            .database
-            .get(current_context.state_id(), &[key.to_string()])?
-            .get(&key.to_string())
-        {
-            return Ok(Some(value.to_vec()));
-        }
-        Ok(None)
+            Ok(None)
+        })
     }
 
     /// Adds an Event to the specified Context.
     pub fn add_event(
-        &mut self,
+        &self,
         context_id: &ContextId,
         event: Event,
     ) -> Result<(), ContextManagerError> {
-        let context = self.get_context_mut(&context_id)?;
-        context.add_event(event);
-        Ok(())
+        self.get_context_mut(&context_id, |context| {
+            context.add_event(event);
+            Ok(())
+        })
     }
 
     /// Adds Data to the specified Context.
     pub fn add_data(
-        &mut self,
+        &self,
         context_id: &ContextId,
         data: Vec<u8>,
     ) -> Result<(), ContextManagerError> {
-        let context = self.get_context_mut(&context_id)?;
-        context.add_data(data);
-        Ok(())
+        self.get_context_mut(&context_id, |context| {
+            context.add_data(data);
+            Ok(())
+        })
     }
 }
 
@@ -259,6 +316,18 @@ mod tests {
          f2edd5f22960d76e402e6c07c90b7816374891d698310dd25d9b88dce7dbcba8219d9f7c9cae1861",
     );
     static ATTR2: (&str, &str) = ("block_num", "3");
+
+    impl ContextManager {
+        fn len(&self) -> usize {
+            self.with_contexts(|contexts| Ok(contexts.len()))
+                .expect("Unable to get length")
+        }
+
+        fn context_clone(&self, context_id: &ContextId) -> Option<Context> {
+            self.with_contexts(|contexts| Ok(contexts.get(context_id).cloned()))
+                .expect("Unable to read contexts")
+        }
+    }
 
     fn make_manager(state_changes: Option<Vec<state::StateChange>>) -> (ContextManager, String) {
         let state = HashMapState::new();
@@ -303,13 +372,13 @@ mod tests {
     fn create_contexts() {
         let (mut manager, state_id) = make_manager(None);
         let first_context_id = manager.create_context(&[], &state_id);
-        assert!(!manager.contexts.is_empty());
-        assert!(manager.contexts.get(&first_context_id).is_some());
+        assert_eq!(manager.len(), 1);
+        assert!(manager.context_clone(&first_context_id).is_some());
 
         let second_context_id = manager.create_context(&[], &state_id);
-        let second_context = manager.get_context(&second_context_id).unwrap();
+        let second_context = manager.context_clone(&second_context_id).unwrap();
         assert_eq!(&second_context_id, second_context.id());
-        assert_eq!(manager.contexts.len(), 2);
+        assert_eq!(manager.len(), 2);
     }
 
     #[test]
@@ -327,7 +396,7 @@ mod tests {
             .unwrap();
         let event_add_result = manager.add_event(&context_id, event.clone());
         assert!(event_add_result.is_ok());
-        let context = manager.get_context(&context_id).unwrap();
+        let context = manager.context_clone(&context_id).unwrap();
         assert_eq!(context.events()[0], event.clone());
     }
 
@@ -337,7 +406,7 @@ mod tests {
         let context_id = manager.create_context(&[], &state_id);
 
         let data_add_result = manager.add_data(&context_id, BYTES2.to_vec());
-        let context = manager.get_context(&context_id).unwrap();
+        let context = manager.context_clone(&context_id).unwrap();
         assert!(data_add_result.is_ok());
         assert_eq!(context.data()[0], BYTES2);
     }
@@ -347,7 +416,7 @@ mod tests {
         let (mut manager, state_id) = make_manager(None);
 
         let context_id = manager.create_context(&[], &state_id);
-        let mut context = manager.get_context(&context_id).unwrap();
+        let mut context = manager.context_clone(&context_id).unwrap();
         assert_eq!(&context_id, context.id());
 
         let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
@@ -367,12 +436,12 @@ mod tests {
             .unwrap();
         let event_add_result = manager.add_event(&context_id, event.clone());
         assert!(event_add_result.is_ok());
-        context = manager.get_context(&context_id).unwrap();
+        context = manager.context_clone(&context_id).unwrap();
         assert_eq!(context.events()[0], event.clone());
 
         // Adding Data to the Context, to be used to build the TransactionReceipt
         let data_add_result = manager.add_data(&context_id, BYTES2.to_vec());
-        context = manager.get_context(&context_id).unwrap();
+        context = manager.context_clone(&context_id).unwrap();
         assert!(data_add_result.is_ok());
         assert_eq!(context.data()[0], BYTES2);
 
@@ -390,11 +459,8 @@ mod tests {
         let set_result = manager.set_state(&context_id, KEY1.to_string(), BYTES3.to_vec());
         assert!(set_result.is_ok());
 
-        let get_value = manager
-            .get_context(&context_id)
-            .unwrap()
-            .get_state(&KEY1.to_string());
-        assert_eq!(get_value, Some(BYTES3.as_ref()));
+        let get_value = manager.get(&context_id, &[KEY1.to_string()]).unwrap();
+        assert_eq!(get_value, vec![(KEY1.to_string(), BYTES3.to_vec())]);
     }
 
     #[test]

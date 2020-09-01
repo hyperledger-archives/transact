@@ -43,7 +43,7 @@ use crate::protocol::transaction::{TransactionHeader, TransactionPair};
 /// can be adapted as follows:
 ///
 ///     # use sawtooth_xo::handler::XoTransactionHandler;
-///     # use transact::context::manager::sync::ContextManager;
+///     # use transact::context::manager::ContextManager;
 ///     # use transact::database::btree::BTreeDatabase;
 ///     # use transact::execution::adapter::static_adapter::StaticExecutionAdapter;
 ///     # use transact::sawtooth::SawtoothToTransactHandlerAdapter;
@@ -217,13 +217,12 @@ fn to_context_error(err: ContextError) -> SawtoothContextError {
 
 #[cfg(test)]
 mod xo_compat_test {
-    use std::panic;
     use std::sync::{Arc, Mutex};
 
     use sawtooth_xo::handler::XoTransactionHandler;
     use sha2::{Digest, Sha512};
 
-    use crate::context::manager::sync::ContextManager;
+    use crate::context::manager::ContextManager;
     use crate::database::{btree::BTreeDatabase, Database};
     use crate::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
     use crate::protocol::{
@@ -253,49 +252,45 @@ mod xo_compat_test {
 
         let test_executor = executor.clone();
 
-        let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = HashSigner::new(vec![00u8, 01, 02]);
 
-            let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+        let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
 
-            let state_root = initial_db_root(&*db);
+        let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+        let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+            .expect("Failed to create scheduler");
 
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler
-                .set_result_callback(Box::new(move |batch_result| {
-                    result_tx
-                        .send(batch_result)
-                        .expect("Unable to send batch result")
-                }))
-                .expect("Failed to set result callback");
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }))
+            .expect("Failed to set result callback");
 
-            scheduler
-                .add_batch(batch_pair)
-                .expect("Failed to add batch");
-            scheduler.finalize().expect("Failed to finalize scheduler");
+        scheduler
+            .add_batch(batch_pair)
+            .expect("Failed to add batch");
+        scheduler.finalize().expect("Failed to finalize scheduler");
 
-            run_schedule(&test_executor, &mut scheduler);
+        run_schedule(&test_executor, &mut scheduler);
 
-            let batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
-                }],
-                batch_result,
-            );
-        });
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
+            }],
+            batch_result,
+        );
 
         stop_executor(&executor);
-
-        assert!(panic_check.is_ok());
     }
 
     ///
@@ -316,70 +311,66 @@ mod xo_compat_test {
 
         let test_executor = executor.clone();
 
-        let panic_check = panic::catch_unwind(move || {
-            let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = HashSigner::new(vec![00u8, 01, 02]);
 
-            let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
-            let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
+        let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+        let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
 
-            let state_root = initial_db_root(&*db);
+        let state_root = initial_db_root(&*db);
 
-            let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
-                .expect("Failed to create scheduler");
+        let mut scheduler = SerialScheduler::new(Box::new(context_manager), state_root.clone())
+            .expect("Failed to create scheduler");
 
-            let (result_tx, result_rx) = std::sync::mpsc::channel();
-            scheduler
-                .set_result_callback(Box::new(move |batch_result| {
-                    result_tx
-                        .send(batch_result)
-                        .expect("Unable to send batch result")
-                }))
-                .expect("Failed to set result callback");
+        let (result_tx, result_rx) = std::sync::mpsc::channel();
+        scheduler
+            .set_result_callback(Box::new(move |batch_result| {
+                result_tx
+                    .send(batch_result)
+                    .expect("Unable to send batch result")
+            }))
+            .expect("Failed to set result callback");
 
-            scheduler
-                .add_batch(create_batch_pair)
-                .expect("Failed to add 1st batch");
-            scheduler
-                .add_batch(take_batch_pair)
-                .expect("Failed to add 2nd batch");
-            scheduler.finalize().expect("Failed to finalize scheduler");
+        scheduler
+            .add_batch(create_batch_pair)
+            .expect("Failed to add 1st batch");
+        scheduler
+            .add_batch(take_batch_pair)
+            .expect("Failed to add 2nd batch");
+        scheduler.finalize().expect("Failed to finalize scheduler");
 
-            run_schedule(&test_executor, &mut scheduler);
+        run_schedule(&test_executor, &mut scheduler);
 
-            let create_batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let create_batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            let take_batch_result = result_rx
-                .recv()
-                .expect("Unable to receive result from executor")
-                .expect("Should not have received None from the executor");
+        let take_batch_result = result_rx
+            .recv()
+            .expect("Unable to receive result from executor")
+            .expect("Should not have received None from the executor");
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
-                }],
-                create_batch_result,
-            );
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: "my_game,---------,P1-NEXT,,".as_bytes().to_vec(),
+            }],
+            create_batch_result,
+        );
 
-            assert_state_changes(
-                vec![StateChange::Set {
-                    key: calculate_game_address("my_game"),
-                    value: format!(
-                        "my_game,X--------,P2-NEXT,{},",
-                        hex::encode(signer.public_key())
-                    )
-                    .into_bytes(),
-                }],
-                take_batch_result,
-            );
-        });
+        assert_state_changes(
+            vec![StateChange::Set {
+                key: calculate_game_address("my_game"),
+                value: format!(
+                    "my_game,X--------,P2-NEXT,{},",
+                    hex::encode(signer.public_key())
+                )
+                .into_bytes(),
+            }],
+            take_batch_result,
+        );
 
         stop_executor(&executor);
-
-        assert!(panic_check.is_ok());
     }
 
     fn assert_state_changes(

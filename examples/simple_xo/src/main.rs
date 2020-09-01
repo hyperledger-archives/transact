@@ -14,7 +14,7 @@
 // limitations under the License.
 
 use sawtooth_xo::handler::XoTransactionHandler;
-use transact::context::manager::sync::ContextManager;
+use transact::context::manager::ContextManager;
 use transact::database::{btree::BTreeDatabase, Database};
 use transact::execution::{adapter::static_adapter::StaticExecutionAdapter, executor::Executor};
 use transact::protocol::receipt::{Event, TransactionResult};
