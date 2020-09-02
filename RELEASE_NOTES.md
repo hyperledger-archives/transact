@@ -1,5 +1,46 @@
 # Release Notes
 
+## Changes in Transact 0.3.0
+
+### Highlights
+
+* The `contract-archive` feature has been stabilized. This feature guards the
+  smart contract archive (scar) functionality.
+* The `transact::signing` module has been replaced by the `cylinder` library
+  crate.
+
+### libsplinter Updates
+
+* Update the `sawtooth-sdk` and `sawtooth-xo` dependencies to `0.4`.
+* Add a `clone_box` method to `ContextLifecycle` that enables the trait to be
+  clone-able.
+* Add the `ExecutionTaskSubmitter` for submitting tasks to the executor. This
+  struct is thread-safe and allows a single executor to be used across threads.
+* Update the `families::command::make_command_transaction` function to take a
+  signer for signing the transaction.
+* Refactor the `XoTransactionWorkload` and `XoBatchWorkload` to take optional
+  workload seeds and signers.
+
+#### Scheduler
+
+* Add the `SchedulerFactory` trait for creating generic schedulers, along with
+  implementations for `MultiScheduler` and `SerialScheduler`.
+* Require implementations of the `Scheduler` trait to have the `Send` marker
+  trait.
+* Change the `Scheduler::cancel` method to abort and return any in-progress
+  batches.
+* Change the `Scheduler::cancel` method to send a `None` execution result if the
+  scheduler is finished.
+* Update all schedulers to shut themselves down when they are finished and have
+  no more batches to execute.
+* Fix a bug in the serial scheduler where a `None` execution result was not sent
+  when the scheduler was finalized with a non-empty batch queue.
+
+### CI Changes
+
+* Enable nightly builds to catch any breaking changes in dependencies or
+  upstream tools.
+
 ## Changes in Transact 0.2.4
 
 ### Experimental Changes
