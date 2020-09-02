@@ -219,6 +219,7 @@ fn to_context_error(err: ContextError) -> SawtoothContextError {
 mod xo_compat_test {
     use std::panic;
 
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     use sawtooth_xo::handler::XoTransactionHandler;
     use sha2::{Digest, Sha512};
 
@@ -234,7 +235,6 @@ mod xo_compat_test {
         transaction::{HashMethod, TransactionBuilder},
     };
     use crate::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
-    use crate::signing::{hash::HashSigner, Signer};
     use crate::state::merkle::{self, MerkleRadixTree, MerkleState};
 
     use super::*;
@@ -257,9 +257,9 @@ mod xo_compat_test {
             .execution_task_submitter()
             .expect("Unable to get task submitter form started executor");
 
-        let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = new_signer();
 
-        let batch_pair = create_batch(&signer, "my_game", "my_game,create,");
+        let batch_pair = create_batch(&*signer, "my_game", "my_game,create,");
 
         let state_root = initial_db_root(&*db);
 
@@ -318,10 +318,10 @@ mod xo_compat_test {
             .execution_task_submitter()
             .expect("Unable to get task submitter form started executor");
 
-        let signer = HashSigner::new(vec![00u8, 01, 02]);
+        let signer = new_signer();
 
-        let create_batch_pair = create_batch(&signer, "my_game", "my_game,create,");
-        let take_batch_pair = create_batch(&signer, "my_game", "my_game,take,1");
+        let create_batch_pair = create_batch(&*signer, "my_game", "my_game,create,");
+        let take_batch_pair = create_batch(&*signer, "my_game", "my_game,take,1");
 
         let state_root = initial_db_root(&*db);
 
@@ -370,7 +370,10 @@ mod xo_compat_test {
                 key: calculate_game_address("my_game"),
                 value: format!(
                     "my_game,X--------,P2-NEXT,{},",
-                    hex::encode(signer.public_key())
+                    signer
+                        .public_key()
+                        .expect("Failed to get public key")
+                        .as_hex(),
                 )
                 .into_bytes(),
             }],
@@ -403,7 +406,6 @@ mod xo_compat_test {
     fn create_batch(signer: &dyn Signer, game_name: &str, payload: &str) -> BatchPair {
         let game_address = calculate_game_address(game_name);
         let txn_pair = TransactionBuilder::new()
-            .with_batcher_public_key(signer.public_key().to_vec())
             .with_family_name("xo".to_string())
             .with_family_version("1.0".to_string())
             .with_inputs(vec![hex::decode(&game_address).unwrap()])
@@ -455,5 +457,11 @@ mod xo_compat_test {
             MerkleRadixTree::new(db.clone_box(), None).expect("Cannot initialize merkle database");
 
         merkle_db.get_merkle_root()
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 }

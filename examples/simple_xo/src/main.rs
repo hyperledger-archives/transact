@@ -13,6 +13,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 use sawtooth_xo::handler::XoTransactionHandler;
 use transact::context::{manager::sync::ContextManager, ContextLifecycle};
 use transact::database::btree::BTreeDatabase;
@@ -28,7 +29,6 @@ use transact::protocol::{
 };
 use transact::sawtooth::SawtoothToTransactHandlerAdapter;
 use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
-use transact::signing::{hash::HashSigner, Signer};
 use transact::state::merkle::{self, MerkleRadixTree, MerkleState};
 use transact::state::StateChange as ChangeSet;
 use transact::state::Write;
@@ -53,12 +53,12 @@ fn main() {
         .expect("Unable to get task executor after starting executor");
 
     let orig_root = merkle_db.get_merkle_root();
-    let signer = HashSigner::new(vec![00u8, 1, 2]);
+    let signer = new_signer();
     let current_result = play_game(
         &task_executor,
         Box::new(context_manager.clone()),
         &orig_root,
-        &signer,
+        &*signer,
         "my_game,create,",
     );
     let (game_address, value) = get_state_change(current_result);
@@ -77,7 +77,7 @@ fn main() {
             &task_executor,
             Box::new(context_manager.clone()),
             &state_root,
-            &signer,
+            &*signer,
             &format!("my_game,take,{}", next_tx),
         );
         let (key, value) = get_state_change(current_result);
@@ -92,6 +92,12 @@ fn main() {
             break;
         }
     }
+}
+
+fn new_signer() -> Box<dyn Signer> {
+    let context = Secp256k1Context::new();
+    let key = context.new_random_private_key();
+    context.new_signer(key)
 }
 
 fn print_current_state(value: &[u8]) -> &str {
@@ -211,7 +217,6 @@ fn create_batch(signer: &dyn Signer, game_name: &str, payload: &str) -> BatchPai
     sha.input(game_name);
     let game_address = "5b7349".to_owned() + &hex::encode(&sha.result())[..64];
     let txn_pair = TransactionBuilder::new()
-        .with_batcher_public_key(signer.public_key().to_vec())
         .with_family_name("xo".to_string())
         .with_family_version("1.0".to_string())
         .with_inputs(vec![hex::decode(&game_address).unwrap()])

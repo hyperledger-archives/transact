@@ -30,6 +30,7 @@ repository = "http://github.com/hyperledger/transact"
 [dependencies]
 bzip2 = { version = "0.3", optional = true }
 cbor-codec = { version = "0.7", optional = true }
+cylinder = "0.1"
 glob = { version = "0.3", optional = true }
 hex = "0.3"
 libc = ">=0.2.35"
@@ -50,7 +51,6 @@ serde_derive = { version = "1.0", optional = true }
 serde_yaml = { version = "0.8", optional = true }
 sha2 = "0.8"
 tar = { version = "0.4", optional = true }
-ursa = { version = "0.2.0", optional = true }
 uuid = { version = "0.7", features = ["v4"] }
 
 [dev-dependencies]
@@ -109,7 +109,6 @@ redis-db = ["redis"]
 sawtooth-compat = ["sawtooth-sdk"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 state-merkle = ["cbor-codec"]
-ursa-compat = ["ursa"]
 workload = []
 
 [package.metadata.docs.rs]

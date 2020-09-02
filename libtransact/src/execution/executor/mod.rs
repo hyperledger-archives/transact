@@ -152,16 +152,18 @@ impl SubSchedulerHandler for ExecutionTaskSubmitter {
 
 #[cfg(test)]
 mod tests {
-
     use super::*;
+
+    use std::collections::VecDeque;
+    use std::time::Duration;
+
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
     use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTask;
     use crate::scheduler::ExecutionTaskCompletionNotification;
     use crate::scheduler::ExecutionTaskCompletionNotifier;
-    use crate::signing::{hash::HashSigner, Signer};
-    use std::collections::VecDeque;
-    use std::time::Duration;
 
     static FAMILY_NAME1: &str = "test1";
     static FAMILY_NAME2: &str = "test2";
@@ -257,7 +259,6 @@ mod tests {
 
     impl MockTaskExecutionIterator {
         fn new() -> Self {
-            let signer = HashSigner::default();
             let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 
             let family_name = |i| {
@@ -268,9 +269,11 @@ mod tests {
                 }
             };
 
+            let signer = new_signer();
+
             MockTaskExecutionIterator {
                 tasks: (0..NUMBER_OF_TRANSACTIONS)
-                    .map(move |i| create_txn(&signer, family_name(i)))
+                    .map(move |i| create_txn(&*signer, family_name(i)))
                     .map(move |txn_pair| ExecutionTask::new(txn_pair, context_id.clone()))
                     .collect(),
             }
@@ -316,5 +319,11 @@ mod tests {
         fn clone_box(&self) -> Box<dyn ExecutionTaskCompletionNotifier> {
             Box::new(self.clone())
         }
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 }

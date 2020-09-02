@@ -20,6 +20,7 @@ authors = ["IBM Corp.", "Cargill Incorporated"]
 edition = "2018"
 
 [dependencies]
+cylinder = "0.1"
 transact = { path = "../../libtransact", features = ["sawtooth-compat"] }
 sawtooth-xo = "0.4"
 hex = "0.3"
