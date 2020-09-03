@@ -1,5 +1,12 @@
 # Release Notes
 
+## Changes in Transact 0.3.1
+
+### Highlights
+
+* Update the `sawtooth-sdk` version to 0.5. The sawtooth-sdk is used for the
+  `sawtooth-compat` feature.
+
 ## Changes in Transact 0.3.0
 
 ### Highlights
