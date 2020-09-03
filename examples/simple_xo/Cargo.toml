@@ -22,7 +22,7 @@ edition = "2018"
 [dependencies]
 cylinder = "0.1"
 transact = { path = "../../libtransact", features = ["sawtooth-compat"] }
-sawtooth-xo = "0.4"
+sawtooth-xo = "0.5"
 hex = "0.3"
 sha2 = "0.8"
 
