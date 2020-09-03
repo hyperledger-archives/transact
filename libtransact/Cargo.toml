@@ -54,7 +54,7 @@ tar = { version = "0.4", optional = true }
 uuid = { version = "0.7", features = ["v4"] }
 
 [dev-dependencies]
-sawtooth-xo = "0.4"
+sawtooth-xo = "0.5"
 serial_test = "0.3"
 tempdir = "0.3"
 
