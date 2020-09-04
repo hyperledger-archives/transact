@@ -16,7 +16,7 @@
 * The `transact::signing` module has been replaced by the `cylinder` library
   crate.
 
-### libsplinter Updates
+### libtransact Updates
 
 * Update the `sawtooth-sdk` and `sawtooth-xo` dependencies to `0.4`.
 * Add a `clone_box` method to `ContextLifecycle` that enables the trait to be
