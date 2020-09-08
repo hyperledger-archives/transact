@@ -15,7 +15,7 @@
 #[macro_use]
 extern crate clap;
 
-use log::Level;
+use log::LevelFilter;
 
 use sawtooth_sabre::handler::SabreTransactionHandler;
 use sawtooth_sdk::processor::TransactionProcessor;
@@ -29,15 +29,15 @@ fn main() {
         (@arg verbose: -v --verbose +multiple
          "increase output verbosity"))
     .get_matches();
-
+    let logger = simple_logger::SimpleLogger::new();
     let logger = match matches.occurrences_of("verbose") {
-        0 => simple_logger::init_with_level(Level::Warn),
-        1 => simple_logger::init_with_level(Level::Info),
-        2 => simple_logger::init_with_level(Level::Debug),
-        _ => simple_logger::init_with_level(Level::Trace),
+        0 => logger.with_level(LevelFilter::Warn),
+        1 => logger.with_level(LevelFilter::Info),
+        2 => logger.with_level(LevelFilter::Debug),
+        _ => logger.with_level(LevelFilter::Trace),
     };
 
-    logger.expect("Failed to create logger");
+    logger.init().expect("Failed to create logger");
 
     let connect = matches
         .value_of("connect")

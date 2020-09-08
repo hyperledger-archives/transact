@@ -30,7 +30,8 @@ protobuf = "2"
 sha2 = "0.8"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-transact = "0.2"
+transact = "0.3"
+cylinder = "0.1"
 
 [build-dependencies]
 protoc-rust = "2.14"

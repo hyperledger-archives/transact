@@ -11,14 +11,12 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-
+#[cfg(not(target_arch = "wasm32"))]
+use cylinder::Signer;
 use protobuf::Message;
 use protobuf::RepeatedField;
 #[cfg(not(target_arch = "wasm32"))]
-use transact::{
-    protocol::transaction::{HashMethod, TransactionBuilder},
-    signing::Signer,
-};
+use transact::protocol::transaction::{HashMethod, TransactionBuilder};
 
 use std::error::Error as StdError;
 
@@ -2166,6 +2164,7 @@ pub enum SabrePayloadBuildError {
     InvalidAction(String),
     MissingField(String),
     ProtoConversionError(String),
+    SigningError(String),
 }
 
 impl StdError for SabrePayloadBuildError {
@@ -2175,6 +2174,7 @@ impl StdError for SabrePayloadBuildError {
             SabrePayloadBuildError::InvalidAction(ref msg) => msg,
             SabrePayloadBuildError::MissingField(ref msg) => msg,
             SabrePayloadBuildError::ProtoConversionError(ref msg) => msg,
+            SabrePayloadBuildError::SigningError(ref msg) => msg,
         }
     }
 }
@@ -2188,6 +2188,7 @@ impl std::fmt::Display for SabrePayloadBuildError {
             SabrePayloadBuildError::ProtoConversionError(ref s) => {
                 write!(f, "ProtoConversionError: {}", s)
             }
+            SabrePayloadBuildError::SigningError(ref s) => write!(f, "SigningError: {}", s),
         }
     }
 }
@@ -2324,12 +2325,18 @@ impl SabrePayloadBuilder {
             Action::CreateSmartPermission(CreateSmartPermissionAction { org_id, name, .. })
             | Action::UpdateSmartPermission(UpdateSmartPermissionAction { org_id, name, .. })
             | Action::DeleteSmartPermission(DeleteSmartPermissionAction { org_id, name, .. }) => {
+                let public_key = signer.public_key().map_err(|err| {
+                    SabrePayloadBuildError::SigningError(format!(
+                        "Unable to get public key from signer: {}",
+                        err
+                    ))
+                })?;
                 let addresses = vec![
                     compute_smart_permission_address(&org_id, &name)?,
                     // This converts the public key to a hex string and gets the raw bytes of that
                     // string; this is required because it is how the agent addresses is calculated
                     // by the Sabre transaction processor.
-                    compute_agent_address(bytes_to_hex_str(signer.public_key()).as_bytes())?,
+                    compute_agent_address(public_key.as_hex().as_bytes())?,
                     compute_org_address(&org_id)?,
                 ];
                 (addresses.clone(), addresses)
@@ -2371,18 +2378,11 @@ fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
     Ok(res)
 }
 
-fn bytes_to_hex_str(b: &[u8]) -> String {
-    b.iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<_>>()
-        .join("")
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    use transact::signing::hash::HashSigner;
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
     #[test]
     // check that a create contract action is built correctly
@@ -2872,7 +2872,7 @@ mod tests {
     // check that a create contract can be converted -> sabre payload builder -> transaction
     // builder -> transaction
     fn create_contract_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = CreateContractActionBuilder::new()
             .with_name("TestContract".to_string())
@@ -2882,9 +2882,9 @@ mod tests {
             .with_contract(b"test".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -2901,16 +2901,16 @@ mod tests {
     // check that a delete contract can be converted -> sabre payload builder -> transaction
     // builder -> transaction
     fn delete_contract_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = DeleteContractActionBuilder::new()
             .with_name("TestContract".to_string())
             .with_version("0.1".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -2927,7 +2927,7 @@ mod tests {
     // check that an execute contract can be converted -> sabre payload builder -> transaction
     // builder -> transaction
     fn execute_contract_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = ExecuteContractActionBuilder::new()
             .with_name("TestContract".to_string())
@@ -2937,9 +2937,9 @@ mod tests {
             .with_payload(b"test_payload".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -2956,16 +2956,16 @@ mod tests {
     // check that a create contract registry can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn create_contract_registry_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = CreateContractRegistryActionBuilder::new()
             .with_name("TestContract".to_string())
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -2982,15 +2982,15 @@ mod tests {
     // check that a delete contract registry can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn delete_contract_registry_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = DeleteContractRegistryActionBuilder::new()
             .with_name("TestContract".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3007,16 +3007,16 @@ mod tests {
     // check that an update contract registry owners can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn update_contract_registry_owners_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = UpdateContractRegistryOwnersActionBuilder::new()
             .with_name("TestContract".to_string())
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3033,16 +3033,16 @@ mod tests {
     // check that a create namespace registry can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn create_namespace_registry_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = CreateNamespaceRegistryActionBuilder::new()
             .with_namespace("TestNamespace".to_string())
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3059,15 +3059,15 @@ mod tests {
     // check that a delete namespace registry can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn delete_namespace_registry_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = DeleteNamespaceRegistryActionBuilder::new()
             .with_namespace("TestNamespace".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3084,16 +3084,16 @@ mod tests {
     // check that a update namespace registry owners can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn update_namespace_registry_owners_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = UpdateNamespaceRegistryOwnersActionBuilder::new()
             .with_namespace("TestNamespace".to_string())
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3110,7 +3110,7 @@ mod tests {
     // check that a create namespace registry permission can be converted -> sabre payload builder
     // -> transaction builder -> transaction
     fn create_namespace_registry_permission_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = CreateNamespaceRegistryPermissionActionBuilder::new()
             .with_namespace("TestNamespace".to_string())
@@ -3119,9 +3119,9 @@ mod tests {
             .with_write(true)
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3138,16 +3138,16 @@ mod tests {
     // check that a delete namespace registry permission can be converted -> sabre payload builder
     // -> transaction builder -> transaction
     fn delete_namespace_registry_permission_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = DeleteNamespaceRegistryPermissionActionBuilder::new()
             .with_namespace("TestNamespace".to_string())
             .with_contract_name("TestContract".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3164,7 +3164,7 @@ mod tests {
     // check that a create smart permission can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn create_smart_permission_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = CreateSmartPermissionActionBuilder::new()
             .with_name("SmartPermission".to_string())
@@ -3172,9 +3172,9 @@ mod tests {
             .with_function(b"test".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3191,7 +3191,7 @@ mod tests {
     // check that a update smart permission can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn update_smart_permission_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = UpdateSmartPermissionActionBuilder::new()
             .with_name("SmartPermission".to_string())
@@ -3199,9 +3199,9 @@ mod tests {
             .with_function(b"test".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3218,16 +3218,16 @@ mod tests {
     // check that a delete smart permission can be converted -> sabre payload builder ->
     // transaction builder -> transaction
     fn delete_smart_permission_into_transaction() {
-        let signer = HashSigner::default();
+        let signer = new_signer();
 
         let txn_pair = DeleteSmartPermissionActionBuilder::new()
             .with_name("SmartPermission".to_string())
             .with_org_id("org_id".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&signer)
+            .into_transaction_builder(&*signer)
             .expect("failed to convert to transaction builder")
-            .build_pair(&signer)
+            .build_pair(&*signer)
             .expect("failed to build transaction pair");
 
         let txn_header = txn_pair.header();
@@ -3238,5 +3238,11 @@ mod tests {
             SABRE_PROTOCOL_VERSION.to_string()
         );
         assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+    }
+
+    fn new_signer() -> Box<dyn Signer> {
+        let context = Secp256k1Context::new();
+        let key = context.new_random_private_key();
+        context.new_signer(key)
     }
 }
