@@ -55,3 +55,13 @@ the Sabre transaction processor image.
 |            |          |           |         |   `into_payload_builder` method|
 |            |          |           |         |   to all `*ActionBuilders`.    |
 +------------+----------+-----------+---------+--------------------------------+
+| 0.6        | 0.6      | 0.6       |  0.5    | - Update sawtooth-sdk version  |
+|            |          |           |         | to 0.5.                        |
+|            |          |           |         | - Updates transact version to  |
+|            |          |           |         | 0.3.                           |
+|            |          |           |         | - Updates TransactionBuilder   |
+|            |          |           |         | to take cylinder `Signer`      |
+|            |          |           |         | instead of transact `Signer`   |
+|            |          |           |         | which was removed in the new   |
+|            |          |           |         | transact version.              |
++------------+----------+-----------+---------+--------------------------------+
