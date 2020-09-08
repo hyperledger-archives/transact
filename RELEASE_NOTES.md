@@ -1,5 +1,15 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.6.0
+
+* Add `add_events` to Sabre TransactionContext which adds events to  the
+  execution result for a transaction. This brings the Sabre API closer to the
+  Sawtooth TransactionContext API.
+* Improve error messages when there is an InvalidTransaction caused by a
+  transaction not being submitted by an authorized admin.
+* Update sawtooth-sdk dependency version to 0.5.
+* Update transact dependency version to 0.3.
+
 ## Changes in Sawtooth Sabre 0.5.2
 
 * Add `Result` class to the AssemblyScript SDK for basic error handling
