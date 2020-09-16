@@ -307,6 +307,10 @@ impl MerkleRadixTree {
         state_changes: &[StateChange],
         is_virtual: bool,
     ) -> Result<String, StateDatabaseError> {
+        if state_changes.is_empty() {
+            return Ok(self.root_hash.clone());
+        }
+
         let mut path_map = HashMap::new();
 
         let mut deletions = HashSet::new();

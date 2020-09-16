@@ -28,6 +28,23 @@ use transact::{
 };
 
 /// 1. Layer a MerkleRadixTree over the given database
+/// 2. Compute the state root hash for an empty change list to the original root
+/// 3. Validate the computed root is the same as the original root
+fn test_merkle_trie_empty_changes(db: Box<dyn Database>) {
+    let merkle_state = MerkleState::new(db.clone());
+    let merkle_db = MerkleRadixTree::new(db.clone(), None)
+        .expect("Could not overlay the merkle tree on the database");
+
+    let orig_root = merkle_db.get_merkle_root();
+
+    let new_state_id = merkle_state
+        .compute_state_id(&orig_root, &[])
+        .expect("Did not supply a state id");
+
+    assert_eq!(orig_root, new_state_id);
+}
+
+/// 1. Layer a MerkleRadixTree over the given database
 /// 2. Apply a Set state change to the original root
 /// 3. Validate that the state has not changed under the original root
 /// 4. Validate that the change log entries have been set
@@ -937,6 +954,12 @@ mod btree {
     use super::*;
 
     #[test]
+    fn merkle_trie_empty_changes() {
+        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+        test_merkle_trie_empty_changes(btree_db);
+    }
+
+    #[test]
     fn merkle_trie_root_advance() {
         let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
         test_merkle_trie_root_advance(btree_db);
@@ -1015,6 +1038,14 @@ mod lmdb {
     };
 
     use super::*;
+
+    #[test]
+    fn merkle_trie_empty_changes() {
+        run_test(|merkle_path| {
+            let db = make_lmdb(&merkle_path);
+            test_merkle_trie_empty_changes(db);
+        })
+    }
 
     #[test]
     fn merkle_trie_root_advance() {
@@ -1172,6 +1203,17 @@ mod redisdb {
     use super::*;
 
     const DEFAULT_REDIS_URL: &str = "redis://localhost:6379/";
+
+    #[test]
+    fn merkle_trie_empty_changes() {
+        run_test(|redis_url, primary| {
+            let db = Box::new(
+                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                    .expect("Unable to create redis database"),
+            );
+            test_merkle_trie_empty_changes(db);
+        })
+    }
 
     #[test]
     fn merkle_trie_root_advance() {
@@ -1349,6 +1391,16 @@ mod sqlitedb {
     };
 
     use super::*;
+
+    #[test]
+    fn merkle_trie_empty_changes() {
+        run_test(|db_path| {
+            let db = Box::new(
+                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+            );
+            test_merkle_trie_empty_changes(db);
+        })
+    }
 
     #[test]
     fn merkle_trie_root_advance() {
