@@ -137,9 +137,20 @@ impl Scheduler for SerialScheduler {
         // Notify the core thread to cancel and wait for it to return an aborted batch
         let (sender, receiver) = mpsc::channel();
         self.core_tx.send(core::CoreMessage::Cancelled(sender))?;
-        let aborted_batch = receiver.recv().map_err(|_| {
-            SchedulerError::Internal("scheduler's core thread did not return aborted batch".into())
-        })?;
+        let aborted_batch = match receiver.recv() {
+            Ok(batch) => batch,
+            Err(_) => {
+                // If the scheduler was already finalized, it's normal for the core thread to have
+                // already shutdown; if it's not finalized, something went wrong.
+                if self.shared_lock.lock()?.finalized() {
+                    None
+                } else {
+                    return Err(SchedulerError::Internal(
+                        "scheduler's core thread did not return aborted batch".into(),
+                    ));
+                }
+            }
+        };
 
         // If there was an aborted batch, add it to the front of the list of unscheduled batches
         if let Some(batch) = aborted_batch {
@@ -316,6 +327,19 @@ mod tests {
     }
 
     // SerialScheduler-specific tests
+
+    /// Verifies that the serial scheduler can be cancelled after finalization when there are no
+    /// unscheduled batches.
+    #[test]
+    fn finalize_then_cancel() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+
+        scheduler.finalize().expect("Failed to finalize");
+        scheduler.cancel().expect("Failed to cancel");
+    }
 
     /// This test verifies that the SerialScheduler executes transactions strictly in order, and
     /// does not return the next execution task until the previous one is completed.
