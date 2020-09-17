@@ -134,14 +134,24 @@ impl Scheduler for SerialScheduler {
     fn cancel(&mut self) -> Result<Vec<BatchPair>, SchedulerError> {
         let mut unscheduled_batches = self.shared_lock.lock()?.drain_unscheduled_batches();
 
-        // Notify the core thread to cancel and wait for it to return an aborted batch
+        // Notify the core thread to cancel and wait for it to return an aborted batch. If the
+        // scheduler was already finalized, it may have already shutdown, which could cause message
+        // sending/receiving to fail. This is normal behavior, so it's ignored. If the scheduler is
+        // not finalized, something went wrong.
         let (sender, receiver) = mpsc::channel();
-        self.core_tx.send(core::CoreMessage::Cancelled(sender))?;
+        if self
+            .core_tx
+            .send(core::CoreMessage::Cancelled(sender))
+            .is_err()
+            && !self.shared_lock.lock()?.finalized()
+        {
+            return Err(SchedulerError::Internal(
+                "scheduler's core thread disconnected before finalization".into(),
+            ));
+        }
         let aborted_batch = match receiver.recv() {
             Ok(batch) => batch,
             Err(_) => {
-                // If the scheduler was already finalized, it's normal for the core thread to have
-                // already shutdown; if it's not finalized, something went wrong.
                 if self.shared_lock.lock()?.finalized() {
                     None
                 } else {
@@ -328,8 +338,10 @@ mod tests {
 
     // SerialScheduler-specific tests
 
-    /// Verifies that the serial scheduler can be cancelled after finalization when there are no
-    /// unscheduled batches.
+    /// Verifies that the serial scheduler can be cancelled immediately after finalization when
+    /// there are no unscheduled batches. This ensures that the scheduler is resillient to the
+    /// aborted batch sender being dropped in the case where the internal thread has shutdown
+    /// normally.
     #[test]
     fn finalize_then_cancel() {
         let state_id = String::from("state0");
@@ -338,6 +350,22 @@ mod tests {
             SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
 
         scheduler.finalize().expect("Failed to finalize");
+        scheduler.cancel().expect("Failed to cancel");
+    }
+
+    /// Verifies that the serial scheduler can be cancelled after some time has passed since
+    /// finalization when there are no unscheduled batches. This ensures that the scheduler is
+    /// resillient to the internal receiver being dropped in the case where the internal thread has
+    /// shutdown normally.
+    #[test]
+    fn finalize_then_cancel_after_wait() {
+        let state_id = String::from("state0");
+        let context_lifecycle = Box::new(MockContextLifecycle::new());
+        let mut scheduler =
+            SerialScheduler::new(context_lifecycle, state_id).expect("Failed to create scheduler");
+
+        scheduler.finalize().expect("Failed to finalize");
+        std::thread::sleep(std::time::Duration::from_secs(1));
         scheduler.cancel().expect("Failed to cancel");
     }
 
