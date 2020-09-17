@@ -1,5 +1,15 @@
 # Release Notes
 
+## Changes in Transact 0.3.2
+
+### libtransact Updates
+
+* Fix an issue in `state::merkle::MerkleRadixTree` where an empty set of state
+  changes would produce an empty state id. This has been updated to return the
+  current state root hash.
+* Fix two issues in the `SerialScheduler` with call ordering of `cancel` and
+  `finalize`.  These methods can be called in either order.
+
 ## Changes in Transact 0.3.1
 
 ### Highlights
