@@ -20,21 +20,17 @@ mod internal;
 mod reader;
 
 use internal::ExecutorThread;
-use reader::ExecutionTaskReader;
 
 use crate::execution::adapter::ExecutionAdapter;
 use crate::scheduler::multi::SubSchedulerHandler;
 use crate::scheduler::ExecutionTask;
 use crate::scheduler::ExecutionTaskCompletionNotifier;
-use log::debug;
-use std::collections::HashMap;
-use std::sync::{mpsc::Sender, Arc, Mutex};
+use std::sync::mpsc::Sender;
 
 pub use self::error::ExecutorError;
 use self::internal::ExecutorCommand;
 
 pub struct Executor {
-    readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
     executor_thread: ExecutorThread,
 }
 
@@ -55,10 +51,7 @@ impl Executor {
     /// Returns an `ExecutorError` if the Executor has not been started.
     pub fn execution_task_submitter(&self) -> Result<ExecutionTaskSubmitter, ExecutorError> {
         if let Some(sender) = self.executor_thread.sender() {
-            Ok(ExecutionTaskSubmitter {
-                readers: Arc::clone(&self.readers),
-                sender,
-            })
+            Ok(ExecutionTaskSubmitter { sender })
         } else {
             Err(ExecutorError::NotStarted)
         }
@@ -71,20 +64,11 @@ impl Executor {
     }
 
     pub fn stop(self) {
-        for reader in self
-            .readers
-            .lock()
-            .expect("The ExecutionTaskReader mutex is poisoned")
-            .drain()
-        {
-            reader.1.stop();
-        }
         self.executor_thread.stop();
     }
 
     pub fn new(execution_adapters: Vec<Box<dyn ExecutionAdapter>>) -> Self {
         Executor {
-            readers: Arc::new(Mutex::new(HashMap::new())),
             executor_thread: ExecutorThread::new(execution_adapters),
         }
     }
@@ -94,7 +78,6 @@ impl Executor {
 #[derive(Clone)]
 pub struct ExecutionTaskSubmitter {
     sender: Sender<ExecutorCommand>,
-    readers: Arc<Mutex<HashMap<usize, ExecutionTaskReader>>>,
 }
 
 impl ExecutionTaskSubmitter {
@@ -111,31 +94,13 @@ impl ExecutionTaskSubmitter {
         task_iterator: Box<dyn Iterator<Item = ExecutionTask> + Send>,
         notifier: Box<dyn ExecutionTaskCompletionNotifier>,
     ) -> Result<(), ExecutorError> {
-        let index = self
-            .readers
-            .lock()
-            .expect("The iterator adapters map lock is poisoned")
-            .keys()
-            .max()
-            .cloned()
-            .unwrap_or(0);
-
-        let mut reader = ExecutionTaskReader::new(index);
-
-        reader
-            .start(task_iterator, notifier, self.sender.clone())
-            .map_err(|err| ExecutorError::ResourcesUnavailable(err.to_string()))?;
-
-        debug!("Execute called, creating execution adapter {}", index);
-
-        let mut readers = self
-            .readers
-            .lock()
-            .expect("The iterator adapter map lock is poisoned");
-
-        readers.insert(index, reader);
-
-        Ok(())
+        self.sender
+            .send(ExecutorCommand::CreateReader(task_iterator, notifier))
+            .map_err(|_| {
+                ExecutorError::ResourcesUnavailable(
+                    "Unable to submit task iterator to executor".into(),
+                )
+            })
     }
 }
 
@@ -155,6 +120,7 @@ mod tests {
     use super::*;
 
     use std::collections::VecDeque;
+    use std::sync::{Arc, Mutex};
     use std::time::Duration;
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
