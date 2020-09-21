@@ -172,43 +172,57 @@ impl SchedulerCore {
         }
     }
 
+    /// Checks if the scheduler should shutdown, sending the appropriate notifications if necessary.
+    /// The scheduler should shutdown if the following conditions are satisfied:
+    ///
+    /// * The scheduler has been finalized
+    /// * The scheduler is not currently executing a batch
+    /// * There are no more unscheduled batches to execute
+    ///
+    /// # Returns
+    ///
     /// Returns `true` if the scheduler should shutdown; returns `false` otherwise.
-    fn try_schedule_next(&mut self) -> Result<bool, CoreError> {
+    fn try_shutdown(&mut self) -> Result<bool, CoreError> {
+        let shared = self.shared_lock.lock()?;
+        if shared.finalized()
+            && self.current_batch.is_none()
+            && shared.unscheduled_batches_is_empty()
+        {
+            debug!("Shutting down serial scheduler thread");
+
+            // Send `None` to let the user of the scheduler know that no more results will
+            // be sent
+            shared.result_callback()(None);
+
+            // If another execution task was requested, send `None` to indicate that there
+            // are no more tasks to execute
+            if self.next_ready {
+                self.execution_tx.send(None)?;
+            }
+
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn try_schedule_next(&mut self) -> Result<(), CoreError> {
         if self.current_txn.is_some() {
-            return Ok(false);
+            return Ok(());
         }
 
         if self.current_batch.is_none() {
-            let mut shared = self.shared_lock.lock()?;
-
-            // If their are no unscheduled batches, check if scheduler should shutdown
-            if shared.unscheduled_batches_is_empty() {
-                // If the scheduler is finalized, no more batches will be added; send a `None`
-                // result to let the calling code know that all results have been sent, then
-                // return `true` to indicate that the scheduler should shutdown.
-                if shared.finalized() {
-                    shared.result_callback()(None);
-                    return Ok(true);
-                }
-                // if not finalized, don't shutdown
-                return Ok(false);
-            }
-
             if !self.next_ready {
-                return Ok(false);
+                return Ok(());
             }
 
-            match shared.pop_unscheduled_batch() {
+            match self.shared_lock.lock()?.pop_unscheduled_batch() {
                 Some(unscheduled_batch) => {
                     self.txn_queue =
                         VecDeque::from(unscheduled_batch.batch().transactions().to_vec());
                     self.current_batch = Some(unscheduled_batch);
                 }
-                None => {
-                    return Err(CoreError::Internal(
-                        "No batch returned from non empty unscheduled batches".to_string(),
-                    ))
-                }
+                None => return Ok(()),
             }
         }
 
@@ -231,7 +245,7 @@ impl SchedulerCore {
                     error_data: vec![],
                 })?;
                 self.send_batch_result()?;
-                return Ok(false);
+                return Ok(());
             }
         };
 
@@ -247,7 +261,7 @@ impl SchedulerCore {
             .send(Some(ExecutionTask::new(transaction_pair, context_id)))?;
         self.next_ready = false;
 
-        Ok(false)
+        Ok(())
     }
 
     fn invalidate_current_batch(
@@ -343,9 +357,7 @@ impl SchedulerCore {
         loop {
             match self.rx.recv() {
                 Ok(CoreMessage::BatchAdded) => {
-                    if self.try_schedule_next()? {
-                        break;
-                    }
+                    self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
                     let current_txn_id = self.current_txn.clone().unwrap_or_else(|| "".into());
@@ -380,30 +392,17 @@ impl SchedulerCore {
                         self.send_batch_result()?;
                     }
 
-                    if self.try_schedule_next()? {
+                    // A transaction has finished executing, so the scheduler may be ready to
+                    // shutdown
+                    if self.try_shutdown()? {
                         break;
                     }
+
+                    self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::Next) => {
-                    // If the scheduler is finalized, there are no unscheduled batches, and there
-                    // are no more transactions in the queue for the current batch: there are no
-                    // more execution tasks to return.
-                    {
-                        let shared = self.shared_lock.lock()?;
-                        if shared.finalized()
-                            && shared.unscheduled_batches_is_empty()
-                            && self.txn_queue.is_empty()
-                        {
-                            self.execution_tx.send(None)?;
-                            continue;
-                        }
-                    }
-
                     self.next_ready = true;
-
-                    if self.try_schedule_next()? {
-                        break;
-                    }
+                    self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::Cancelled(sender)) => {
                     // If a batch is currently executing, return it using the provided sender
@@ -413,23 +412,15 @@ impl SchedulerCore {
                     // Also remove the current transaction
                     self.current_txn.take();
 
-                    // If already finalized, the scheduler can shutdown because no more batches will
-                    // be added
-                    let shared = self.shared_lock.lock()?;
-                    if shared.finalized() {
-                        // Send a `None` result before shutting down to let the caller know that all
-                        // batches have been completed or descheduled
-                        shared.result_callback()(None);
+                    // No batches are executing or in the queue now, so the scheduler may be ready
+                    // to shutdown
+                    if self.try_shutdown()? {
                         break;
                     }
                 }
                 Ok(CoreMessage::Finalized) => {
-                    // If there are no unscheduled batches and no batch is currently executing, the
-                    // scheduler is done; send a `None` result to let the calling code know that
-                    // all results have been sent, then shutdown.
-                    let shared = self.shared_lock.lock()?;
-                    if self.current_batch.is_none() && shared.unscheduled_batches_is_empty() {
-                        shared.result_callback()(None);
+                    // The scheduler is finalized now, so it may be ready to shutdown
+                    if self.try_shutdown()? {
                         break;
                     }
                 }
