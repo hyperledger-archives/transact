@@ -53,6 +53,7 @@ impl ExecutionTaskReader {
         let stop = Arc::clone(&self.stop);
 
         if self.threads.is_none() {
+            let reader_id = self.id;
             let join_handle = thread::Builder::new()
                 .name(format!("ExecutionTaskReader-{}", self.id))
                 .spawn(move || {
@@ -69,6 +70,9 @@ impl ExecutionTaskReader {
                         }
                     }
                     debug!("Completed task iterator!");
+                    if let Err(err) = internal.send(ExecutorCommand::ReaderDone(reader_id)) {
+                        warn!("Unable to send done signal: {}", err)
+                    }
                 })?;
 
             self.threads = Some(join_handle);

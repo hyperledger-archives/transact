@@ -25,7 +25,7 @@
 //                                                                                                --------- ExecutionAdapter
 //
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::thread::JoinHandle;
@@ -35,6 +35,8 @@ use log::warn;
 use crate::execution::adapter::{ExecutionAdapter, ExecutionAdapterError};
 use crate::execution::{ExecutionRegistry, TransactionFamily};
 use crate::scheduler::{ExecutionTask, ExecutionTaskCompletionNotifier};
+
+use super::reader::ExecutionTaskReader;
 
 /// The `TransactionPair` and `ContextId` along with where to send
 /// results.
@@ -59,6 +61,11 @@ pub enum RegistrationChange {
 pub enum ExecutorCommand {
     RegistrationChange(RegistrationChange),
     Execution(Box<ExecutionEvent>),
+    CreateReader(
+        Box<dyn Iterator<Item = ExecutionTask> + Send>,
+        Box<dyn ExecutionTaskCompletionNotifier>,
+    ),
+    ReaderDone(usize),
     Shutdown,
 }
 
@@ -180,8 +187,8 @@ impl ExecutorThread {
                 }
             }
 
-            self.sender = Some(registry_sender);
-            match self.start_thread(receiver) {
+            self.sender = Some(registry_sender.clone());
+            match self.start_thread(registry_sender, receiver) {
                 Ok(join_handle) => {
                     self.internal_thread = Some(join_handle);
                 }
@@ -282,6 +289,7 @@ impl ExecutorThread {
 
     fn start_thread(
         &self,
+        sender: ExecutorCommandSender,
         receiver: ExecutorCommandReceiver,
     ) -> Result<JoinHandle<()>, std::io::Error> {
         std::thread::Builder::new()
@@ -293,6 +301,8 @@ impl ExecutorThread {
                 > = HashMap::new();
                 let mut parked: ParkedExecutionEventsMap = HashMap::new();
                 let mut unparked = vec![];
+                let mut reader_index = 0usize;
+                let mut readers: BTreeMap<usize, ExecutionTaskReader> = BTreeMap::new();
                 loop {
                     for execution_event in unparked.drain(0..) {
                         Self::try_send_execution_event(
@@ -344,8 +354,27 @@ impl ExecutorThread {
                                 });
                         }
 
+                        Ok(ExecutorCommand::CreateReader(task_iterator, notifier)) => {
+                            let (index, _) = reader_index.overflowing_add(1);
+                            let mut reader = ExecutionTaskReader::new(index);
+
+                            if let Err(err) = reader.start(task_iterator, notifier, sender.clone())
+                            {
+                                error!("Unable to start task reader: {}", err);
+                                continue;
+                            }
+
+                            readers.insert(index, reader);
+                            reader_index = index;
+                        }
+
+                        Ok(ExecutorCommand::ReaderDone(reader_id)) => {
+                            if let Some(reader) = readers.remove(&reader_id) {
+                                reader.stop();
+                            }
+                        }
+
                         Ok(ExecutorCommand::Shutdown) => {
-                            Self::shutdown_fanout_threads(&fanout_threads);
                             break;
                         }
                         Err(err) => {
@@ -353,6 +382,11 @@ impl ExecutorThread {
                             break;
                         }
                     }
+                }
+
+                Self::shutdown_fanout_threads(&fanout_threads);
+                for (_, reader) in readers.into_iter() {
+                    reader.stop();
                 }
             })
     }
@@ -564,7 +598,7 @@ mod tests {
                         });
                     }
                 },
-                ExecutorCommand::Shutdown => panic!("Should not have called shutdown during test"),
+                _ => panic!("Should not have sent command during test"),
             }
         }
 
