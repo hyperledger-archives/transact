@@ -345,7 +345,6 @@ impl ExecutorThread {
                         }
 
                         Ok(ExecutorCommand::Shutdown) => {
-                            Self::shutdown_fanout_threads(&fanout_threads);
                             break;
                         }
                         Err(err) => {
@@ -354,6 +353,8 @@ impl ExecutorThread {
                         }
                     }
                 }
+
+                Self::shutdown_fanout_threads(&fanout_threads);
             })
     }
 
