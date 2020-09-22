@@ -301,6 +301,7 @@ impl ExecutorThread {
                 > = HashMap::new();
                 let mut parked: ParkedExecutionEventsMap = HashMap::new();
                 let mut unparked = vec![];
+                let mut reader_index = 0usize;
                 let mut readers: BTreeMap<usize, ExecutionTaskReader> = BTreeMap::new();
                 loop {
                     for execution_event in unparked.drain(0..) {
@@ -354,7 +355,7 @@ impl ExecutorThread {
                         }
 
                         Ok(ExecutorCommand::CreateReader(task_iterator, notifier)) => {
-                            let index = readers.keys().max().cloned().unwrap_or(0);
+                            let (index, _) = reader_index.overflowing_add(1);
                             let mut reader = ExecutionTaskReader::new(index);
 
                             if let Err(err) = reader.start(task_iterator, notifier, sender.clone())
@@ -364,6 +365,7 @@ impl ExecutorThread {
                             }
 
                             readers.insert(index, reader);
+                            reader_index = index;
                         }
 
                         Ok(ExecutorCommand::ReaderDone(reader_id)) => {
