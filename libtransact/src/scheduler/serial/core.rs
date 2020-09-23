@@ -38,6 +38,7 @@ use super::shared::Shared;
 
 /// An enum of messages which can be sent to the SchedulerCore via a
 /// `Sender<CoreMessage>`.
+#[derive(Debug)]
 pub enum CoreMessage {
     /// An indicator to the scheduler that a batch has been added.
     BatchAdded,
@@ -194,11 +195,8 @@ impl SchedulerCore {
             // be sent
             shared.result_callback()(None);
 
-            // If another execution task was requested, send `None` to indicate that there
-            // are no more tasks to execute
-            if self.next_ready {
-                self.execution_tx.send(None)?;
-            }
+            // Send a `None` execution task to indicate that there are no more tasks to execute
+            self.execution_tx.send(None)?;
 
             Ok(true)
         } else {
