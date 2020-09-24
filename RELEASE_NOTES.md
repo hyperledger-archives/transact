@@ -1,5 +1,22 @@
 # Release Notes
 
+## Changes in Transact 0.3.3
+
+### libtransact Updates
+
+* Update the executor's internal thread to shutdown the fan-out threads after
+  its main loop has terminated to ensure they get shut down properly every time.
+* Fix a bug where the task readers in the executor were always being given an
+  index of 0.
+* Add better management of task readers to the executor to enable shutting down
+  the task readers when they have completed. Previously, these task readers were
+  not being cleaned up, which leaked memory.
+* Fix a bug in the serial scheduler's shutdown process where the scheduler's
+  core thread did not always send a message to terminate the execution task
+  iterator.
+* Update the serial scheduler's execution task iterator to log an error whenever
+  the scheduler's core thread shuts down without notifying the iterator.
+
 ## Changes in Transact 0.3.2
 
 ### libtransact Updates
