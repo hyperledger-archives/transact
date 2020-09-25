@@ -1,5 +1,12 @@
 # Release Notes
 
+## Changes in Transact 0.3.4
+
+### libtransact Updates
+
+* Fix a serial scheduler execution task iterator test that was failing due to
+  timing issues.
+
 ## Changes in Transact 0.3.3
 
 ### libtransact Updates
