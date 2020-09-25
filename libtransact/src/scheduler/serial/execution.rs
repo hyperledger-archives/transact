@@ -303,7 +303,7 @@ mod tests {
         fn task_iterator_send_successful_but_receive_failed() {
             let logger = init_logger();
 
-            let (core_tx, core_rx) = channel();
+            let (core_tx, _core_rx) = channel();
             let (_, task_rx) = channel();
 
             let join_handle = std::thread::spawn(move || {
