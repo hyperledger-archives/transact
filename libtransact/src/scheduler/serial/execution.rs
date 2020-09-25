@@ -115,10 +115,7 @@ impl ExecutionTaskCompletionNotifier for SerialExecutionTaskCompletionNotifier {
 mod tests {
     use super::*;
 
-    use std::sync::{
-        mpsc::{channel, TryRecvError},
-        Arc, Mutex,
-    };
+    use std::sync::{mpsc::channel, Arc, Mutex};
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
     use log::{set_boxed_logger, set_max_level, Level, LevelFilter, Log, Metadata, Record};
@@ -196,10 +193,7 @@ mod tests {
             recv_next(&core_rx);
             task_tx.send(None).expect("Failed to send `None`");
 
-            match core_rx.try_recv() {
-                Err(TryRecvError::Empty) => {}
-                res => panic!("Expected `Err(TryRecvError::Empty)`, got {:?} instead", res),
-            }
+            core_rx.try_recv().expect_err("Got an unexpected task request");
 
             let (task1, task2, task3) = join_handle.join().expect("Iterator thread panicked");
             assert!(task1.is_some());
@@ -303,7 +297,7 @@ mod tests {
         fn task_iterator_send_successful_but_receive_failed() {
             let logger = init_logger();
 
-            let (core_tx, core_rx) = channel();
+            let (core_tx, _core_rx) = channel();
             let (_, task_rx) = channel();
 
             let join_handle = std::thread::spawn(move || {
