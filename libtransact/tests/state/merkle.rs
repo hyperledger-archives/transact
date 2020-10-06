@@ -1186,7 +1186,7 @@ mod lmdb {
     }
 }
 
-#[cfg(feature = "redis-db")]
+#[cfg(feature = "state-merkle-redis-db-tests")]
 mod redisdb {
     use std::iter;
     use std::panic;
