@@ -14,4 +14,5 @@ docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
    /bin/bash -c \
    "cargo test && \
     cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features sawtooth-compat && \
-    cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features experimental"
+    cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features experimental && \
+    cargo test --manifest-path /project/transact/libtransact/Cargo.toml --features experimental,state-merkle-redis-db-tests"

@@ -110,6 +110,9 @@ redis-db = ["redis"]
 sawtooth-compat = ["sawtooth-sdk"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 state-merkle = ["cbor-codec"]
+# This feature must be enabled to run the merkle tests using a redis db.  It is
+# not enabled by default, due to its requirement of an external redis instance.
+state-merkle-redis-db-tests = ["redis-db", "state-merkle"]
 workload = []
 
 [package.metadata.docs.rs]
