@@ -1,5 +1,11 @@
 # Release Notes
 
+## Changes in Transact 0.3.5
+
+### libtransact Updates
+
+* Add a 32bit-usize-friendly lmdb DEFAULT_SIZE value
+
 ## Changes in Transact 0.3.4
 
 ### libtransact Updates
