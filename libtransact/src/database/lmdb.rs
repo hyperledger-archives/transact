@@ -29,6 +29,12 @@ use lmdb_zero as lmdb;
 
 use crate::database::error::DatabaseError;
 
+// 32-bit architectures
+#[cfg(any(target_arch = "x86", target_arch = "arm"))]
+const DEFAULT_SIZE: usize = 1 << 30; // 1024 ** 3
+
+// Remaining architectures are assumed to be 64-bit
+#[cfg(not(any(target_arch = "x86", target_arch = "arm")))]
 const DEFAULT_SIZE: usize = 1 << 40; // 1024 ** 4
 
 #[derive(Clone)]
