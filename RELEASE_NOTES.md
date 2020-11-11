@@ -1,5 +1,9 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.6.1
+
+* Update the `cylinder` dependency of the Rust SDK and the CLI to version `0.2`
+
 ## Changes in Sawtooth Sabre 0.6.0
 
 * Add `add_events` to Sabre TransactionContext which adds events to  the
