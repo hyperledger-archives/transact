@@ -358,13 +358,10 @@ impl StateEntryList {
     }
 
     pub fn contains(&self, normalized_key: String) -> bool {
-        let nkeys = self
-            .entries()
+        self.entries()
             .to_vec()
             .into_iter()
-            .map(|e| e.normalized_key().to_string())
-            .collect::<Vec<String>>();
-        nkeys.contains(&normalized_key)
+            .any(|e| e.normalized_key() == normalized_key)
     }
 }
 
