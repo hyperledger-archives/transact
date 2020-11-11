@@ -30,7 +30,7 @@ repository = "http://github.com/hyperledger/transact"
 [dependencies]
 bzip2 = { version = "0.3", optional = true }
 cbor-codec = { version = "0.7", optional = true }
-cylinder = "0.1"
+cylinder = "0.2"
 glob = { version = "0.3", optional = true }
 hex = "0.3"
 libc = ">=0.2.35"
