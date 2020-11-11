@@ -1,5 +1,10 @@
 # Release Notes
 
+## Changes in Transact 0.3.6
+
+* Update the `cylinder` dependency of libtransact and the `simple_xo` example to
+  version `0.2`
+
 ## Changes in Transact 0.3.5
 
 ### libtransact Updates
