@@ -126,7 +126,10 @@ impl std::error::Error for ExecutorThreadError {}
 impl std::fmt::Display for ExecutorThreadError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            ExecutorThreadError::InvalidState => write!(f, "Invalid State: ExecutorThread in an invalid state when 'start' was called"),
+            ExecutorThreadError::InvalidState => write!(
+                f,
+                "Invalid State: ExecutorThread in an invalid state when 'start' was called"
+            ),
             ExecutorThreadError::ResourcesUnavailable => {
                 write!(f, "ResourcesUnavailable: ExecutorThread unable to access a resource needed for operation")
             }
