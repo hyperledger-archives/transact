@@ -15,7 +15,6 @@
 pub type WasmPtr = i32;
 pub type WasmPtrList = i32;
 
-#[no_mangle]
 extern "C" {
     pub fn get_state(addresses: WasmPtrList) -> WasmPtrList;
     pub fn set_state(addr_data: WasmPtrList) -> i32;
