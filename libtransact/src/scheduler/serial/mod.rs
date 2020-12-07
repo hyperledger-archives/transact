@@ -417,12 +417,12 @@ mod tests {
             .name("Thread-test_serial_scheduler_ordering".into())
             .spawn(move || {
                 std::thread::sleep(std::time::Duration::from_secs(1));
+                // This send must occur before the next task is returned.
+                tx.send(()).expect("Failed to send");
                 first_task_notifier.notify(ExecutionTaskCompletionNotification::Valid(
                     mock_context_id(),
                     first_task_txn_id,
                 ));
-                // This send must occur before the next task is returned.
-                tx.send(()).expect("Failed to send");
             })
             .expect("Failed to spawn thread");
 
