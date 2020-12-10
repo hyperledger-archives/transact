@@ -20,7 +20,7 @@ use std::error::Error;
 
 use sha2::{Digest, Sha512};
 
-pub const SABRE_PROTOCOL_VERSION: &str = "0.6";
+pub const SABRE_PROTOCOL_VERSION: &str = "1";
 
 pub const ADMINISTRATORS_SETTING_KEY: &str = "sawtooth.swa.administrators";
 

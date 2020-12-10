@@ -68,7 +68,7 @@ impl SabreTransactionHandler {
     pub fn new() -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
-            family_versions: vec![SABRE_PROTOCOL_VERSION.into()],
+            family_versions: vec!["0.5".into(), "0.6".into(), SABRE_PROTOCOL_VERSION.into()],
             namespaces: vec![
                 NAMESPACE_REGISTRY_PREFIX.into(),
                 CONTRACT_REGISTRY_PREFIX.into(),
