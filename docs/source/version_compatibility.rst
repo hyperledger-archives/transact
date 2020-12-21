@@ -65,3 +65,10 @@ the Sabre transaction processor image.
 |            |          |           |         | which was removed in the new   |
 |            |          |           |         | transact version.              |
 +------------+----------+-----------+---------+--------------------------------+
+| 0.7        | 0.7      | 0.7       |  0.5    | - Update accepted family       |
+|            |          |           |         |   versions to include 0.5, 0.6 |
+|            |          |           |         |   and 1. This makes the Sabre  |
+|            |          |           |         |   Transaction Proccessor able  |
+|            |          |           |         |   to handle transactions from  |
+|            |          |           |         |   from past versions.          |
++------------+----------+-----------+---------+--------------------------------+
