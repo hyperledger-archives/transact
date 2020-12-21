@@ -1,10 +1,14 @@
 # Release Notes
 
-## Changes in Sawtooth Sabre 0.7.0
+## Changes in Sawtooth Sabre 0.7.1
 
 * Update the allowed family version to include 0.5, 0.6 and update the current
   version to 1. This will allow the Sabre transaction processor to accept
   transactions from 0.5, 0.6 and 1 versions of Sabre.
+
+## Changes in Sawtooth Sabre 0.7.0
+
+* Unreleased version
 
 ## Changes in Sawtooth Sabre 0.6.1
 
