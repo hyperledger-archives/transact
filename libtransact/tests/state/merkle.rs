@@ -1438,7 +1438,7 @@ mod sqlitedb {
                 SqliteDatabase::builder()
                     .with_path(db_path)
                     .with_indexes(&INDEXES)
-                    .with_write_ahead_log_mode()
+                    .with_journal_mode(transact::database::sqlite::JournalMode::Wal)
                     .build()
                     .expect("Unable to create Sqlite database"),
             );
@@ -1453,7 +1453,7 @@ mod sqlitedb {
                 SqliteDatabase::builder()
                     .with_path(db_path)
                     .with_indexes(&INDEXES)
-                    .with_write_ahead_log_mode()
+                    .with_journal_mode(transact::database::sqlite::JournalMode::Wal)
                     .with_synchronous(transact::database::sqlite::Synchronous::Full)
                     .build()
                     .expect("Unable to create Sqlite database"),
