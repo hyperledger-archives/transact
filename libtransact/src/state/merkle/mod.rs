@@ -345,7 +345,7 @@ impl MerkleRadixTree {
         for del_address in delete_items.iter() {
             path_map.remove(*del_address);
             let (mut parent_address, mut path_branch) = parent_and_branch(del_address);
-            while parent_address != "" {
+            while !parent_address.is_empty() {
                 let remove_parent = {
                     let parent_node = path_map
                         .get_mut(parent_address)
@@ -372,7 +372,7 @@ impl MerkleRadixTree {
                 parent_address = next_parent;
                 path_branch = next_branch;
 
-                if parent_address == "" {
+                if parent_address.is_empty() {
                     let parent_node = path_map
                         .get_mut(parent_address)
                         .expect("Path map not correctly generated");
@@ -398,7 +398,7 @@ impl MerkleRadixTree {
             let (hash_key, packed) = encode_and_hash(node)?;
             key_hash = hash_key.clone();
 
-            if path != "" {
+            if !path.is_empty() {
                 let (parent_address, path_branch) = parent_and_branch(&path);
                 let parent = path_map
                     .get_mut(parent_address)
