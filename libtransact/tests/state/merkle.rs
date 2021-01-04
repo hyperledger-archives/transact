@@ -1421,6 +1421,7 @@ mod sqlitedb {
         })
     }
 
+    /// Atomic Commit/Rollback is the default journal model.
     #[test]
     fn merkle_trie_update_atomic_commit_rollback() {
         run_test(|db_path| {
