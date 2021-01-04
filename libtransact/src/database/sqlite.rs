@@ -254,7 +254,29 @@ impl SqliteDatabaseBuilder {
             source: None,
         })?;
 
-        let manager = SqliteConnectionManager::file(&path);
+        let mmap_size = self.memory_map_size;
+        let journal_mode_opt = self.journal_mode;
+        let synchronous_opt = self.synchronous;
+
+        let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+            | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
+
+        let manager = SqliteConnectionManager::file(&path)
+            .with_flags(flags)
+            .with_init(move |conn| {
+                conn.pragma_update(None, "mmap_size", &mmap_size)?;
+
+                if let Some(journal_mode) = journal_mode_opt.as_ref() {
+                    conn.pragma_update(None, "journal_mode", journal_mode)?;
+                }
+
+                if let Some(synchronous) = synchronous_opt.as_ref() {
+                    conn.pragma_update(None, "synchronous", synchronous)?;
+                }
+
+                Ok(())
+            });
 
         let mut pool_builder = r2d2::Pool::builder();
         if let Some(pool_size) = self.pool_size {
@@ -271,28 +293,6 @@ impl SqliteDatabaseBuilder {
             context: "unable to connect to database".into(),
             source: Some(Box::new(err)),
         })?;
-
-        conn.pragma_update(None, "mmap_size", &self.memory_map_size)
-            .map_err(|err| SqliteDatabaseError {
-                context: "unable to configure memory map I/O".into(),
-                source: Some(Box::new(err)),
-            })?;
-
-        if let Some(journal_mode) = self.journal_mode {
-            conn.pragma_update(None, "journal_mode", &journal_mode)
-                .map_err(|err| SqliteDatabaseError {
-                    context: "unable to modify journal mode setting".into(),
-                    source: Some(Box::new(err)),
-                })?;
-        }
-
-        if let Some(synchronous) = self.synchronous {
-            conn.pragma_update(None, "synchronous", &synchronous)
-                .map_err(|err| SqliteDatabaseError {
-                    context: "unable to modify synchronous setting".into(),
-                    source: Some(Box::new(err)),
-                })?;
-        }
 
         let prefix = self
             .prefix
