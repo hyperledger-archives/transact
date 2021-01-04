@@ -123,7 +123,7 @@ fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError
         // String starts at hex 60 plus the length of the string.
         // For Names it should range from hex 61 (decimal 97) to 74 (decimal 116) because a name
         // cannot be empty and must not be greater than 20 characters
-        if string_type < 97 || string_type > 116 {
+        if !(97..=116).contains(&string_type) {
             return Err(ApplyError::InvalidTransaction(String::from(
                 "Name is either too long, too short, or not a string.",
             )));
@@ -214,7 +214,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
     for key in keys {
         // Keys need to have a length between 1 and 20
         let key_length = key.len();
-        if key_length < 1 || key_length > 20 {
+        if !(1..=20).contains(&key_length) {
             return Err(ApplyError::InvalidTransaction(String::from(
                 "Key must be at least 1 character and no more than 20",
             )));
