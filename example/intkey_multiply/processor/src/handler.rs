@@ -230,7 +230,7 @@ fn encode_intkey(map: BTreeMap<String, u32>) -> Result<String, ApplyError> {
         let raw_value = map
             .get(&key)
             .ok_or_else(|| ApplyError::InvalidTransaction("Value from map".into()))?;
-        if *raw_value > (23 as u32) {
+        if *raw_value > 23 {
             let mut value = format!("{:02X}", raw_value);
             if value.len() % 2 == 1 {
                 value = "0".to_string() + &value.clone();

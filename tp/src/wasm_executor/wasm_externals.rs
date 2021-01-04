@@ -240,7 +240,7 @@ impl<'a> WasmExternals<'a> {
         // In case the data to be added is empty, keep the memory_write_offset
         // moving to the next location.
         let offset_to_add = if data.capacity() == 0 {
-            1 as u32
+            1
         } else {
             data.capacity() as u32
         };
