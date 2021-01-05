@@ -11,6 +11,8 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+use protobuf::Message;
+
 use sabre_sdk::protocol::pike::state::{Agent, AgentList, Organization, OrganizationList};
 use sabre_sdk::protocol::state::{
     Contract, ContractList, ContractListBuilder, ContractRegistry, ContractRegistryList,
@@ -48,7 +50,7 @@ impl<'a> SabreState<'a> {
         match d {
             Some(packed) => {
                 let setting: Setting =
-                    protobuf::parse_from_bytes(packed.as_slice()).map_err(|err| {
+                    Message::parse_from_bytes(packed.as_slice()).map_err(|err| {
                         ApplyError::InvalidTransaction(format!(
                             "Cannot deserialize setting: {:?}",
                             err,

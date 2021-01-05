@@ -27,7 +27,7 @@ dirs = "2"
 futures = "0.1"
 hyper = "0.11"
 rust-crypto = "0.2"
-protobuf = "2"
+protobuf = "2.19"
 sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
 tokio-core = "0.1"
 users = "0.6"

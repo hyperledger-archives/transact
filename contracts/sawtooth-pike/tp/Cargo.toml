@@ -19,7 +19,7 @@ authors = ["Cargill Incorporated"]
 build = "build.rs"
 
 [dependencies]
-protobuf = "2"
+protobuf = "2.19"
 cfg-if = "0.1"
 hex = "0.3.1"
 addresser = {path = "../addresser"}

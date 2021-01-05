@@ -36,7 +36,7 @@ pub fn submit_batches(
         batches: &[u8],
         timeout: u32) -> Result<Vec<BatchStatus>, TransactionError> {
 
-    let batch_list: BatchList = protobuf::parse_from_bytes(&batches)?;
+    let batch_list: BatchList = Message::parse_from_bytes(&batches)?;
 
     let mut submit_req = ClientBatchSubmitRequest::new();
     submit_req.set_batches(batch_list.batches.clone());
@@ -48,7 +48,7 @@ pub fn submit_batches(
         Message_MessageType::CLIENT_BATCH_SUBMIT_REQUEST,
         &submit_req_bytes)?;
 
-    let res_msg: ClientBatchSubmitResponse = protobuf::parse_from_bytes(&response.content)?;
+    let res_msg: ClientBatchSubmitResponse = Message::parse_from_bytes(&response.content)?;
 
     if res_msg.status != submit_status::OK {
         return Err(TransactionError::map_submit_status(res_msg.status));
@@ -78,7 +78,7 @@ pub fn check_batch_status(
         Message_MessageType::CLIENT_BATCH_STATUS_REQUEST,
         &req_bytes)?;
 
-    let res_msg: ClientBatchStatusResponse = protobuf::parse_from_bytes(&response.content)?;
+    let res_msg: ClientBatchStatusResponse = Message::parse_from_bytes(&response.content)?;
 
     if res_msg.status != batch_res_status::OK {
         return Err(TransactionError::map_batch_status(res_msg.status));

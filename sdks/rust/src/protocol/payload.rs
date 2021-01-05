@@ -246,7 +246,7 @@ impl FromNative<CreateContractAction> for protos::payload::CreateContractAction 
 
 impl FromBytes<CreateContractAction> for CreateContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateContractAction, ProtoConversionError> {
-        let proto: protos::payload::CreateContractAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::CreateContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateContractAction from bytes".to_string(),
@@ -389,7 +389,7 @@ impl FromNative<DeleteContractAction> for protos::payload::DeleteContractAction 
 
 impl FromBytes<DeleteContractAction> for DeleteContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteContractAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteContractAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::DeleteContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteContractAction from bytes".to_string(),
@@ -520,7 +520,7 @@ impl FromNative<ExecuteContractAction> for protos::payload::ExecuteContractActio
 
 impl FromBytes<ExecuteContractAction> for ExecuteContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<ExecuteContractAction, ProtoConversionError> {
-        let proto: protos::payload::ExecuteContractAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::ExecuteContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ExecuteContractAction from bytes".to_string(),
@@ -665,8 +665,8 @@ impl FromNative<CreateContractRegistryAction> for protos::payload::CreateContrac
 
 impl FromBytes<CreateContractRegistryAction> for CreateContractRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateContractRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::CreateContractRegistryAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::payload::CreateContractRegistryAction = Message::parse_from_bytes(bytes)
+            .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateContractRegistryAction from bytes".to_string(),
                 )
@@ -770,8 +770,8 @@ impl FromNative<DeleteContractRegistryAction> for protos::payload::DeleteContrac
 
 impl FromBytes<DeleteContractRegistryAction> for DeleteContractRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteContractRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteContractRegistryAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::payload::DeleteContractRegistryAction = Message::parse_from_bytes(bytes)
+            .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteContractRegistryAction from bytes".to_string(),
                 )
@@ -875,7 +875,7 @@ impl FromBytes<UpdateContractRegistryOwnersAction> for UpdateContractRegistryOwn
         bytes: &[u8],
     ) -> Result<UpdateContractRegistryOwnersAction, ProtoConversionError> {
         let proto: protos::payload::UpdateContractRegistryOwnersAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get UpdateContractRegistryOwnersAction from bytes".to_string(),
                 )
@@ -995,7 +995,7 @@ impl FromNative<CreateNamespaceRegistryAction> for protos::payload::CreateNamesp
 impl FromBytes<CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateNamespaceRegistryAction, ProtoConversionError> {
         let proto: protos::payload::CreateNamespaceRegistryAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateNamespaceRegistryAction from bytes".to_string(),
                 )
@@ -1099,7 +1099,7 @@ impl FromNative<DeleteNamespaceRegistryAction> for protos::payload::DeleteNamesp
 impl FromBytes<DeleteNamespaceRegistryAction> for DeleteNamespaceRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteNamespaceRegistryAction, ProtoConversionError> {
         let proto: protos::payload::DeleteNamespaceRegistryAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteNamespaceRegistryAction from bytes".to_string(),
                 )
@@ -1203,7 +1203,7 @@ impl FromBytes<UpdateNamespaceRegistryOwnersAction> for UpdateNamespaceRegistryO
         bytes: &[u8],
     ) -> Result<UpdateNamespaceRegistryOwnersAction, ProtoConversionError> {
         let proto: protos::payload::UpdateNamespaceRegistryOwnersAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get UpdateNamespaceRegistryOwnersAction from bytes".to_string(),
                 )
@@ -1353,7 +1353,7 @@ impl FromBytes<CreateNamespaceRegistryPermissionAction>
         bytes: &[u8],
     ) -> Result<CreateNamespaceRegistryPermissionAction, ProtoConversionError> {
         let proto: protos::payload::CreateNamespaceRegistryPermissionAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateNamespaceRegistryPermissionAction from bytes".to_string(),
                 )
@@ -1503,7 +1503,7 @@ impl FromBytes<DeleteNamespaceRegistryPermissionAction>
         bytes: &[u8],
     ) -> Result<DeleteNamespaceRegistryPermissionAction, ProtoConversionError> {
         let proto: protos::payload::DeleteNamespaceRegistryPermissionAction =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteNamespaceRegistryPermissionAction from bytes".to_string(),
                 )
@@ -1630,7 +1630,7 @@ impl FromNative<CreateSmartPermissionAction> for protos::payload::CreateSmartPer
 
 impl FromBytes<CreateSmartPermissionAction> for CreateSmartPermissionAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::CreateSmartPermissionAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::CreateSmartPermissionAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateSmartPermissionAction from bytes".to_string(),
@@ -1763,7 +1763,7 @@ impl FromNative<UpdateSmartPermissionAction> for protos::payload::UpdateSmartPer
 
 impl FromBytes<UpdateSmartPermissionAction> for UpdateSmartPermissionAction {
     fn from_bytes(bytes: &[u8]) -> Result<UpdateSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::UpdateSmartPermissionAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::UpdateSmartPermissionAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get UpdateSmartPermissionAction from bytes".to_string(),
@@ -1889,7 +1889,7 @@ impl FromNative<DeleteSmartPermissionAction> for protos::payload::DeleteSmartPer
 
 impl FromBytes<DeleteSmartPermissionAction> for DeleteSmartPermissionAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteSmartPermissionAction = protobuf::parse_from_bytes(bytes)
+        let proto: protos::payload::DeleteSmartPermissionAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteSmartPermissionAction from bytes".to_string(),
@@ -2134,7 +2134,7 @@ impl FromNative<SabrePayload> for protos::payload::SabrePayload {
 impl FromBytes<SabrePayload> for SabrePayload {
     fn from_bytes(bytes: &[u8]) -> Result<SabrePayload, ProtoConversionError> {
         let proto: protos::payload::SabrePayload =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get SabrePayload from bytes".to_string(),
                 )

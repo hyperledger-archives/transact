@@ -43,12 +43,12 @@ fn set(conn: &PgConnection, address: &str, value: &[u8]) -> Result<(), StateChan
     let resource_byte = &address[6..8];
 
     let results: Vec<StateChangeError> = match byte_to_resource(resource_byte)? {
-        Resource::AGENT => protobuf::parse_from_bytes::<AgentList>(value)?
+        Resource::AGENT => Message::parse_from_bytes::<AgentList>(value)?
             .get_agents()
             .into_iter()
             .filter_map(|agent| set_agent(conn, agent).err())
             .collect(),
-        Resource::ORG => protobuf::parse_from_bytes::<OrganizationList>(value)?
+        Resource::ORG => Message::parse_from_bytes::<OrganizationList>(value)?
             .get_organizations()
             .into_iter()
             .filter_map(|org| set_org(conn, org).err())
