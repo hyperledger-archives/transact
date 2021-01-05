@@ -227,7 +227,7 @@ impl FromNative<StateChange> for protos::transaction_receipt::StateChange {
 
 impl FromBytes<StateChange> for StateChange {
     fn from_bytes(bytes: &[u8]) -> Result<StateChange, ProtoConversionError> {
-        let proto: protos::transaction_receipt::StateChange = protobuf::parse_from_bytes(bytes)
+        let proto: protos::transaction_receipt::StateChange = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get StateChange from bytes".to_string(),
@@ -363,7 +363,7 @@ impl FromNative<TransactionReceipt> for protos::transaction_receipt::Transaction
 impl FromBytes<TransactionReceipt> for TransactionReceipt {
     fn from_bytes(bytes: &[u8]) -> Result<TransactionReceipt, ProtoConversionError> {
         let proto: protos::transaction_receipt::TransactionReceipt =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get TransactionReceipt from bytes".to_string(),
                 )
@@ -439,7 +439,7 @@ impl FromNative<Event> for protos::events::Event {
 
 impl FromBytes<Event> for Event {
     fn from_bytes(bytes: &[u8]) -> Result<Event, ProtoConversionError> {
-        let proto: protos::events::Event = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::events::Event = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError(
                 "Unable to get TransactionReceipt from bytes".to_string(),
             )
@@ -969,7 +969,7 @@ mod tests {
             protobuf::Message::write_to_bytes(&proto_transaction_receipt).unwrap();
 
         let proto: protos::transaction_receipt::TransactionReceipt =
-            protobuf::parse_from_bytes(&transaction_receipt_bytes).unwrap();
+            Message::parse_from_bytes(&transaction_receipt_bytes).unwrap();
 
         let transaction_receipt: TransactionReceipt = proto.into_native().unwrap();
         match transaction_receipt.transaction_result {
