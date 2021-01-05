@@ -38,7 +38,7 @@ sabre-sdk = {path = "../sdks/rust"}
 log = "0.4"
 simple_logger = "1"
 clap = "2"
-protobuf = "2"
+protobuf = "2.19"
 rust-crypto = "0.2.36"
 wasmi = "0.4"
 

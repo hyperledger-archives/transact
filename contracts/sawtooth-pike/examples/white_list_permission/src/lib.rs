@@ -25,12 +25,12 @@ use protos::agent::AgentContainer;
 /// proposals to.
 ///
 fn has_permission(request: Request) -> Result<bool, WasmSdkError> {
-    let proposal = protobuf::parse_from_bytes::<CreateProposalAction>(request.get_payload())?;
+    let proposal = Message::parse_from_bytes::<CreateProposalAction>(request.get_payload())?;
     let receiving_agent = proposal.get_receiving_agent();
 
     let agent_bytes = request.get_state(request.get_org_id())?;
 
-    let agents = protobuf::parse_from_bytes::<AgentContainer>(&agent_bytes)?;
+    let agents = Message::parse_from_bytes::<AgentContainer>(&agent_bytes)?;
 
     let agent = agents
         .get_entries()

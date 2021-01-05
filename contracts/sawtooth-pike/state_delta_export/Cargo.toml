@@ -25,7 +25,7 @@ addresser = { path = "../addresser/" }
 log = "0.3.8"
 simple_logger = "0.4.0"
 clap = "2"
-protobuf = "2"
+protobuf = "2.19"
 uuid = { version = "0.5", features = ["v4"] }
 chan-signal = "0.3.1"
 regex = "0.2.3"

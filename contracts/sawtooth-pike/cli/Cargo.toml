@@ -21,7 +21,7 @@ build = "build.rs"
 [dependencies]
 sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
 addresser = {path = "../addresser"}
-protobuf = "2"
+protobuf = "2.19"
 clap = "2"
 rust-crypto = "0.2"
 futures = "0.1"

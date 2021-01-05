@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use protobuf;
+use protobuf::Message;
 use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 
@@ -67,7 +67,7 @@ impl<'a> PikeState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let agents: AgentList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                let agents: AgentList = match Message::parse_from_bytes(packed.as_slice()) {
                     Ok(agents) => agents,
                     Err(err) => {
                         return Err(ApplyError::InternalError(format!(
@@ -92,7 +92,7 @@ impl<'a> PikeState<'a> {
         let address = compute_address(public_key, Resource::AGENT);
         let d = self.context.get_state_entry(&address)?;
         let mut agent_list = match d {
-            Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
+            Some(packed) => match Message::parse_from_bytes(packed.as_slice()) {
                 Ok(agents) => agents,
                 Err(err) => {
                     return Err(ApplyError::InternalError(format!(
@@ -142,7 +142,7 @@ impl<'a> PikeState<'a> {
         let d = self.context.get_state_entry(&address)?;
         match d {
             Some(packed) => {
-                let orgs: OrganizationList = match protobuf::parse_from_bytes(packed.as_slice()) {
+                let orgs: OrganizationList = match Message::parse_from_bytes(packed.as_slice()) {
                     Ok(orgs) => orgs,
                     Err(err) => {
                         return Err(ApplyError::InternalError(format!(
@@ -171,7 +171,7 @@ impl<'a> PikeState<'a> {
         let address = compute_address(id, Resource::ORG);
         let d = self.context.get_state_entry(&address)?;
         let mut organization_list = match d {
-            Some(packed) => match protobuf::parse_from_bytes(packed.as_slice()) {
+            Some(packed) => match Message::parse_from_bytes(packed.as_slice()) {
                 Ok(orgs) => orgs,
                 Err(err) => {
                     return Err(ApplyError::InternalError(format!(
@@ -248,7 +248,7 @@ impl TransactionHandler for PikeTransactionHandler {
         request: &TpProcessRequest,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let payload = protobuf::parse_from_bytes::<PikePayload>(request.get_payload())
+        let payload: PikePayload = Message::parse_from_bytes(request.get_payload())
             .map_err(|_| ApplyError::InternalError("Failed to parse payload".into()))?;
 
         let signer = request.get_header().get_signer_public_key();

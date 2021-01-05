@@ -109,7 +109,7 @@ The following is an example for intkey-multiply
 
   [dependencies]
   clap = "2"
-  protobuf = "2"
+  protobuf = "2.19"
   cfg-if = "0.1"
   hex = "0.3.1"
 

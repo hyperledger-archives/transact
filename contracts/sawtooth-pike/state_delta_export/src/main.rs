@@ -103,7 +103,7 @@ fn main() {
             .iter()
             .filter(|x| "sawtooth/state-delta" == x.event_type)
             .filter_map(|x| -> Option<StateChangeList> {
-                protobuf::parse_from_bytes(&x.data).ok()
+                Message::parse_from_bytes(&x.data).ok()
             })
             .flat_map(|x| x.state_changes.into_iter())
             .for_each(|x| {

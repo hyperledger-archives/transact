@@ -108,7 +108,7 @@ impl Subscriber {
             },
         };
 
-        let response: ClientEventsSubscribeResponse = match protobuf::parse_from_bytes(&response_msg.content) {
+        let response: ClientEventsSubscribeResponse = match Message::parse_from_bytes(&response_msg.content) {
             Ok(r) => r,
             Err(error) => {
                 error!("Error parsing response: {:?}", error);
@@ -138,7 +138,7 @@ impl Subscriber {
                 }
             };
 
-            let event_list = match protobuf::parse_from_bytes(&content) {
+            let event_list = match Message::parse_from_bytes(&content) {
                 Ok(l) => l,
                 Err(err) => {
                     error!("An error occured while attempting to receive message {:?}", err);
