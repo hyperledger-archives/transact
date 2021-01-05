@@ -103,7 +103,7 @@ impl FromNative<BatchHeader> for protos::batch::BatchHeader {
 impl FromBytes<BatchHeader> for BatchHeader {
     fn from_bytes(bytes: &[u8]) -> Result<BatchHeader, ProtoConversionError> {
         let proto: protos::batch::BatchHeader =
-            protobuf::parse_from_bytes(bytes).map_err(|err| {
+            Message::parse_from_bytes(bytes).map_err(|err| {
                 ProtoConversionError::SerializationError(format!(
                     "unable to get BatchHeader from bytes: {}",
                     err
@@ -218,7 +218,7 @@ impl FromNative<Batch> for protos::batch::Batch {
 
 impl FromBytes<Batch> for Batch {
     fn from_bytes(bytes: &[u8]) -> Result<Batch, ProtoConversionError> {
-        let proto: protos::batch::Batch = protobuf::parse_from_bytes(bytes).map_err(|err| {
+        let proto: protos::batch::Batch = Message::parse_from_bytes(bytes).map_err(|err| {
             ProtoConversionError::SerializationError(format!(
                 "unable to get Batch from bytes: {}",
                 err
@@ -268,7 +268,7 @@ impl FromNative<Vec<Batch>> for protos::batch::BatchList {
 
 impl FromBytes<Vec<Batch>> for Vec<Batch> {
     fn from_bytes(bytes: &[u8]) -> Result<Self, ProtoConversionError> {
-        let proto: protos::batch::BatchList = protobuf::parse_from_bytes(bytes).map_err(|err| {
+        let proto: protos::batch::BatchList = Message::parse_from_bytes(bytes).map_err(|err| {
             ProtoConversionError::SerializationError(format!(
                 "unable to get BatchList from bytes: {}",
                 err
@@ -623,7 +623,7 @@ mod tests {
 
         // Deserialize the header bytes into our protobuf
         let header_proto: protos::batch::BatchHeader =
-            protobuf::parse_from_bytes(&header_bytes).unwrap();
+            Message::parse_from_bytes(&header_bytes).unwrap();
 
         // Convert to a BatchHeader
         let header: BatchHeader = header_proto.into_native().unwrap();

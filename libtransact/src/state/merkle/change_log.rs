@@ -99,7 +99,7 @@ impl ChangeLogEntry {
     }
 
     pub fn from_bytes(bytes: &[u8]) -> Result<ChangeLogEntry, StateDatabaseError> {
-        Ok(ChangeLogEntry::from_proto(protobuf::parse_from_bytes(
+        Ok(ChangeLogEntry::from_proto(Message::parse_from_bytes(
             bytes,
         )?)?)
     }
@@ -173,7 +173,7 @@ mod tests {
         let entry_bytes = protobuf::Message::write_to_bytes(&proto_entry).unwrap();
 
         let proto: protos::merkle::ChangeLogEntry =
-            protobuf::parse_from_bytes(&entry_bytes).unwrap();
+            Message::parse_from_bytes(&entry_bytes).unwrap();
 
         let change_log_entry: ChangeLogEntry = proto.into_native().unwrap();
         assert_eq!(BYTES1.to_vec(), change_log_entry.parent);

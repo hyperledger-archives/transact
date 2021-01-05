@@ -122,7 +122,7 @@ impl FromNative<StateEntryValue> for protos::key_value_state::StateEntryValue {
 
 impl FromBytes<StateEntryValue> for StateEntryValue {
     fn from_bytes(bytes: &[u8]) -> Result<StateEntryValue, ProtoConversionError> {
-        let proto: protos::key_value_state::StateEntryValue = protobuf::parse_from_bytes(bytes)
+        let proto: protos::key_value_state::StateEntryValue = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get StateEntryValue from bytes".to_string(),
@@ -260,8 +260,8 @@ impl FromNative<StateEntry> for protos::key_value_state::StateEntry {
 
 impl FromBytes<StateEntry> for StateEntry {
     fn from_bytes(bytes: &[u8]) -> Result<StateEntry, ProtoConversionError> {
-        let proto: protos::key_value_state::StateEntry = protobuf::parse_from_bytes(bytes)
-            .map_err(|_| {
+        let proto: protos::key_value_state::StateEntry =
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get StateEntry from bytes".to_string(),
                 )
@@ -399,7 +399,7 @@ impl FromNative<StateEntryList> for protos::key_value_state::StateEntryList {
 
 impl FromBytes<StateEntryList> for StateEntryList {
     fn from_bytes(bytes: &[u8]) -> Result<StateEntryList, ProtoConversionError> {
-        let proto: protos::key_value_state::StateEntryList = protobuf::parse_from_bytes(bytes)
+        let proto: protos::key_value_state::StateEntryList = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get StateEntryList from bytes".to_string(),

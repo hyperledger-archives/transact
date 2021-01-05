@@ -196,7 +196,7 @@ impl FromNative<TransactionHeader> for protos::transaction::TransactionHeader {
 
 impl FromBytes<TransactionHeader> for TransactionHeader {
     fn from_bytes(bytes: &[u8]) -> Result<TransactionHeader, ProtoConversionError> {
-        let proto: protos::transaction::TransactionHeader = protobuf::parse_from_bytes(bytes)
+        let proto: protos::transaction::TransactionHeader = Message::parse_from_bytes(bytes)
             .map_err(|err| {
                 ProtoConversionError::SerializationError(format!(
                     "unable to get TransactionHeader from bytes: {}",
@@ -312,7 +312,7 @@ impl FromNative<Transaction> for protos::transaction::Transaction {
 impl FromBytes<Transaction> for Transaction {
     fn from_bytes(bytes: &[u8]) -> Result<Transaction, ProtoConversionError> {
         let proto: protos::transaction::Transaction =
-            protobuf::parse_from_bytes(bytes).map_err(|err| {
+            Message::parse_from_bytes(bytes).map_err(|err| {
                 ProtoConversionError::SerializationError(format!(
                     "unable to get Transaction from bytes: {}",
                     err
@@ -814,7 +814,7 @@ mod tests {
 
         // Deserialize the header bytes into our protobuf
         let header_proto: protos::transaction::TransactionHeader =
-            protobuf::parse_from_bytes(&header_bytes).unwrap();
+            Message::parse_from_bytes(&header_bytes).unwrap();
 
         // Convert to a TransactionHeader
         let header: TransactionHeader = header_proto.into_native().unwrap();
@@ -871,7 +871,7 @@ mod tests {
 
         // Deserialize the header bytes into our protobuf
         let transaction_proto: protos::transaction::Transaction =
-            protobuf::parse_from_bytes(&transaction_bytes).unwrap();
+            Message::parse_from_bytes(&transaction_bytes).unwrap();
 
         // Convert to a Transaction
         let transaction: Transaction = transaction_proto

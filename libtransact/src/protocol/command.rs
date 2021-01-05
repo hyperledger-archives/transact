@@ -69,7 +69,7 @@ impl FromNative<CommandPayload> for protos::command::CommandPayload {
 impl FromBytes<CommandPayload> for CommandPayload {
     fn from_bytes(bytes: &[u8]) -> Result<CommandPayload, ProtoConversionError> {
         let proto: protos::command::CommandPayload =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CommandPayload from byte".to_string(),
                 )
@@ -196,7 +196,7 @@ impl FromNative<Command> for protos::command::Command {
 
 impl FromBytes<Command> for Command {
     fn from_bytes(bytes: &[u8]) -> Result<Command, ProtoConversionError> {
-        let proto: protos::command::Command = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::command::Command = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError("Unable to get Command from bytes".to_string())
         })?;
         proto.into_native()
@@ -260,7 +260,7 @@ impl FromNative<BytesEntry> for protos::command::BytesEntry {
 impl FromBytes<BytesEntry> for BytesEntry {
     fn from_bytes(bytes: &[u8]) -> Result<BytesEntry, ProtoConversionError> {
         let proto: protos::command::BytesEntry =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get BytesEntry from bytes".to_string(),
                 )
@@ -332,7 +332,7 @@ impl FromNative<SetState> for protos::command::SetState {
 
 impl FromBytes<SetState> for SetState {
     fn from_bytes(bytes: &[u8]) -> Result<SetState, ProtoConversionError> {
-        let proto: protos::command::SetState = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::command::SetState = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError(
                 "Unable to get SetState from bytes".to_string(),
             )
@@ -395,7 +395,7 @@ impl FromNative<DeleteState> for protos::command::DeleteState {
 impl FromBytes<DeleteState> for DeleteState {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteState, ProtoConversionError> {
         let proto: protos::command::DeleteState =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteState from bytes".to_string(),
                 )
@@ -454,7 +454,7 @@ impl FromNative<GetState> for protos::command::GetState {
 
 impl FromBytes<GetState> for GetState {
     fn from_bytes(bytes: &[u8]) -> Result<GetState, ProtoConversionError> {
-        let proto: protos::command::GetState = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::command::GetState = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError(
                 "Unable to get GetState from bytes".to_string(),
             )
@@ -544,7 +544,7 @@ impl FromNative<AddEvent> for protos::command::AddEvent {
 
 impl FromBytes<AddEvent> for AddEvent {
     fn from_bytes(bytes: &[u8]) -> Result<AddEvent, ProtoConversionError> {
-        let proto: protos::command::AddEvent = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::command::AddEvent = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError(
                 "Unable to get AddEvent from bytes".to_string(),
             )
@@ -605,7 +605,7 @@ impl FromNative<AddReceiptData> for protos::command::AddReceiptData {
 impl FromBytes<AddReceiptData> for AddReceiptData {
     fn from_bytes(bytes: &[u8]) -> Result<AddReceiptData, ProtoConversionError> {
         let proto: protos::command::AddReceiptData =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get AddReceiptData from bytes".to_string(),
                 )
@@ -702,7 +702,7 @@ impl FromNative<Sleep> for protos::command::Sleep {
 
 impl FromBytes<Sleep> for Sleep {
     fn from_bytes(bytes: &[u8]) -> Result<Sleep, ProtoConversionError> {
-        let proto: protos::command::Sleep = protobuf::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::command::Sleep = Message::parse_from_bytes(bytes).map_err(|_| {
             ProtoConversionError::SerializationError("Unable to get bytes from Sleep".to_string())
         })?;
         proto.into_native()
@@ -759,7 +759,7 @@ impl FromNative<ReturnInvalid> for protos::command::ReturnInvalid {
 impl FromBytes<ReturnInvalid> for ReturnInvalid {
     fn from_bytes(bytes: &[u8]) -> Result<ReturnInvalid, ProtoConversionError> {
         let proto: protos::command::ReturnInvalid =
-            protobuf::parse_from_bytes(bytes).map_err(|_| {
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ReturnInvalid from bytes".to_string(),
                 )
@@ -822,7 +822,7 @@ impl FromNative<ReturnInternalError> for protos::command::ReturnInternalError {
 
 impl FromBytes<ReturnInternalError> for ReturnInternalError {
     fn from_bytes(bytes: &[u8]) -> Result<ReturnInternalError, ProtoConversionError> {
-        let proto: protos::command::ReturnInternalError = protobuf::parse_from_bytes(bytes)
+        let proto: protos::command::ReturnInternalError = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ReturnInvalid from bytes".to_string(),
