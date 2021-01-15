@@ -136,9 +136,17 @@ pub mod state;
 #[cfg(feature = "workload")]
 pub mod workload;
 
+// #[macro_use]` on the `sabre-sdk` enables the sabre log macros, this however cannot be
+// enabled at the same time as the `log` crate's macros due to linker conflicts
+#[cfg(all(feature = "sabre-compat", feature = "log"))]
+compile_error!("Incompatible features enabled: 'sabre-compat' and 'log'");
+
 #[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
+#[cfg(feature = "sabre-compat")]
+#[macro_use]
+extern crate sabre_sdk;
 #[cfg(feature = "contract-archive")]
 #[macro_use]
 extern crate serde_derive;

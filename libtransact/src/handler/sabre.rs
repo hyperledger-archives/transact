@@ -1,6 +1,6 @@
 /*
  * Copyright 2017 Bitwise IO, Inc.
- * Copyright 2019 Cargill Incorporated
+ * Copyright 2019-2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,21 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Traits for handling the execution of a transaction.
+//! A struct for wrapping a `sabre_sdk::TransactionContext`.
 //!
-//! The TransactionHandler trait provides the interface for implementing smart contract engines.
-//! These handlers must be stateless and deterministic.  They are provided, along with the
-//! transaction itself, a TransactonContext implementation which provides access to reading and
-//! writing from state, as well appending events and other opaque data to the receipt.
+//! This will allow for a transact `TransactionHandler` to accept a
+//! `sabre_sdk::TransactionContext` and be used in a Sabre smart contract.
 
-mod error;
-#[cfg(feature = "sabre-compat")]
-pub mod sabre;
+use super::{error::ContextError, TransactionContext};
+use sabre_sdk::TransactionContext as SabreTransactionContext;
 
-pub use crate::handler::error::{ApplyError, ContextError};
-use crate::protocol::transaction::TransactionPair;
+/// A wrapper around a `'a mut dyn sabre_sdk::TransactionContext` that implements
+/// `transact::handler::TransactionHandler`
+pub struct SabreContext<'a> {
+    pub context: &'a mut dyn SabreTransactionContext,
+}
 
-pub trait TransactionContext {
+impl<'a> TransactionContext for SabreContext<'a> {
     /// get_state_entry queries the validator state for data at the
     /// address given. If the  address is set, the data is returned.
     ///
@@ -39,7 +39,9 @@ pub trait TransactionContext {
     /// * `address` - the address to fetch
     fn get_state_entry(&self, address: &str) -> Result<Option<Vec<u8>>, ContextError> {
         Ok(self
-            .get_state_entries(&[address.to_string()])?
+            .context
+            .get_state_entries(&[address.to_string()])
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))?
             .into_iter()
             .map(|(_, val)| val)
             .next())
@@ -55,7 +57,11 @@ pub trait TransactionContext {
     fn get_state_entries(
         &self,
         addresses: &[String],
-    ) -> Result<Vec<(String, Vec<u8>)>, ContextError>;
+    ) -> Result<Vec<(String, Vec<u8>)>, ContextError> {
+        self.context
+            .get_state_entries(addresses)
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))
+    }
 
     /// set_state_entry requests that the provided address is set in the validator state to its
     /// corresponding value.
@@ -65,7 +71,9 @@ pub trait TransactionContext {
     /// * `address` - address of where to store the data
     /// * `data` - payload is the data to store at the address
     fn set_state_entry(&self, address: String, data: Vec<u8>) -> Result<(), ContextError> {
-        self.set_state_entries(vec![(address, data)])
+        self.context
+            .set_state_entries(vec![(address, data)])
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))
     }
 
     /// set_state_entries requests that each address in the provided map be
@@ -74,7 +82,11 @@ pub trait TransactionContext {
     /// # Arguments
     ///
     /// * `entries` - entries are a hashmap where the key is an address and value is the data
-    fn set_state_entries(&self, entries: Vec<(String, Vec<u8>)>) -> Result<(), ContextError>;
+    fn set_state_entries(&self, entries: Vec<(String, Vec<u8>)>) -> Result<(), ContextError> {
+        self.context
+            .set_state_entries(entries)
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))
+    }
 
     /// delete_state_entry requests that the provided address be unset
     /// in validator state. A list of successfully deleted addresses
@@ -85,7 +97,8 @@ pub trait TransactionContext {
     /// * `address` - the address to delete
     fn delete_state_entry(&self, address: &str) -> Result<Option<String>, ContextError> {
         Ok(self
-            .delete_state_entries(&[address.to_string()])?
+            .delete_state_entries(&[address.to_string()])
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))?
             .into_iter()
             .next())
     }
@@ -97,14 +110,23 @@ pub trait TransactionContext {
     /// # Arguments
     ///
     /// * `addresses` - the addresses to delete
-    fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, ContextError>;
+    fn delete_state_entries(&self, addresses: &[String]) -> Result<Vec<String>, ContextError> {
+        self.context
+            .delete_state_entries(addresses)
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))
+    }
 
     /// add_receipt_data adds a blob to the execution result for this transaction
     ///
     /// # Arguments
     ///
     /// * `data` - the data to add
-    fn add_receipt_data(&self, data: Vec<u8>) -> Result<(), ContextError>;
+    ///
+    /// This is not currently supported `sabre_sdk::TransactionContext` so it is
+    /// left unimplemented.
+    fn add_receipt_data(&self, _data: Vec<u8>) -> Result<(), ContextError> {
+        unimplemented!()
+    }
 
     /// add_event adds a new event to the execution result for this transaction.
     ///
@@ -121,30 +143,9 @@ pub trait TransactionContext {
         event_type: String,
         attributes: Vec<(String, String)>,
         data: Vec<u8>,
-    ) -> Result<(), ContextError>;
-}
-
-pub trait TransactionHandler: Send {
-    /// TransactionHandler that defines the business logic for a new transaction family.
-    /// The family_name, family_versions, and namespaces functions are
-    /// used by the processor to route processing requests to the handler.
-
-    /// family_name should return the name of the transaction family that this
-    /// handler can process, e.g. "intkey"
-    fn family_name(&self) -> &str;
-
-    /// family_versions should return a list of versions this transaction
-    /// family handler can process, e.g. ["1.0"]
-    fn family_versions(&self) -> &[String];
-
-    /// Apply is the single method where all the business logic for a
-    /// transaction family is defined. The method will be called by the
-    /// transaction processor upon receiving a TpProcessRequest that the
-    /// handler understands and will pass in the TpProcessRequest and an
-    /// initialized instance of the Context type.
-    fn apply(
-        &self,
-        transaction: &TransactionPair,
-        context: &mut dyn TransactionContext,
-    ) -> Result<(), ApplyError>;
+    ) -> Result<(), ContextError> {
+        self.context
+            .add_event(event_type, attributes, &data)
+            .map_err(|err| ContextError::ResponseAttributeError(err.to_string()))
+    }
 }
