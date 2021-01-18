@@ -42,7 +42,7 @@
 //!
 //! # Feature
 //!
-//! This is available via the optional feature "sqlite-db".
+//! This is available via the optional feature "database-sqlite".
 //!
 //! _This is currently an experimental feature._
 use std::cell::RefCell;

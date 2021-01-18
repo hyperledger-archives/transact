@@ -14,7 +14,8 @@
 
 //! An Redis-backed implementation of the database traits.
 //!
-//! This is an experimental feature, and is only available by enabling the "redis-db" feature.
+//! This is an experimental feature, and is only available by enabling the "database-redis"
+//! feature.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};

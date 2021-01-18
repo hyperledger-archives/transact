@@ -90,11 +90,11 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
+    "database-redis",
+    "database-sqlite",
     "family-command",
     "family-xo",
     "key-value-state",
-    "redis-db",
-    "sqlite-db",
     "workload",
 ]
 
@@ -108,6 +108,8 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_derive", "serde_yaml", "tar"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
+database-redis = ["redis"]
+database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["handler", "log", "protocol-transaction", "scheduler"]
 family-command = []
 family-xo = ["rand_hc", "workload"]
@@ -115,14 +117,12 @@ handler = ["protocol-transaction"]
 key-value-state = []
 protocol-batch = ["cylinder", "protocol-transaction"]
 protocol-transaction = ["cylinder", "protocol-batch"]
-redis-db = ["redis"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["log", "protocol-batch"]
-sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 state-merkle = ["cbor-codec", "log", "openssl"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
-state-merkle-redis-db-tests = ["redis-db", "state-merkle"]
+state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
 workload = []
 
 [package.metadata.docs.rs]
