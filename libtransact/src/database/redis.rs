@@ -1,4 +1,4 @@
-// Copyright 2019 Cargill Incorporated
+// Copyright 2019-2021 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 
 //! An Redis-backed implementation of the database traits.
 //!
-//! This is an experimental feature, and is only available by enabling the "redis-db" feature.
+//! This is an experimental feature, and is only available by enabling the "database-redis"
+//! feature.
 
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};

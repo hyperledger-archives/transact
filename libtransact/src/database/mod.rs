@@ -31,10 +31,11 @@
 
 pub mod btree;
 pub mod error;
+#[cfg(feature = "database-lmdb")]
 pub mod lmdb;
-#[cfg(feature = "redis-db")]
+#[cfg(feature = "database-redis")]
 pub mod redis;
-#[cfg(feature = "sqlite-db")]
+#[cfg(feature = "database-sqlite")]
 pub mod sqlite;
 
 pub use crate::database::error::DatabaseError;

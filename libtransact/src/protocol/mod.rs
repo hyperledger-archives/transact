@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Cargill Incorporated
+ * Copyright 2019-2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,9 +20,11 @@
 //! These structs cover the core protocols of the Transact system.  Batches of transactions are
 //! scheduled and executed.  The resuls of execution are stored in transaction receipts.
 
+#[cfg(feature = "protocol-batch")]
 pub mod batch;
 pub mod command;
 #[cfg(feature = "key-value-state")]
 pub mod key_value_state;
 pub mod receipt;
+#[cfg(feature = "protocol-transaction")]
 pub mod transaction;

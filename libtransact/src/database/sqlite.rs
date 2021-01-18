@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Cargill Incorporated
+ * Copyright 2020-2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,7 +42,7 @@
 //!
 //! # Feature
 //!
-//! This is available via the optional feature "sqlite-db".
+//! This is available via the optional feature "database-sqlite".
 //!
 //! _This is currently an experimental feature._
 use std::cell::RefCell;
