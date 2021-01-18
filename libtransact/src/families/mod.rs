@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(any(test, feature = "family-command"))]
+#[cfg(feature = "family-command")]
 pub mod command;
 #[cfg(feature = "family-xo")]
 pub mod xo;

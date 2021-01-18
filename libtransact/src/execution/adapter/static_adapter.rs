@@ -290,7 +290,7 @@ impl From<ContextManagerError> for ContextError {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "family-command"))]
 mod test {
     use super::*;
 
