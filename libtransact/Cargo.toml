@@ -36,7 +36,7 @@ hex = "0.3"
 libc = ">=0.2.35"
 lmdb-zero = ">=0.4.1"
 log = { version = "0.4", optional = true, features = ["std"] }
-openssl = "0.10"
+openssl = { version = "0.10", optional = true }
 protobuf = "2.19"
 r2d2 = { version = "0.8", optional = true }
 r2d2_sqlite = { version = "0.15", optional = true }
@@ -119,7 +119,7 @@ redis-db = ["redis"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["log", "protocol-batch"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
-state-merkle = ["cbor-codec", "log"]
+state-merkle = ["cbor-codec", "log", "openssl"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["redis-db", "state-merkle"]
