@@ -1,4 +1,5 @@
 /*
+ * Copyright 2021 Cargill Incorporated
  * Copyright 2018 Intel Corporation
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -15,16 +16,13 @@
  * ------------------------------------------------------------------------------
  */
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha512;
-use protobuf;
+use protobuf::Message;
+use sha2::{Digest, Sha512};
 
-use sawtooth_sdk::messages::processor::TpProcessRequest;
-use sawtooth_sdk::processor::handler::ApplyError;
-use sawtooth_sdk::processor::handler::TransactionContext;
-use sawtooth_sdk::processor::handler::TransactionHandler;
+use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
+use crate::protocol::transaction::TransactionPair;
 
-use protos::smallbank::{
+use crate::protos::smallbank::{
     Account, SmallbankTransactionPayload, SmallbankTransactionPayload_AmalgamateTransactionData,
     SmallbankTransactionPayload_CreateAccountTransactionData,
     SmallbankTransactionPayload_DepositCheckingTransactionData,
@@ -41,37 +39,38 @@ pub struct SmallbankTransactionHandler {
 }
 
 impl SmallbankTransactionHandler {
+    #[allow(clippy::new_without_default)]
     pub fn new() -> SmallbankTransactionHandler {
         SmallbankTransactionHandler {
             family_name: "smallbank".to_string(),
             family_versions: vec!["1.0".to_string()],
-            namespaces: vec![get_smallbank_prefix().to_string()],
+            namespaces: vec![get_smallbank_prefix()],
         }
+    }
+
+    pub fn namespaces(&self) -> Vec<String> {
+        self.namespaces.clone()
     }
 }
 
 impl TransactionHandler for SmallbankTransactionHandler {
-    fn family_name(&self) -> String {
-        self.family_name.clone()
+    fn family_name(&self) -> &str {
+        &self.family_name
     }
 
-    fn family_versions(&self) -> Vec<String> {
-        self.family_versions.clone()
-    }
-
-    fn namespaces(&self) -> Vec<String> {
-        self.namespaces.clone()
+    fn family_versions(&self) -> &[String] {
+        &self.family_versions
     }
 
     fn apply(
         &self,
-        request: &TpProcessRequest,
+        transaction_pair: &TransactionPair,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let mut payload = unpack_payload(request.get_payload())?;
+        let mut payload = unpack_payload(transaction_pair.transaction().payload())?;
         debug!(
             "Smallbank txn {}: type {:?}",
-            request.get_signature(),
+            transaction_pair.transaction().header_signature(),
             payload.get_payload_type()
         );
 
@@ -102,7 +101,7 @@ impl TransactionHandler for SmallbankTransactionHandler {
 }
 
 fn unpack_payload(payload: &[u8]) -> Result<SmallbankTransactionPayload, ApplyError> {
-    protobuf::parse_from_bytes(&payload).map_err(|err| {
+    Message::parse_from_bytes(&payload).map_err(|err| {
         warn!(
             "Invalid transaction: Failed to unmarshal SmallbankTransaction: {:?}",
             err
@@ -260,7 +259,7 @@ fn apply_amalgamate(
 }
 
 fn unpack_account(account_data: &[u8]) -> Result<Account, ApplyError> {
-    protobuf::parse_from_bytes(&account_data).map_err(|err| {
+    Message::parse_from_bytes(&account_data).map_err(|err| {
         warn!(
             "Invalid transaction: Failed to unmarshal Account: {:?}",
             err
@@ -303,12 +302,12 @@ fn save_account(account: &Account, context: &mut dyn TransactionContext) -> Resu
 
 fn get_smallbank_prefix() -> String {
     let mut sha = Sha512::new();
-    sha.input_str("smallbank");
-    sha.result_str()[..6].to_string()
+    sha.input("smallbank");
+    hex::encode(&sha.result())[..6].to_string()
 }
 
 fn create_smallbank_address(payload: &str) -> String {
     let mut sha = Sha512::new();
     sha.input(payload.as_bytes());
-    get_smallbank_prefix() + &sha.result_str()[..64].to_string()
+    get_smallbank_prefix() + &hex::encode(&sha.result())[..64]
 }
