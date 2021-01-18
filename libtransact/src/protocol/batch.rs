@@ -1,5 +1,6 @@
 /*
  * Copyright 2018 Bitwise IO, Inc.
+ * Copyright 2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +25,7 @@
 use std::error::Error as StdError;
 use std::fmt;
 
+#[cfg(feature = "protocol-batch-builder")]
 use cylinder::{Signer, SigningError};
 use protobuf::Message;
 
@@ -400,18 +402,21 @@ impl From<ProtoConversionError> for BatchBuildError {
     }
 }
 
+#[cfg(feature = "protocol-batch-builder")]
 impl From<SigningError> for BatchBuildError {
     fn from(err: SigningError) -> Self {
         Self::SigningError(err.to_string())
     }
 }
 
+#[cfg(feature = "protocol-batch-builder")]
 #[derive(Default, Clone)]
 pub struct BatchBuilder {
     transactions: Option<Vec<Transaction>>,
     trace: Option<bool>,
 }
 
+#[cfg(feature = "protocol-batch-builder")]
 impl BatchBuilder {
     pub fn new() -> Self {
         BatchBuilder::default()
@@ -530,6 +535,7 @@ mod tests {
         assert_eq!(true, pair.batch().trace());
     }
 
+    #[cfg(feature = "protocol-batch-builder")]
     #[test]
     fn batch_builder_chain() {
         let signer = new_signer();
@@ -554,6 +560,7 @@ mod tests {
         check_builder_batch(&*signer, &pair);
     }
 
+    #[cfg(feature = "protocol-batch-builder")]
     #[test]
     fn batch_builder_separate() {
         let signer = new_signer();
@@ -704,6 +711,7 @@ mod benchmarks {
         });
     }
 
+    #[cfg(feature = "protocol-batch-builder")]
     #[bench]
     fn bench_batch_builder(b: &mut Bencher) {
         let signer = new_signer();

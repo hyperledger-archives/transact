@@ -69,7 +69,9 @@ default = [
     "execution",
     "handler",
     "protocol-batch",
+    "protocol-batch-builder",
     "protocol-transaction",
+    "protocol-transaction-builder",
     "scheduler",
     "state-merkle",
 ]
@@ -116,12 +118,14 @@ database-lmdb = ["lmdb-zero"]
 database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
-family-command = ["handler"]
+family-command = ["cylinder", "handler", "protocol-transaction-builder"]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
 key-value-state = []
-protocol-batch = ["cylinder", "protocol-transaction"]
-protocol-transaction = ["cylinder", "protocol-batch"]
+protocol-batch = ["protocol-transaction"]
+protocol-batch-builder = ["cylinder", "protocol-batch"]
+protocol-transaction = []
+protocol-transaction-builder = ["cylinder", "protocol-transaction", "protocol-batch-builder"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]
 state-merkle = ["cbor-codec", "log", "openssl"]
