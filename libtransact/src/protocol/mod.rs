@@ -20,9 +20,11 @@
 //! These structs cover the core protocols of the Transact system.  Batches of transactions are
 //! scheduled and executed.  The resuls of execution are stored in transaction receipts.
 
+#[cfg(feature = "protocol-batch")]
 pub mod batch;
 pub mod command;
 #[cfg(feature = "key-value-state")]
 pub mod key_value_state;
 pub mod receipt;
+#[cfg(feature = "protocol-transaction")]
 pub mod transaction;

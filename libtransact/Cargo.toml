@@ -30,12 +30,12 @@ repository = "http://github.com/hyperledger/transact"
 [dependencies]
 bzip2 = { version = "0.3", optional = true }
 cbor-codec = { version = "0.7", optional = true }
-cylinder = "0.2"
+cylinder = { version = "0.2", optional = true }
 glob = { version = "0.3", optional = true }
 hex = "0.3"
 libc = ">=0.2.35"
 lmdb-zero = ">=0.4.1"
-log = { version = "0.4", features = ["std"] }
+log = { version = "0.4", optional = true, features = ["std"] }
 openssl = "0.10"
 protobuf = "2.19"
 r2d2 = { version = "0.8", optional = true }
@@ -64,6 +64,11 @@ protoc-rust = "2.14"
 
 [features]
 default = [
+    "execution",
+    "handler",
+    "protocol-batch",
+    "protocol-transaction",
+    "scheduler",
     "state-merkle",
 ]
 
@@ -103,13 +108,18 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_derive", "serde_yaml", "tar"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
+execution = ["handler", "log", "protocol-transaction", "scheduler"]
 family-command = []
 family-xo = ["rand_hc", "workload"]
+handler = ["protocol-transaction"]
 key-value-state = []
+protocol-batch = ["cylinder", "protocol-transaction"]
+protocol-transaction = ["cylinder", "protocol-batch"]
 redis-db = ["redis"]
 sawtooth-compat = ["sawtooth-sdk"]
+scheduler = ["log", "protocol-batch"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
-state-merkle = ["cbor-codec"]
+state-merkle = ["cbor-codec", "log"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["redis-db", "state-merkle"]

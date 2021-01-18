@@ -119,19 +119,23 @@ pub mod context;
 #[cfg(feature = "contract")]
 pub mod contract;
 pub mod database;
+#[cfg(feature = "execution")]
 pub mod execution;
 pub mod families;
+#[cfg(feature = "handler")]
 pub mod handler;
 pub mod protocol;
 #[allow(renamed_and_removed_lints)]
 pub mod protos;
 #[cfg(feature = "sawtooth-compat")]
 pub mod sawtooth;
+#[cfg(feature = "scheduler")]
 pub mod scheduler;
 pub mod state;
 #[cfg(feature = "workload")]
 pub mod workload;
 
+#[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
 #[cfg(feature = "contract-archive")]
