@@ -115,6 +115,7 @@
 
 #![cfg_attr(feature = "nightly", feature(test))]
 
+#[cfg(feature = "context")]
 pub mod context;
 #[cfg(feature = "contract")]
 pub mod contract;

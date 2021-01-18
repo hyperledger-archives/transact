@@ -51,7 +51,7 @@ serde_derive = { version = "1.0", optional = true }
 serde_yaml = { version = "0.8", optional = true }
 sha2 = "0.8"
 tar = { version = "0.4", optional = true }
-uuid = { version = "0.7", features = ["v4"] }
+uuid = { version = "0.7", optional = true, features = ["v4"] }
 
 [dev-dependencies]
 rusty-fork = "0.3"
@@ -64,6 +64,7 @@ protoc-rust = "2.14"
 
 [features]
 default = [
+    "context",
     "database-lmdb",
     "execution",
     "handler",
@@ -102,6 +103,7 @@ experimental = [
 
 nightly = []
 
+context = ["uuid"]
 contract = []
 contract-address = ["contract"]
 contract-address-key-hash = ["contract-address"]
@@ -113,7 +115,7 @@ contract-context-key-value = ["contract-context", "key-value-state"]
 database-lmdb = ["lmdb-zero"]
 database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
-execution = ["handler", "log", "protocol-transaction", "scheduler"]
+execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = []
 family-xo = ["rand_hc", "workload"]
 handler = ["protocol-transaction"]
@@ -121,7 +123,7 @@ key-value-state = []
 protocol-batch = ["cylinder", "protocol-transaction"]
 protocol-transaction = ["cylinder", "protocol-batch"]
 sawtooth-compat = ["sawtooth-sdk"]
-scheduler = ["log", "protocol-batch"]
+scheduler = ["context", "log", "protocol-batch"]
 state-merkle = ["cbor-codec", "log", "openssl"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
