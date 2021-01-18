@@ -31,6 +31,7 @@
 
 pub mod btree;
 pub mod error;
+#[cfg(feature = "database-lmdb")]
 pub mod lmdb;
 #[cfg(feature = "database-redis")]
 pub mod redis;

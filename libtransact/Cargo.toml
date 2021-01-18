@@ -34,7 +34,7 @@ cylinder = { version = "0.2", optional = true }
 glob = { version = "0.3", optional = true }
 hex = "0.3"
 libc = ">=0.2.35"
-lmdb-zero = ">=0.4.1"
+lmdb-zero = { version = ">=0.4.1", optional = true }
 log = { version = "0.4", optional = true, features = ["std"] }
 openssl = { version = "0.10", optional = true }
 protobuf = "2.19"
@@ -64,6 +64,7 @@ protoc-rust = "2.14"
 
 [features]
 default = [
+    "database-lmdb",
     "execution",
     "handler",
     "protocol-batch",
@@ -90,6 +91,7 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
+    "database-lmdb",
     "database-redis",
     "database-sqlite",
     "family-command",
@@ -108,6 +110,7 @@ contract-address-triple-key-hash = ["contract-address"]
 contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_derive", "serde_yaml", "tar"]
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
+database-lmdb = ["lmdb-zero"]
 database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["handler", "log", "protocol-transaction", "scheduler"]
