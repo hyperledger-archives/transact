@@ -1,2 +1,10 @@
 [workspace]
-members = ["libtransact", "examples/simple_xo", "examples/address_generator"]
+members = [
+  "libtransact",
+  "examples/simple_xo",
+  "examples/address_generator",
+  ]
+
+# Exclude sabre_smallbank to avoid incompatible features `sabre-compat` and
+# `log`
+exclude = ["examples/sabre_smallbank"]
