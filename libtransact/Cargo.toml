@@ -99,6 +99,7 @@ experimental = [
     "database-redis",
     "database-sqlite",
     "family-command",
+    "family-smallbank",
     "family-xo",
     "key-value-state",
     "workload",
@@ -133,6 +134,7 @@ database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["cylinder", "handler", "protocol-transaction-builder"]
+family-smallbank = ["handler"]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
 key-value-state = []

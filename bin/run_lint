@@ -13,3 +13,9 @@ docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo fmt
 docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo fmt -- --check
 docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo clippy --version
 docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo clippy -- -D clippy::all
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact cargo clippy -- -D clippy::all
+docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+   /bin/bash -c \
+   " echo \"Linting sabre_smallbank ...\" && \
+    (cd examples/sabre_smallbank && cargo fmt -- --check) && \
+    (cd examples/sabre_smallbank && cargo clippy -- -D clippy::all)"
