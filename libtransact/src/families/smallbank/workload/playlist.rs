@@ -1,5 +1,6 @@
 /*
  * Copyright 2017 Intel Corporation
+ * Copyright 2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,49 +16,38 @@
  * ------------------------------------------------------------------------------
  */
 
-//! Tools for generating YAML playlists of transactions.
-
-extern crate crypto;
-extern crate rand;
-extern crate yaml_rust;
-
+//! Tools for generating YAML playlists of transactions and continous payloads
 use std::borrow::Cow;
-use std::error;
 use std::fmt;
-use std::io::Error as StdIoError;
 use std::io::Read;
 use std::io::Write;
 use std::time::Instant;
 
-use self::yaml_rust::yaml::Hash;
-use self::yaml_rust::EmitError;
-use self::yaml_rust::Yaml;
-use self::yaml_rust::YamlEmitter;
-use self::yaml_rust::YamlLoader;
-use rand::prelude::*;
-
-use protos::smallbank;
-use protos::smallbank::SmallbankTransactionPayload;
-use protos::smallbank::SmallbankTransactionPayload_PayloadType as SBPayloadType;
-
-use protobuf;
+use cylinder::Signer;
 use protobuf::Message;
+use rand::prelude::*;
+use sha2::{Digest, Sha512};
+use yaml_rust::yaml::Hash;
+use yaml_rust::Yaml;
+use yaml_rust::YamlEmitter;
+use yaml_rust::YamlLoader;
 
-use sawtooth_sdk::messages::transaction::Transaction;
-use sawtooth_sdk::messages::transaction::TransactionHeader;
-use sawtooth_sdk::signing;
+use crate::protocol::sabre::ExecuteContractActionBuilder;
+use crate::protos::smallbank;
+use crate::protos::smallbank::SmallbankTransactionPayload;
+use crate::protos::smallbank::SmallbankTransactionPayload_PayloadType as SBPayloadType;
+use crate::protos::IntoProto;
 
-use self::crypto::digest::Digest;
-use self::crypto::sha2::Sha512;
+use super::error::PlaylistError;
 
 macro_rules! yaml_map(
-    { $($key:expr => $value:expr),+ } => {
-        {
-            let mut m = Hash::new();
-            $(m.insert(Yaml::from_str($key), $value);)+
-            Yaml::Hash(m)
-        }
-    };
+ { $($key:expr => $value:expr),+ } => {
+     {
+         let mut m = Hash::new();
+         $(m.insert(Yaml::from_str($key), $value);)+
+         Yaml::Hash(m)
+     }
+ };
 );
 
 /// Generates a playlist of Smallbank transactions.
@@ -97,60 +87,58 @@ pub fn generate_smallbank_playlist(
 pub fn process_smallbank_playlist(
     output: &mut dyn Write,
     playlist_input: &mut dyn Read,
-    signing_context: &dyn signing::Context,
-    signing_key: &dyn signing::PrivateKey,
+    signer: &dyn Signer,
 ) -> Result<(), PlaylistError> {
     let payloads = read_smallbank_playlist(playlist_input)?;
 
-    let crypto_factory = signing::CryptoFactory::new(signing_context);
-    let signer = crypto_factory.new_signer(signing_key);
-    let pub_key = signing_context
-        .get_public_key(signing_key)
-        .map_err(PlaylistError::SigningError)?;
-    let pub_key_hex = pub_key.as_hex();
-
     let start = Instant::now();
     for payload in payloads {
-        let mut txn = Transaction::new();
-        let mut txn_header = TransactionHeader::new();
-
-        txn_header.set_family_name(String::from("smallbank"));
-        txn_header.set_family_version(String::from("1.0"));
-
         let elapsed = start.elapsed();
-        txn_header.set_nonce(format!("{}{}", elapsed.as_secs(), elapsed.subsec_nanos()));
-
-        let addresses = protobuf::RepeatedField::from_vec(make_addresses(&payload));
-
-        txn_header.set_inputs(addresses.clone());
-        txn_header.set_outputs(addresses.clone());
+        let addresses = make_addresses(&payload);
 
         let payload_bytes = payload
             .write_to_bytes()
             .map_err(PlaylistError::MessageError)?;
 
-        let mut sha = Sha512::new();
-        sha.input(&payload_bytes);
-        let hash: &mut [u8] = &mut [0; 64];
-        sha.result(hash);
+        let txn = ExecuteContractActionBuilder::new()
+            .with_name(String::from("smallbank"))
+            .with_version(String::from("1.0"))
+            .with_inputs(addresses.clone())
+            .with_outputs(addresses.clone())
+            .with_payload(payload_bytes)
+            .into_payload_builder()
+            .map_err(|err| {
+                PlaylistError::BuildError(format!(
+                    "Unable to convert execute action into sabre payload: {}",
+                    err
+                ))
+            })?
+            .into_transaction_builder()
+            .map_err(|err| {
+                PlaylistError::BuildError(format!(
+                    "Unable to convert execute payload into transaction: {}",
+                    err
+                ))
+            })?
+            .with_nonce(
+                format!("{}{}", elapsed.as_secs(), elapsed.subsec_nanos())
+                    .as_bytes()
+                    .to_vec(),
+            )
+            .build(&*signer)
+            .map_err(|err| {
+                PlaylistError::BuildError(format!("Unable to build transaction: {}", err))
+            })?;
 
-        txn_header.set_payload_sha512(bytes_to_hex_str(hash));
-        txn_header.set_signer_public_key(pub_key_hex.clone());
-        txn_header.set_batcher_public_key(pub_key_hex.clone());
+        let txn_proto = txn.into_proto().map_err(|err| {
+            PlaylistError::BuildError(format!(
+                "Unable to convert transaction to protobuf: {}",
+                err
+            ))
+        })?;
 
-        let header_bytes = txn_header
-            .write_to_bytes()
-            .map_err(PlaylistError::MessageError)?;
-
-        let signature = signer
-            .sign(&header_bytes)
-            .map_err(PlaylistError::SigningError)?;
-
-        txn.set_header(header_bytes);
-        txn.set_header_signature(signature);
-        txn.set_payload(payload_bytes);
-
-        txn.write_length_delimited_to_writer(output)
+        txn_proto
+            .write_length_delimited_to_writer(output)
             .map_err(PlaylistError::MessageError)?
     }
 
@@ -186,8 +174,7 @@ pub fn make_addresses(payload: &SmallbankTransactionPayload) -> Vec<String> {
 fn customer_id_address(customer_id: u32) -> String {
     let mut sha = Sha512::new();
     sha.input(customer_id.to_string().as_bytes());
-    let hash: &mut [u8] = &mut [0; 64];
-    sha.result(hash);
+    let hash = &mut sha.result();
 
     let hex = bytes_to_hex_str(hash);
     // Using the precomputed Sha512 hash of "smallbank"
@@ -237,7 +224,7 @@ fn read_yaml(input: &mut dyn Read) -> Result<Cow<str>, PlaylistError> {
 fn load_yaml_array(yaml_str: &str) -> Result<Cow<Vec<Yaml>>, PlaylistError> {
     let mut yaml = YamlLoader::load_from_str(yaml_str).map_err(PlaylistError::YamlInputError)?;
     let element = yaml.remove(0);
-    let yaml_array = element.as_vec().cloned().unwrap().clone();
+    let yaml_array = element.as_vec().cloned().unwrap();
 
     Ok(Cow::Owned(yaml_array))
 }
@@ -561,54 +548,13 @@ fn next_non_matching_in_range(rng: &mut StdRng, max: u32, exclude: u32) -> u32 {
     selected
 }
 
-#[derive(Debug)]
-pub enum PlaylistError {
-    IoError(StdIoError),
-    YamlOutputError(EmitError),
-    YamlInputError(yaml_rust::ScanError),
-    MessageError(protobuf::ProtobufError),
-    SigningError(signing::Error),
-}
-
-impl fmt::Display for PlaylistError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match *self {
-            PlaylistError::IoError(ref err) => {
-                write!(f, "Error occurred writing messages: {}", err)
-            }
-            PlaylistError::YamlOutputError(_) => write!(f, "Error occurred generating YAML output"),
-            PlaylistError::YamlInputError(_) => write!(f, "Error occurred reading YAML input"),
-            PlaylistError::MessageError(ref err) => {
-                write!(f, "Error occurred creating protobuf: {}", err)
-            }
-            PlaylistError::SigningError(ref err) => {
-                write!(f, "Error occurred signing transactions: {}", err)
-            }
-        }
-    }
-}
-
-impl error::Error for PlaylistError {
-    fn cause(&self) -> Option<&dyn error::Error> {
-        match *self {
-            PlaylistError::IoError(ref err) => Some(err),
-            PlaylistError::YamlOutputError(_) => None,
-            PlaylistError::YamlInputError(_) => None,
-            PlaylistError::MessageError(ref err) => Some(err),
-            PlaylistError::SigningError(ref err) => Some(err),
-        }
-    }
-}
-
 struct FmtWriter<'a> {
-    writer: Box<&'a mut dyn Write>,
+    writer: &'a mut dyn Write,
 }
 
 impl<'a> FmtWriter<'a> {
     pub fn new(writer: &'a mut dyn Write) -> Self {
-        FmtWriter {
-            writer: Box::new(writer),
-        }
+        FmtWriter { writer }
     }
 }
 

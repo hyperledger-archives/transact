@@ -15,8 +15,5 @@
  * ------------------------------------------------------------------------------
  */
 
-pub mod handler;
-#[cfg(feature = "family-smallbank-workload")]
-pub mod workload;
-
-pub use self::handler::SmallbankTransactionHandler;
+pub mod error;
+pub mod playlist;
