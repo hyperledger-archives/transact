@@ -3,5 +3,8 @@
 /target
 /Cargo.lock
 
+/examples/sabre_smallbank/target
+/examples/sabre_smallbank/Cargo.lock
+
 # Editor files
 .idea/
