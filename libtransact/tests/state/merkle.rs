@@ -84,8 +84,7 @@ fn test_merkle_trie_root_advance(db: Box<dyn Database>) {
             .index_get(CHANGE_LOG_INDEX, new_root_bytes)
             .expect("A database error occurred")
             .expect("Did not return a change log entry");
-        protobuf::parse_from_bytes::<ChangeLogEntry>(entry_bytes)
-            .expect("Failed to parse change log entry")
+        protobuf::Message::parse_from_bytes(entry_bytes).expect("Failed to parse change log entry")
     };
 
     assert_eq!(orig_root_bytes, &change_log.parent);
@@ -910,7 +909,7 @@ fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_
 
 fn expect_change_log(db: &dyn Database, root_hash: &[u8]) -> ChangeLogEntry {
     let reader = db.get_reader().unwrap();
-    protobuf::parse_from_bytes::<ChangeLogEntry>(
+    protobuf::Message::parse_from_bytes(
         &reader
             .index_get(CHANGE_LOG_INDEX, root_hash)
             .expect("No db errors")
