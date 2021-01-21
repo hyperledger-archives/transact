@@ -102,6 +102,7 @@ experimental = [
     "family-smallbank",
     "family-xo",
     "key-value-state",
+    "protocol-sabre-exec",
     "workload",
 ]
 
@@ -142,6 +143,7 @@ protocol-batch = ["protocol-transaction"]
 protocol-batch-builder = ["cylinder", "protocol-batch"]
 protocol-transaction = []
 protocol-transaction-builder = ["cylinder", "protocol-transaction", "protocol-batch-builder"]
+protocol-sabre-exec = []
 sabre-compat = ["sabre-sdk"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]
