@@ -8,6 +8,9 @@ pub enum WorkloadError {
 
     // Returned when an error occurs while using TransactionBuilder.
     TransactionBuildError(TransactionBuildError),
+
+    // Underlying workload raised an error
+    InvalidState(String),
 }
 
 impl std::error::Error for WorkloadError {
@@ -15,6 +18,7 @@ impl std::error::Error for WorkloadError {
         match *self {
             WorkloadError::BatchBuildError(ref err) => Some(err),
             WorkloadError::TransactionBuildError(ref err) => Some(err),
+            WorkloadError::InvalidState(_) => None,
         }
     }
 }
@@ -25,6 +29,9 @@ impl std::fmt::Display for WorkloadError {
             WorkloadError::BatchBuildError(ref err) => write!(f, "BatchBuildError: {}", err),
             WorkloadError::TransactionBuildError(ref err) => {
                 write!(f, "TransactionBuildError: {}", err)
+            }
+            WorkloadError::InvalidState(ref err) => {
+                write!(f, "InvalidState: {}", err)
             }
         }
     }

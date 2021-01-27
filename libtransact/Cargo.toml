@@ -53,6 +53,7 @@ serde_yaml = { version = "0.8", optional = true }
 sha2 = "0.8"
 tar = { version = "0.4", optional = true }
 uuid = { version = "0.7", optional = true, features = ["v4"] }
+yaml-rust =  { version = "0.4", optional = true }
 
 [dev-dependencies]
 rusty-fork = "0.3"
@@ -100,8 +101,10 @@ experimental = [
     "database-sqlite",
     "family-command",
     "family-smallbank",
+    "family-smallbank-workload",
     "family-xo",
     "key-value-state",
+    "protocol-sabre-exec",
     "workload",
 ]
 
@@ -135,6 +138,7 @@ database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["cylinder", "handler", "protocol-transaction-builder"]
 family-smallbank = ["handler"]
+family-smallbank-workload = ["family-smallbank", "protocol-sabre-exec", "workload"]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
 key-value-state = []
@@ -142,6 +146,7 @@ protocol-batch = ["protocol-transaction"]
 protocol-batch-builder = ["cylinder", "protocol-batch"]
 protocol-transaction = []
 protocol-transaction-builder = ["cylinder", "protocol-transaction", "protocol-batch-builder"]
+protocol-sabre-exec = []
 sabre-compat = ["sabre-sdk"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]
@@ -149,7 +154,7 @@ state-merkle = ["cbor-codec", "log", "openssl"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
-workload = []
+workload = ["yaml-rust"]
 
 [package.metadata.docs.rs]
 features = [
