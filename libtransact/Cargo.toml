@@ -138,7 +138,12 @@ database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["cylinder", "handler", "protocol-transaction-builder"]
 family-smallbank = ["handler"]
-family-smallbank-workload = ["family-smallbank", "protocol-sabre-exec", "workload"]
+family-smallbank-workload = [
+  "family-smallbank",
+  "protocol-sabre-exec",
+  "yaml-rust",
+  "workload"
+]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
 key-value-state = []
@@ -154,7 +159,7 @@ state-merkle = ["cbor-codec", "log", "openssl"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
-workload = ["yaml-rust"]
+workload = []
 
 [package.metadata.docs.rs]
 features = [
