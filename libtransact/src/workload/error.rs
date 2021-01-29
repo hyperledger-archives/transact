@@ -48,3 +48,38 @@ impl From<TransactionBuildError> for WorkloadError {
         WorkloadError::TransactionBuildError(err)
     }
 }
+
+#[cfg(feature = "workload-runner")]
+#[derive(Debug, PartialEq)]
+pub enum WorkloadRunnerError {
+    /// Error raised when failing to submit the batch
+    SubmitError(String),
+    TooManyRequests,
+    /// Error raised when adding workload to the runner
+    WorkloadAddError(String),
+    /// Error raised when removing workload from the runner
+    WorkloadRemoveError(String),
+}
+
+#[cfg(feature = "workload-runner")]
+impl std::error::Error for WorkloadRunnerError {}
+
+#[cfg(feature = "workload-runner")]
+impl std::fmt::Display for WorkloadRunnerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            WorkloadRunnerError::SubmitError(ref err) => {
+                write!(f, "Unable to submit batch: {}", err)
+            }
+            WorkloadRunnerError::TooManyRequests => {
+                write!(f, "Unable to submit batch because of TooManyRequests")
+            }
+            WorkloadRunnerError::WorkloadAddError(ref err) => {
+                write!(f, "Unable to add workload: {}", err)
+            }
+            WorkloadRunnerError::WorkloadRemoveError(ref err) => {
+                write!(f, "Unable to remove workload: {}", err)
+            }
+        }
+    }
+}

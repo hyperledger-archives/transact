@@ -30,6 +30,7 @@ repository = "http://github.com/hyperledger/transact"
 [dependencies]
 bzip2 = { version = "0.3", optional = true }
 cbor-codec = { version = "0.7", optional = true }
+chrono = { version = "0.4", optional = true }
 cylinder = { version = "0.2", optional = true }
 glob = { version = "0.3", optional = true }
 hex = "0.3"
@@ -43,6 +44,7 @@ r2d2_sqlite = { version = "0.15", optional = true }
 rand = "0.6"
 rand_hc = { version = "0.1", optional = true }
 redis = { version = "0.13.0", default-features = false, optional = true }
+reqwest = { version = "0.10", features = ["blocking", "json"], optional = true}
 rusqlite = { version = "0.22", optional = true }
 sabre-sdk = { version ="0.7.1", optional = true }
 sawtooth-sdk = { version = "0.5", optional = true }
@@ -106,6 +108,7 @@ experimental = [
     "key-value-state",
     "protocol-sabre-exec",
     "workload",
+    "workload-runner"
 ]
 
 # stable features in support of wasm
@@ -142,7 +145,8 @@ family-smallbank-workload = [
   "family-smallbank",
   "protocol-sabre-exec",
   "yaml-rust",
-  "workload"
+  "workload",
+  "workload-runner"
 ]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
@@ -160,6 +164,7 @@ state-merkle = ["cbor-codec", "log", "openssl"]
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
 workload = []
+workload-runner = ["chrono", "reqwest", "serde", "serde_derive"]
 
 [package.metadata.docs.rs]
 features = [

@@ -1,6 +1,6 @@
 /*
  * Copyright 2018 Bitwise IO, Inc.
- * Copyright 2019 Cargill Incorporated
+ * Copyright 2019-2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,16 +17,20 @@
  */
 
 pub mod error;
+#[cfg(feature = "workload-runner")]
+pub mod runner;
 
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
+#[cfg(feature = "workload-runner")]
+pub use crate::workload::runner::WorkloadRunner;
 
-pub trait TransactionWorkload {
+pub trait TransactionWorkload: Send {
     fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError>;
 }
 
-pub trait BatchWorkload {
+pub trait BatchWorkload: Send {
     fn next_batch(&mut self) -> Result<BatchPair, WorkloadError>;
 }
 
