@@ -147,6 +147,6 @@ extern crate log;
 #[cfg(feature = "sabre-compat")]
 #[macro_use]
 extern crate sabre_sdk;
-#[cfg(feature = "contract-archive")]
+#[cfg(feature = "serde_derive")]
 #[macro_use]
 extern crate serde_derive;
