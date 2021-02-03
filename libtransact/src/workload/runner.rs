@@ -275,7 +275,7 @@ impl WorkerBuilder {
                         match receiver.try_recv() {
                             // recieved shutdown
                             Ok(_) => {
-                                info!("Worker received shutdowm");
+                                info!("Worker received shutdown");
                                 break;
                             }
                             Err(TryRecvError::Empty) => {
