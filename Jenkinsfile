@@ -67,13 +67,21 @@ pipeline {
                 sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
             }
         }
+
+        stage('Build/archive artifacts') {
+            steps {
+                sh 'docker-compose -f docker-compose-installed.yaml build'
+                sh 'docker-compose -f docker/compose/copy-debs.yaml up'
+            }
+        }
     }
     post {
         always {
             sh 'docker-compose -f docker/compose/docker-compose.yaml down'
+            sh 'docker-compose -f docker/compose/copy-debs.yaml down'
         }
         success {
-            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js'
+            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js, build/scar/*.scar'
         }
     }
 }
