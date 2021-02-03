@@ -8,3 +8,5 @@
 
 # Editor files
 .idea/
+
+/build/
