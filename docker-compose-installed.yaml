@@ -102,4 +102,6 @@ services:
     build:
       context: .
       dockerfile: example/intkey_multiply/processor/Dockerfile-scar
+      args:
+      - REPO_VERSION=${REPO_VERSION}
     image: intkeym-scar:${ISOLATION_ID}

@@ -92,7 +92,7 @@ pipeline {
             steps {
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-cli'
                 sh 'docker-compose -f docker-compose-installed.yaml build sabre-tp'
-                sh 'docker-compose -f docker-compose-installed.yaml build intkey_multiply'
+                sh 'VERSION=AUTO_STRICT REPO_VERSION=$(bin/get_version) docker-compose -f docker-compose-installed.yaml build intkey_multiply'
 
             }
         }

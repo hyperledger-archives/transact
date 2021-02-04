@@ -78,6 +78,8 @@ COPY example/intkey_multiply/processor/src \
      /build/example/intkey_multiply/processor/src
 
 # Build the contract
+ARG REPO_VERSION
+RUN sed -i -e s/version.*$/version\ =\ \"${REPO_VERSION}\"/ Cargo.toml
 RUN cargo build --target wasm32-unknown-unknown --release
 
 # Copy the packaging directory
@@ -91,4 +93,4 @@ RUN cp target/wasm32-unknown-unknown/release/intkey-multiply.wasm \
 WORKDIR /build/example/intkey_multiply/processor/packaging/scar
 
 # Create .scar file
-RUN tar -jcvf /tmp/intkey-multiply_0.7.2.scar .
+RUN tar -jcvf /tmp/intkey-multiply_${REPO_VERSION}.scar .
