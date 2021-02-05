@@ -3,6 +3,7 @@ members = [
   "libtransact",
   "examples/simple_xo",
   "examples/address_generator",
+  "cli"
   ]
 
 # Exclude sabre_smallbank to avoid incompatible features `sabre-compat` and

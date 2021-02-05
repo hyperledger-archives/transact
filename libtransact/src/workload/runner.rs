@@ -30,7 +30,7 @@ use crate::protos::IntoBytes;
 use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 
-const DEFAULT_LOG_TIME_SECS: u32 = 5; // time in seconds
+const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// Keeps track of the currenlty running workloads.
 ///
@@ -52,6 +52,7 @@ impl WorkloadRunner {
     ///              URL before adding `/batches` for submission
     /// * `rate`- How many tranactions per second to submit
     /// * `auth` - The string to be set in the Authorization header for the request
+    /// * `update_time` - The time between updates on the workload
     ///
     /// Returns an error if a workload with that ID is already running or if the workload thread
     /// could not be started
@@ -62,6 +63,7 @@ impl WorkloadRunner {
         targets: Vec<String>,
         rate: u32,
         auth: String,
+        update_time: u32,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
@@ -76,6 +78,7 @@ impl WorkloadRunner {
             .with_targets(targets)
             .with_rate(rate)
             .with_auth(auth)
+            .with_update_time(update_time)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -155,6 +158,7 @@ struct WorkerBuilder {
     targets: Option<Vec<String>>,
     rate: Option<u32>,
     auth: Option<String>,
+    update_time: Option<u32>,
 }
 
 impl WorkerBuilder {
@@ -209,6 +213,16 @@ impl WorkerBuilder {
         self
     }
 
+    /// Sets the update time of the worker
+    ///
+    /// # Arguments
+    ///
+    ///  * `update_time` - How often to provide an update about the workload
+    pub fn with_update_time(mut self, update_time: u32) -> WorkerBuilder {
+        self.update_time = Some(update_time);
+        self
+    }
+
     pub fn build(self) -> Result<Worker, WorkloadRunnerError> {
         let id = self.id.ok_or_else(|| {
             WorkloadRunnerError::WorkloadAddError(
@@ -240,6 +254,8 @@ impl WorkerBuilder {
             )
         })?;
 
+        let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
+
         let (sender, receiver) = channel();
 
         let time_to_wait = time::Duration::from_secs(1) / rate;
@@ -259,7 +275,7 @@ impl WorkerBuilder {
                         match receiver.try_recv() {
                             // recieved shutdown
                             Ok(_) => {
-                                info!("Worker received shutdowm");
+                                info!("Worker received shutdown");
                                 break;
                             }
                             Err(TryRecvError::Empty) => {
@@ -295,7 +311,7 @@ impl WorkerBuilder {
                                 }
 
                                 // log http submission stats if its been longer then update time
-                                log(&http_counter, &mut last_log_time, DEFAULT_LOG_TIME_SECS);
+                                log(&http_counter, &mut last_log_time, update_time);
 
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
