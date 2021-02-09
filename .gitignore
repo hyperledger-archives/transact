@@ -1,6 +1,6 @@
 **/*.rs.bk
 
-/target
+**/target
 /Cargo.lock
 
 /cli/packaging/man/*.1
