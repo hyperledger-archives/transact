@@ -3,6 +3,8 @@
 /target
 /Cargo.lock
 
+/cli/packaging/man/*.1
+
 /examples/sabre_smallbank/target
 /examples/sabre_smallbank/Cargo.lock
 
