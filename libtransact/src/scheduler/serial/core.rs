@@ -271,7 +271,7 @@ impl SchedulerCore {
             .as_ref()
             .ok_or_else(|| {
                 CoreError::Internal(
-                    "attemping to invalidate current batch but no current batch exists".into(),
+                    "attempting to invalidate current batch but no current batch exists".into(),
                 )
             })?
             .batch()
