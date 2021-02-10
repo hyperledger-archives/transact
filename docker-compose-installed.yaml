@@ -20,8 +20,4 @@ services:
     build:
       context: .
       dockerfile: examples/sabre_smallbank/Dockerfile-scar
-      args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
     image: smallbank-scar:${ISOLATION_ID}
