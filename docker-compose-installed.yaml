@@ -20,4 +20,6 @@ services:
     build:
       context: .
       dockerfile: examples/sabre_smallbank/Dockerfile-scar
+      args:
+      - REPO_VERSION=${REPO_VERSION}
     image: smallbank-scar:${ISOLATION_ID}

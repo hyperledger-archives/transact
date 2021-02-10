@@ -79,6 +79,10 @@ RUN rm target/wasm32-unknown-unknown/release/sabre-smallbank* \
 # Copy over source files
 COPY examples/sabre_smallbank/src /build/examples/sabre_smallbank/src
 
+# Update version in Cargo.toml
+ARG REPO_VERSION
+RUN sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"${REPO_VERSION}\"/" Cargo.toml
+
 # Build the contract
 RUN cargo build --target wasm32-unknown-unknown --release
 
@@ -93,4 +97,4 @@ RUN cp target/wasm32-unknown-unknown/release/sabre-smallbank.wasm \
 WORKDIR /build/examples/sabre_smallbank/packaging/scar
 
 # Create .scar file
-RUN tar -jcvf /tmp/smallbank_0.3.7.scar .
+RUN tar -jcvf /tmp/smallbank_${REPO_VERSION}.scar .
