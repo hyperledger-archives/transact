@@ -81,7 +81,7 @@ pipeline {
             sh 'docker-compose -f docker/compose/copy-debs.yaml down'
         }
         success {
-            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js, build/scar/*.scar'
+            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js, build/scar/*.scar, build/debs/*.deb'
         }
     }
 }

@@ -24,3 +24,12 @@ services:
       bash -c "
         cp /tmp/*.scar /build/scar
       "
+
+  transact-cli:
+    image: transact-cli:${ISOLATION_ID}
+    volumes:
+      - ../../build/debs:/build/debs
+    command: |
+      bash -c "
+        cp /tmp/*.deb /build/debs
+      "
