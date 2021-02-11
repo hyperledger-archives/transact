@@ -195,6 +195,7 @@ pub fn create_smallbank_playlist(
         num_accounts,
         current_account: 0,
         rng,
+        accounts: vec![],
     };
 
     Box::new(iter.take(num_transactions))
@@ -233,6 +234,7 @@ pub struct SmallbankGeneratingIter {
     num_accounts: usize,
     current_account: usize,
     rng: StdRng,
+    accounts: Vec<u32>,
 }
 
 impl SmallbankGeneratingIter {
@@ -241,6 +243,7 @@ impl SmallbankGeneratingIter {
             num_accounts,
             current_account: 0,
             rng: SeedableRng::seed_from_u64(seed),
+            accounts: vec![],
         }
     }
 }
@@ -255,7 +258,9 @@ impl Iterator for SmallbankGeneratingIter {
 
             let mut create_account =
                 smallbank::SmallbankTransactionPayload_CreateAccountTransactionData::new();
-            create_account.set_customer_id(self.current_account as u32);
+            let customer_id: u32 = self.rng.gen_range(0, u32::MAX);
+            self.accounts.push(customer_id);
+            create_account.set_customer_id(customer_id);
             create_account.set_customer_name(
                 self.rng
                     .sample_iter(&rand::distributions::Alphanumeric)
@@ -286,25 +291,43 @@ impl Iterator for SmallbankGeneratingIter {
 
             match payload_type {
                 SBPayloadType::DEPOSIT_CHECKING => {
-                    let data =
-                        make_smallbank_deposit_checking_txn(&mut self.rng, self.num_accounts);
+                    let data = make_smallbank_deposit_checking_txn(
+                        &mut self.rng,
+                        self.num_accounts,
+                        &self.accounts,
+                    );
                     payload.set_deposit_checking(data);
                 }
                 SBPayloadType::WRITE_CHECK => {
-                    let data = make_smallbank_write_check_txn(&mut self.rng, self.num_accounts);
+                    let data = make_smallbank_write_check_txn(
+                        &mut self.rng,
+                        self.num_accounts,
+                        &self.accounts,
+                    );
                     payload.set_write_check(data);
                 }
                 SBPayloadType::TRANSACT_SAVINGS => {
-                    let data =
-                        make_smallbank_transact_savings_txn(&mut self.rng, self.num_accounts);
+                    let data = make_smallbank_transact_savings_txn(
+                        &mut self.rng,
+                        self.num_accounts,
+                        &self.accounts,
+                    );
                     payload.set_transact_savings(data);
                 }
                 SBPayloadType::SEND_PAYMENT => {
-                    let data = make_smallbank_send_payment_txn(&mut self.rng, self.num_accounts);
+                    let data = make_smallbank_send_payment_txn(
+                        &mut self.rng,
+                        self.num_accounts,
+                        &self.accounts,
+                    );
                     payload.set_send_payment(data);
                 }
                 SBPayloadType::AMALGAMATE => {
-                    let data = make_smallbank_amalgamate_txn(&mut self.rng, self.num_accounts);
+                    let data = make_smallbank_amalgamate_txn(
+                        &mut self.rng,
+                        self.num_accounts,
+                        &self.accounts,
+                    );
                     payload.set_amalgamate(data);
                 }
                 _ => panic!("Should not have generated outside of [2, 7)"),
@@ -483,9 +506,12 @@ impl<'a> From<&'a Yaml> for SmallbankTransactionPayload {
 fn make_smallbank_deposit_checking_txn(
     rng: &mut StdRng,
     num_accounts: usize,
+    accounts: &[u32],
 ) -> smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData::new();
-    payload.set_customer_id(rng.gen_range(0, num_accounts as u32));
+    // value in range should always exist
+    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    payload.set_customer_id(customer_id);
     payload.set_amount(rng.gen_range(10, 200));
 
     payload
@@ -494,9 +520,12 @@ fn make_smallbank_deposit_checking_txn(
 fn make_smallbank_write_check_txn(
     rng: &mut StdRng,
     num_accounts: usize,
+    accounts: &[u32],
 ) -> smallbank::SmallbankTransactionPayload_WriteCheckTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_WriteCheckTransactionData::new();
-    payload.set_customer_id(rng.gen_range(0, num_accounts as u32));
+    // value in range should always exist
+    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    payload.set_customer_id(customer_id);
     payload.set_amount(rng.gen_range(10, 200));
 
     payload
@@ -505,9 +534,12 @@ fn make_smallbank_write_check_txn(
 fn make_smallbank_transact_savings_txn(
     rng: &mut StdRng,
     num_accounts: usize,
+    accounts: &[u32],
 ) -> smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData::new();
-    payload.set_customer_id(rng.gen_range(0, num_accounts as u32));
+    // value in range should always exist
+    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    payload.set_customer_id(customer_id);
     payload.set_amount(rng.gen_range(10, 200));
 
     payload
@@ -516,12 +548,14 @@ fn make_smallbank_transact_savings_txn(
 fn make_smallbank_send_payment_txn(
     rng: &mut StdRng,
     num_accounts: usize,
+    accounts: &[u32],
 ) -> smallbank::SmallbankTransactionPayload_SendPaymentTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_SendPaymentTransactionData::new();
-    let source_id = rng.gen_range(0, num_accounts as u32);
-    let dest_id = next_non_matching_in_range(rng, num_accounts as u32, source_id);
-    payload.set_source_customer_id(source_id);
-    payload.set_dest_customer_id(dest_id);
+    // value in range should always exist
+    let source = rng.gen_range(0, num_accounts);
+    let dest = next_non_matching_in_range(rng, num_accounts, source);
+    payload.set_source_customer_id(accounts[source]);
+    payload.set_dest_customer_id(accounts[dest]);
     payload.set_amount(rng.gen_range(10, 200));
 
     payload
@@ -530,17 +564,19 @@ fn make_smallbank_send_payment_txn(
 fn make_smallbank_amalgamate_txn(
     rng: &mut StdRng,
     num_accounts: usize,
+    accounts: &[u32],
 ) -> smallbank::SmallbankTransactionPayload_AmalgamateTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_AmalgamateTransactionData::new();
-    let source_id = rng.gen_range(0, num_accounts as u32);
-    let dest_id = next_non_matching_in_range(rng, num_accounts as u32, source_id);
-    payload.set_source_customer_id(source_id);
-    payload.set_dest_customer_id(dest_id);
+    // value in range should always exist
+    let source = rng.gen_range(0, num_accounts);
+    let dest = next_non_matching_in_range(rng, num_accounts, source);
+    payload.set_source_customer_id(accounts[source]);
+    payload.set_dest_customer_id(accounts[dest]);
 
     payload
 }
 
-fn next_non_matching_in_range(rng: &mut StdRng, max: u32, exclude: u32) -> u32 {
+fn next_non_matching_in_range(rng: &mut StdRng, max: usize, exclude: usize) -> usize {
     let mut selected = exclude;
     while selected == exclude {
         selected = rng.gen_range(0, max)
