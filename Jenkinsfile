@@ -70,7 +70,7 @@ pipeline {
 
         stage('Build/archive artifacts') {
             steps {
-                sh 'docker-compose -f docker-compose-installed.yaml build'
+                sh 'REPO_VERSION=$(VERSION=AUTO_STRICT ./bin/get_version) docker-compose -f docker-compose-installed.yaml build'
                 sh 'docker-compose -f docker/compose/copy-debs.yaml up'
             }
         }
@@ -81,7 +81,7 @@ pipeline {
             sh 'docker-compose -f docker/compose/copy-debs.yaml down'
         }
         success {
-            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js, build/scar/*.scar'
+            archiveArtifacts 'target/doc/**/*.html, target/doc/**/*.woff, target/doc/**/*.txt, target/doc/**/*.css, target/doc/**/*.js, build/scar/*.scar, build/debs/*.deb'
         }
     }
 }

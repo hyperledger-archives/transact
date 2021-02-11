@@ -21,7 +21,13 @@ services:
       context: .
       dockerfile: examples/sabre_smallbank/Dockerfile-scar
       args:
-        - http_proxy
-        - https_proxy
-        - no_proxy
+      - REPO_VERSION=${REPO_VERSION}
     image: smallbank-scar:${ISOLATION_ID}
+
+  transact-cli:
+    build:
+      context: .
+      dockerfile: cli/Dockerfile
+      args:
+      - REPO_VERSION=${REPO_VERSION}
+    image: ${REGISTRY}${NAMESPACE}transact-cli:${ISOLATION_ID}
