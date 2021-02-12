@@ -119,10 +119,14 @@ fn apply_create_account(
 ) -> Result<(), ApplyError> {
     match load_account(create_account_data.get_customer_id(), context)? {
         Some(_) => {
-            warn!("Invalid transaction: during CREATE_ACCOUNT, Customer Name must be set");
-            Err(ApplyError::InvalidTransaction(
-                "Customer Name must be set".into(),
-            ))
+            warn!(
+                "Invalid transaction: during CREATE_ACCOUNT, Customer {} already exists",
+                create_account_data.get_customer_id()
+            );
+            Err(ApplyError::InvalidTransaction(format!(
+                "Customer {} already exists",
+                create_account_data.get_customer_id()
+            )))
         }
         None => {
             if create_account_data.get_customer_name().is_empty() {
