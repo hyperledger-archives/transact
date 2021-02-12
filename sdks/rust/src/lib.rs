@@ -738,7 +738,14 @@ impl From<WasmSdkError> for ApplyError {
 unsafe fn ptr_to_vec(ptr: WasmPtr) -> Result<Option<Vec<u8>>, WasmSdkError> {
     let mut vec = Vec::new();
 
-    for i in 0..externs::get_ptr_len(ptr) {
+    let ptr_len = externs::get_ptr_len(ptr);
+    if ptr_len == -1 {
+        return Err(WasmSdkError::MemoryRetrievalError(
+            "WasmPtr does not exist".to_string(),
+        ));
+    }
+
+    for i in 0..ptr_len {
         vec.push(externs::read_byte(ptr as isize + i));
     }
 
