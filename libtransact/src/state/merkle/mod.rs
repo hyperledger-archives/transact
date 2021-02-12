@@ -210,7 +210,7 @@ impl MerkleRadixTree {
             let (deletion_candidates, duplicates) = MerkleRadixTree::remove_duplicate_hashes(
                 db_writer.as_reader(),
                 change_log.additions,
-            )?;
+            );
 
             for hash in &deletion_candidates {
                 let hash_hex = ::hex::encode(hash);
@@ -247,7 +247,7 @@ impl MerkleRadixTree {
                 MerkleRadixTree::remove_duplicate_hashes(
                     db_writer.as_reader(),
                     successor.deletions,
-                )?;
+                );
 
             for hash in &deletion_candidates {
                 let hash_hex = ::hex::encode(hash);
@@ -270,14 +270,14 @@ impl MerkleRadixTree {
     fn remove_duplicate_hashes(
         db_reader: &dyn DatabaseReader,
         deletions: Vec<Vec<u8>>,
-    ) -> Result<(Vec<StateHash>, Vec<StateHash>), StateDatabaseError> {
-        Ok(deletions.into_iter().partition(|key| {
+    ) -> (Vec<StateHash>, Vec<StateHash>) {
+        deletions.into_iter().partition(|key| {
             if let Ok(count) = get_ref_count(db_reader, &key) {
                 count == 0
             } else {
                 false
             }
-        }))
+        })
     }
     /// Returns the current merkle root for this MerkleRadixTree
     pub fn get_merkle_root(&self) -> String {
