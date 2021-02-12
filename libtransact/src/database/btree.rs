@@ -237,7 +237,8 @@ impl<'a> DatabaseWriter for BTreeWriter<'a> {
     }
 
     fn commit(self: Box<Self>) -> Result<(), DatabaseError> {
-        BTreeWriter::commit(self.db, self.transactions)
+        BTreeWriter::commit(self.db, self.transactions);
+        Ok(())
     }
 
     fn as_reader(&self) -> &dyn DatabaseReader {
@@ -246,10 +247,7 @@ impl<'a> DatabaseWriter for BTreeWriter<'a> {
 }
 
 impl<'a> BTreeWriter<'a> {
-    fn commit(
-        mut db: RwLockWriteGuard<'a, BTreeDbInternal>,
-        transactions: Vec<WriterTransaction>,
-    ) -> Result<(), DatabaseError> {
+    fn commit(mut db: RwLockWriteGuard<'a, BTreeDbInternal>, transactions: Vec<WriterTransaction>) {
         for transaction in transactions {
             match transaction {
                 WriterTransaction::Put { key, value } => {
@@ -269,7 +267,6 @@ impl<'a> BTreeWriter<'a> {
                 }
             }
         }
-        Ok(())
     }
 }
 
