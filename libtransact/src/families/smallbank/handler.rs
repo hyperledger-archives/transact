@@ -194,7 +194,10 @@ fn apply_transact_savings(
             if transact_savings_data.get_amount() < 0
                 && (-transact_savings_data.get_amount() as u32) > account.get_savings_balance()
             {
-                warn!("Invalid transaction: during TRANSACT_SAVINGS, Insufficient funds in source savings account");
+                warn!(
+                    "Invalid transaction: during TRANSACT_SAVINGS, Insufficient funds in source \
+                    savings account"
+                );
                 return Err(ApplyError::InvalidTransaction(
                     "Insufficient funds in source savings account".into(),
                 ));
@@ -229,7 +232,10 @@ fn apply_send_payment(
         load_account(send_payment_data.get_dest_customer_id(), context)?.ok_or_else(err)?;
 
     if source_account.get_checking_balance() < send_payment_data.get_amount() {
-        warn!("Invalid transaction: during SEND_PAYMENT, Insufficient funds in source checking account");
+        warn!(
+            "Invalid transaction: during SEND_PAYMENT, Insufficient funds in source checking \
+            account"
+        );
         Err(ApplyError::InvalidTransaction(
             "Insufficient funds in source checking account".into(),
         ))
