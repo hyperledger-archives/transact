@@ -15,10 +15,12 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
-
+#[cfg(feature = "workload-batch-gen")]
+pub mod batch_gen;
 pub mod error;
 #[cfg(feature = "workload-runner")]
 pub mod runner;
+pub mod source;
 
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
