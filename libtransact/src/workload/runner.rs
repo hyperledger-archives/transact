@@ -32,7 +32,7 @@ use super::batch_gen::BatchListFeeder;
 use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 
-const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
+pub const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// Keeps track of the currenlty running workloads.
 ///

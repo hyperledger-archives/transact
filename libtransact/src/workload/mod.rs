@@ -27,7 +27,7 @@ use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 #[cfg(feature = "workload-runner")]
 pub use crate::workload::runner::{
-    submit_batches_from_source, WorkloadRunner,
+    submit_batches_from_source, WorkloadRunner, DEFAULT_LOG_TIME_SECS,
 };
 
 pub trait TransactionWorkload: Send {
