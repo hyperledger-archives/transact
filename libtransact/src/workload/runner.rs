@@ -19,6 +19,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Sender, TryRecvError};
 use std::{thread, time};
@@ -27,6 +28,7 @@ use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::protos::IntoBytes;
 
+use super::batch_gen::BatchListFeeder;
 use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 
@@ -436,4 +438,75 @@ pub fn log(counter: &HTTPRequestCounter, last_log_time: &mut time::Instant, upda
         counter.log(log_time.as_secs(), log_time.subsec_nanos());
         *last_log_time = time::Instant::now();
     }
+}
+
+/// Helper function to submit a list of batches from a source
+pub fn submit_batches_from_source(
+    source: &mut dyn Read,
+    input_file: String,
+    targets: Vec<String>,
+    rate: u32,
+    auth: String,
+    update: u32,
+) {
+    let mut workload = BatchListFeeder::new(source);
+    let time_to_wait = time::Duration::from_secs(1) / rate;
+    // set first target
+    let mut next_target = 0;
+    // keep track of status of http requests for logging
+    let http_counter = HTTPRequestCounter::new(format!("File: {}", input_file));
+    // the last time http request information was logged
+    let mut last_log_time = time::Instant::now();
+    loop {
+        let target = match targets.get(next_target) {
+            Some(target) => target,
+            None => {
+                error!("No targets provided");
+                break;
+            }
+        };
+
+        // get next batch
+        let batch = match workload.next() {
+            Some(Ok(batch)) => batch,
+            Some(Err(err)) => {
+                error!("Unable to get batch: {}", err);
+                break;
+            }
+            None => {
+                info!("All batches submitted");
+                break;
+            }
+        };
+
+        let batch_bytes = match vec![batch.batch().clone()].into_bytes() {
+            Ok(bytes) => bytes,
+            Err(err) => {
+                error!("Unable to get batch bytes {}", err);
+                break;
+            }
+        };
+
+        // submit batch to the target
+        match submit_batch(target, &auth, batch_bytes) {
+            Ok(()) => http_counter.increment_sent(),
+            Err(err) => {
+                if err == WorkloadRunnerError::TooManyRequests {
+                    http_counter.increment_queue_full()
+                } else {
+                    error!("{}", err);
+                }
+            }
+        }
+
+        // log http submission stats if its been longer then update time
+        log(&http_counter, &mut last_log_time, update);
+
+        // get next target, round robin
+        next_target = (next_target + 1) % targets.len();
+        thread::sleep(time_to_wait);
+    }
+
+    // log http submission stats for remaning workload
+    log(&http_counter, &mut last_log_time, 0);
 }

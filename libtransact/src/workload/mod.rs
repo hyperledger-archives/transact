@@ -26,7 +26,9 @@ use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 #[cfg(feature = "workload-runner")]
-pub use crate::workload::runner::WorkloadRunner;
+pub use crate::workload::runner::{
+    submit_batches_from_source, WorkloadRunner,
+};
 
 pub trait TransactionWorkload: Send {
     fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError>;
