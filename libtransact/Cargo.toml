@@ -108,6 +108,7 @@ experimental = [
     "key-value-state",
     "protocol-sabre-exec",
     "workload",
+    "workload-batch-gen",
     "workload-runner"
 ]
 
@@ -164,7 +165,13 @@ state-merkle = ["cbor-codec", "log", "openssl"]
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
 workload = []
-workload-runner = ["chrono", "reqwest", "serde", "serde_derive"]
+workload-batch-gen = ["workload"]
+workload-runner = [
+  "chrono",
+  "reqwest",
+  "serde",
+  "serde_derive",
+  "workload-batch-gen"]
 
 [package.metadata.docs.rs]
 features = [

@@ -590,8 +590,6 @@ impl std::fmt::Display for AddressingError {
 mod tests {
     use super::*;
 
-    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
-
     #[test]
     // check that a execute contract action is built correctly
     fn check_execute_contract_action() {
@@ -629,11 +627,5 @@ mod tests {
 
         let execute = ExecuteContractAction::from_bytes(&bytes).unwrap();
         assert_eq!(execute, original);
-    }
-
-    fn new_signer() -> Box<dyn Signer> {
-        let context = Secp256k1Context::new();
-        let key = context.new_random_private_key();
-        context.new_signer(key)
     }
 }
