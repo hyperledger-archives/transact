@@ -25,6 +25,7 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
 
+use crate::admin::AdminPermission;
 use crate::payload::SabreRequestPayload;
 use crate::state::SabreState;
 use crate::wasm_executor::wasm_module::WasmModule;
@@ -36,7 +37,7 @@ use sabre_sdk::protocol::payload::{
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
     UpdateSmartPermissionAction,
 };
-use sabre_sdk::protocol::{ADMINISTRATORS_SETTING_KEY, SABRE_PROTOCOL_VERSION};
+use sabre_sdk::protocol::SABRE_PROTOCOL_VERSION;
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
@@ -60,12 +61,12 @@ pub struct SabreTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
     namespaces: Vec<String>,
+    admin_permissions: Box<dyn AdminPermission>,
 }
 
 impl SabreTransactionHandler {
     /// Constructs a new SabreTransactionHandler
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> SabreTransactionHandler {
+    pub fn new(admin_permissions: Box<dyn AdminPermission>) -> SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
             family_versions: vec!["0.5".into(), "0.6".into(), SABRE_PROTOCOL_VERSION.into()],
@@ -74,6 +75,7 @@ impl SabreTransactionHandler {
                 CONTRACT_REGISTRY_PREFIX.into(),
                 CONTRACT_PREFIX.into(),
             ],
+            admin_permissions,
         }
     }
 }
@@ -135,29 +137,51 @@ impl TransactionHandler for SabreTransactionHandler {
                 &mut state,
             ),
             Action::CreateContractRegistry(create_contract_registry_payload) => {
-                create_contract_registry(create_contract_registry_payload, signer, &mut state)
+                create_contract_registry(
+                    create_contract_registry_payload,
+                    signer,
+                    &mut state,
+                    &*self.admin_permissions,
+                )
             }
             Action::DeleteContractRegistry(delete_contract_registry_payload) => {
-                delete_contract_registry(delete_contract_registry_payload, signer, &mut state)
+                delete_contract_registry(
+                    delete_contract_registry_payload,
+                    signer,
+                    &mut state,
+                    &*self.admin_permissions,
+                )
             }
             Action::UpdateContractRegistryOwners(update_contract_registry_owners_payload) => {
                 update_contract_registry_owners(
                     update_contract_registry_owners_payload,
                     signer,
                     &mut state,
+                    &*self.admin_permissions,
                 )
             }
             Action::CreateNamespaceRegistry(create_namespace_registry_payload) => {
-                create_namespace_registry(create_namespace_registry_payload, signer, &mut state)
+                create_namespace_registry(
+                    create_namespace_registry_payload,
+                    signer,
+                    &mut state,
+                    &*self.admin_permissions,
+                )
             }
             Action::DeleteNamespaceRegistry(delete_namespace_registry_payload) => {
-                delete_namespace_registry(delete_namespace_registry_payload, signer, &mut state)
+                delete_namespace_registry(
+                    delete_namespace_registry_payload,
+                    signer,
+                    &mut state,
+                    &*self.admin_permissions,
+                )
             }
             Action::UpdateNamespaceRegistryOwners(update_namespace_registry_owners_payload) => {
                 update_namespace_registry_owners(
                     update_namespace_registry_owners_payload,
                     signer,
                     &mut state,
+                    &*self.admin_permissions,
                 )
             }
             Action::CreateNamespaceRegistryPermission(
@@ -166,6 +190,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 create_namespace_registry_permission_payload,
                 signer,
                 &mut state,
+                &*self.admin_permissions,
             ),
             Action::DeleteNamespaceRegistryPermission(
                 delete_namespace_registry_permission_payload,
@@ -173,6 +198,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 delete_namespace_registry_permission_payload,
                 signer,
                 &mut state,
+                &*self.admin_permissions,
             ),
             Action::CreateSmartPermission(payload) => {
                 create_smart_permission(payload, signer, &mut state)
@@ -507,6 +533,7 @@ fn create_contract_registry(
     payload: CreateContractRegistryAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let name = payload.name();
 
@@ -526,33 +553,11 @@ fn create_contract_registry(
         }
     };
 
-    let setting = match state.get_admin_setting() {
-        Ok(Some(setting)) => setting,
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Admins not set and only admins can create a contract registry: {}",
-                signer,
-            )));
-        }
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}",
-                err,
-            )));
-        }
-    };
-
-    for entry in setting.get_entries() {
-        if entry.key == ADMINISTRATORS_SETTING_KEY {
-            let values = entry.value.split(',');
-            let value_vec: Vec<&str> = values.collect();
-            if !value_vec.contains(&signer) {
-                return Err(ApplyError::InvalidTransaction(format!(
-                    "Only admins can create a contract registry: {}",
-                    signer,
-                )));
-            }
-        }
+    if !admin_permissions.is_admin(signer, state)? {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Only admins can create a contract registry: {}",
+            signer,
+        )));
     }
 
     let contract_registry = ContractRegistryBuilder::new()
@@ -570,6 +575,7 @@ fn delete_contract_registry(
     payload: DeleteContractRegistryAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let name = payload.name();
     let contract_registry = match state.get_contract_registry(name) {
@@ -596,7 +602,7 @@ fn delete_contract_registry(
     }
 
     // Check if signer is an owner or an admin
-    can_update_contract_registry(contract_registry, signer, state)?;
+    can_update_contract_registry(contract_registry, signer, state, admin_permissions)?;
 
     state.delete_contract_registry(name)
 }
@@ -605,6 +611,7 @@ fn update_contract_registry_owners(
     payload: UpdateContractRegistryOwnersAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let name = payload.name();
     let contract_registry = match state.get_contract_registry(name) {
@@ -624,7 +631,7 @@ fn update_contract_registry_owners(
     };
 
     // Check if signer is an owner or an admin
-    can_update_contract_registry(contract_registry.clone(), signer, state)?;
+    can_update_contract_registry(contract_registry.clone(), signer, state, admin_permissions)?;
 
     let contract_registry = contract_registry
         .into_builder()
@@ -641,6 +648,7 @@ fn create_namespace_registry(
     payload: CreateNamespaceRegistryAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let namespace = payload.namespace();
 
@@ -667,33 +675,11 @@ fn create_namespace_registry(
         }
     }
 
-    let setting = match state.get_admin_setting() {
-        Ok(Some(setting)) => setting,
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Admins not set and only admins can create a namespace registry: {}",
-                signer,
-            )));
-        }
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Unable to check state: {}",
-                err,
-            )));
-        }
-    };
-
-    for entry in setting.get_entries() {
-        if entry.key == ADMINISTRATORS_SETTING_KEY {
-            let values = entry.value.split(',');
-            let value_vec: Vec<&str> = values.collect();
-            if !value_vec.contains(&signer) {
-                return Err(ApplyError::InvalidTransaction(format!(
-                    "Only admins can create a namespace registry: {}",
-                    signer,
-                )));
-            }
-        }
+    if !admin_permissions.is_admin(signer, state)? {
+        return Err(ApplyError::InvalidTransaction(format!(
+            "Only admins can create a namespace registry: {}",
+            signer,
+        )));
     }
 
     let namespace_registry = NamespaceRegistryBuilder::new()
@@ -711,6 +697,7 @@ fn delete_namespace_registry(
     payload: DeleteNamespaceRegistryAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let namespace = payload.namespace();
 
@@ -729,7 +716,7 @@ fn delete_namespace_registry(
             )));
         }
     };
-    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+    can_update_namespace_registry(namespace_registry.clone(), signer, state, admin_permissions)?;
 
     if !namespace_registry.permissions().is_empty() {
         return Err(ApplyError::InvalidTransaction(format!(
@@ -744,6 +731,7 @@ fn update_namespace_registry_owners(
     payload: UpdateNamespaceRegistryOwnersAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let namespace = payload.namespace();
 
@@ -764,7 +752,7 @@ fn update_namespace_registry_owners(
     };
 
     // Check if signer is an owner or an admin
-    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+    can_update_namespace_registry(namespace_registry.clone(), signer, state, admin_permissions)?;
     let namespace_registry = namespace_registry
         .into_builder()
         .with_owners(payload.owners().to_vec())
@@ -780,6 +768,7 @@ fn create_namespace_registry_permission(
     payload: CreateNamespaceRegistryPermissionAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let namespace = payload.namespace();
     let contract_name = payload.contract_name();
@@ -799,7 +788,7 @@ fn create_namespace_registry_permission(
         }
     };
     // Check if signer is an owner or an admin
-    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+    can_update_namespace_registry(namespace_registry.clone(), signer, state, admin_permissions)?;
 
     let new_permission = PermissionBuilder::new()
         .with_contract_name(contract_name.into())
@@ -843,6 +832,7 @@ fn delete_namespace_registry_permission(
     payload: DeleteNamespaceRegistryPermissionAction,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     let namespace = payload.namespace();
     let contract_name = payload.contract_name();
@@ -863,7 +853,7 @@ fn delete_namespace_registry_permission(
         }
     };
     // Check if signer is an owner or an admin
-    can_update_namespace_registry(namespace_registry.clone(), signer, state)?;
+    can_update_namespace_registry(namespace_registry.clone(), signer, state, admin_permissions)?;
 
     // remove old permission for contract
     let mut permissions = namespace_registry.permissions().to_vec();
@@ -1062,36 +1052,21 @@ fn can_update_namespace_registry(
     namespace_registry: NamespaceRegistry,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     if !namespace_registry.owners().contains(&signer.into()) {
-        let setting = match state.get_admin_setting() {
-            Ok(Some(setting)) => setting,
-            Ok(None) => {
+        match admin_permissions.is_admin(signer, state) {
+            Ok(true) => (),
+            Ok(false) => {
                 return Err(ApplyError::InvalidTransaction(format!(
-                    "Owners or admins not set. Only owners or admins can update or delete a namespace registry: {}",
+                    "Only owners or admins can update or delete a namespace registry: {}",
                     signer,
                 )));
             }
             Err(err) => {
-                return Err(ApplyError::InvalidTransaction(format!(
-                    "Unable to check state: {}",
-                    err,
-                )));
+                return Err(err);
             }
         };
-
-        for entry in setting.get_entries() {
-            if entry.key == ADMINISTRATORS_SETTING_KEY {
-                let values = entry.value.split(',');
-                let value_vec: Vec<&str> = values.collect();
-                if !value_vec.contains(&signer) {
-                    return Err(ApplyError::InvalidTransaction(format!(
-                        "Only owners or admins can update or delete a namespace registry: {}",
-                        signer,
-                    )));
-                }
-            }
-        }
     }
     Ok(())
 }
@@ -1101,36 +1076,21 @@ fn can_update_contract_registry(
     contract_registry: ContractRegistry,
     signer: &str,
     state: &mut SabreState,
+    admin_permissions: &dyn AdminPermission,
 ) -> Result<(), ApplyError> {
     if !contract_registry.owners().contains(&signer.into()) {
-        let setting = match state.get_admin_setting() {
-            Ok(Some(setting)) => setting,
-            Ok(None) => {
+        match admin_permissions.is_admin(signer, state) {
+            Ok(true) => (),
+            Ok(false) => {
                 return Err(ApplyError::InvalidTransaction(format!(
                     "Only owners or admins can update or delete a contract registry: {}",
                     signer,
                 )));
             }
             Err(err) => {
-                return Err(ApplyError::InvalidTransaction(format!(
-                    "Unable to check state: {}",
-                    err,
-                )));
+                return Err(err);
             }
         };
-
-        for entry in setting.get_entries() {
-            if entry.key == ADMINISTRATORS_SETTING_KEY {
-                let values = entry.value.split(',');
-                let value_vec: Vec<&str> = values.collect();
-                if !value_vec.contains(&signer) {
-                    return Err(ApplyError::InvalidTransaction(format!(
-                        "Only owners or admins can update or delete a contract registry: {}",
-                        signer,
-                    )));
-                }
-            }
-        }
     }
     Ok(())
 }

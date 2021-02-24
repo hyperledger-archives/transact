@@ -14,21 +14,32 @@
 
 #[macro_use]
 extern crate clap;
+#[macro_use]
+extern crate log;
 
+use clap::Arg;
 use log::LevelFilter;
 
+use sawtooth_sabre::admin;
 use sawtooth_sabre::handler::SabreTransactionHandler;
 use sawtooth_sdk::processor::TransactionProcessor;
 
 fn main() {
-    let matches = clap_app!(wasm_store_tp =>
+    let mut app = clap_app!(wasm_store_tp =>
         (version: crate_version!())
         (about: "Implements the Sawtooth Sabre transaction family")
         (@arg connect: -C --connect +takes_value
          "connection endpoint for validator")
         (@arg verbose: -v --verbose +multiple
-         "increase output verbosity"))
-    .get_matches();
+         "increase output verbosity"));
+
+    app = app.arg(
+        Arg::with_name("admin_allow_all")
+            .long("admin-allow-all")
+            .long_help("Turns off the check for admin keys in Sawtooth Settings"),
+    );
+
+    let matches = app.get_matches();
     let logger = simple_logger::SimpleLogger::new();
     let logger = match matches.occurrences_of("verbose") {
         0 => logger.with_level(LevelFilter::Warn),
@@ -43,7 +54,15 @@ fn main() {
         .value_of("connect")
         .unwrap_or("tcp://localhost:4004");
 
-    let handler = SabreTransactionHandler::new();
+    let handler = {
+        if matches.is_present("admin_allow_all") {
+            warn!("Starting Sabre transaction processor without admin key verifcation");
+            SabreTransactionHandler::new(Box::new(admin::AllowAllAdminPermission::default()))
+        } else {
+            SabreTransactionHandler::new(Box::new(admin::SettingsAdminPermission::default()))
+        }
+    };
+
     let mut processor = TransactionProcessor::new(connect);
 
     processor.add_handler(&handler);
