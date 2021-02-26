@@ -1,4 +1,4 @@
-// Copyright 2019 Cargill Incorporated
+// Copyright 2021 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,14 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate log;
+//! An implementations of `AdminPermission` that always returns true
 
-mod addressing;
-pub mod admin;
-pub mod handler;
-mod payload;
-mod state;
-mod wasm_executor;
+use sawtooth_sdk::processor::handler::ApplyError;
 
-pub use sabre_sdk::protocol::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};
+use crate::state::SabreState;
+
+use super::AdminPermission;
+
+#[derive(Default)]
+pub struct AllowAllAdminPermission;
+
+impl AdminPermission for AllowAllAdminPermission {
+    fn is_admin(&self, _signer: &str, _state: &mut SabreState) -> Result<bool, ApplyError> {
+        Ok(true)
+    }
+}
