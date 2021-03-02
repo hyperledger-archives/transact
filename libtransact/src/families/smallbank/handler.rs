@@ -312,8 +312,8 @@ fn save_account(account: &Account, context: &mut dyn TransactionContext) -> Resu
     })?;
 
     context.set_state_entry(address, data).map_err(|err| {
-        warn!("Invalid transaction: Failed to load Account: {:?}", err);
-        ApplyError::InvalidTransaction(format!("Failed to load Account: {:?}", err))
+        warn!("Invalid transaction: Failed to save Account: {:?}", err);
+        ApplyError::InvalidTransaction(format!("Failed to save Account: {:?}", err))
     })
 }
 
