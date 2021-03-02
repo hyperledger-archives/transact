@@ -262,6 +262,13 @@ fn apply_amalgamate(
     let mut dest_account =
         load_account(amalgamate_data.get_dest_customer_id(), context)?.ok_or_else(err)?;
 
+    if source_account.get_savings_balance() == 0 {
+        warn!("Invalid transaction: Source account savings balance cannot be 0 in amalgamate");
+        return Err(ApplyError::InvalidTransaction(
+            "Source account savings balance cannot be 0 in amalgamate".to_string(),
+        ));
+    }
+
     let balance = dest_account.get_checking_balance() + source_account.get_savings_balance();
     source_account.set_savings_balance(0);
     dest_account.set_checking_balance(balance);
