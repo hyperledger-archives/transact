@@ -29,5 +29,6 @@ services:
       context: .
       dockerfile: cli/Dockerfile
       args:
+      - CARGO_ARGS=${CARGO_ARGS}
       - REPO_VERSION=${REPO_VERSION}
     image: ${REGISTRY}${NAMESPACE}transact-cli:${ISOLATION_ID}
