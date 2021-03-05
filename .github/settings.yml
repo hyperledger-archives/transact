@@ -1,0 +1,16 @@
+repository:
+  name: transact
+  description: Transact is a transaction execution platform designed to be used
+    as a library or component when implementing distributed ledgers, including
+    blockchains.
+  homepage: https://wiki.hyperledger.org/display/transact
+  topics: distributed ledger, smart contract, blockchain
+  private: false
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  has_downloads: false
+  default_branch: main
+  allow_squash_merge: false
+  allow_merge_commit: true
+  allow_rebase_merge: true
