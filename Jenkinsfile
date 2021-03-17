@@ -75,12 +75,6 @@ pipeline {
             }
         }
 
-        stage('Fetch Tags') {
-            steps {
-                sh 'git fetch --tag'
-            }
-        }
-
         stage('Run Lint') {
             steps {
               sh 'docker build . -f docker/lint -t lint-sabre:$ISOLATION_ID'
