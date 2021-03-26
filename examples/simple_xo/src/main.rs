@@ -222,7 +222,7 @@ fn create_batch(signer: &dyn Signer, game_name: &str, payload: &str) -> BatchPai
         .with_inputs(vec![hex::decode(&game_address).unwrap()])
         .with_nonce(b"test_nonce".to_vec())
         .with_outputs(vec![hex::decode(&game_address).unwrap()])
-        .with_payload_hash_method(HashMethod::SHA512)
+        .with_payload_hash_method(HashMethod::Sha512)
         .with_payload(payload.as_bytes().to_vec())
         .build_pair(signer)
         .expect("The TransactionBuilder was not given the correct items");

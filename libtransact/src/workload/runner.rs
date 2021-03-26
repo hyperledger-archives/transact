@@ -270,7 +270,7 @@ impl WorkerBuilder {
                     let mut next_target = 0;
                     let mut workload = workload;
                     // keep track of status of http requests for logging
-                    let http_counter = HTTPRequestCounter::new(thread_id.to_string());
+                    let http_counter = HttpRequestCounter::new(thread_id.to_string());
                     // the last time http request information was logged
                     let mut last_log_time = time::Instant::now();
                     loop {
@@ -381,15 +381,15 @@ fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), Wo
 }
 
 /// Counts sent and queue full for Batches submmissions from the target REST Api.
-pub struct HTTPRequestCounter {
+pub struct HttpRequestCounter {
     id: String,
     sent_count: AtomicUsize,
     queue_full_count: AtomicUsize,
 }
 
-impl HTTPRequestCounter {
+impl HttpRequestCounter {
     pub fn new(id: String) -> Self {
-        HTTPRequestCounter {
+        HttpRequestCounter {
             id,
             sent_count: AtomicUsize::new(0),
             queue_full_count: AtomicUsize::new(0),
@@ -417,7 +417,7 @@ impl HTTPRequestCounter {
     }
 }
 
-impl fmt::Display for HTTPRequestCounter {
+impl fmt::Display for HttpRequestCounter {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let time = chrono::Utc::now();
         write!(
@@ -432,7 +432,7 @@ impl fmt::Display for HTTPRequestCounter {
 }
 
 /// Log if time since last log is greater than update time.
-pub fn log(counter: &HTTPRequestCounter, last_log_time: &mut time::Instant, update_time: u32) {
+pub fn log(counter: &HttpRequestCounter, last_log_time: &mut time::Instant, update_time: u32) {
     let log_time = time::Instant::now() - *last_log_time;
     if log_time.as_secs() as u32 >= update_time {
         counter.log(log_time.as_secs(), log_time.subsec_nanos());
@@ -454,7 +454,7 @@ pub fn submit_batches_from_source(
     // set first target
     let mut next_target = 0;
     // keep track of status of http requests for logging
-    let http_counter = HTTPRequestCounter::new(format!("File: {}", input_file));
+    let http_counter = HttpRequestCounter::new(format!("File: {}", input_file));
     // the last time http request information was logged
     let mut last_log_time = time::Instant::now();
     loop {

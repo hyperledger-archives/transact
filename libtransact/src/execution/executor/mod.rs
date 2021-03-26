@@ -213,7 +213,7 @@ mod tests {
                 hex::decode(KEY6).unwrap(),
                 hex::decode(&KEY7[0..4]).unwrap(),
             ])
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(BYTES2.to_vec())
             .build_pair(signer)
             .expect("The TransactionBuilder was not given the correct items")

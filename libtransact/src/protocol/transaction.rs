@@ -46,7 +46,7 @@ static DEFAULT_NONCE_SIZE: usize = 32;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum HashMethod {
-    SHA512,
+    Sha512,
 }
 
 #[derive(PartialEq, Clone)]
@@ -175,7 +175,7 @@ impl FromProto<protos::transaction::TransactionHeader> for TransactionHeader {
                 .map(|d| hex::decode(d).map_err(ProtoConversionError::from))
                 .collect::<Result<_, _>>()?,
             payload_hash: hex::decode(header.get_payload_sha512())?,
-            payload_hash_method: HashMethod::SHA512,
+            payload_hash_method: HashMethod::Sha512,
             signer_public_key: hex::decode(header.get_signer_public_key())?,
         })
     }
@@ -521,7 +521,7 @@ impl TransactionBuilder {
         })?;
 
         let payload_hash = match payload_hash_method {
-            HashMethod::SHA512 => {
+            HashMethod::Sha512 => {
                 let mut hasher = Sha512::new();
                 hasher.input(&payload);
                 hasher.result().to_vec()
@@ -614,7 +614,7 @@ mod tests {
             .expect("Failed to get signer public key");
 
         let payload_hash = match pair.header().payload_hash_method() {
-            HashMethod::SHA512 => {
+            HashMethod::Sha512 => {
                 let mut hasher = Sha512::new();
                 hasher.input(&pair.transaction().payload());
                 hasher.result().to_vec()
@@ -643,7 +643,7 @@ mod tests {
             pair.header().outputs()
         );
         assert_eq!(payload_hash, pair.header().payload_hash());
-        assert_eq!(HashMethod::SHA512, *pair.header().payload_hash_method());
+        assert_eq!(HashMethod::Sha512, *pair.header().payload_hash_method());
         assert_eq!(signer_pub_key.as_slice(), pair.header().signer_public_key());
     }
 
@@ -666,7 +666,7 @@ mod tests {
                 hex::decode(KEY6).unwrap(),
                 hex::decode(&KEY7[0..4]).unwrap(),
             ])
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(BYTES2.to_vec())
             .build_pair(&*signer)
             .unwrap();
@@ -693,7 +693,7 @@ mod tests {
             hex::decode(KEY6).unwrap(),
             hex::decode(&KEY7[0..4]).unwrap(),
         ]);
-        builder = builder.with_payload_hash_method(HashMethod::SHA512);
+        builder = builder.with_payload_hash_method(HashMethod::Sha512);
         builder = builder.with_payload(BYTES2.to_vec());
         let pair = builder.build_pair(&*signer).unwrap();
 
@@ -717,7 +717,7 @@ mod tests {
                 hex::decode(&KEY7[0..4]).unwrap(),
             ],
             payload_hash: hex::decode(HASH).unwrap(),
-            payload_hash_method: HashMethod::SHA512,
+            payload_hash_method: HashMethod::Sha512,
             signer_public_key: hex::decode(KEY8).unwrap(),
         };
         assert_eq!(KEY1, hex::encode(header.batcher_public_key()));
@@ -742,7 +742,7 @@ mod tests {
             header.outputs()
         );
         assert_eq!(HASH, hex::encode(header.payload_hash()));
-        assert_eq!(HashMethod::SHA512, *header.payload_hash_method());
+        assert_eq!(HashMethod::Sha512, *header.payload_hash_method());
         assert_eq!(KEY8, hex::encode(header.signer_public_key()));
     }
 
@@ -764,7 +764,7 @@ mod tests {
                 hex::decode(&KEY7[0..4]).unwrap(),
             ],
             payload_hash: hex::decode(HASH).unwrap(),
-            payload_hash_method: HashMethod::SHA512,
+            payload_hash_method: HashMethod::Sha512,
             signer_public_key: hex::decode(KEY8).unwrap(),
         };
 
@@ -849,7 +849,7 @@ mod tests {
             header.outputs()
         );
         assert_eq!(hex::decode(HASH).unwrap(), header.payload_hash());
-        assert_eq!(HashMethod::SHA512, *header.payload_hash_method());
+        assert_eq!(HashMethod::Sha512, *header.payload_hash_method());
         assert_eq!(hex::decode(KEY8).unwrap(), header.signer_public_key());
     }
 
@@ -940,7 +940,7 @@ mod benchmarks {
                 hex::decode(KEY6).unwrap(),
                 hex::decode(&KEY7[0..4]).unwrap(),
             ])
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(BYTES2.to_vec());
 
         b.iter(|| transaction.clone().build_pair(&*signer));
@@ -972,7 +972,7 @@ mod benchmarks {
                 hex::decode(&KEY7[0..4]).unwrap(),
             ],
             payload_hash: hex::decode(HASH).unwrap(),
-            payload_hash_method: HashMethod::SHA512,
+            payload_hash_method: HashMethod::Sha512,
             signer_public_key: hex::decode(KEY8).unwrap(),
         };
 

@@ -178,7 +178,7 @@ pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> Tr
                 .map(Option::unwrap)
                 .collect(),
         )
-        .with_payload_hash_method(HashMethod::SHA512)
+        .with_payload_hash_method(HashMethod::Sha512)
         .with_payload(
             command_payload
                 .into_bytes()

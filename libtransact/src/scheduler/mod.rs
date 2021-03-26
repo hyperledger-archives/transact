@@ -267,7 +267,7 @@ mod tests {
                     .with_outputs(vec![])
                     .with_nonce(vec![i])
                     .with_payload(vec![])
-                    .with_payload_hash_method(HashMethod::SHA512)
+                    .with_payload_hash_method(HashMethod::Sha512)
                     .build(&*signer)
                     .expect("Failed to build transaction")
             })
