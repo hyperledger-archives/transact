@@ -350,11 +350,11 @@ where
                     .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))
             })
             .collect::<Result<Vec<StateEntryValue>, ContractContextError>>()?;
-        Ok(StateEntryBuilder::new()
+        StateEntryBuilder::new()
             .with_normalized_key(self.addresser.normalize(key.to_owned()))
             .with_state_entry_values(state_values)
             .build()
-            .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))?)
+            .map_err(|err| ContractContextError::ProtocolBuildError(Box::new(err)))
     }
 }
 
