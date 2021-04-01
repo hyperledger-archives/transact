@@ -29,7 +29,7 @@ rust-crypto-wasm = "0.3"
 sabre-sdk = {path = "../../../sdks/rust"}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
+sawtooth-sdk = "0.5"
 log = "0.3.8"
 log4rs = "0.7.0"
 simple_logger = "0.4.0"
