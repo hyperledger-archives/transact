@@ -16,6 +16,7 @@ extern crate addresser;
 #[macro_use]
 extern crate clap;
 extern crate crypto;
+extern crate dirs;
 extern crate futures;
 extern crate hyper;
 extern crate protobuf;

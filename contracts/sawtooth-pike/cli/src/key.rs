@@ -12,25 +12,37 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-
 //! Contains functions which assist with signing key management
 
 use std::env;
-use std::io::prelude::*;
 use std::fs::File;
+use std::io::prelude::*;
 
-use users::get_current_username;
-
+use dirs;
 use sawtooth_sdk::signing::secp256k1::Secp256k1PrivateKey;
+use std::path::PathBuf;
+use users::get_current_username;
 
 use error::CliError;
 
 /// Return a signing key loaded from the user's environment
 ///
-/// This method attempts to load the user's key from a file.  The filename
-/// is constructed by appending ".priv" to the key's name.  If the name argument
-/// is None, then the USER environment variable is used in its place.
+/// This method attempts to load the user's key from a file.
+/// The input parameter ```key_param (K)``` works as follows.
+/// The parameter `key_param` is optional
 ///
+/// If the parameter is Some:
+///   1) The short-name translates to the ```keyfile``` at
+///      ${HOME}/.sawtooth/(K).priv
+///   2) If a ```keyfile``` as in point (1) is not found then a file
+///      ${HOME}/.sawtooth/{K} is searched for.
+///   3) If a ```keyfile``` as in point (2) also fails then a path
+///      {K} is searched for.
+///
+/// If the parameter is None:
+/// The USER environment variable is used as a key file identifier.
+/// The filename is constructed by appending ".priv" to the
+/// constructed key's name from the USER environment variable.
 /// The directory containing the keys is determined using the HOME
 /// environment variable:
 ///
@@ -38,8 +50,7 @@ use error::CliError;
 ///
 /// # Arguments
 ///
-/// * `name` - The name of the signing key, which is used to construct the
-///            key's filename
+/// * `key_param` - The signing key parameter to be loaded
 ///
 /// # Errors
 ///
@@ -47,8 +58,9 @@ use error::CliError;
 ///
 /// If a HOME or USER environment variable is required but cannot be
 /// retrieved from the environment, a CliError::VarError is returned.
-pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
-    let username: String = name.map(|s| String::from(s))
+pub fn load_signing_key(key_param: Option<&str>) -> Result<Secp256k1PrivateKey, CliError> {
+    let derived_keyfile: String = key_param
+        .map(String::from)
         .ok_or_else(|| env::var("USER"))
         .or_else(|_| get_current_username().ok_or(0))
         .map_err(|_| {
@@ -57,16 +69,42 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             ))
         })?;
 
-    let private_key_filename = env::home_dir()
-        .ok_or(CliError::UserError(String::from(
-            "Could not load signing key: unable to determine home directory",
-        )))
-        .and_then(|mut p| {
+    // For the case Some(scenario 3)
+    let mut private_key_filename: PathBuf = PathBuf::from(&derived_keyfile);
+
+    // For the case Some(scenario 2)
+    let keyfile_identifier = dirs::home_dir()
+        .ok_or_else(|| {
+            CliError::UserError(String::from(
+                "Could not load signing key: unable to determine home directory",
+            ))
+        })
+        .map(|mut p| {
             p.push(".sawtooth");
             p.push("keys");
-            p.push(format!("{}.priv", &username));
-            Ok(p)
+            p.push(&derived_keyfile);
+            p
         })?;
+    if keyfile_identifier.as_path().exists() {
+        private_key_filename = keyfile_identifier;
+    }
+
+    // For the case Some(scenario 1) and None
+    let key_identifier = dirs::home_dir()
+        .ok_or_else(|| {
+            CliError::UserError(String::from(
+                "Could not load signing key: unable to determine home directory",
+            ))
+        })
+        .map(|mut p| {
+            p.push(".sawtooth");
+            p.push("keys");
+            p.push(format!("{}.priv", &derived_keyfile));
+            p
+        })?;
+    if key_identifier.as_path().exists() {
+        private_key_filename = key_identifier;
+    }
 
     if !private_key_filename.as_path().exists() {
         return Err(CliError::UserError(format!(
@@ -86,7 +124,7 @@ pub fn load_signing_key(name: Option<&str>) -> Result<Secp256k1PrivateKey, CliEr
             return Err(CliError::UserError(format!(
                 "Empty key file: {}",
                 private_key_filename.display()
-            )))
+            )));
         }
     };
 
