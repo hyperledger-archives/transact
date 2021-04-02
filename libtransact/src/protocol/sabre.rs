@@ -461,7 +461,7 @@ impl SabrePayloadBuilder {
             .with_family_version(SABRE_PROTOCOL_VERSION.into())
             .with_inputs(input_addresses)
             .with_outputs(output_addresses)
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(payload_bytes))
     }
 }

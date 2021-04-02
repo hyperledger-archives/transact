@@ -411,7 +411,7 @@ mod xo_compat_test {
             .with_inputs(vec![hex::decode(&game_address).unwrap()])
             .with_nonce("test_nonce".as_bytes().to_vec())
             .with_outputs(vec![hex::decode(&game_address).unwrap()])
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(payload.as_bytes().to_vec())
             .build_pair(signer)
             .expect("The TransactionBuilder was not given the correct items");

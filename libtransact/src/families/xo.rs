@@ -58,7 +58,7 @@ impl TransactionWorkload for XoTransactionWorkload {
             .with_outputs(payload.outputs())
             .with_nonce(nonce)
             .with_payload(payload.bytes())
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .build_pair(&*self.signer)?)
     }
 }
@@ -93,7 +93,7 @@ impl BatchWorkload for XoBatchWorkload {
 }
 
 enum Action {
-    CREATE,
+    Create,
 }
 
 struct Payload {
@@ -102,7 +102,7 @@ struct Payload {
 }
 
 impl Payload {
-    /// Creates a Payload initialized with Action::CREATE and a randomly
+    /// Creates a Payload initialized with Action::Create and a randomly
     /// generated name.
     pub fn new_as_create_with_random_name(rnd: &mut Hc128Rng) -> Self {
         let length = rnd.gen_range(5, 20);
@@ -115,18 +115,18 @@ impl Payload {
         )
     }
 
-    /// Creates a Payload initialized with Action::CREATE and the specified
+    /// Creates a Payload initialized with Action::Create and the specified
     /// name.
     pub fn new_as_create(name: &str) -> Self {
         Payload {
             name: String::from(name),
-            action: Action::CREATE,
+            action: Action::Create,
         }
     }
 
     pub fn bytes(&self) -> Vec<u8> {
         match self.action {
-            Action::CREATE => format!("create,{},", self.name),
+            Action::Create => format!("create,{},", self.name),
         }
         .into_bytes()
     }

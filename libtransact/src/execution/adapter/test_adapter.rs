@@ -240,7 +240,7 @@ mod tests {
             .with_outputs(vec![vec![]])
             .with_nonce(vec![])
             .with_payload(vec![])
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .build_pair(signer)
             .expect("The TransactionBuilder was supplied all the options")
     }
