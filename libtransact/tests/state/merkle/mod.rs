@@ -1296,11 +1296,11 @@ fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]])
             }
         }
         if !has_root {
-            panic!(format!(
+            panic!(
                 "Root {} not found in change log {:?}",
                 ::hex::encode(successor_root),
                 change_log
-            ));
+            );
         }
     }
 }
