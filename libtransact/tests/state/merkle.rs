@@ -1019,6 +1019,7 @@ mod btree {
     }
 }
 
+#[cfg(feature = "database-lmdb")]
 mod lmdb {
     //! LMDB-backed tests for the merkle state implementation.
 
@@ -1380,7 +1381,7 @@ mod redisdb {
     }
 }
 
-#[cfg(feature = "sqlite-db")]
+#[cfg(feature = "database-sqlite")]
 mod sqlitedb {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
