@@ -93,6 +93,7 @@ impl BatchWorkload for XoBatchWorkload {
 }
 
 enum Action {
+    #[allow(clippy::upper_case_acronyms)]
     CREATE,
 }
 

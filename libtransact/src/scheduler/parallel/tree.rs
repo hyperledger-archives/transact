@@ -65,8 +65,7 @@ impl<T: Clone> RadixTree<T> {
     /// Collects all children below ADDRESS, as well as the children's descendants
     fn walk_to_address(&self, address: &str) -> Vec<Rc<RefCell<Node<T>>>> {
         let mut current_node = Rc::clone(&self.root);
-        let mut results = vec![];
-        results.push(Rc::clone(&current_node));
+        let mut results = vec![Rc::clone(&current_node)];
 
         // A node's address is always a proper prefix of the addresses of its children
         while address != current_node.borrow().address.as_str()

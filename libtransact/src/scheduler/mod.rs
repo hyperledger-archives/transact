@@ -90,13 +90,13 @@ pub struct InvalidTransactionResult {
     pub error_data: Vec<u8>,
 }
 
-impl Into<TransactionReceipt> for InvalidTransactionResult {
-    fn into(self) -> TransactionReceipt {
+impl From<InvalidTransactionResult> for TransactionReceipt {
+    fn from(result: InvalidTransactionResult) -> Self {
         TransactionReceipt {
-            transaction_id: self.transaction_id,
+            transaction_id: result.transaction_id,
             transaction_result: TransactionResult::Invalid {
-                error_message: self.error_message,
-                error_data: self.error_data,
+                error_message: result.error_message,
+                error_data: result.error_data,
             },
         }
     }

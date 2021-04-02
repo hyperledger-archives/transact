@@ -441,11 +441,7 @@ impl ExecutorThread {
                 p.push(execution_event);
                 None
             }
-            None => {
-                let mut p = vec![];
-                p.push(execution_event);
-                Some(p)
-            }
+            None => Some(vec![execution_event]),
         };
         if let Some(p) = p {
             parked.insert(transaction_family, p);

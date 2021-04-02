@@ -39,6 +39,8 @@ static DEFAULT_NONCE_SIZE: usize = 32;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum HashMethod {
+    // For backwards compatibility ignore clippy error
+    #[allow(clippy::upper_case_acronyms)]
     SHA512,
 }
 
