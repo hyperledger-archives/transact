@@ -119,7 +119,7 @@ The following is an example for intkey-multiply
 
   [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
   rust-crypto = "0.2.36"
-  sawtooth-sdk = {git = "https://github.com/hyperledger/sawtooth-sdk-rust"}
+  sawtooth-sdk = "0.5"
   rustc-serialize = "0.3.22"
   log = "0.3.0"
   log4rs = "0.7.0"
