@@ -106,6 +106,51 @@ impl ToSql for Synchronous {
     }
 }
 
+/// Journal Mode setting values.
+///
+/// See the [PRAGMA "journal_mode"](https://sqlite.org/pragma.html#pragma_journal_mode)
+/// documentation for more details.
+#[derive(Debug)]
+pub enum JournalMode {
+    /// The DELETE journaling mode is the normal behavior. In the DELETE mode, the rollback journal
+    /// is deleted at the conclusion of each transaction. Indeed, the delete operation is the
+    /// action that causes the transaction to commit.
+    Delete,
+    /// The TRUNCATE journaling mode commits transactions by truncating the rollback journal to
+    /// zero-length instead of deleting it.
+    Truncate,
+    /// The PERSIST journaling mode prevents the rollback journal from being deleted at the end of
+    /// each transaction. Instead, the header of the journal is overwritten with zeros. This will
+    /// prevent other database connections from rolling the journal back.
+    Persist,
+    /// The MEMORY journaling mode stores the rollback journal in volatile RAM.
+    Memory,
+    /// Enable "Write-Ahead Log" (WAL) journal mode.
+    ///
+    /// In SQLite, WAL journal mode provides considerable performance improvements in most
+    /// scenarios.  See [https://sqlite.org/wal.html](https://sqlite.org/wal.html) for more
+    /// details on this mode.
+    ///
+    /// While many of the disadvantages of this mode are unlikely to effect transact and its
+    /// use-cases, WAL mode cannot be used with a database file on a networked file system.
+    Wal,
+    /// Disables the rollback journal completely.
+    Off,
+}
+
+impl ToSql for JournalMode {
+    fn to_sql(&self) -> Result<ToSqlOutput, rusqlite::Error> {
+        match self {
+            JournalMode::Delete => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"DELETE"))),
+            JournalMode::Truncate => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"TRUNCATE"))),
+            JournalMode::Persist => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"PERSIST"))),
+            JournalMode::Memory => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"MEMORY"))),
+            JournalMode::Wal => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"WAL"))),
+            JournalMode::Off => Ok(ToSqlOutput::Borrowed(ValueRef::Text(b"OFF"))),
+        }
+    }
+}
+
 /// A builder for generating SqliteDatabase instances.
 pub struct SqliteDatabaseBuilder {
     path: Option<String>,
@@ -113,7 +158,7 @@ pub struct SqliteDatabaseBuilder {
     indexes: Vec<&'static str>,
     pool_size: Option<u32>,
     memory_map_size: i64,
-    write_ahead_log_mode: bool,
+    journal_mode: Option<JournalMode>,
     synchronous: Option<Synchronous>,
 }
 
@@ -125,7 +170,7 @@ impl SqliteDatabaseBuilder {
             indexes: vec![],
             pool_size: None,
             memory_map_size: DEFAULT_MMAP_SIZE,
-            write_ahead_log_mode: false,
+            journal_mode: None,
             synchronous: None,
         }
     }
@@ -169,16 +214,14 @@ impl SqliteDatabaseBuilder {
         self
     }
 
-    /// Enable "Write-Ahead Log" (WAL) journal mode.
+    /// Modify the "journal mode" setting for the SQLite connection.
     ///
-    /// In SQLite, WAL journal mode provides considerable performance improvements in most
-    /// scenarios.  See [https://sqlite.org/wal.html](https://sqlite.org/wal.html) for more
-    /// details on this mode.
+    /// See the [pragma journal_mode
+    /// documentation](https://sqlite.org/pragma.html#pragma_journal_mode) for more information.
     ///
-    /// While many of the disadvantages of this mode are unlikely to effect transact and its
-    /// use-cases, WAL mode cannot be used with a database file on a networked file system.
-    pub fn with_write_ahead_log_mode(mut self) -> Self {
-        self.write_ahead_log_mode = true;
+    /// If unchanged, the default value is left to underlying SQLite installation.
+    pub fn with_journal_mode(mut self, journal_mode: JournalMode) -> Self {
+        self.journal_mode = Some(journal_mode);
         self
     }
 
@@ -203,7 +246,7 @@ impl SqliteDatabaseBuilder {
     /// * No path provided
     /// * Unable to connect to the database.
     /// * Unable to configure the provided memory map size
-    /// * Unable to configure the WAL journal mode, if requested
+    /// * Unable to configure the journal mode, if requested
     /// * Unable to create tables, as required.
     pub fn build(self) -> Result<SqliteDatabase, SqliteDatabaseError> {
         let path = self.path.ok_or_else(|| SqliteDatabaseError {
@@ -211,7 +254,29 @@ impl SqliteDatabaseBuilder {
             source: None,
         })?;
 
-        let manager = SqliteConnectionManager::file(&path);
+        let mmap_size = self.memory_map_size;
+        let journal_mode_opt = self.journal_mode;
+        let synchronous_opt = self.synchronous;
+
+        let flags = rusqlite::OpenFlags::SQLITE_OPEN_READ_WRITE
+            | rusqlite::OpenFlags::SQLITE_OPEN_CREATE
+            | rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX;
+
+        let manager = SqliteConnectionManager::file(&path)
+            .with_flags(flags)
+            .with_init(move |conn| {
+                conn.pragma_update(None, "mmap_size", &mmap_size)?;
+
+                if let Some(journal_mode) = journal_mode_opt.as_ref() {
+                    conn.pragma_update(None, "journal_mode", journal_mode)?;
+                }
+
+                if let Some(synchronous) = synchronous_opt.as_ref() {
+                    conn.pragma_update(None, "synchronous", synchronous)?;
+                }
+
+                Ok(())
+            });
 
         let mut pool_builder = r2d2::Pool::builder();
         if let Some(pool_size) = self.pool_size {
@@ -228,28 +293,6 @@ impl SqliteDatabaseBuilder {
             context: "unable to connect to database".into(),
             source: Some(Box::new(err)),
         })?;
-
-        conn.pragma_update(None, "mmap_size", &self.memory_map_size)
-            .map_err(|err| SqliteDatabaseError {
-                context: "unable to configure memory map I/O".into(),
-                source: Some(Box::new(err)),
-            })?;
-
-        if self.write_ahead_log_mode {
-            conn.pragma_update(None, "journal_mode", &String::from("WAL"))
-                .map_err(|err| SqliteDatabaseError {
-                    context: "unable to configure WAL journal mode".into(),
-                    source: Some(Box::new(err)),
-                })?;
-        }
-
-        if let Some(synchronous) = self.synchronous {
-            conn.pragma_update(None, "synchronous", &synchronous)
-                .map_err(|err| SqliteDatabaseError {
-                    context: "unable to modify synchronous setting".into(),
-                    source: Some(Box::new(err)),
-                })?;
-        }
 
         let prefix = self
             .prefix

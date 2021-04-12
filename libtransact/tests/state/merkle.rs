@@ -929,11 +929,11 @@ fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]])
             }
         }
         if !has_root {
-            panic!(format!(
+            panic!(
                 "Root {} not found in change log {:?}",
                 ::hex::encode(successor_root),
                 change_log
-            ));
+            );
         }
     }
 }
@@ -1019,6 +1019,7 @@ mod btree {
     }
 }
 
+#[cfg(feature = "database-lmdb")]
 mod lmdb {
     //! LMDB-backed tests for the merkle state implementation.
 
@@ -1380,7 +1381,7 @@ mod redisdb {
     }
 }
 
-#[cfg(feature = "sqlite-db")]
+#[cfg(feature = "database-sqlite")]
 mod sqlitedb {
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -1421,6 +1422,7 @@ mod sqlitedb {
         })
     }
 
+    /// Atomic Commit/Rollback is the default journal model.
     #[test]
     fn merkle_trie_update_atomic_commit_rollback() {
         run_test(|db_path| {
@@ -1438,7 +1440,7 @@ mod sqlitedb {
                 SqliteDatabase::builder()
                     .with_path(db_path)
                     .with_indexes(&INDEXES)
-                    .with_write_ahead_log_mode()
+                    .with_journal_mode(transact::database::sqlite::JournalMode::Wal)
                     .build()
                     .expect("Unable to create Sqlite database"),
             );
@@ -1453,7 +1455,7 @@ mod sqlitedb {
                 SqliteDatabase::builder()
                     .with_path(db_path)
                     .with_indexes(&INDEXES)
-                    .with_write_ahead_log_mode()
+                    .with_journal_mode(transact::database::sqlite::JournalMode::Wal)
                     .with_synchronous(transact::database::sqlite::Synchronous::Full)
                     .build()
                     .expect("Unable to create Sqlite database"),
