@@ -567,8 +567,8 @@ pub fn compute_org_address(id: &str) -> Result<Vec<u8>, AddressingError> {
 
 fn sha512_hash(bytes: &[u8]) -> Vec<u8> {
     let mut hasher = Sha512::new();
-    hasher.input(bytes);
-    hasher.result().to_vec()
+    hasher.update(bytes);
+    hasher.finalize().to_vec()
 }
 
 #[derive(Debug)]

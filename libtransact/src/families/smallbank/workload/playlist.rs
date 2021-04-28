@@ -173,8 +173,8 @@ pub fn make_addresses(payload: &SmallbankTransactionPayload) -> Vec<String> {
 
 fn customer_id_address(customer_id: u32) -> String {
     let mut sha = Sha512::new();
-    sha.input(customer_id.to_string().as_bytes());
-    let hash = &mut sha.result();
+    sha.update(customer_id.to_string().as_bytes());
+    let hash = &mut sha.finalize();
 
     let hex = bytes_to_hex_str(hash);
     // Using the precomputed Sha512 hash of "smallbank"

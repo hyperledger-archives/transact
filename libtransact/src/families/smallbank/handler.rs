@@ -319,12 +319,12 @@ fn save_account(account: &Account, context: &mut dyn TransactionContext) -> Resu
 
 fn get_smallbank_prefix() -> String {
     let mut sha = Sha512::new();
-    sha.input("smallbank");
-    hex::encode(&sha.result())[..6].to_string()
+    sha.update("smallbank");
+    hex::encode(&sha.finalize())[..6].to_string()
 }
 
 fn create_smallbank_address(payload: &str) -> String {
     let mut sha = Sha512::new();
-    sha.input(payload.as_bytes());
-    get_smallbank_prefix() + &hex::encode(&sha.result())[..64]
+    sha.update(payload.as_bytes());
+    get_smallbank_prefix() + &hex::encode(&sha.finalize())[..64]
 }

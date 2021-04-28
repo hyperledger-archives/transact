@@ -49,6 +49,6 @@ pub trait Addresser<K> {
 
 pub fn hash(hash_length: usize, key: &str) -> String {
     let mut sha = Sha512::new();
-    sha.input(key.as_bytes());
-    hex::encode(sha.result().to_vec())[..hash_length].to_string()
+    sha.update(key.as_bytes());
+    hex::encode(sha.finalize().to_vec())[..hash_length].to_string()
 }

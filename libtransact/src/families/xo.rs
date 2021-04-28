@@ -135,12 +135,12 @@ impl Payload {
         let mut address = Vec::new();
 
         let mut prefix_sha = Sha512::new();
-        prefix_sha.input(FAMILY_NAME);
-        address.append(&mut prefix_sha.result()[..6].to_vec());
+        prefix_sha.update(FAMILY_NAME);
+        address.append(&mut prefix_sha.finalize()[..6].to_vec());
 
         let mut name_sha = Sha512::new();
-        name_sha.input(&self.name);
-        address.append(&mut name_sha.result()[..64].to_vec());
+        name_sha.update(&self.name);
+        address.append(&mut name_sha.finalize()[..64].to_vec());
 
         address
     }
