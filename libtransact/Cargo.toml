@@ -60,7 +60,7 @@ yaml-rust =  { version = "0.4", optional = true }
 [dev-dependencies]
 rusty-fork = "0.3"
 sawtooth-xo = "0.5"
-serial_test = "0.3"
+serial_test = "0.5"
 tempdir = "0.3"
 
 [build-dependencies]
