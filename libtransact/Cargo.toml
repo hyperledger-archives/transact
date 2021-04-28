@@ -28,7 +28,7 @@ description = """\
 repository = "http://github.com/hyperledger/transact"
 
 [dependencies]
-bzip2 = { version = "0.3", optional = true }
+bzip2 = { version = "0.4", optional = true }
 cbor-codec = { version = "0.7", optional = true }
 chrono = { version = "0.4", optional = true }
 cylinder = { version = "0.2", optional = true }
