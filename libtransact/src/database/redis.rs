@@ -20,7 +20,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 
-use redis::{self, Commands, PipelineCommands};
+use redis::{self, Commands};
 
 use super::{Database, DatabaseCursor, DatabaseError, DatabaseReader, DatabaseWriter};
 

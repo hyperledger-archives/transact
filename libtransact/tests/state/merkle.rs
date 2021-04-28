@@ -1193,7 +1193,7 @@ mod redisdb {
 
     use rand::distributions::Alphanumeric;
     use rand::{thread_rng, Rng};
-    use redis::{self, PipelineCommands};
+    use redis;
 
     use transact::{
         database::{btree::BTreeDatabase, redis::RedisDatabase},
