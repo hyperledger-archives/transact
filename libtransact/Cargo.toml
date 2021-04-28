@@ -42,7 +42,7 @@ r2d2 = { version = "0.8", optional = true }
 r2d2_sqlite = { version = "0.15", optional = true }
 rand = "0.6"
 rand_hc = { version = "0.1", optional = true }
-redis = { version = "0.13.0", default-features = false, optional = true }
+redis = { version = "0.20", default-features = false, optional = true }
 rusqlite = { version = "0.22", optional = true }
 sawtooth-sdk = { version = "0.5", optional = true }
 semver = { version = "1", optional = true }
