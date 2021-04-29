@@ -35,7 +35,7 @@ use crate::protocol::transaction::TransactionPair;
 use crate::protos::{FromBytes, IntoBytes};
 
 const COMMAND_FAMILY_NAME: &str = "command";
-const COMMAND_VERSION: &str = "0.1";
+const COMMAND_VERSION: &str = "1.0";
 
 #[derive(Default)]
 pub struct CommandTransactionHandler {
