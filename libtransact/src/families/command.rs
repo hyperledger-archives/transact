@@ -39,6 +39,7 @@ const COMMAND_VERSION: &str = "1.0";
 
 #[derive(Default)]
 pub struct CommandTransactionHandler {
+    family_name: String,
     versions: Vec<String>,
     namespaces: Vec<String>,
 }
@@ -46,6 +47,7 @@ pub struct CommandTransactionHandler {
 impl CommandTransactionHandler {
     pub fn new() -> Self {
         CommandTransactionHandler {
+            family_name: COMMAND_FAMILY_NAME.to_string(),
             versions: vec![COMMAND_VERSION.to_owned()],
             namespaces: vec![get_command_prefix()],
         }
@@ -58,7 +60,7 @@ impl CommandTransactionHandler {
 
 impl TransactionHandler for CommandTransactionHandler {
     fn family_name(&self) -> &str {
-        COMMAND_FAMILY_NAME
+        &self.family_name
     }
 
     fn family_versions(&self) -> &[String] {
