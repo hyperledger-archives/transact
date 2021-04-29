@@ -21,6 +21,7 @@ use std::{thread, time};
 
 #[cfg(feature = "family-command-cylinder")]
 use cylinder::Signer;
+use sha2::{Digest, Sha512};
 
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
 #[cfg(feature = "family-command-cylinder")]
@@ -39,13 +40,19 @@ const COMMAND_VERSION: &str = "0.1";
 #[derive(Default)]
 pub struct CommandTransactionHandler {
     versions: Vec<String>,
+    namespaces: Vec<String>,
 }
 
 impl CommandTransactionHandler {
     pub fn new() -> Self {
         CommandTransactionHandler {
             versions: vec![COMMAND_VERSION.to_owned()],
+            namespaces: vec![get_command_prefix()],
         }
+    }
+
+    pub fn namespaces(&self) -> Vec<String> {
+        self.namespaces.clone()
     }
 }
 
@@ -193,6 +200,12 @@ pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> Tr
         )
         .build_pair(signer)
         .unwrap()
+}
+
+fn get_command_prefix() -> String {
+    let mut sha = Sha512::new();
+    sha.input("command");
+    hex::encode(&sha.result())[..6].to_string()
 }
 
 fn sleep(sleep_type: SleepType, duration: u32) {
