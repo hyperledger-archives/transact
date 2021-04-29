@@ -19,12 +19,18 @@
 
 use std::{thread, time};
 
+#[cfg(feature = "family-command-cylinder")]
 use cylinder::Signer;
 
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
+#[cfg(feature = "family-command-cylinder")]
 use crate::protocol;
 use crate::protocol::command::{Command, CommandPayload, SleepType};
-use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
+#[cfg(feature = "family-command-cylinder")]
+use crate::protocol::transaction::HashMethod;
+#[cfg(feature = "family-command-cylinder")]
+use crate::protocol::transaction::TransactionBuilder;
+use crate::protocol::transaction::TransactionPair;
 use crate::protos::{FromBytes, IntoBytes};
 
 const COMMAND_FAMILY_NAME: &str = "command";
@@ -122,6 +128,7 @@ impl TransactionHandler for CommandTransactionHandler {
     }
 }
 
+#[cfg(feature = "family-command-cylinder")]
 pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
     let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()

@@ -102,6 +102,7 @@ experimental = [
     "database-redis",
     "database-sqlite",
     "family-command",
+    "family-command-cylinder",
     "family-smallbank",
     "family-smallbank-workload",
     "family-xo",
@@ -140,7 +141,8 @@ database-lmdb = ["lmdb-zero"]
 database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
-family-command = ["cylinder", "handler", "protocol-transaction-builder"]
+family-command = ["handler"]
+family-command-cylinder = ["cylinder", "family-command", "protocol-transaction-builder"]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
   "family-smallbank",
