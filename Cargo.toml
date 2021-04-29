@@ -6,6 +6,6 @@ members = [
   "cli"
   ]
 
-# Exclude sabre_smallbank to avoid incompatible features `sabre-compat` and
-# `log`
-exclude = ["examples/sabre_smallbank"]
+# Exclude sabre_smallbank and sabre_command to avoid incompatible features
+# `sabre-compat` and `log`
+exclude = ["examples/sabre_smallbank", "examples/sabre_command"]
