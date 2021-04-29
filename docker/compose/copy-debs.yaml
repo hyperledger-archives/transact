@@ -25,6 +25,15 @@ services:
         cp /tmp/*.scar /build/scar
       "
 
+  command-scar:
+    image: command-scar:${ISOLATION_ID}
+    volumes:
+      - ../../build/scar:/build/scar
+    command: |
+      bash -c "
+        cp /tmp/*.scar /build/scar
+      "
+
   transact-cli:
     image: transact-cli:${ISOLATION_ID}
     volumes:
