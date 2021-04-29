@@ -24,6 +24,14 @@ services:
       - REPO_VERSION=${REPO_VERSION}
     image: smallbank-scar:${ISOLATION_ID}
 
+  command-scar:
+    build:
+      context: .
+      dockerfile: examples/sabre_command/Dockerfile-scar
+      args:
+      - REPO_VERSION=${REPO_VERSION}
+    image: command-scar:${ISOLATION_ID}
+
   transact-cli:
     build:
       context: .
