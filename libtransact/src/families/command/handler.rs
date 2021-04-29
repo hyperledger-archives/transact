@@ -25,18 +25,25 @@ use crate::protocol::transaction::TransactionPair;
 use crate::protos::FromBytes;
 
 const COMMAND_FAMILY_NAME: &str = "command";
+const COMMAND_NAMESPACE: &str = "06abbc";
 const COMMAND_VERSION: &str = "0.1";
 
 #[derive(Default)]
 pub struct CommandTransactionHandler {
     versions: Vec<String>,
+    namespaces: Vec<String>,
 }
 
 impl CommandTransactionHandler {
     pub fn new() -> Self {
         CommandTransactionHandler {
             versions: vec![COMMAND_VERSION.to_owned()],
+            namespaces: vec![COMMAND_NAMESPACE.to_owned()],
         }
+    }
+
+    pub fn namespaces(&self) -> Vec<String> {
+        self.namespaces.clone()
     }
 }
 
