@@ -16,5 +16,7 @@
  */
 
 pub mod handler;
+#[cfg(feature = "family-command-workload")]
+pub mod workload;
 
 pub use self::handler::CommandTransactionHandler;

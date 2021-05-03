@@ -304,7 +304,7 @@ mod test {
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
     use crate::context::ContextLifecycle;
-    use crate::families::command::{make_command_transaction, CommandTransactionHandler};
+    use crate::families::command::{workload::make_command_transaction, CommandTransactionHandler};
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
