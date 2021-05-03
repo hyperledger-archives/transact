@@ -26,7 +26,7 @@ use crate::protos::FromBytes;
 
 const COMMAND_FAMILY_NAME: &str = "command";
 const COMMAND_NAMESPACE: &str = "06abbc";
-const COMMAND_VERSION: &str = "0.1";
+const COMMAND_VERSION: &str = "1";
 
 #[derive(Default)]
 pub struct CommandTransactionHandler {
