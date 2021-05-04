@@ -5,6 +5,8 @@
 
 /cli/packaging/man/*.1
 
+/examples/sabre_command/target
+/examples/sabre_command/Cargo.lock
 /examples/sabre_smallbank/target
 /examples/sabre_smallbank/Cargo.lock
 

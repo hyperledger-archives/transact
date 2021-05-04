@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 Cargill Incorporated
+ * Copyright 2021 Cargill Incorporated
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -19,33 +19,39 @@
 
 use std::{thread, time};
 
-use cylinder::Signer;
-
 use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
-use crate::protocol;
 use crate::protocol::command::{Command, CommandPayload, SleepType};
-use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
-use crate::protos::{FromBytes, IntoBytes};
+use crate::protocol::transaction::TransactionPair;
+use crate::protos::FromBytes;
 
 const COMMAND_FAMILY_NAME: &str = "command";
-const COMMAND_VERSION: &str = "0.1";
+const COMMAND_NAMESPACE: &str = "06abbc";
+const COMMAND_VERSION: &str = "1";
 
 #[derive(Default)]
 pub struct CommandTransactionHandler {
+    family_name: String,
     versions: Vec<String>,
+    namespaces: Vec<String>,
 }
 
 impl CommandTransactionHandler {
     pub fn new() -> Self {
         CommandTransactionHandler {
+            family_name: COMMAND_FAMILY_NAME.to_string(),
             versions: vec![COMMAND_VERSION.to_owned()],
+            namespaces: vec![COMMAND_NAMESPACE.to_owned()],
         }
+    }
+
+    pub fn namespaces(&self) -> Vec<String> {
+        self.namespaces.clone()
     }
 }
 
 impl TransactionHandler for CommandTransactionHandler {
     fn family_name(&self) -> &str {
-        COMMAND_FAMILY_NAME
+        &self.family_name
     }
 
     fn family_versions(&self) -> &[String] {
@@ -120,72 +126,6 @@ impl TransactionHandler for CommandTransactionHandler {
 
         Ok(())
     }
-}
-
-pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
-    let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
-    TransactionBuilder::new()
-        .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
-        .with_family_name(COMMAND_FAMILY_NAME.to_owned())
-        .with_family_version(COMMAND_VERSION.to_owned())
-        .with_inputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .map(Option::unwrap)
-                .collect(),
-        )
-        .with_outputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .map(Option::unwrap)
-                .collect(),
-        )
-        .with_payload_hash_method(HashMethod::Sha512)
-        .with_payload(
-            command_payload
-                .into_bytes()
-                .expect("Unable to get bytes from Command Payload"),
-        )
-        .build_pair(signer)
-        .unwrap()
 }
 
 fn sleep(sleep_type: SleepType, duration: u32) {
