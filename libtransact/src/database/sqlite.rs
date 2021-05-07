@@ -797,11 +797,9 @@ pub struct SqliteDatabaseError {
 
 impl std::error::Error for SqliteDatabaseError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        if let Some(ref err) = self.source {
-            Some(&**err)
-        } else {
-            None
-        }
+        self.source
+            .as_ref()
+            .map(|err| &**err as &(dyn std::error::Error + 'static))
     }
 }
 
