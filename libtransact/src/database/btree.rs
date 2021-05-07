@@ -457,17 +457,17 @@ impl BTreeDatabaseCursor {
 
 impl DatabaseReaderCursor for BTreeDatabaseCursor {
     fn seek_first(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
-        match self.db.iter().next() {
-            Some((key, value)) => Some((key.to_vec(), value.to_vec())),
-            None => None,
-        }
+        self.db
+            .iter()
+            .next()
+            .map(|(key, value)| (key.to_vec(), value.to_vec()))
     }
 
     fn seek_last(&mut self) -> Option<(Vec<u8>, Vec<u8>)> {
-        match self.db.iter().last() {
-            Some((key, value)) => Some((key.to_vec(), value.to_vec())),
-            None => None,
-        }
+        self.db
+            .iter()
+            .last()
+            .map(|(key, value)| (key.to_vec(), value.to_vec()))
     }
 }
 
