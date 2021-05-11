@@ -344,6 +344,35 @@ pub struct ServerError {
     pub message: String,
 }
 
+fn slow_rate(
+    target: &str,
+    auth: &str,
+    batch_bytes: Vec<u8>,
+    start_time: time::Instant,
+    submitted_batches: u32,
+) -> Result<(), WorkloadRunnerError> {
+    debug!("Received TooManyRequests message from target, attempting to resubmit batch");
+    // figure out the rate at which batches were successfully submitted
+    let effective_rate = submitted_batches / (time::Instant::now() - start_time).as_secs() as u32;
+    let wait = time::Duration::from_secs(1) / effective_rate;
+    // sleep
+    thread::sleep(wait);
+    loop {
+        // attempt to submit batch again
+        match submit_batch(target, &auth, batch_bytes.clone()) {
+            Ok(()) => break,
+            Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
+            Err(err) => {
+                return Err(WorkloadRunnerError::SubmitError(format!(
+                    "Failed to submit batch: {}",
+                    err
+                )))
+            }
+        }
+    }
+    Ok(())
+}
+
 fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), WorkloadRunnerError> {
     Client::new()
         .post(&format!("{}/batches", target))
