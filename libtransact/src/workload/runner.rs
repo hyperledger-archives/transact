@@ -276,6 +276,8 @@ impl WorkerBuilder {
                     let start_time = time::Instant::now();
                     // total number of batches that have been submitted
                     let mut submitted_batches = 0;
+                    let mut submission_start = time::Instant::now();
+                    let mut submission_avg: Option<time::Duration> = None;
                     loop {
                         match receiver.try_recv() {
                             // recieved shutdown
@@ -338,7 +340,20 @@ impl WorkerBuilder {
 
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
-                                thread::sleep(time_to_wait);
+                                let diff = time::Instant::now() - submission_start;
+                                let submission_time = match submission_avg {
+                                    Some(val) => (diff + val) / 2,
+                                    None => diff,
+                                };
+                                submission_avg = Some(submission_time);
+
+                                let wait_time = match time_to_wait.checked_sub(submission_time) {
+                                    Some(dur) => dur,
+                                    None => time::Duration::from_nanos(0),
+                                };
+
+                                thread::sleep(wait_time);
+                                submission_start = time::Instant::now();
                             }
 
                             Err(TryRecvError::Disconnected) => {
@@ -507,6 +522,8 @@ pub fn submit_batches_from_source(
     let http_counter = HttpRequestCounter::new(format!("File: {}", input_file));
     // the last time http request information was logged
     let mut last_log_time = time::Instant::now();
+    let mut submission_start = time::Instant::now();
+    let mut submission_avg: Option<time::Duration> = None;
     loop {
         let target = match targets.get(next_target) {
             Some(target) => target,
@@ -554,7 +571,20 @@ pub fn submit_batches_from_source(
 
         // get next target, round robin
         next_target = (next_target + 1) % targets.len();
-        thread::sleep(time_to_wait);
+        let diff = time::Instant::now() - submission_start;
+        let submission_time = match submission_avg {
+            Some(val) => (diff + val) / 2,
+            None => diff,
+        };
+        submission_avg = Some(submission_time);
+
+        let wait_time = match time_to_wait.checked_sub(submission_time) {
+            Some(dur) => dur,
+            None => time::Duration::from_nanos(0),
+        };
+
+        thread::sleep(wait_time);
+        submission_start = time::Instant::now();
     }
 
     // log http submission stats for remaning workload
