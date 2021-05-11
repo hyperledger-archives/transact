@@ -273,6 +273,9 @@ impl WorkerBuilder {
                     let http_counter = HttpRequestCounter::new(thread_id.to_string());
                     // the last time http request information was logged
                     let mut last_log_time = time::Instant::now();
+                    let start_time = time::Instant::now();
+                    // total number of batches that have been submitted
+                    let mut submitted_batches = 0;
                     loop {
                         match receiver.try_recv() {
                             // recieved shutdown
@@ -301,11 +304,29 @@ impl WorkerBuilder {
                                 };
 
                                 // submit batch to the target
-                                match submit_batch(target, &auth, batch_bytes) {
-                                    Ok(()) => http_counter.increment_sent(),
+                                match submit_batch(target, &auth, batch_bytes.clone()) {
+                                    Ok(()) => {
+                                        submitted_batches += 1;
+                                        http_counter.increment_sent()
+                                    }
                                     Err(err) => {
                                         if err == WorkloadRunnerError::TooManyRequests {
-                                            http_counter.increment_queue_full()
+                                            http_counter.increment_queue_full();
+
+                                            // attempt to resubmit batch
+                                            match slow_rate(
+                                                target,
+                                                &auth,
+                                                batch_bytes.clone(),
+                                                start_time,
+                                                submitted_batches,
+                                            ) {
+                                                Ok(()) => {
+                                                    submitted_batches += 1;
+                                                    http_counter.increment_sent()
+                                                }
+                                                Err(err) => error!("{}:{}", thread_id, err),
+                                            }
                                         } else {
                                             error!("{}:{}", thread_id, err);
                                         }
