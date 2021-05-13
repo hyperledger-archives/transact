@@ -120,6 +120,7 @@ pub mod context;
 #[cfg(feature = "contract")]
 pub mod contract;
 pub mod database;
+pub mod error;
 #[cfg(feature = "execution")]
 pub mod execution;
 pub mod families;
