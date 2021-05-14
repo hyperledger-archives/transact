@@ -30,8 +30,13 @@ use cbor::value::{Bytes, Key, Text, Value};
 
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
+#[cfg(feature = "state-merkle-leaf-reader")]
+use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use crate::state::{Prune, Read, StateChange, Write};
+
+#[cfg(feature = "state-merkle-leaf-reader")]
+use super::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
 
 use self::change_log::{ChangeLogEntry, Successor};
 pub use self::error::StateDatabaseError;
@@ -135,6 +140,55 @@ impl Read for MerkleState {
 
     fn clone_box(&self) -> Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(Clone::clone(self))
+    }
+}
+
+// These types make the clippy happy
+#[cfg(feature = "state-merkle-leaf-reader")]
+type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
+#[cfg(feature = "state-merkle-leaf-reader")]
+type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
+
+#[cfg(feature = "state-merkle-leaf-reader")]
+impl MerkleRadixLeafReader for MerkleState {
+    /// Returns an iterator over the leaves of a merkle radix tree.
+    /// By providing an optional address prefix, the caller can limit the iteration
+    /// over the leaves in a specific subtree.
+    fn leaves(
+        &self,
+        state_id: &Self::StateId,
+        subtree: Option<&str>,
+    ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
+        let mut merkle_tree =
+            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| {
+                MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(err)))
+            })?;
+
+        merkle_tree
+            .set_merkle_root(state_id.to_string())
+            .map_err(|err| match err {
+                StateDatabaseError::NotFound(msg) => MerkleRadixLeafReadError::InvalidStateError(
+                    InvalidStateError::with_message(msg),
+                ),
+                _ => MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(
+                    err,
+                ))),
+            })?;
+
+        merkle_tree
+            .leaves(subtree)
+            .map(|iter| {
+                Box::new(iter.map(|item| {
+                    item.map_err(|e| {
+                        MerkleRadixLeafReadError::InternalError(InternalError::from_source(
+                            Box::new(e),
+                        ))
+                    })
+                })) as Box<dyn Iterator<Item = _>>
+            })
+            .map_err(|e| {
+                MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(e)))
+            })
     }
 }
 
