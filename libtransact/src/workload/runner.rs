@@ -273,6 +273,9 @@ impl WorkerBuilder {
                     let http_counter = HttpRequestCounter::new(thread_id.to_string());
                     // the last time http request information was logged
                     let mut last_log_time = time::Instant::now();
+                    let start_time = time::Instant::now();
+                    // total number of batches that have been submitted
+                    let mut submitted_batches = 0;
                     loop {
                         match receiver.try_recv() {
                             // recieved shutdown
@@ -301,11 +304,29 @@ impl WorkerBuilder {
                                 };
 
                                 // submit batch to the target
-                                match submit_batch(target, &auth, batch_bytes) {
-                                    Ok(()) => http_counter.increment_sent(),
+                                match submit_batch(target, &auth, batch_bytes.clone()) {
+                                    Ok(()) => {
+                                        submitted_batches += 1;
+                                        http_counter.increment_sent()
+                                    }
                                     Err(err) => {
                                         if err == WorkloadRunnerError::TooManyRequests {
-                                            http_counter.increment_queue_full()
+                                            http_counter.increment_queue_full();
+
+                                            // attempt to resubmit batch
+                                            match slow_rate(
+                                                target,
+                                                &auth,
+                                                batch_bytes.clone(),
+                                                start_time,
+                                                submitted_batches,
+                                            ) {
+                                                Ok(()) => {
+                                                    submitted_batches += 1;
+                                                    http_counter.increment_sent()
+                                                }
+                                                Err(err) => error!("{}:{}", thread_id, err),
+                                            }
                                         } else {
                                             error!("{}:{}", thread_id, err);
                                         }
@@ -342,6 +363,35 @@ impl WorkerBuilder {
 #[derive(Deserialize)]
 pub struct ServerError {
     pub message: String,
+}
+
+fn slow_rate(
+    target: &str,
+    auth: &str,
+    batch_bytes: Vec<u8>,
+    start_time: time::Instant,
+    submitted_batches: u32,
+) -> Result<(), WorkloadRunnerError> {
+    debug!("Received TooManyRequests message from target, attempting to resubmit batch");
+    // figure out the rate at which batches were successfully submitted
+    let effective_rate = submitted_batches / (time::Instant::now() - start_time).as_secs() as u32;
+    let wait = time::Duration::from_secs(1) / effective_rate;
+    // sleep
+    thread::sleep(wait);
+    loop {
+        // attempt to submit batch again
+        match submit_batch(target, &auth, batch_bytes.clone()) {
+            Ok(()) => break,
+            Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
+            Err(err) => {
+                return Err(WorkloadRunnerError::SubmitError(format!(
+                    "Failed to submit batch: {}",
+                    err
+                )))
+            }
+        }
+    }
+    Ok(())
 }
 
 fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), WorkloadRunnerError> {
