@@ -17,9 +17,34 @@
  * -----------------------------------------------------------------------------
  */
 
+#[cfg(feature = "state-merkle-leaf-reader")]
+mod error;
 pub mod kv;
 
+#[cfg(feature = "state-merkle-leaf-reader")]
+use crate::state::Read;
+
+#[cfg(feature = "state-merkle-leaf-reader")]
+pub use error::MerkleRadixLeafReadError;
 pub use kv::{
     MerkleRadixTree, MerkleState, StateDatabaseError, CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX,
     INDEXES,
 };
+
+// These types make the clippy happy
+#[cfg(feature = "state-merkle-leaf-reader")]
+type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
+#[cfg(feature = "state-merkle-leaf-reader")]
+type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
+
+#[cfg(feature = "state-merkle-leaf-reader")]
+pub trait MerkleRadixLeafReader: Read<StateId = String, Key = String, Value = Vec<u8>> {
+    /// Returns an iterator over the leaves of a merkle radix tree.
+    /// By providing an optional address prefix, the caller can limit the iteration
+    /// over the leaves in a specific subtree.
+    fn leaves(
+        &self,
+        state_id: &Self::StateId,
+        subtree: Option<&str>,
+    ) -> IterResult<LeafIter<(Self::Key, Self::Value)>>;
+}

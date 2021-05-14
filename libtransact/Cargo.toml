@@ -108,6 +108,7 @@ experimental = [
     "family-xo",
     "key-value-state",
     "protocol-sabre-exec",
+    "state-merkle-leaf-reader",
     "workload",
     "workload-batch-gen",
     "workload-runner"
@@ -163,6 +164,7 @@ sabre-compat = ["sabre-sdk"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]
 state-merkle = ["cbor-codec", "log", "openssl"]
+state-merkle-leaf-reader = []
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
