@@ -22,6 +22,7 @@ use std::fmt;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::time::Duration;
 use std::{thread, time};
 
 use reqwest::{blocking::Client, header, StatusCode};
@@ -63,7 +64,7 @@ impl WorkloadRunner {
         id: String,
         workload: Box<dyn BatchWorkload>,
         targets: Vec<String>,
-        rate: u32,
+        time_to_wait: Duration,
         auth: String,
         update_time: u32,
     ) -> Result<(), WorkloadRunnerError> {
@@ -78,7 +79,7 @@ impl WorkloadRunner {
             .with_id(id.to_string())
             .with_workload(workload)
             .with_targets(targets)
-            .with_rate(rate)
+            .with_time_to_wait(time_to_wait)
             .with_auth(auth)
             .with_update_time(update_time)
             .build()?;
@@ -158,7 +159,7 @@ struct WorkerBuilder {
     id: Option<String>,
     workload: Option<Box<dyn BatchWorkload>>,
     targets: Option<Vec<String>>,
-    rate: Option<u32>,
+    time_to_wait: Option<Duration>,
     auth: Option<String>,
     update_time: Option<u32>,
 }
@@ -195,13 +196,13 @@ impl WorkerBuilder {
         self
     }
 
-    /// Sets the rate for the worker
+    /// Sets the wait time between batches for the worker
     ///
     /// # Arguments
     ///
-    ///  * `rate` - How many batches to submit per second
-    pub fn with_rate(mut self, rate: u32) -> WorkerBuilder {
-        self.rate = Some(rate);
+    ///  * `time_to_wait` - How many batches to submit per second
+    pub fn with_time_to_wait(mut self, time_to_wait: Duration) -> WorkerBuilder {
+        self.time_to_wait = Some(time_to_wait);
         self
     }
 
@@ -232,9 +233,9 @@ impl WorkerBuilder {
             )
         })?;
 
-        let rate = self.rate.ok_or_else(|| {
+        let time_to_wait = self.time_to_wait.ok_or_else(|| {
             WorkloadRunnerError::WorkloadAddError(
-                "unable to build, missing field: `rate`".to_string(),
+                "unable to build, missing field: `time_to_wait`".to_string(),
             )
         })?;
 
@@ -260,7 +261,6 @@ impl WorkerBuilder {
 
         let (sender, receiver) = channel();
 
-        let time_to_wait = time::Duration::from_secs(1) / rate;
         let thread_id = id.to_string();
         let thread = Some(
             thread::Builder::new()
@@ -538,12 +538,11 @@ pub fn submit_batches_from_source(
     source: &mut dyn Read,
     input_file: String,
     targets: Vec<String>,
-    rate: u32,
+    time_to_wait: Duration,
     auth: String,
     update: u32,
 ) {
     let mut workload = BatchListFeeder::new(source);
-    let time_to_wait = time::Duration::from_secs(1) / rate;
     // set first target
     let mut next_target = 0;
     // keep track of status of http requests for logging
