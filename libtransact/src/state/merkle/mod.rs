@@ -20,6 +20,7 @@
 #[cfg(feature = "state-merkle-leaf-reader")]
 mod error;
 pub mod kv;
+mod node;
 
 #[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::Read;
