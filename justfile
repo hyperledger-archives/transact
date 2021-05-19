@@ -55,6 +55,11 @@ copy-env:
     set -e
     find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
 
+doc:
+    #!/usr/bin/env sh
+    set -e
+    cargo doc
+
 lint: clean
     #!/usr/bin/env sh
     set -e
