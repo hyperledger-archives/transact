@@ -52,26 +52,25 @@ pipeline {
 
         stage("Run lint") {
             steps {
-                sh './bin/run_lint'
+                sh 'just ci-lint'
             }
         }
 
         stage("Run unit tests") {
             steps {
-                sh './bin/run_tests'
+                sh 'just ci-test'
             }
         }
 
         stage("Build rust docs") {
             steps {
-                sh 'docker-compose -f docker/compose/docker-compose.yaml run --rm transact bash -c "cd /project/transact && cargo doc"'
+                sh 'just ci-doc'
             }
         }
 
         stage('Build/archive artifacts') {
             steps {
-                sh 'REPO_VERSION=$(VERSION=AUTO_STRICT ./bin/get_version) docker-compose -f docker-compose-installed.yaml build'
-                sh 'docker-compose -f docker/compose/copy-debs.yaml up'
+                sh 'just ci-debs'
             }
         }
     }

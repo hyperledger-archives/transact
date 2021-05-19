@@ -12,12 +12,6 @@ services:
     image: transact:${ISOLATION_ID}
     volumes:
       - ../..:/project/transact
-    command: |
-      bash -c "
-        cd /project/transact
-        cargo fmt -- --check
-        cargo clippy -- -D clippy::all
-      "
     environment:
         REDIS_URL: redis://redis:6379
         TEST_MODE: --verbose --release
