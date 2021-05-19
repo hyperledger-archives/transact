@@ -55,6 +55,39 @@ copy-env:
     set -e
     find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
 
+ci-doc:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just doc" --abort-on-container-exit transact
+
+ci-lint:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just lint" --abort-on-container-exit transact
+
+ci-test:
+    #!/usr/bin/env sh
+    set -e
+
+    trap "docker-compose -f docker/compose/docker-compose.yaml down" EXIT
+
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just test" --abort-on-container-exit transact
+
+    docker-compose -f docker/compose/docker-compose.yaml up --detach redis
+
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+       /bin/bash -c \
+       "cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
+          --features sawtooth-compat && \
+        cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
+          --features experimental,state-merkle-redis-db-tests"
+
 doc:
     #!/usr/bin/env sh
     set -e
