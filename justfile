@@ -29,11 +29,12 @@ features := '\
 build:
     #!/usr/bin/env sh
     set -e
+    env
     for feature in $(echo {{features}})
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
@@ -78,11 +79,12 @@ lint:
 test: build
     #!/usr/bin/env sh
     set -e
+    env
     for feature in $(echo {{features}})
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
