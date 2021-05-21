@@ -15,6 +15,8 @@
  * ------------------------------------------------------------------------------
  */
 
+pub mod playlist;
+
 use cylinder::Signer;
 
 use crate::protocol;
