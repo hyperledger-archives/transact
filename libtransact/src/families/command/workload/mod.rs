@@ -118,7 +118,7 @@ impl BatchWorkload for CommandBatchWorkload {
 }
 
 pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
-    let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
+    let command_payload = CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()
         .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
         .with_family_name(String::from("command"))
