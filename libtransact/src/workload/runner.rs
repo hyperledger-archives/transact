@@ -389,9 +389,18 @@ fn slow_rate(
     submitted_batches: u32,
 ) -> Result<(), WorkloadRunnerError> {
     debug!("Received TooManyRequests message from target, attempting to resubmit batch");
-    // figure out the rate at which batches were successfully submitted
-    let effective_rate = submitted_batches / (time::Instant::now() - start_time).as_secs() as u32;
-    let wait = time::Duration::from_secs(1) / effective_rate;
+
+    let time = (time::Instant::now() - start_time).as_secs() as u32;
+
+    // calculate the sleep time using the effective rate of submission
+    // default to one second if the rate is calculated to be 0
+    let wait = match time {
+        0 => time::Duration::from_secs(1),
+        sec => match submitted_batches / sec {
+            0 => time::Duration::from_secs(1),
+            rate => time::Duration::from_secs(1) / rate,
+        },
+    };
     // sleep
     thread::sleep(wait);
     loop {
