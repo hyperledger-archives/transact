@@ -40,7 +40,7 @@ libc = ">=0.2.35"
 lmdb-zero = ">=0.4.1"
 log = { version = "0.4", features = ["std"] }
 openssl = "0.10"
-protobuf = "2.19"
+protobuf = "2.23"
 r2d2 = { version = "0.8", optional = true }
 r2d2_sqlite = { version = "0.15", optional = true }
 rand = "0.6"
