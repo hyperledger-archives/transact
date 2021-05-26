@@ -273,7 +273,7 @@ impl WorkerBuilder {
                     let http_counter = HttpRequestCounter::new(thread_id.to_string());
                     // the last time http request information was logged
                     let mut last_log_time = time::Instant::now();
-                    let start_time = time::Instant::now();
+                    let mut start_time = time::Instant::now();
                     // total number of batches that have been submitted
                     let mut submitted_batches = 0;
                     let mut submission_start = time::Instant::now();
@@ -324,7 +324,8 @@ impl WorkerBuilder {
                                                 submitted_batches,
                                             ) {
                                                 Ok(()) => {
-                                                    submitted_batches += 1;
+                                                    submitted_batches = 1;
+                                                    start_time = time::Instant::now();
                                                     http_counter.increment_sent()
                                                 }
                                                 Err(err) => error!("{}:{}", thread_id, err),
