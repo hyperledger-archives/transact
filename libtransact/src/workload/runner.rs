@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::mpsc::{channel, Sender, TryRecvError};
+use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::{thread, time};
 
 use reqwest::{blocking::Client, header, StatusCode};
@@ -322,8 +322,10 @@ impl WorkerBuilder {
                                                 batch_bytes.clone(),
                                                 start_time,
                                                 submitted_batches,
+                                                &receiver,
                                             ) {
-                                                Ok(()) => {
+                                                Ok(true) => break,
+                                                Ok(false) => {
                                                     submitted_batches = 1;
                                                     start_time = time::Instant::now();
                                                     http_counter.increment_sent()
@@ -387,8 +389,10 @@ fn slow_rate(
     batch_bytes: Vec<u8>,
     start_time: time::Instant,
     submitted_batches: u32,
-) -> Result<(), WorkloadRunnerError> {
+    receiver: &Receiver<ShutdownMessage>,
+) -> Result<bool, WorkloadRunnerError> {
     debug!("Received TooManyRequests message from target, attempting to resubmit batch");
+    let mut shutdown = false;
 
     let time = (time::Instant::now() - start_time).as_secs() as u32;
 
@@ -404,19 +408,33 @@ fn slow_rate(
     // sleep
     thread::sleep(wait);
     loop {
-        // attempt to submit batch again
-        match submit_batch(target, &auth, batch_bytes.clone()) {
-            Ok(()) => break,
-            Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
-            Err(err) => {
-                return Err(WorkloadRunnerError::SubmitError(format!(
-                    "Failed to submit batch: {}",
-                    err
-                )))
+        match receiver.try_recv() {
+            // recieved shutdown
+            Ok(_) => {
+                info!("Worker received shutdown");
+                shutdown = true;
+                break;
+            }
+            Err(TryRecvError::Empty) => {
+                // attempt to submit batch again
+                match submit_batch(target, &auth, batch_bytes.clone()) {
+                    Ok(()) => break,
+                    Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
+                    Err(err) => {
+                        return Err(WorkloadRunnerError::SubmitError(format!(
+                            "Failed to submit batch: {}",
+                            err
+                        )))
+                    }
+                }
+            }
+            Err(TryRecvError::Disconnected) => {
+                error!("Channel has disconnected");
+                break;
             }
         }
     }
-    Ok(())
+    Ok(shutdown)
 }
 
 fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), WorkloadRunnerError> {
