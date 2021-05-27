@@ -15,6 +15,8 @@
  * -----------------------------------------------------------------------------
  */
 
+pub(super) mod update_index;
+
 #[cfg(feature = "sqlite")]
 no_arg_sql_function!(
     last_insert_rowid,
