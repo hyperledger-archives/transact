@@ -180,8 +180,8 @@ fn make_command_workload_addresses() -> Vec<String> {
     // Create 100 addresses
     for i in 0..100 {
         let mut sha = Sha512::new();
-        sha.input(format!("address{}", i).as_bytes());
-        let hash = &mut sha.result();
+        sha.update(format!("address{}", i).as_bytes());
+        let hash = &mut sha.finalize();
 
         let hex = bytes_to_hex_str(hash);
 
