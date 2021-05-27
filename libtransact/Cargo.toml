@@ -28,39 +28,39 @@ description = """\
 repository = "http://github.com/hyperledger/transact"
 
 [dependencies]
-bzip2 = { version = "0.3", optional = true }
+bzip2 = { version = "0.4", optional = true }
 cbor-codec = { version = "0.7", optional = true }
 chrono = { version = "0.4", optional = true }
 cylinder = { version = "0.2", optional = true }
 glob = { version = "0.3", optional = true }
-hex = "0.3"
+hex = "0.4"
 libc = ">=0.2.35"
 lmdb-zero = { version = ">=0.4.1", optional = true }
 log = { version = "0.4", optional = true, features = ["std"] }
 openssl = { version = "0.10", optional = true }
-protobuf = "2.19"
+protobuf = "2.23"
 r2d2 = { version = "0.8", optional = true }
-r2d2_sqlite = { version = "0.15", optional = true }
+r2d2_sqlite = { version = "0.18", optional = true }
 rand = "0.6"
 rand_hc = { version = "0.1", optional = true }
-redis = { version = "0.13.0", default-features = false, optional = true }
-reqwest = { version = "0.10", features = ["blocking", "json"], optional = true}
-rusqlite = { version = "0.22", optional = true }
+redis = { version = "0.20", default-features = false, optional = true }
+reqwest = { version = "0.11", features = ["blocking", "json"], optional = true}
+rusqlite = { version = "0.25", optional = true }
 sabre-sdk = { version ="0.7.1", optional = true }
 sawtooth-sdk = { version = "0.5", optional = true }
-semver = { version = "0.9", optional = true }
+semver = { version = "0.11", optional = true }
 serde = { version = "1.0", optional = true }
 serde_derive = { version = "1.0", optional = true }
 serde_yaml = { version = "0.8", optional = true }
-sha2 = "0.8"
+sha2 = "0.9"
 tar = { version = "0.4", optional = true }
-uuid = { version = "0.7", optional = true, features = ["v4"] }
+uuid = { version = "0.8", optional = true, features = ["v4"] }
 yaml-rust =  { version = "0.4", optional = true }
 
 [dev-dependencies]
 rusty-fork = "0.3"
 sawtooth-xo = "0.5"
-serial_test = "0.3"
+serial_test = "0.5"
 tempdir = "0.3"
 
 [build-dependencies]

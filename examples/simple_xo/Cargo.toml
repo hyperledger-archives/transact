@@ -23,8 +23,8 @@ edition = "2018"
 cylinder = "0.2"
 transact = { path = "../../libtransact", features = ["sawtooth-compat"] }
 sawtooth-xo = "0.5"
-hex = "0.3"
-sha2 = "0.8"
+hex = "0.4"
+sha2 = "0.9"
 
 [features]
 default = []

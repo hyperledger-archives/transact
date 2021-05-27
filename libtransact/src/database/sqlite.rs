@@ -535,7 +535,7 @@ impl<'db> DatabaseWriter for SqliteDatabaseWriter<'db> {
             ))
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
-        stmt.execute_named(named_params! {":key": key, ":value": value})
+        stmt.execute(named_params! {":key": key, ":value": value})
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
         Ok(())
@@ -565,7 +565,7 @@ impl<'db> DatabaseWriter for SqliteDatabaseWriter<'db> {
             .prepare_cached(&sql)
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
-        stmt.execute_named(named_params! {":key": key, ":value": value})
+        stmt.execute(named_params! {":key": key, ":value": value})
             .map_err(|err| DatabaseError::WriterError(format!("unable to write value: {}", err)))?;
 
         Ok(())

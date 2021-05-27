@@ -665,7 +665,7 @@ mod tests {
     ) -> PathBuf {
         let scar_file_path = dir.as_ref().join(format!("{}_{}.scar", name, version));
         let scar_file = File::create(&scar_file_path).expect("failed to create scar file");
-        let mut scar_file_builder = Builder::new(BzEncoder::new(scar_file, Compression::Default));
+        let mut scar_file_builder = Builder::new(BzEncoder::new(scar_file, Compression::fast()));
 
         if let Some(manifest_file_path) = manifest_file_path {
             scar_file_builder

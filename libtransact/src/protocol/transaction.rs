@@ -523,8 +523,8 @@ impl TransactionBuilder {
         let payload_hash = match payload_hash_method {
             HashMethod::Sha512 => {
                 let mut hasher = Sha512::new();
-                hasher.input(&payload);
-                hasher.result().to_vec()
+                hasher.update(&payload);
+                hasher.finalize().to_vec()
             }
         };
 
@@ -616,8 +616,8 @@ mod tests {
         let payload_hash = match pair.header().payload_hash_method() {
             HashMethod::Sha512 => {
                 let mut hasher = Sha512::new();
-                hasher.input(&pair.transaction().payload());
-                hasher.result().to_vec()
+                hasher.update(&pair.transaction().payload());
+                hasher.finalize().to_vec()
             }
         };
 

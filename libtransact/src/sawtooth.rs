@@ -448,8 +448,8 @@ mod xo_compat_test {
 
     fn calculate_game_address<S: AsRef<[u8]>>(name: S) -> String {
         let mut sha = Sha512::default();
-        sha.input(name);
-        "5b7349".to_owned() + &hex::encode(&sha.result())[..64]
+        sha.update(name);
+        "5b7349".to_owned() + &hex::encode(&sha.finalize())[..64]
     }
 
     fn initial_db_root(db: &dyn Database) -> String {
