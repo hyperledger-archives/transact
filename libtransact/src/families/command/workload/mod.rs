@@ -15,16 +15,110 @@
  * ------------------------------------------------------------------------------
  */
 
+pub mod playlist;
+
 use cylinder::Signer;
 
-use crate::protocol;
-use crate::protocol::command::Command;
-use crate::protocol::transaction::HashMethod;
-use crate::protocol::transaction::{TransactionBuilder, TransactionPair};
-use crate::protos::IntoBytes;
+use crate::protocol::{
+    batch::{BatchBuilder, BatchPair},
+    command::{Command, CommandPayload},
+    sabre::ExecuteContractActionBuilder,
+    transaction::{HashMethod, TransactionBuilder, TransactionPair},
+};
+use crate::protos::{FromProto, IntoBytes};
+use crate::workload::{error::WorkloadError, BatchWorkload, TransactionWorkload};
+
+use self::playlist::CommandGeneratingIter;
+
+pub struct CommandTransactionWorkload {
+    generator: CommandGeneratingIter,
+    signer: Box<dyn Signer>,
+}
+
+impl CommandTransactionWorkload {
+    pub fn new(generator: CommandGeneratingIter, signer: Box<dyn Signer>) -> Self {
+        Self { generator, signer }
+    }
+}
+
+impl TransactionWorkload for CommandTransactionWorkload {
+    fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError> {
+        let (command_proto, address) = self
+            .generator
+            .next()
+            .ok_or_else(|| WorkloadError::InvalidState("No command available".to_string()))?;
+
+        let command = Command::from_proto(command_proto).map_err(|_| {
+            WorkloadError::InvalidState("Unable to convert from command proto".to_string())
+        })?;
+
+        let command_payload = CommandPayload::new(vec![command.clone()]);
+
+        let payload_bytes = command_payload
+            .into_bytes()
+            .expect("Unable to get bytes from Command Payload");
+
+        let addresses = match command {
+            Command::SetState(set_state) => set_state
+                .state_writes()
+                .iter()
+                .map(|b| String::from(b.key()))
+                .collect::<Vec<String>>(),
+            Command::DeleteState(delete_state) => delete_state.state_keys().to_vec(),
+            Command::GetState(get_state) => get_state.state_keys().to_vec(),
+            _ => vec![address],
+        };
+
+        let txn = ExecuteContractActionBuilder::new()
+            .with_name(String::from("command"))
+            .with_version(String::from("1.0"))
+            .with_inputs(addresses.clone())
+            .with_outputs(addresses)
+            .with_payload(payload_bytes)
+            .into_payload_builder()
+            .map_err(|err| {
+                WorkloadError::InvalidState(format!(
+                    "Unable to convert execute action into sabre payload: {}",
+                    err
+                ))
+            })?
+            .into_transaction_builder()
+            .map_err(|err| {
+                WorkloadError::InvalidState(format!(
+                    "Unable to convert execute payload into transaction: {}",
+                    err
+                ))
+            })?
+            .build_pair(&*self.signer)?;
+
+        Ok(txn)
+    }
+}
+
+pub struct CommandBatchWorkload {
+    transaction_workload: CommandTransactionWorkload,
+    signer: Box<dyn Signer>,
+}
+
+impl CommandBatchWorkload {
+    pub fn new(transaction_workload: CommandTransactionWorkload, signer: Box<dyn Signer>) -> Self {
+        Self {
+            transaction_workload,
+            signer,
+        }
+    }
+}
+
+impl BatchWorkload for CommandBatchWorkload {
+    fn next_batch(&mut self) -> Result<BatchPair, WorkloadError> {
+        Ok(BatchBuilder::new()
+            .with_transactions(vec![self.transaction_workload.next_transaction()?.take().0])
+            .build_pair(&*self.signer)?)
+    }
+}
 
 pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
-    let command_payload = protocol::command::CommandPayload::new(commands.to_vec());
+    let command_payload = CommandPayload::new(commands.to_vec());
     TransactionBuilder::new()
         .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
         .with_family_name(String::from("command"))
