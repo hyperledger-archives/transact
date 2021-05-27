@@ -115,6 +115,10 @@
 
 #![cfg_attr(feature = "nightly", feature(test))]
 
+#[cfg(feature = "state-merkle-sql")]
+#[macro_use]
+extern crate diesel;
+
 pub mod context;
 #[cfg(feature = "contract")]
 pub mod contract;

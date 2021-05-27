@@ -21,6 +21,8 @@
 mod error;
 pub mod kv;
 mod node;
+#[cfg(feature = "state-merkle-sql")]
+pub mod sql;
 
 #[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::Read;
