@@ -17,6 +17,7 @@ crates := '\
     libtransact \
     examples/simple_xo \
     examples/address_generator \
+    examples/sabre_command \
     examples/sabre_smallbank \
     cli \
     '
