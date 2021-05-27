@@ -29,7 +29,6 @@ features := '\
 build:
     #!/usr/bin/env sh
     set -e
-    env
     for feature in $(echo {{features}})
     do
         for crate in $(echo {{crates}})
@@ -112,7 +111,6 @@ lint:
 test: build
     #!/usr/bin/env sh
     set -e
-    env
     for feature in $(echo {{features}})
     do
         for crate in $(echo {{crates}})
