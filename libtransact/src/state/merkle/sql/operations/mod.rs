@@ -15,6 +15,13 @@
  * -----------------------------------------------------------------------------
  */
 
+#[cfg(feature = "sqlite")]
+no_arg_sql_function!(
+    last_insert_rowid,
+    diesel::sql_types::BigInt,
+    "Represents the SQLite last_insert_rowid() function"
+);
+
 pub struct MerkleRadixOperations<'a, C>
 where
     C: diesel::Connection,
