@@ -15,6 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
+pub(super) mod get_leaves;
 pub(super) mod update_index;
 
 #[cfg(feature = "sqlite")]
