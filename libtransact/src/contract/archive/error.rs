@@ -16,7 +16,7 @@
  */
 
 use glob::PatternError;
-use semver::ReqParseError;
+use semver::Error as SemverError;
 
 #[derive(Debug)]
 pub struct Error {
@@ -58,8 +58,8 @@ impl From<PatternError> for Error {
     }
 }
 
-impl From<ReqParseError> for Error {
-    fn from(err: ReqParseError) -> Self {
+impl From<SemverError> for Error {
+    fn from(err: SemverError) -> Self {
         Self::new_with_source("invalid version", err.into())
     }
 }
