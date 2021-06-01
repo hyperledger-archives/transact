@@ -1159,7 +1159,9 @@ mod lmdb {
 
         remove_file(dbpath).unwrap();
 
-        assert!(result.is_ok())
+        if let Err(err) = result {
+            panic::resume_unwind(err);
+        }
     }
 
     fn make_lmdb(merkle_path: &str) -> Box<LmdbDatabase> {
@@ -1570,7 +1572,9 @@ mod sqlitedb {
 
         std::fs::remove_file(dbpath).unwrap();
 
-        assert!(result.is_ok())
+        if let Err(err) = result {
+            std::panic::resume_unwind(err);
+        }
     }
     static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
