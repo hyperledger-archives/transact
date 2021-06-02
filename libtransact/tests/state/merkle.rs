@@ -18,30 +18,29 @@ use std::str::from_utf8;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 
+#[cfg(feature = "state-merkle-leaf-reader")]
+use transact::state::merkle::MerkleRadixLeafReader;
 use transact::{
     database::{error::DatabaseError, Database},
     protos::merkle::ChangeLogEntry,
     state::{
         merkle::{MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
-        Prune, StateChange, Write,
+        Prune, Read, StateChange, StateReadError, Write,
     },
 };
 
-/// 1. Layer a MerkleRadixTree over the given database
-/// 2. Compute the state root hash for an empty change list to the original root
-/// 3. Validate the computed root is the same as the original root
-fn test_merkle_trie_empty_changes(db: Box<dyn Database>) {
-    let merkle_state = MerkleState::new(db.clone());
-    let merkle_db = MerkleRadixTree::new(db.clone(), None)
-        .expect("Could not overlay the merkle tree on the database");
-
-    let orig_root = merkle_db.get_merkle_root();
-
+/// 1. Compute the state root hash for an empty change list to the original root
+/// 2. Validate the computed root is the same as the original root
+fn test_merkle_trie_empty_changes<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
     let new_state_id = merkle_state
-        .compute_state_id(&orig_root, &[])
+        .compute_state_id(&initial_state_root, &[])
         .expect("Did not supply a state id");
 
-    assert_eq!(orig_root, new_state_id);
+    assert_eq!(initial_state_root, new_state_id);
 }
 
 /// 1. Layer a MerkleRadixTree over the given database
@@ -104,20 +103,20 @@ fn test_merkle_trie_root_advance(db: Box<dyn Database>) {
 /// 4. Commit a Delete state change against the previous state root
 /// 5. Check that the value still exists under the previous state root
 /// 6. Set the merkle root to the committed root and validate that the value has been deleted
-fn test_merkle_trie_delete(db: Box<dyn Database>) {
-    let merkle_state = MerkleState::new(db.clone());
-    let mut merkle_db = MerkleRadixTree::new(db.clone(), None).unwrap();
-
+fn test_merkle_trie_delete<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
     let state_change_set = StateChange::Set {
         key: "1234".to_string(),
         value: "deletable".as_bytes().to_vec(),
     };
 
     let new_root = merkle_state
-        .commit(&merkle_db.get_merkle_root(), &[state_change_set])
+        .commit(&initial_state_root, &[state_change_set])
         .unwrap();
-    merkle_db.set_merkle_root(new_root.clone()).unwrap();
-    assert_value_at_address(&merkle_db, "1234", "deletable");
+    assert_read_value_at_address(&merkle_state, &new_root, "1234", Some("deletable"));
 
     let state_change_del_1 = StateChange::Delete {
         key: "barf".to_string(),
@@ -136,18 +135,15 @@ fn test_merkle_trie_delete(db: Box<dyn Database>) {
         .commit(&new_root, &[state_change_del_2])
         .unwrap();
 
-    // del_root hasn't been set yet, so address should still have value
-    assert_value_at_address(&merkle_db, "1234", "deletable");
-    merkle_db.set_merkle_root(del_root).unwrap();
-    assert!(!merkle_db.contains("1234").unwrap());
+    assert_read_value_at_address(&merkle_state, &new_root, "1234", Some("deletable"));
+    assert_read_value_at_address(&merkle_state, &del_root, "1234", None);
 }
 
-fn test_merkle_trie_update(db: Box<dyn Database>) {
-    let merkle_state = MerkleState::new(db.clone());
-    let mut merkle_db = MerkleRadixTree::new(db.clone(), None).unwrap();
-
-    let init_root = merkle_db.get_merkle_root();
-
+fn test_merkle_trie_update<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
     let key_hashes = (0..1000)
         .map(|i| {
             let key = format!("{:016x}", i);
@@ -157,7 +153,7 @@ fn test_merkle_trie_update(db: Box<dyn Database>) {
         .collect::<Vec<_>>();
 
     let mut values = HashMap::new();
-    let mut new_root = init_root.clone();
+    let mut new_root = initial_state_root.clone();
     for &(ref key, ref hashed) in key_hashes.iter() {
         let state_change_set = StateChange::Set {
             key: hashed.to_string(),
@@ -166,9 +162,6 @@ fn test_merkle_trie_update(db: Box<dyn Database>) {
         new_root = merkle_state.commit(&new_root, &[state_change_set]).unwrap();
         values.insert(hashed.clone(), key.to_string());
     }
-
-    merkle_db.set_merkle_root(new_root.clone()).unwrap();
-    assert_ne!(init_root, merkle_db.get_merkle_root());
 
     let mut rng = thread_rng();
     let mut state_changes = vec![];
@@ -193,32 +186,29 @@ fn test_merkle_trie_update(db: Box<dyn Database>) {
     state_changes.extend_from_slice(&delete_items);
 
     let virtual_root = merkle_state
-        .compute_state_id(&merkle_db.get_merkle_root(), &state_changes)
+        .compute_state_id(&new_root, &state_changes)
         .unwrap();
 
     // virtual root shouldn't match actual contents of tree
-    assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
+    let res = merkle_state.get(&virtual_root, &[state_changes[0].key().to_string()]);
+    assert!(
+        matches!(res, Err(StateReadError::InvalidStateId(_))),
+        "expected {:?} but was {:?}",
+        StateReadError::InvalidStateId(virtual_root.clone()),
+        res
+    );
 
-    let actual_root = merkle_state
-        .commit(&merkle_db.get_merkle_root(), &state_changes)
-        .unwrap();
+    let actual_root = merkle_state.commit(&new_root, &state_changes).unwrap();
+
     // the virtual root should be the same as the actual root
     assert_eq!(virtual_root, actual_root);
-    assert_ne!(actual_root, merkle_db.get_merkle_root());
-
-    merkle_db.set_merkle_root(actual_root).unwrap();
 
     for (address, value) in values {
-        assert_value_at_address(&merkle_db, &address, &value);
+        assert_read_value_at_address(&merkle_state, &actual_root, &address, Some(&value));
     }
 
     for delete_change in delete_items {
-        match delete_change {
-            StateChange::Delete { key } => {
-                assert!(merkle_db.get_value(&key.clone()).unwrap().is_none());
-            }
-            _ => (),
-        }
+        assert_read_value_at_address(&merkle_state, &actual_root, delete_change.key(), None);
     }
 }
 
@@ -229,11 +219,11 @@ fn test_merkle_trie_update(db: Box<dyn Database>) {
 ///
 /// A Merkle trie is created with some initial values which is then updated
 /// (set & delete).
-fn test_merkle_trie_update_same_address_space(db: Box<dyn Database>) {
-    let merkle_state = MerkleState::new(db.clone());
-    let mut merkle_db = MerkleRadixTree::new(db.clone(), None).unwrap();
-
-    let init_root = merkle_db.get_merkle_root();
+fn test_merkle_trie_update_same_address_space<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
     let key_hashes = vec![
         // matching prefix e55420
         (
@@ -263,7 +253,7 @@ fn test_merkle_trie_update_same_address_space(db: Box<dyn Database>) {
         ),
     ];
     let mut values = HashMap::new();
-    let mut new_root = init_root.clone();
+    let mut new_root = initial_state_root.clone();
     for &(ref key, ref hashed) in key_hashes.iter() {
         let state_change_set = StateChange::Set {
             key: hashed.to_string(),
@@ -273,8 +263,7 @@ fn test_merkle_trie_update_same_address_space(db: Box<dyn Database>) {
         values.insert(hashed.to_string(), key.to_string());
     }
 
-    merkle_db.set_merkle_root(new_root.clone()).unwrap();
-    assert_ne!(init_root, merkle_db.get_merkle_root());
+    assert_ne!(initial_state_root, new_root);
     let mut state_changes = vec![];
     // Perform some updates on the lower keys
     for &(_, ref key_hash) in key_hashes.iter() {
@@ -317,24 +306,24 @@ fn test_merkle_trie_update_same_address_space(db: Box<dyn Database>) {
         .compute_state_id(&new_root, &state_changes)
         .unwrap();
     // virtual root shouldn't match actual contents of tree
-    assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
+    let res = merkle_state.get(&virtual_root, &[state_changes[0].key().to_string()]);
+    assert!(
+        matches!(res, Err(StateReadError::InvalidStateId(_))),
+        "expected {:?} but was {:?}",
+        StateReadError::InvalidStateId(virtual_root.clone()),
+        res
+    );
 
     let actual_root = merkle_state.commit(&new_root, &state_changes).unwrap();
     // the virtual root should be the same as the actual root
     assert_eq!(virtual_root, actual_root);
-    assert_ne!(actual_root, merkle_db.get_merkle_root());
-
-    merkle_db.set_merkle_root(actual_root).unwrap();
 
     for (address, value) in values {
-        assert_value_at_address(&merkle_db, &address, &value);
+        assert_read_value_at_address(&merkle_state, &actual_root, &address, Some(&value));
     }
 
     for delete_change in delete_items {
-        match delete_change {
-            StateChange::Delete { key } => assert!(merkle_db.get_value(&key).unwrap().is_none()),
-            _ => (),
-        }
+        assert_read_value_at_address(&merkle_state, &actual_root, delete_change.key(), None);
     }
 }
 
@@ -345,11 +334,13 @@ fn test_merkle_trie_update_same_address_space(db: Box<dyn Database>) {
 ///
 /// A Merkle trie is created with some initial values which is then updated
 /// (set & delete).
-fn test_merkle_trie_update_same_address_space_with_no_children(db: Box<dyn Database>) {
-    let merkle_state = MerkleState::new(db.clone());
-    let mut merkle_db = MerkleRadixTree::new(db.clone(), None).unwrap();
-
-    let init_root = merkle_db.get_merkle_root();
+fn test_merkle_trie_update_same_address_space_with_no_children<M>(
+    initial_state_root: String,
+    merkle_state: M,
+) where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
     let key_hashes = vec![
         (
             "qwert",
@@ -374,7 +365,7 @@ fn test_merkle_trie_update_same_address_space_with_no_children(db: Box<dyn Datab
         ),
     ];
     let mut values = HashMap::new();
-    let mut new_root = init_root.clone();
+    let mut new_root = initial_state_root.clone();
     for &(ref key, ref hashed) in key_hashes.iter() {
         let state_change_set = StateChange::Set {
             key: hashed.to_string(),
@@ -384,8 +375,7 @@ fn test_merkle_trie_update_same_address_space_with_no_children(db: Box<dyn Datab
         values.insert(hashed.to_string(), key.to_string());
     }
 
-    merkle_db.set_merkle_root(new_root.clone()).unwrap();
-    assert_ne!(init_root, merkle_db.get_merkle_root());
+    assert_ne!(initial_state_root, new_root);
 
     // matching prefix e55420, however this will be newly added and not set already in trie
     let key_hash_to_be_inserted = vec![(
@@ -436,27 +426,25 @@ fn test_merkle_trie_update_same_address_space_with_no_children(db: Box<dyn Datab
         .unwrap();
 
     // virtual root shouldn't match actual contents of tree
-    assert!(merkle_db.set_merkle_root(virtual_root.clone()).is_err());
+    let res = merkle_state.get(&virtual_root, &[state_changes[0].key().to_string()]);
+    assert!(
+        matches!(res, Err(StateReadError::InvalidStateId(_))),
+        "expected {:?} but was {:?}",
+        StateReadError::InvalidStateId(virtual_root.clone()),
+        res
+    );
 
     let actual_root = merkle_state.commit(&new_root, &state_changes).unwrap();
 
     // the virtual root should be the same as the actual root
     assert_eq!(virtual_root, actual_root);
-    assert_ne!(actual_root, merkle_db.get_merkle_root());
-
-    merkle_db.set_merkle_root(actual_root).unwrap();
 
     for (address, value) in values {
-        assert_value_at_address(&merkle_db, &address, &value);
+        assert_read_value_at_address(&merkle_state, &actual_root, &address, Some(&value));
     }
 
     for delete_change in delete_items {
-        match delete_change {
-            StateChange::Delete { key } => {
-                assert!(merkle_db.get_value(&key).unwrap().is_none());
-            }
-            _ => (),
-        }
+        assert_read_value_at_address(&merkle_state, &actual_root, delete_change.key(), None);
     }
 }
 
@@ -781,11 +769,14 @@ fn test_merkle_trie_pruning_successor_duplicate_leaves(db: Box<dyn Database>) {
     assert_value_at_address(&merkle_db, "ab0000", "0001");
 }
 
+#[cfg(feature = "state-merkle-leaf-reader")]
 /// Test iteration over leaves.
-fn test_leaf_iteration(db: Box<dyn Database>) {
-    let mut merkle_db = MerkleRadixTree::new(db, None).unwrap();
+fn test_leaf_iteration<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Write<StateId = String, Key = String, Value = Vec<u8>> + MerkleRadixLeafReader,
+{
     {
-        let mut leaf_iter = merkle_db.leaves(None).unwrap();
+        let mut leaf_iter = merkle_state.leaves(&initial_state_root, None).unwrap();
         assert!(
             leaf_iter.next().is_none(),
             "Empty tree should return no leaves"
@@ -793,19 +784,20 @@ fn test_leaf_iteration(db: Box<dyn Database>) {
     }
 
     let addresses = vec!["ab0000", "aba001", "abff02"];
+    let mut new_root = initial_state_root.clone();
     for (i, key) in addresses.iter().enumerate() {
         let state_change_set = StateChange::Set {
             key: key.to_string(),
             value: format!("{:04x}", i * 10).as_bytes().to_vec(),
         };
-        let new_root = merkle_db.update(&[state_change_set], false).unwrap();
-        merkle_db.set_merkle_root(new_root).unwrap();
+        new_root = merkle_state.commit(&new_root, &[state_change_set]).unwrap();
     }
-    assert_value_at_address(&merkle_db, "ab0000", "0000");
-    assert_value_at_address(&merkle_db, "aba001", "000a");
-    assert_value_at_address(&merkle_db, "abff02", "0014");
 
-    let mut leaf_iter = merkle_db.leaves(None).unwrap();
+    assert_read_value_at_address(&merkle_state, &new_root, "ab0000", Some("0000"));
+    assert_read_value_at_address(&merkle_state, &new_root, "aba001", Some("000a"));
+    assert_read_value_at_address(&merkle_state, &new_root, "abff02", Some("0014"));
+
+    let mut leaf_iter = merkle_state.leaves(&new_root, None).unwrap();
 
     assert_eq!(
         ("ab0000".into(), "0000".as_bytes().to_vec()),
@@ -822,7 +814,7 @@ fn test_leaf_iteration(db: Box<dyn Database>) {
     assert!(leaf_iter.next().is_none(), "Iterator should be Exhausted");
 
     // test that we can start from an prefix:
-    let mut leaf_iter = merkle_db.leaves(Some("abff")).unwrap();
+    let mut leaf_iter = merkle_state.leaves(&new_root, Some("abff")).unwrap();
     assert_eq!(
         ("abff02".into(), "0014".as_bytes().to_vec()),
         leaf_iter.next().unwrap().unwrap()
@@ -908,6 +900,28 @@ fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_
     }
 }
 
+fn assert_read_value_at_address<R>(
+    merkle_read: &R,
+    root_hash: &str,
+    address: &str,
+    expected_value: Option<&str>,
+) where
+    R: Read<StateId = String, Key = String, Value = Vec<u8>>,
+{
+    let value = merkle_read
+        .get(&root_hash.to_string(), &[address.to_string()])
+        .and_then(|mut values| {
+            Ok(values
+                .remove(address)
+                .map(|value| String::from_utf8(value).expect("could not convert bytes to string")))
+        });
+
+    match value {
+        Ok(value) => assert_eq!(expected_value, value.as_deref()),
+        Err(err) => panic!("value at address {} produced an error: {}", address, err),
+    }
+}
+
 fn expect_change_log(db: &dyn Database, root_hash: &[u8]) -> ChangeLogEntry {
     let reader = db.get_reader().unwrap();
     protobuf::parse_from_bytes::<ChangeLogEntry>(
@@ -953,10 +967,22 @@ mod btree {
 
     use super::*;
 
+    fn new_btree_state_and_root() -> (MerkleState, String) {
+        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
+        let merkle_state = MerkleState::new(btree_db.clone());
+
+        let merkle_db = MerkleRadixTree::new(btree_db, None)
+            .expect("Could not overlay the merkle tree on the database");
+
+        let orig_root = merkle_db.get_merkle_root();
+
+        (merkle_state, orig_root)
+    }
+
     #[test]
     fn merkle_trie_empty_changes() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_empty_changes(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_merkle_trie_empty_changes(orig_root, state);
     }
 
     #[test]
@@ -967,26 +993,26 @@ mod btree {
 
     #[test]
     fn merkle_trie_delete() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_delete(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_merkle_trie_delete(orig_root, state);
     }
 
     #[test]
     fn merkle_trie_update() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_update(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_merkle_trie_update(orig_root, state);
     }
 
     #[test]
     fn merkle_trie_update_same_address_space() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_update_same_address_space(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_merkle_trie_update_same_address_space(orig_root, state);
     }
 
     #[test]
     fn merkle_trie_update_same_address_space_with_no_children() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_update_same_address_space_with_no_children(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_merkle_trie_update_same_address_space_with_no_children(orig_root, state);
     }
 
     #[test]
@@ -1013,10 +1039,11 @@ mod btree {
         test_merkle_trie_pruning_successor_duplicate_leaves(btree_db);
     }
 
+    #[cfg(feature = "state-merkle-leaf-reader")]
     #[test]
     fn leaf_iteration() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_leaf_iteration(btree_db);
+        let (state, orig_root) = new_btree_state_and_root();
+        test_leaf_iteration(orig_root, state);
     }
 }
 
@@ -1039,11 +1066,23 @@ mod lmdb {
 
     use super::*;
 
+    fn new_lmdb_state_and_root(lmdb_path: &str) -> (MerkleState, String) {
+        let lmdb_db = make_lmdb(lmdb_path);
+        let merkle_state = MerkleState::new(lmdb_db.clone());
+
+        let merkle_db = MerkleRadixTree::new(lmdb_db, None)
+            .expect("Could not overlay the merkle tree on the database");
+
+        let orig_root = merkle_db.get_merkle_root();
+
+        (merkle_state, orig_root)
+    }
+
     #[test]
     fn merkle_trie_empty_changes() {
         run_test(|merkle_path| {
-            let db = make_lmdb(&merkle_path);
-            test_merkle_trie_empty_changes(db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_merkle_trie_empty_changes(orig_root, state);
         })
     }
 
@@ -1058,32 +1097,32 @@ mod lmdb {
     #[test]
     fn merkle_trie_delete() {
         run_test(|merkle_path| {
-            let db = make_lmdb(&merkle_path);
-            test_merkle_trie_delete(db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_merkle_trie_delete(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_multiple_entries() {
         run_test(|merkle_path| {
-            let db = make_lmdb(&merkle_path);
-            test_merkle_trie_update(db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_merkle_trie_update(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space() {
         run_test(|merkle_path| {
-            let db = make_lmdb(&merkle_path);
-            test_merkle_trie_update_same_address_space(db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_merkle_trie_update_same_address_space(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space_with_no_children() {
         run_test(|merkle_path| {
-            let db = make_lmdb(&merkle_path);
-            test_merkle_trie_update_same_address_space_with_no_children(db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_merkle_trie_update_same_address_space_with_no_children(orig_root, state);
         })
     }
 
@@ -1119,11 +1158,12 @@ mod lmdb {
         })
     }
 
+    #[cfg(feature = "state-merkle-leaf-reader")]
     #[test]
     fn leaf_iteration() {
         run_test(|merkle_path| {
-            let lmdb_db = make_lmdb(merkle_path);
-            test_leaf_iteration(lmdb_db);
+            let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+            test_leaf_iteration(orig_root, state);
         })
     }
 
@@ -1164,7 +1204,7 @@ mod lmdb {
         }
     }
 
-    fn make_lmdb(merkle_path: &str) -> Box<LmdbDatabase> {
+    fn make_lmdb(merkle_path: &str) -> Box<dyn Database> {
         let ctx = LmdbContext::new(
             Path::new(merkle_path),
             INDEXES.len(),
@@ -1206,14 +1246,26 @@ mod redisdb {
 
     const DEFAULT_REDIS_URL: &str = "redis://localhost:6379/";
 
+    fn new_redis_state_and_root(redis_url: &str, primary: &str) -> (MerkleState, String) {
+        let db = Box::new(
+            RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
+                .expect("Unable to create redis database"),
+        );
+        let merkle_state = MerkleState::new(db.clone());
+
+        let merkle_db = MerkleRadixTree::new(db, None)
+            .expect("Could not overlay the merkle tree on the database");
+
+        let orig_root = merkle_db.get_merkle_root();
+
+        (merkle_state, orig_root)
+    }
+
     #[test]
     fn merkle_trie_empty_changes() {
         run_test(|redis_url, primary| {
-            let db = Box::new(
-                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
-                    .expect("Unable to create redis database"),
-            );
-            test_merkle_trie_empty_changes(db);
+            let (state, orig_root) = new_redis_state_and_root(redis_url, primary);
+            test_merkle_trie_empty_changes(orig_root, state);
         })
     }
 
@@ -1231,44 +1283,32 @@ mod redisdb {
     #[test]
     fn merkle_trie_delete() {
         run_test(|redis_url, primary| {
-            let db = Box::new(
-                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
-                    .expect("Unable to create redis database"),
-            );
-            test_merkle_trie_delete(db);
+            let (state, orig_root) = new_redis_state_and_root(redis_url, primary);
+            test_merkle_trie_delete(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update() {
         run_test(|redis_url, primary| {
-            let db = Box::new(
-                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
-                    .expect("Unable to create redis database"),
-            );
-            test_merkle_trie_update(db);
+            let (state, orig_root) = new_redis_state_and_root(redis_url, primary);
+            test_merkle_trie_update(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space() {
         run_test(|redis_url, primary| {
-            let db = Box::new(
-                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
-                    .expect("Unable to create redis database"),
-            );
-            test_merkle_trie_update_same_address_space(db);
+            let (state, orig_root) = new_redis_state_and_root(redis_url, primary);
+            test_merkle_trie_update_same_address_space(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space_with_no_children() {
         run_test(|redis_url, primary| {
-            let db = Box::new(
-                RedisDatabase::new(redis_url, primary.to_string(), &INDEXES)
-                    .expect("Unable to create redis database"),
-            );
-            test_merkle_trie_update_same_address_space_with_no_children(db);
+            let (state, orig_root) = new_redis_state_and_root(redis_url, primary);
+            test_merkle_trie_update_same_address_space_with_no_children(orig_root, state);
         })
     }
 
@@ -1394,13 +1434,25 @@ mod sqlitedb {
 
     use super::*;
 
+    fn new_sqlite_state_and_root(db_path: &str) -> (MerkleState, String) {
+        let db = Box::new(
+            SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
+        );
+        let merkle_state = MerkleState::new(db.clone());
+
+        let merkle_db = MerkleRadixTree::new(db, None)
+            .expect("Could not overlay the merkle tree on the database");
+
+        let orig_root = merkle_db.get_merkle_root();
+
+        (merkle_state, orig_root)
+    }
+
     #[test]
     fn merkle_trie_empty_changes() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_merkle_trie_empty_changes(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_merkle_trie_empty_changes(orig_root, state);
         })
     }
 
@@ -1417,20 +1469,16 @@ mod sqlitedb {
     #[test]
     fn merkle_trie_delete() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_merkle_trie_delete(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_merkle_trie_delete(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_atomic_commit_rollback() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_merkle_trie_update(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_merkle_trie_update(orig_root, state);
         })
     }
 
@@ -1445,7 +1493,13 @@ mod sqlitedb {
                     .build()
                     .expect("Unable to create Sqlite database"),
             );
-            test_merkle_trie_update(db);
+            let merkle_state = MerkleState::new(db.clone());
+
+            let merkle_db = MerkleRadixTree::new(db, None)
+                .expect("Could not overlay the merkle tree on the database");
+
+            let orig_root = merkle_db.get_merkle_root();
+            test_merkle_trie_update(orig_root, merkle_state);
         })
     }
 
@@ -1461,27 +1515,29 @@ mod sqlitedb {
                     .build()
                     .expect("Unable to create Sqlite database"),
             );
-            test_merkle_trie_update(db);
+            let merkle_state = MerkleState::new(db.clone());
+
+            let merkle_db = MerkleRadixTree::new(db, None)
+                .expect("Could not overlay the merkle tree on the database");
+
+            let orig_root = merkle_db.get_merkle_root();
+            test_merkle_trie_update(orig_root, merkle_state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_merkle_trie_update_same_address_space(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_merkle_trie_update_same_address_space(orig_root, state);
         })
     }
 
     #[test]
     fn merkle_trie_update_same_address_space_with_no_children() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_merkle_trie_update_same_address_space_with_no_children(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_merkle_trie_update_same_address_space_with_no_children(orig_root, state);
         })
     }
 
@@ -1525,13 +1581,12 @@ mod sqlitedb {
         })
     }
 
+    #[cfg(feature = "state-merkle-leaf-reader")]
     #[test]
     fn leaf_iteration() {
         run_test(|db_path| {
-            let db = Box::new(
-                SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
-            );
-            test_leaf_iteration(db);
+            let (state, orig_root) = new_sqlite_state_and_root(db_path);
+            test_leaf_iteration(orig_root, state);
         })
     }
 
