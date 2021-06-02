@@ -71,11 +71,8 @@ impl Write for MerkleState {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let mut merkle_tree = MerkleRadixTree::new(self.db.clone(), Some(state_id))
-            .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
-        merkle_tree
-            .set_merkle_root(state_id.to_string())
-            .map_err(|err| match err {
+        let merkle_tree =
+            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
                 _ => StateWriteError::StorageError(Box::new(err)),
             })?;
@@ -89,15 +86,12 @@ impl Write for MerkleState {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let mut merkle_tree = MerkleRadixTree::new(self.db.clone(), Some(state_id))
-            .map_err(|err| StateWriteError::StorageError(Box::new(err)))?;
-
-        merkle_tree
-            .set_merkle_root(state_id.to_string())
-            .map_err(|err| match err {
+        let merkle_tree =
+            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateWriteError::InvalidStateId(msg),
                 _ => StateWriteError::StorageError(Box::new(err)),
             })?;
+
         merkle_tree
             .update(state_changes, true)
             .map_err(|err| StateWriteError::StorageError(Box::new(err)))
@@ -114,15 +108,12 @@ impl Read for MerkleState {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let mut merkle_tree = MerkleRadixTree::new(self.db.clone(), Some(state_id))
-            .map_err(|err| StateReadError::StorageError(Box::new(err)))?;
-
-        merkle_tree
-            .set_merkle_root(state_id.to_string())
-            .map_err(|err| match err {
+        let merkle_tree =
+            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => StateReadError::InvalidStateId(msg),
                 _ => StateReadError::StorageError(Box::new(err)),
             })?;
+
         keys.iter().try_fold(HashMap::new(), |mut result, key| {
             let value = match merkle_tree.get_by_address(key) {
                 Ok(value) => Ok(value.value),
@@ -159,14 +150,8 @@ impl MerkleRadixLeafReader for MerkleState {
         state_id: &Self::StateId,
         subtree: Option<&str>,
     ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
-        let mut merkle_tree =
-            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| {
-                MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(err)))
-            })?;
-
-        merkle_tree
-            .set_merkle_root(state_id.to_string())
-            .map_err(|err| match err {
+        let merkle_tree =
+            MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
                 StateDatabaseError::NotFound(msg) => MerkleRadixLeafReadError::InvalidStateError(
                     InvalidStateError::with_message(msg),
                 ),
