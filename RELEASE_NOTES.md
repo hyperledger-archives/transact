@@ -1,5 +1,11 @@
 # Release Notes
 
+## Changes in Transact 0.3.7
+
+* Update `semver` dependency from `0.9` to `1.0`.
+* Fix various clippy errors that were introduced with the release of Rust 1.50.
+* Update `protobuf` dependency from `2.0` to `2.19`.
+
 ## Changes in Transact 0.3.6
 
 * Update the `cylinder` dependency of libtransact and the `simple_xo` example to
