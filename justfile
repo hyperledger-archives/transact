@@ -19,6 +19,7 @@ crates := '\
     examples/address_generator \
     examples/sabre_command \
     examples/sabre_smallbank \
+    examples/sabre_command_executor\
     cli \
     '
 
