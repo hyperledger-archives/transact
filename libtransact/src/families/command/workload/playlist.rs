@@ -39,7 +39,9 @@ impl CommandGeneratingIter {
     }
 
     pub fn add_set_address(&mut self, address: String) {
-        self.set_addresses.push(address);
+        if !self.set_addresses.contains(&address) {
+            self.set_addresses.push(address);
+        }
     }
 
     pub fn remove_set_address(&mut self, index: usize) {
