@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod btree;
 mod lmdb;
 #[cfg(feature = "state-merkle-redis-db-tests")]
 mod redisdb;
@@ -964,91 +965,4 @@ fn hex_hash(input: &[u8]) -> String {
     bytes.extend(openssl::sha::sha512(input).iter());
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hex::encode(hash.to_vec())
-}
-
-mod btree {
-    //! B-Tree-backed tests for the merkle state implementation.
-
-    use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
-
-    use super::*;
-
-    fn new_btree_state_and_root() -> (MerkleState, String) {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        let merkle_state = MerkleState::new(btree_db.clone());
-
-        let merkle_db = MerkleRadixTree::new(btree_db, None)
-            .expect("Could not overlay the merkle tree on the database");
-
-        let orig_root = merkle_db.get_merkle_root();
-
-        (merkle_state, orig_root)
-    }
-
-    #[test]
-    fn merkle_trie_empty_changes() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_merkle_trie_empty_changes(orig_root, state);
-    }
-
-    #[test]
-    fn merkle_trie_root_advance() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_root_advance(btree_db);
-    }
-
-    #[test]
-    fn merkle_trie_delete() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_merkle_trie_delete(orig_root, state);
-    }
-
-    #[test]
-    fn merkle_trie_update() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_merkle_trie_update(orig_root, state);
-    }
-
-    #[test]
-    fn merkle_trie_update_same_address_space() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_merkle_trie_update_same_address_space(orig_root, state);
-    }
-
-    #[test]
-    fn merkle_trie_update_same_address_space_with_no_children() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_merkle_trie_update_same_address_space_with_no_children(orig_root, state);
-    }
-
-    #[test]
-    fn merkle_trie_pruning_parent() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_pruning_parent(btree_db);
-    }
-
-    #[test]
-    fn merkle_trie_pruning_successors() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_pruning_successors(btree_db);
-    }
-
-    #[test]
-    fn merkle_trie_pruning_duplicate_leaves() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_pruning_duplicate_leaves(btree_db);
-    }
-
-    #[test]
-    fn merkle_trie_pruning_successor_duplicate_leaves() {
-        let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
-        test_merkle_trie_pruning_successor_duplicate_leaves(btree_db);
-    }
-
-    #[cfg(feature = "state-merkle-leaf-reader")]
-    #[test]
-    fn leaf_iteration() {
-        let (state, orig_root) = new_btree_state_and_root();
-        test_leaf_iteration(orig_root, state);
-    }
 }
