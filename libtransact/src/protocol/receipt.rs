@@ -151,19 +151,22 @@ impl TryFrom<TransactionReceipt> for Vec<state::StateChange> {
 impl fmt::Debug for StateChange {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            StateChange::Set { key, value } => {
-                f.write_str("StateChange{ ")?;
-                write!(f, "key: {:?}, ", key)?;
-                let value_len = value.len();
-                write!(
-                    f,
-                    "value: <{} byte{}>",
-                    value_len,
-                    if value_len == 1 { "" } else { "s" }
-                )?;
-                f.write_str(" }")
-            }
-            StateChange::Delete { key } => write!(f, "StateChange::Delete{{ key: {:?} }})", key),
+            StateChange::Set { key, value } => f
+                .debug_struct("StateChange::Set")
+                .field("key", key)
+                .field(
+                    "value",
+                    &format!(
+                        "value: <{} byte{}>",
+                        value.len(),
+                        if value.len() == 1 { "" } else { "s" }
+                    ),
+                )
+                .finish(),
+            StateChange::Delete { key } => f
+                .debug_struct("StateChange::Delete")
+                .field("key", key)
+                .finish(),
         }
     }
 }
