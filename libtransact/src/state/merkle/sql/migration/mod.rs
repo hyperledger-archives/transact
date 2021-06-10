@@ -15,6 +15,19 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Provides the MigrationManageer trait.
+
 #[cfg(feature = "sqlite")]
-#[allow(dead_code)]
-pub mod sqlite;
+pub(crate) mod sqlite;
+
+use crate::error::InternalError;
+
+use super::backend::Backend;
+
+/// Provides backend migration execution.
+///
+/// Backend's that implement this trait can expose a migration operation on their underlying
+/// database system.
+pub trait MigrationManager: Backend {
+    fn run_migrations(&self) -> Result<(), InternalError>;
+}
