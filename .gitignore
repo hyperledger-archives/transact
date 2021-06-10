@@ -7,6 +7,8 @@
 
 /examples/sabre_command/target
 /examples/sabre_command/Cargo.lock
+/examples/sabre_command_executor/target
+/examples/sabre_command_executor/Cargo.lock
 /examples/sabre_smallbank/target
 /examples/sabre_smallbank/Cargo.lock
 

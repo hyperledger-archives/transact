@@ -54,20 +54,54 @@ pub const ORG_ADDRESS_PREFIX_BYTES: &[u8] = &[202, 209, 29, 1];
 /// Native implementation for SabrePayload_Action
 #[derive(Debug, Clone, PartialEq)]
 pub enum Action {
+    CreateContract(CreateContractAction),
     ExecuteContract(ExecuteContractAction),
+    CreateContractRegistry(CreateContractRegistryAction),
+    CreateNamespaceRegistry(CreateNamespaceRegistryAction),
+    CreateNamespaceRegistryPermission(CreateNamespaceRegistryPermissionAction),
 }
 
 impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
+            Action::CreateContract(_) => write!(f, "Action: Create Contract"),
             Action::ExecuteContract(_) => write!(f, "Action: Execute Contract"),
+            Action::CreateContractRegistry(_) => write!(f, "Action: Create Contract Registry"),
+            Action::CreateNamespaceRegistry(_) => write!(f, "Action: Create Namespace Registry"),
+            Action::CreateNamespaceRegistryPermission(_) => {
+                write!(f, "Create Namespace Registry Permission")
+            }
         }
+    }
+}
+
+impl From<CreateContractAction> for Action {
+    fn from(action: CreateContractAction) -> Self {
+        Action::CreateContract(action)
     }
 }
 
 impl From<ExecuteContractAction> for Action {
     fn from(action: ExecuteContractAction) -> Self {
         Action::ExecuteContract(action)
+    }
+}
+
+impl From<CreateContractRegistryAction> for Action {
+    fn from(action: CreateContractRegistryAction) -> Self {
+        Action::CreateContractRegistry(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryAction> for Action {
+    fn from(action: CreateNamespaceRegistryAction) -> Self {
+        Action::CreateNamespaceRegistry(action)
+    }
+}
+
+impl From<CreateNamespaceRegistryPermissionAction> for Action {
+    fn from(action: CreateNamespaceRegistryPermissionAction) -> Self {
+        Action::CreateNamespaceRegistryPermission(action)
     }
 }
 
@@ -83,6 +117,150 @@ impl std::fmt::Display for ActionBuildError {
         match *self {
             Self::MissingField(ref s) => write!(f, "missing field: {}", s),
         }
+    }
+}
+
+/// Native implementation for CreateContractAction
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct CreateContractAction {
+    name: String,
+    version: String,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    contract: Vec<u8>,
+}
+
+impl CreateContractAction {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn version(&self) -> &str {
+        &self.version
+    }
+
+    pub fn inputs(&self) -> &[String] {
+        &self.inputs
+    }
+
+    pub fn outputs(&self) -> &[String] {
+        &self.outputs
+    }
+
+    pub fn contract(&self) -> &[u8] {
+        &self.contract
+    }
+}
+
+impl FromProto<protos::sabre::CreateContractAction> for CreateContractAction {
+    fn from_proto(
+        proto: protos::sabre::CreateContractAction,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(CreateContractAction {
+            name: proto.get_name().to_string(),
+            version: proto.get_version().to_string(),
+            inputs: proto.get_inputs().to_vec(),
+            outputs: proto.get_outputs().to_vec(),
+            contract: proto.get_contract().to_vec(),
+        })
+    }
+}
+
+impl FromNative<CreateContractAction> for protos::sabre::CreateContractAction {
+    fn from_native(
+        create_contract_action: CreateContractAction,
+    ) -> Result<Self, ProtoConversionError> {
+        let mut proto = protos::sabre::CreateContractAction::new();
+        proto.set_name(create_contract_action.name().to_string());
+        proto.set_version(create_contract_action.version().to_string());
+        proto.set_inputs(RepeatedField::from_vec(
+            create_contract_action.inputs().to_vec(),
+        ));
+        proto.set_outputs(RepeatedField::from_vec(
+            create_contract_action.outputs().to_vec(),
+        ));
+        proto.set_contract(create_contract_action.contract().to_vec());
+        Ok(proto)
+    }
+}
+
+impl IntoProto<protos::sabre::CreateContractAction> for CreateContractAction {}
+impl IntoNative<CreateContractAction> for protos::sabre::CreateContractAction {}
+
+/// Builder used to create a CreateContractAction
+#[derive(Default, Clone)]
+pub struct CreateContractActionBuilder {
+    name: Option<String>,
+    version: Option<String>,
+    inputs: Vec<String>,
+    outputs: Vec<String>,
+    contract: Vec<u8>,
+}
+
+impl CreateContractActionBuilder {
+    pub fn new() -> Self {
+        CreateContractActionBuilder::default()
+    }
+
+    pub fn with_name(mut self, name: String) -> CreateContractActionBuilder {
+        self.name = Some(name);
+        self
+    }
+
+    pub fn with_version(mut self, version: String) -> CreateContractActionBuilder {
+        self.version = Some(version);
+        self
+    }
+
+    pub fn with_inputs(mut self, inputs: Vec<String>) -> CreateContractActionBuilder {
+        self.inputs = inputs;
+        self
+    }
+
+    pub fn with_outputs(mut self, outputs: Vec<String>) -> CreateContractActionBuilder {
+        self.outputs = outputs;
+        self
+    }
+
+    pub fn with_contract(mut self, contract: Vec<u8>) -> CreateContractActionBuilder {
+        self.contract = contract;
+        self
+    }
+
+    pub fn build(self) -> Result<CreateContractAction, ActionBuildError> {
+        let name = self.name.ok_or_else(|| {
+            ActionBuildError::MissingField("'name' field is required".to_string())
+        })?;
+
+        let version = self.version.ok_or_else(|| {
+            ActionBuildError::MissingField("'version' field is required".to_string())
+        })?;
+
+        let inputs = self.inputs;
+        let outputs = self.outputs;
+
+        let contract = {
+            if self.contract.is_empty() {
+                return Err(ActionBuildError::MissingField(
+                    "'contract' field is required".to_string(),
+                ));
+            } else {
+                self.contract
+            }
+        };
+
+        Ok(CreateContractAction {
+            name,
+            version,
+            inputs,
+            outputs,
+            contract,
+        })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
     }
 }
 
@@ -254,6 +432,322 @@ impl ExecuteContractActionBuilder {
     }
 }
 
+/// Native implementation for CreateContractRegistryAction
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct CreateContractRegistryAction {
+    name: String,
+    owners: Vec<String>,
+}
+
+impl CreateContractRegistryAction {
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    pub fn owners(&self) -> &[String] {
+        &self.owners
+    }
+}
+
+impl FromProto<protos::sabre::CreateContractRegistryAction> for CreateContractRegistryAction {
+    fn from_proto(
+        proto: protos::sabre::CreateContractRegistryAction,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(CreateContractRegistryAction {
+            name: proto.get_name().to_string(),
+            owners: proto.get_owners().to_vec(),
+        })
+    }
+}
+
+impl FromNative<CreateContractRegistryAction> for protos::sabre::CreateContractRegistryAction {
+    fn from_native(
+        create_contract_registry_action: CreateContractRegistryAction,
+    ) -> Result<Self, ProtoConversionError> {
+        let mut proto = protos::sabre::CreateContractRegistryAction::new();
+        proto.set_name(create_contract_registry_action.name().to_string());
+        proto.set_owners(RepeatedField::from_vec(
+            create_contract_registry_action.owners().to_vec(),
+        ));
+        Ok(proto)
+    }
+}
+
+impl IntoProto<protos::sabre::CreateContractRegistryAction> for CreateContractRegistryAction {}
+impl IntoNative<CreateContractRegistryAction> for protos::sabre::CreateContractRegistryAction {}
+
+/// Builder used to create a CreateContractRegistryAction
+#[derive(Default, Clone)]
+pub struct CreateContractRegistryActionBuilder {
+    name: Option<String>,
+    owners: Vec<String>,
+}
+
+impl CreateContractRegistryActionBuilder {
+    pub fn new() -> Self {
+        CreateContractRegistryActionBuilder::default()
+    }
+
+    pub fn with_name(mut self, name: String) -> CreateContractRegistryActionBuilder {
+        self.name = Some(name);
+        self
+    }
+
+    pub fn with_owners(mut self, owners: Vec<String>) -> CreateContractRegistryActionBuilder {
+        self.owners = owners;
+        self
+    }
+
+    pub fn build(self) -> Result<CreateContractRegistryAction, ActionBuildError> {
+        let name = self.name.ok_or_else(|| {
+            ActionBuildError::MissingField("'name' field is required".to_string())
+        })?;
+
+        let owners = {
+            if self.owners.is_empty() {
+                return Err(ActionBuildError::MissingField(
+                    "'owners' field is required".to_string(),
+                ));
+            } else {
+                self.owners
+            }
+        };
+
+        Ok(CreateContractRegistryAction { name, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
+}
+
+/// Native implementation for CreateNamespaceRegistryAction
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct CreateNamespaceRegistryAction {
+    namespace: String,
+    owners: Vec<String>,
+}
+
+impl CreateNamespaceRegistryAction {
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn owners(&self) -> &[String] {
+        &self.owners
+    }
+}
+
+impl FromProto<protos::sabre::CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {
+    fn from_proto(
+        proto: protos::sabre::CreateNamespaceRegistryAction,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(CreateNamespaceRegistryAction {
+            namespace: proto.get_namespace().to_string(),
+            owners: proto.get_owners().to_vec(),
+        })
+    }
+}
+
+impl FromNative<CreateNamespaceRegistryAction> for protos::sabre::CreateNamespaceRegistryAction {
+    fn from_native(
+        create_namespace_registry_action: CreateNamespaceRegistryAction,
+    ) -> Result<Self, ProtoConversionError> {
+        let mut proto = protos::sabre::CreateNamespaceRegistryAction::new();
+        proto.set_namespace(create_namespace_registry_action.namespace().to_string());
+        proto.set_owners(RepeatedField::from_vec(
+            create_namespace_registry_action.owners().to_vec(),
+        ));
+        Ok(proto)
+    }
+}
+
+impl IntoProto<protos::sabre::CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {}
+impl IntoNative<CreateNamespaceRegistryAction> for protos::sabre::CreateNamespaceRegistryAction {}
+
+/// Builder used to create a CreateNamespaceRegistryAction
+#[derive(Default, Clone)]
+pub struct CreateNamespaceRegistryActionBuilder {
+    namespace: Option<String>,
+    owners: Vec<String>,
+}
+
+impl CreateNamespaceRegistryActionBuilder {
+    pub fn new() -> Self {
+        CreateNamespaceRegistryActionBuilder::default()
+    }
+
+    pub fn with_namespace(mut self, namespace: String) -> CreateNamespaceRegistryActionBuilder {
+        self.namespace = Some(namespace);
+        self
+    }
+
+    pub fn with_owners(mut self, owners: Vec<String>) -> CreateNamespaceRegistryActionBuilder {
+        self.owners = owners;
+        self
+    }
+
+    pub fn build(self) -> Result<CreateNamespaceRegistryAction, ActionBuildError> {
+        let namespace = self.namespace.ok_or_else(|| {
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
+        })?;
+
+        let owners = {
+            if self.owners.is_empty() {
+                return Err(ActionBuildError::MissingField(
+                    "'owners' field is required".to_string(),
+                ));
+            } else {
+                self.owners
+            }
+        };
+
+        Ok(CreateNamespaceRegistryAction { namespace, owners })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
+}
+
+/// Native implementation for CreateNamespaceRegistryPermissionAction
+#[derive(Default, Debug, Clone, PartialEq)]
+pub struct CreateNamespaceRegistryPermissionAction {
+    namespace: String,
+    contract_name: String,
+    read: bool,
+    write: bool,
+}
+
+impl CreateNamespaceRegistryPermissionAction {
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn contract_name(&self) -> &str {
+        &self.contract_name
+    }
+
+    pub fn read(&self) -> bool {
+        self.read
+    }
+
+    pub fn write(&self) -> bool {
+        self.write
+    }
+}
+
+impl FromProto<protos::sabre::CreateNamespaceRegistryPermissionAction>
+    for CreateNamespaceRegistryPermissionAction
+{
+    fn from_proto(
+        proto: protos::sabre::CreateNamespaceRegistryPermissionAction,
+    ) -> Result<Self, ProtoConversionError> {
+        Ok(CreateNamespaceRegistryPermissionAction {
+            namespace: proto.get_namespace().to_string(),
+            contract_name: proto.get_contract_name().to_string(),
+            read: proto.get_read(),
+            write: proto.get_write(),
+        })
+    }
+}
+
+impl FromNative<CreateNamespaceRegistryPermissionAction>
+    for protos::sabre::CreateNamespaceRegistryPermissionAction
+{
+    fn from_native(
+        create_namespace_permission_action: CreateNamespaceRegistryPermissionAction,
+    ) -> Result<Self, ProtoConversionError> {
+        let mut proto = protos::sabre::CreateNamespaceRegistryPermissionAction::new();
+        proto.set_namespace(create_namespace_permission_action.namespace().to_string());
+        proto.set_contract_name(
+            create_namespace_permission_action
+                .contract_name()
+                .to_string(),
+        );
+        proto.set_read(create_namespace_permission_action.read());
+        proto.set_write(create_namespace_permission_action.write());
+        Ok(proto)
+    }
+}
+
+impl IntoProto<protos::sabre::CreateNamespaceRegistryPermissionAction>
+    for CreateNamespaceRegistryPermissionAction
+{
+}
+impl IntoNative<CreateNamespaceRegistryPermissionAction>
+    for protos::sabre::CreateNamespaceRegistryPermissionAction
+{
+}
+
+/// Builder used to create CreateNamespaceRegistryPermissionAction
+#[derive(Default, Clone)]
+pub struct CreateNamespaceRegistryPermissionActionBuilder {
+    namespace: Option<String>,
+    contract_name: Option<String>,
+    read: Option<bool>,
+    write: Option<bool>,
+}
+
+impl CreateNamespaceRegistryPermissionActionBuilder {
+    pub fn new() -> Self {
+        CreateNamespaceRegistryPermissionActionBuilder::default()
+    }
+
+    pub fn with_namespace(
+        mut self,
+        namespace: String,
+    ) -> CreateNamespaceRegistryPermissionActionBuilder {
+        self.namespace = Some(namespace);
+        self
+    }
+
+    pub fn with_contract_name(
+        mut self,
+        contract_name: String,
+    ) -> CreateNamespaceRegistryPermissionActionBuilder {
+        self.contract_name = Some(contract_name);
+        self
+    }
+
+    pub fn with_read(mut self, read: bool) -> CreateNamespaceRegistryPermissionActionBuilder {
+        self.read = Some(read);
+        self
+    }
+
+    pub fn with_write(mut self, write: bool) -> CreateNamespaceRegistryPermissionActionBuilder {
+        self.write = Some(write);
+        self
+    }
+
+    pub fn build(self) -> Result<CreateNamespaceRegistryPermissionAction, ActionBuildError> {
+        let namespace = self.namespace.ok_or_else(|| {
+            ActionBuildError::MissingField("'namespace' field is required".to_string())
+        })?;
+
+        let contract_name = self.contract_name.ok_or_else(|| {
+            ActionBuildError::MissingField("'contract_name' field is required".to_string())
+        })?;
+
+        let read = self.read.unwrap_or_default();
+        let write = self.write.unwrap_or_default();
+
+        Ok(CreateNamespaceRegistryPermissionAction {
+            namespace,
+            contract_name,
+            read,
+            write,
+        })
+    }
+
+    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
+        self.build()
+            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
+    }
+}
+
 /// Native implementation for SabrePayload
 #[derive(Debug, Clone, PartialEq)]
 pub struct SabrePayload {
@@ -294,9 +788,27 @@ impl FromNative<SabrePayload> for protos::sabre::SabrePayload {
         let mut proto = protos::sabre::SabrePayload::new();
 
         match native.action() {
+            Action::CreateContract(payload) => {
+                proto.set_action(protos::sabre::SabrePayload_Action::CREATE_CONTRACT);
+                proto.set_create_contract(payload.clone().into_proto()?);
+            }
             Action::ExecuteContract(payload) => {
                 proto.set_action(protos::sabre::SabrePayload_Action::EXECUTE_CONTRACT);
                 proto.set_execute_contract(payload.clone().into_proto()?);
+            }
+            Action::CreateContractRegistry(payload) => {
+                proto.set_action(protos::sabre::SabrePayload_Action::CREATE_CONTRACT_REGISTRY);
+                proto.set_create_contract_registry(payload.clone().into_proto()?);
+            }
+            Action::CreateNamespaceRegistry(payload) => {
+                proto.set_action(protos::sabre::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY);
+                proto.set_create_namespace_registry(payload.clone().into_proto()?);
+            }
+            Action::CreateNamespaceRegistryPermission(payload) => {
+                proto.set_action(
+                    protos::sabre::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION,
+                );
+                proto.set_create_namespace_registry_permission(payload.clone().into_proto()?);
             }
         }
 
@@ -403,6 +915,13 @@ impl SabrePayloadBuilder {
         let payload = self.build()?;
 
         let (input_addresses, output_addresses) = match payload.action() {
+            Action::CreateContract(CreateContractAction { name, version, .. }) => {
+                let addresses = vec![
+                    compute_contract_registry_address(&name)?,
+                    compute_contract_address(&name, &version)?,
+                ];
+                (addresses.clone(), addresses)
+            }
             Action::ExecuteContract(ExecuteContractAction {
                 name,
                 version,
@@ -446,6 +965,25 @@ impl SabrePayloadBuilder {
                 }
 
                 (input_addresses, output_addresses)
+            }
+            Action::CreateContractRegistry(CreateContractRegistryAction { name, .. }) => {
+                let addresses = vec![
+                    compute_contract_registry_address(&name)?,
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
+                ];
+                (addresses.clone(), addresses)
+            }
+            Action::CreateNamespaceRegistry(CreateNamespaceRegistryAction {
+                namespace, ..
+            })
+            | Action::CreateNamespaceRegistryPermission(
+                CreateNamespaceRegistryPermissionAction { namespace, .. },
+            ) => {
+                let addresses = vec![
+                    compute_namespace_registry_address(&namespace)?,
+                    ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
+                ];
+                (addresses.clone(), addresses)
             }
         };
 

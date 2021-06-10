@@ -3,6 +3,7 @@ members = [
   "libtransact",
   "examples/simple_xo",
   "examples/address_generator",
+  "examples/sabre_command_executor",
   "cli"
   ]
 
