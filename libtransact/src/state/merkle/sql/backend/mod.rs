@@ -15,8 +15,22 @@
  * -----------------------------------------------------------------------------
  */
 
-pub mod backend;
-mod migration;
-mod models;
-mod operations;
-mod schema;
+#[cfg(feature = "sqlite")]
+mod sqlite;
+
+use crate::error::InternalError;
+
+#[cfg(feature = "sqlite")]
+pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
+
+pub trait Connection {
+    type ConnectionType: diesel::Connection;
+
+    fn as_inner(&self) -> &Self::ConnectionType;
+}
+
+pub trait Backend: Sync + Send {
+    type Connection: Connection;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError>;
+}
