@@ -16,6 +16,8 @@ mod btree;
 mod lmdb;
 #[cfg(feature = "state-merkle-redis-db-tests")]
 mod redisdb;
+#[cfg(all(feature = "state-merkle-sql", feature = "sqlite"))]
+mod sql_sqlite;
 #[cfg(feature = "sqlite-db")]
 mod sqlitedb;
 
@@ -893,6 +895,64 @@ fn test_same_results(left: Box<dyn Database>, right: Box<dyn Database>) {
         prune_result_left.sort_unstable(),
         prune_result_right.sort_unstable()
     );
+}
+
+/// Check that two merkle state implementations will produce the same results.
+///
+/// 1. Perform set operations and verify the same result root
+/// 2. Perform a delete operation and verify the same result root
+#[cfg(all(feature = "state-merkle-sql", feature = "sqlite"))]
+fn test_produce_same_state<L, R>(
+    left_initial_state_root: String,
+    left: L,
+    right_initial_state_root: String,
+    right: R,
+) where
+    L: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+    R: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>,
+{
+    assert_eq!(
+        left_initial_state_root, right_initial_state_root,
+        "State not starting from the same initial state root hash"
+    );
+    let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "0001".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0a01".to_string(),
+        value: "0002".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "abff00".to_string(),
+        value: "0003".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "abff01".to_string(),
+        value: "0004".as_bytes().to_vec(),
+    });
+
+    let merkle_left_root = left.commit(&left_initial_state_root, &updates).unwrap();
+    let merkle_right_root = right.commit(&right_initial_state_root, &updates).unwrap();
+
+    assert_eq!(merkle_left_root, merkle_right_root);
+
+    let state_change_delete = vec![StateChange::Delete {
+        key: "abff01".to_string(),
+    }];
+
+    let merkle_left_root_del = left
+        .commit(&merkle_left_root, &state_change_delete)
+        .unwrap();
+    let merkle_right_root_del = right
+        .commit(&merkle_right_root, &state_change_delete)
+        .unwrap();
+
+    assert_eq!(merkle_left_root_del, merkle_right_root_del);
 }
 
 fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_value: &str) {

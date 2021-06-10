@@ -29,9 +29,7 @@ use super::last_insert_rowid;
 use super::MerkleRadixOperations;
 
 pub enum ChangedLeaf<'data> {
-    #[allow(dead_code)]
     AddedOrUpdated { address: &'data str, leaf_id: i64 },
-    #[allow(dead_code)]
     Deleted(&'data str),
 }
 
