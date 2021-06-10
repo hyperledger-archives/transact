@@ -40,7 +40,6 @@ impl<'a, C> MerkleRadixOperations<'a, C>
 where
     C: diesel::Connection,
 {
-    #[allow(dead_code)]
     pub fn new(conn: &'a C) -> Self {
         MerkleRadixOperations { conn }
     }
