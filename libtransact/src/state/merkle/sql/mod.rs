@@ -16,7 +16,7 @@
  */
 
 pub mod backend;
-mod migration;
+pub mod migration;
 mod models;
 mod operations;
 mod schema;

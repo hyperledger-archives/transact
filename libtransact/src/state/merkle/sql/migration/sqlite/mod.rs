@@ -20,6 +20,9 @@
 embed_migrations!("./src/state/merkle/sql/migration/sqlite/migrations");
 
 use crate::error::InternalError;
+use crate::state::merkle::sql::backend::{Backend, Connection, SqliteBackend};
+
+use super::MigrationManager;
 
 /// Run database migrations to create tables defined by biome
 ///
@@ -33,4 +36,10 @@ pub fn run_migrations(conn: &diesel::sqlite::SqliteConnection) -> Result<(), Int
     info!("Successfully applied SQLite migrations");
 
     Ok(())
+}
+
+impl MigrationManager for SqliteBackend {
+    fn run_migrations(&self) -> Result<(), InternalError> {
+        run_migrations(self.connection()?.as_inner())
+    }
 }
