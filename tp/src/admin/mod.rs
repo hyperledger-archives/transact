@@ -28,7 +28,7 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use crate::state::SabreState;
 
 /// Used to verify if a signer is an admin
-pub trait AdminPermission {
+pub trait AdminPermission: Send {
     /// Returns if the signer is an admin
     ///
     /// # Arguments
