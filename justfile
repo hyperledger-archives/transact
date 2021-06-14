@@ -50,14 +50,6 @@ build:
     $cmd
     echo "\n\033[92mBuild Success\033[0m\n"
 
-clean:
-    cargo clean
-
-copy-env:
-    #!/usr/bin/env sh
-    set -e
-    find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
-
 ci-debs:
     #!/usr/bin/env sh
     set -e
@@ -98,6 +90,14 @@ ci-test:
         cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
           --features experimental,state-merkle-redis-db-tests && \
         (cd examples/sabre_smallbank && cargo test)"
+
+clean:
+    cargo clean
+
+copy-env:
+    #!/usr/bin/env sh
+    set -e
+    find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
 
 doc:
     #!/usr/bin/env sh
