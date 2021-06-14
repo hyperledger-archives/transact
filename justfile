@@ -50,6 +50,12 @@ build:
     $cmd
     echo "\n\033[92mBuild Success\033[0m\n"
 
+ci:
+    just ci-lint
+    just ci-test
+    just ci-docs
+    just ci-debs
+
 ci-debs:
     #!/usr/bin/env sh
     set -e
