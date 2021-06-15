@@ -118,6 +118,9 @@
 #[cfg(feature = "state-merkle-sql")]
 #[macro_use]
 extern crate diesel;
+#[cfg(feature = "diesel_migrations")]
+#[macro_use]
+extern crate diesel_migrations;
 
 #[cfg(feature = "context")]
 pub mod context;

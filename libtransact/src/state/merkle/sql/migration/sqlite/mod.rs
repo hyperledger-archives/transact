@@ -15,54 +15,22 @@
  * -----------------------------------------------------------------------------
  */
 
-use diesel::prelude::*;
+//! Defines methods and utilities to interact with biome tables in a SQLite database.
+
+embed_migrations!("./src/state/merkle/sql/migration/sqlite/migrations");
 
 use crate::error::InternalError;
 
-const CREATE_LEAF_TABLE: &str = r#"
-    CREATE TABLE IF NOT EXISTS merkle_radix_leaf (
-        id INTEGER PRIMARY KEY,
-        address STRING NOT NULL,
-        data BLOB
-    )
-    "#;
+/// Run database migrations to create tables defined by biome
+///
+/// # Arguments
+///
+/// * `conn` - Connection to SQLite database
+///
+pub fn run_migrations(conn: &diesel::sqlite::SqliteConnection) -> Result<(), InternalError> {
+    embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-const CREATE_TREE_TABLE: &str = r#"
-    CREATE TABLE IF NOT EXISTS merkle_radix_tree_node (
-        hash STRING PRIMARY KEY,
-        leaf_id INTEGER,
-        children TEXT,
-        FOREIGN KEY(leaf_id) REFERENCES merkle_radix_leaf(id)
-    )
-    "#;
-const CREATE_STATE_ROOT_TABLE: &str = r#"
-    CREATE TABLE IF NOT EXISTS merkle_radix_state_root (
-        id INTEGER PRIMARY KEY,
-        state_root STRING NOT NULL,
-        parent_state_root STRING NOT NULL,
-        FOREIGN KEY(state_root) REFERENCES merkle_radix_tree_node (hash)
-    )
-    "#;
+    info!("Successfully applied SQLite migrations");
 
-const CREATE_STATE_ROOT_LEAF_INDEX_TABLE: &str = r#"
-    CREATE TABLE IF NOT EXISTS merkle_radix_state_root_leaf_index (
-        id INTEGER PRIMARY KEY,
-        leaf_id INTEGER NOT NULL,
-        from_state_root_id INTEGER NOT NULL,
-        to_state_root_id INTEGER,
-        FOREIGN KEY(from_state_root_id) REFERENCES merkle_radix_state_root(id),
-        FOREIGN KEY(leaf_id) REFERENCES merkle_radix_leaf (id)
-    )
-    "#;
-
-pub fn run_migrations(conn: &SqliteConnection) -> Result<(), InternalError> {
-    conn.transaction::<_, diesel::result::Error, _>(|| {
-        conn.execute(CREATE_LEAF_TABLE)?;
-        conn.execute(CREATE_TREE_TABLE)?;
-        conn.execute(CREATE_STATE_ROOT_TABLE)?;
-        conn.execute(CREATE_STATE_ROOT_LEAF_INDEX_TABLE)?;
-
-        Ok(())
-    })
-    .map_err(|err| InternalError::from_source(Box::new(err)))
+    Ok(())
 }
