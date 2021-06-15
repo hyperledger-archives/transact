@@ -32,6 +32,7 @@ bzip2 = { version = "0.3", optional = true }
 cbor-codec = { version = "0.7", optional = true }
 cylinder = "0.2"
 diesel = { version = "~1.4.7", features = ["r2d2"], optional = true }
+diesel_migrations = { version = "1.4", optional = true }
 glob = { version = "0.3", optional = true }
 hex = "0.3"
 libc = ">=0.2.35"
@@ -117,7 +118,7 @@ sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec"]
 state-merkle-leaf-reader = []
-state-merkle-sql = ["diesel"]
+state-merkle-sql = ["diesel", "diesel_migrations"]
 # This feature must be enabled to run the merkle tests using a redis db.  It is
 # not enabled by default, due to its requirement of an external redis instance.
 state-merkle-redis-db-tests = ["redis-db", "state-merkle"]
