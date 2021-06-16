@@ -40,7 +40,7 @@ simple_logger = "1"
 clap = "2"
 protobuf = "2.19"
 rust-crypto = "0.2.36"
-wasmi = "0.4"
+wasmi = "0.9"
 
 [build-dependencies]
 protoc-rust = "2"
