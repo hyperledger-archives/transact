@@ -105,7 +105,7 @@ impl ChangeLogEntry {
     }
 
     pub fn take_successors(&mut self) -> Vec<Successor> {
-        ::std::mem::replace(&mut self.successors, Vec::new())
+        std::mem::take(&mut self.successors)
     }
 }
 
