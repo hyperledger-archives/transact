@@ -117,11 +117,10 @@ impl ContextManager {
             }
             if !context.contains(&key) && !contexts.is_empty() {
                 while let Some(current_context) = contexts.pop_front() {
+                    context = current_context;
                     if current_context.contains(&key) {
-                        context = current_context;
                         break;
                     } else {
-                        context = current_context;
                         for context_id in context.base_contexts().iter() {
                             contexts.push_back(self.get_context(context_id)?);
                         }
