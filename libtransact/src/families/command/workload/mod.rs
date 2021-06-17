@@ -145,7 +145,7 @@ pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> Tr
                     _ => None,
                 })
                 .filter(Option::is_some)
-                .map(Option::unwrap)
+                .flatten()
                 .collect(),
         )
         .with_outputs(
@@ -170,7 +170,7 @@ pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> Tr
                     _ => None,
                 })
                 .filter(Option::is_some)
-                .map(Option::unwrap)
+                .flatten()
                 .collect(),
         )
         .with_payload_hash_method(HashMethod::Sha512)
