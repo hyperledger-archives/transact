@@ -7,3 +7,18 @@ edition = "2018"
 [dev-dependencies]
 subprocess = "0.1"
 serde_json = "1.0"
+
+[features]
+default = []
+
+stable = [
+    # The stable feature extends default:
+    "default",
+    # The following features are stable:
+]
+
+experimental = [
+    # The experimental feature extends stable:
+    "stable",
+    # The following features are experimental:
+]
