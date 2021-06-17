@@ -74,7 +74,7 @@ impl std::str::FromStr for Rate {
                 Ok(Self { numeric, unit })
             } else {
                 Err(RateParseError {
-                    msg: "rate must be possitive".to_string(),
+                    msg: "rate must be positive".to_string(),
                 })
             }
         } else {
@@ -134,7 +134,7 @@ impl std::str::FromStr for TimeUnit {
 }
 
 impl TimeUnit {
-    fn to_sec(&self) -> u64 {
+    fn to_sec(self) -> u64 {
         use TimeUnit::*;
         match self {
             Hour => 60 * 60,

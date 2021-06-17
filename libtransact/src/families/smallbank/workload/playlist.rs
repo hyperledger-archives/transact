@@ -252,8 +252,8 @@ impl Iterator for SmallbankGeneratingIter {
     type Item = SmallbankTransactionPayload;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut payload = SmallbankTransactionPayload::new();
         if self.current_account < self.num_accounts {
-            let mut payload = SmallbankTransactionPayload::new();
             payload.set_payload_type(SBPayloadType::CREATE_ACCOUNT);
 
             let mut create_account =
@@ -273,11 +273,7 @@ impl Iterator for SmallbankGeneratingIter {
             payload.set_create_account(create_account);
 
             self.current_account += 1;
-
-            Some(payload)
         } else {
-            let mut payload = SmallbankTransactionPayload::new();
-
             let payload_type = match self.rng.gen_range(2, 7) {
                 2 => SBPayloadType::DEPOSIT_CHECKING,
                 3 => SBPayloadType::WRITE_CHECK,
@@ -332,9 +328,8 @@ impl Iterator for SmallbankGeneratingIter {
                 }
                 _ => panic!("Should not have generated outside of [2, 7)"),
             };
-
-            Some(payload)
         }
+        Some(payload)
     }
 }
 
