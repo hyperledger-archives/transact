@@ -1,5 +1,9 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.8.0
+
+* Unreleased version
+
 ## Changes in Sawtooth Sabre 0.7.1
 
 * Update the allowed family version to include 0.5, 0.6 and update the current
