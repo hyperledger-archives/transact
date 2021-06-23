@@ -70,6 +70,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
                             })?,
+                            tree_id: 1,
                             address: &insertable_node.address,
                             data,
                         })
@@ -94,6 +95,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                 .map::<Result<MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
                     Ok(MerkleRadixTreeNode {
                         hash: insertable_node.hash.clone(),
+                        tree_id: 1,
                         leaf_id: leaf_ids.get(insertable_node.address.as_str()).copied(),
                         children: node_to_children(&insertable_node.node)?,
                     })
@@ -182,6 +184,7 @@ mod tests {
             nodes[0],
             MerkleRadixTreeNode {
                 hash: "initial-state-root".into(),
+                tree_id: 1,
                 leaf_id: None,
                 children: Children(vec![None; 256]),
             }
@@ -258,21 +261,25 @@ mod tests {
             vec![
                 MerkleRadixTreeNode {
                     hash: "state-root".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: single_child(10, "first-node-hash"),
                 },
                 MerkleRadixTreeNode {
                     hash: "first-node-hash".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: single_child(1, "second-node-hash"),
                 },
                 MerkleRadixTreeNode {
                     hash: "second-node-hash".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: single_child(255, "leaf-node-hash"),
                 },
                 MerkleRadixTreeNode {
                     hash: "leaf-node-hash".into(),
+                    tree_id: 1,
                     leaf_id: Some(leaves[0].id),
                     children: Children(vec![None; 256])
                 },

@@ -63,6 +63,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError> {
+        let tree_id: i64 = 1;
         let address_bytes =
             hex::decode(address).map_err(|e| InternalError::from_source(Box::new(e)))?;
         let path = sql_query(
@@ -70,14 +71,14 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
             WITH RECURSIVE tree_path AS
             (
                 -- This is the initial node
-                SELECT hash, leaf_id, children, 0 as depth
+                SELECT hash, tree_id, leaf_id, children, 0 as depth
                 FROM merkle_radix_tree_node
-                WHERE hash = ?
+                WHERE hash = ? AND tree_id = ?
 
                 UNION ALL
 
                 -- Recurse through the tree
-                SELECT c.hash, c.leaf_id, c.children, p.depth + 1
+                SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p
                 WHERE c.hash = json_extract(
                   p.children,
@@ -86,13 +87,16 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
             )
             SELECT t.hash, t.leaf_id, t.children, l.data FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
+            WHERE t.tree_id = ?
             "#,
         )
         .bind::<Text, _>(state_root_hash)
+        .bind::<BigInt, _>(tree_id)
         .bind::<Text, _>(
             serde_json::to_string(&address_bytes)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?,
         )
+        .bind::<BigInt, _>(tree_id)
         .load::<ExtendedMerkleRadixTreeNode>(self.conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
@@ -167,6 +171,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(NewMerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "000000",
                 data: b"hello",
             })
@@ -178,21 +183,25 @@ mod sqlite_tests {
             .values(vec![
                 MerkleRadixTreeNode {
                     hash: "000000-hash".into(),
+                    tree_id: 1,
                     leaf_id: Some(inserted_id),
                     children: Children(vec![]),
                 },
                 MerkleRadixTreeNode {
                     hash: "0000-hash".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: Children(vec![Some("000000-hash".to_string())]),
                 },
                 MerkleRadixTreeNode {
                     hash: "00-hash".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: Children(vec![Some("0000-hash".to_string())]),
                 },
                 MerkleRadixTreeNode {
                     hash: "root-hash".into(),
+                    tree_id: 1,
                     leaf_id: None,
                     children: Children(vec![Some("00-hash".to_string())]),
                 },

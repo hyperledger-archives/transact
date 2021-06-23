@@ -65,6 +65,7 @@ mod tests {
         insert_into(merkle_radix_tree_node::table)
             .values(MerkleRadixTreeNode {
                 hash: "initial-state-root".into(),
+                tree_id: 1,
                 leaf_id: None,
                 children: Children(vec![]),
             })
