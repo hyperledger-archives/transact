@@ -93,8 +93,7 @@ impl BatchWorkload for XoBatchWorkload {
 }
 
 enum Action {
-    #[allow(clippy::upper_case_acronyms)]
-    CREATE,
+    Create,
 }
 
 struct Payload {
@@ -121,13 +120,13 @@ impl Payload {
     pub fn new_as_create(name: &str) -> Self {
         Payload {
             name: String::from(name),
-            action: Action::CREATE,
+            action: Action::Create,
         }
     }
 
     pub fn bytes(&self) -> Vec<u8> {
         match self.action {
-            Action::CREATE => format!("create,{},", self.name),
+            Action::Create => format!("create,{},", self.name),
         }
         .into_bytes()
     }
