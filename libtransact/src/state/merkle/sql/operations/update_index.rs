@@ -59,6 +59,7 @@ impl<'a> MerkleRadixUpdateIndexOperation for MerkleRadixOperations<'a, SqliteCon
         parent_state_root: &str,
         changed_addresses: Vec<ChangedLeaf>,
     ) -> Result<(), InternalError> {
+        let tree_id: i64 = 1;
         self.conn
             .transaction::<_, diesel::result::Error, _>(|| {
                 let fork = merkle_radix_state_root::table
@@ -89,6 +90,7 @@ impl<'a> MerkleRadixUpdateIndexOperation for MerkleRadixOperations<'a, SqliteCon
 
                 insert_into(merkle_radix_state_root::table)
                     .values(NewMerkleRadixStateRoot {
+                        tree_id,
                         state_root,
                         parent_state_root,
                     })
@@ -124,6 +126,7 @@ impl<'a> MerkleRadixUpdateIndexOperation for MerkleRadixOperations<'a, SqliteCon
                             .filter(|change| matches!(change, ChangedLeaf::AddedOrUpdated { .. }))
                             .map(|change| match change {
                                 ChangedLeaf::AddedOrUpdated { leaf_id, .. } => (
+                                    merkle_radix_state_root_leaf_index::tree_id.eq(tree_id),
                                     merkle_radix_state_root_leaf_index::leaf_id.eq(leaf_id),
                                     merkle_radix_state_root_leaf_index::from_state_root_id
                                         .eq(state_root_id),
@@ -166,6 +169,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -215,6 +219,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -237,6 +242,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 2,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"goodbye".to_vec(),
             })
@@ -297,6 +303,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -319,6 +326,7 @@ mod sqlite_tests {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 2,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"goodbye".to_vec(),
             })

@@ -123,6 +123,7 @@ mod test {
         // insert the initial root:
         insert_into(merkle_radix_state_root::table)
             .values((
+                merkle_radix_state_root::tree_id.eq(1),
                 merkle_radix_state_root::state_root.eq("initial-state-root"),
                 merkle_radix_state_root::parent_state_root.eq(""),
             ))
@@ -132,6 +133,7 @@ mod test {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -151,6 +153,7 @@ mod test {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 2,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"goodbye".to_vec(),
             })
@@ -197,6 +200,7 @@ mod test {
         // insert the initial root:
         insert_into(merkle_radix_state_root::table)
             .values((
+                merkle_radix_state_root::tree_id.eq(1),
                 merkle_radix_state_root::state_root.eq("initial-state-root"),
                 merkle_radix_state_root::parent_state_root.eq(""),
             ))
@@ -206,6 +210,7 @@ mod test {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -258,6 +263,7 @@ mod test {
         // insert the initial root:
         insert_into(merkle_radix_state_root::table)
             .values((
+                merkle_radix_state_root::tree_id.eq(1),
                 merkle_radix_state_root::state_root.eq("initial-state-root"),
                 merkle_radix_state_root::parent_state_root.eq(""),
             ))
@@ -267,6 +273,7 @@ mod test {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 1,
+                tree_id: 1,
                 address: "aabbcc".into(),
                 data: b"hello".to_vec(),
             })
@@ -286,6 +293,7 @@ mod test {
         insert_into(merkle_radix_leaf::table)
             .values(MerkleRadixLeaf {
                 id: 2,
+                tree_id: 1,
                 address: "112233".into(),
                 data: b"goodbye".to_vec(),
             })
