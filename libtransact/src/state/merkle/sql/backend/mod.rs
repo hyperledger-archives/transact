@@ -15,32 +15,22 @@
  * -----------------------------------------------------------------------------
  */
 
-pub(super) mod get_leaves;
-pub(super) mod get_path;
-pub(super) mod has_root;
-pub(super) mod insert_nodes;
-pub(super) mod list_leaves;
-pub(super) mod update_index;
+#[cfg(feature = "sqlite")]
+mod sqlite;
+
+use crate::error::InternalError;
 
 #[cfg(feature = "sqlite")]
-no_arg_sql_function!(
-    last_insert_rowid,
-    diesel::sql_types::BigInt,
-    "Represents the SQLite last_insert_rowid() function"
-);
+pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
 
-pub struct MerkleRadixOperations<'a, C>
-where
-    C: diesel::Connection,
-{
-    conn: &'a C,
+pub trait Connection {
+    type ConnectionType: diesel::Connection;
+
+    fn as_inner(&self) -> &Self::ConnectionType;
 }
 
-impl<'a, C> MerkleRadixOperations<'a, C>
-where
-    C: diesel::Connection,
-{
-    pub fn new(conn: &'a C) -> Self {
-        MerkleRadixOperations { conn }
-    }
+pub trait Backend: Sync + Send {
+    type Connection: Connection;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError>;
 }
