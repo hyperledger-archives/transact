@@ -167,13 +167,15 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(state_id, subtree)?;
+        let leaves =
+            MerkleRadixOperations::new(conn.as_inner()).list_leaves(1, state_id, subtree)?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }
 }
 
 struct MerkleRadixOverlay<'s, O> {
+    tree_id: i64,
     state_root_hash: &'s str,
     inner: O,
 }
@@ -187,6 +189,7 @@ where
 {
     fn new(state_root_hash: &'s str, inner: O) -> Self {
         Self {
+            tree_id: 1,
             state_root_hash,
             inner,
         }
@@ -199,6 +202,7 @@ where
         deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         self.inner.write_changes(
+            self.tree_id,
             new_state_root,
             self.state_root_hash,
             node_changes,
@@ -209,13 +213,13 @@ where
     }
 
     fn has_root(&self) -> Result<bool, InternalError> {
-        self.inner.has_root(self.state_root_hash)
+        self.inner.has_root(self.tree_id, self.state_root_hash)
     }
 
     fn get_entries(&self, keys: &[String]) -> Result<HashMap<String, Vec<u8>>, InternalError> {
         let keys = keys.iter().map(|k| &**k).collect::<Vec<_>>();
         self.inner
-            .get_entries(self.state_root_hash, keys)
+            .get_entries(self.tree_id, self.state_root_hash, keys)
             .map(|result| result.into_iter().collect::<HashMap<_, _>>())
     }
 
@@ -237,7 +241,7 @@ where
             match state_change {
                 StateChange::Set { key, value } => {
                     let mut set_path_map = self
-                        .get_path(self.state_root_hash, &key)
+                        .get_path(&key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     {
                         let node = set_path_map
@@ -252,7 +256,7 @@ where
                 }
                 StateChange::Delete { key } => {
                     let del_path_map = self
-                        .get_path(self.state_root_hash, &key)
+                        .get_path(&key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     path_map.extend(del_path_map);
                     delete_items.push(key);
@@ -336,11 +340,7 @@ where
         Ok((key_hash_hex, batch))
     }
 
-    fn get_path(
-        &self,
-        state_root_hash: &str,
-        address: &str,
-    ) -> Result<HashMap<String, Node>, InternalError> {
+    fn get_path(&self, address: &str) -> Result<HashMap<String, Node>, InternalError> {
         // Build up the address along the path, starting with the empty address for the root, and
         // finishing with the complete address.
         let addresses_along_path: Vec<String> = (0..address.len())
@@ -351,7 +351,7 @@ where
 
         let node_path_iter = self
             .inner
-            .get_path(state_root_hash, address)?
+            .get_path(self.tree_id, &self.state_root_hash, address)?
             .into_iter()
             .map(|(_, node)| node)
             // include empty nodes after the queried path, to cover cases where the branch doesn't
@@ -366,16 +366,18 @@ where
 }
 
 trait OverlayReader {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError>;
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError>;
 
     fn get_entries(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
@@ -384,6 +386,7 @@ trait OverlayReader {
 trait OverlayWriter {
     fn write_changes(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         parent_state_root_hash: &str,
         changes: Vec<(String, Node, String)>,
@@ -403,33 +406,35 @@ impl<'b, B: Backend> SqlOverlay<'b, B> {
 
 #[cfg(feature = "sqlite")]
 impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError> {
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.has_root(state_root_hash)
+        operations.has_root(tree_id, state_root_hash)
     }
 
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_path(state_root_hash, address)
+        operations.get_path(tree_id, state_root_hash, address)
     }
 
     fn get_entries(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_leaves(state_root_hash, keys)
+        operations.get_leaves(tree_id, state_root_hash, keys)
     }
 }
 
@@ -437,6 +442,7 @@ impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
 impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
     fn write_changes(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         parent_state_root_hash: &str,
         changes: Vec<(String, Node, String)>,
@@ -456,7 +462,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
             )
             .collect::<Vec<_>>();
 
-        let indexable_info = operations.insert_nodes(&insertable_changes)?;
+        let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
 
         let changes = indexable_info
             .iter()
@@ -473,7 +479,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
             )
             .collect();
 
-        operations.update_index(state_root_hash, parent_state_root_hash, changes)?;
+        operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
 
         Ok(())
     }

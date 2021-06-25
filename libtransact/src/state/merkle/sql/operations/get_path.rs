@@ -51,6 +51,7 @@ struct ExtendedMerkleRadixTreeNode {
 pub trait MerkleRadixGetPathOperation {
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError>;
@@ -60,10 +61,10 @@ pub trait MerkleRadixGetPathOperation {
 impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError> {
-        let tree_id: i64 = 1;
         let address_bytes =
             hex::decode(address).map_err(|e| InternalError::from_source(Box::new(e)))?;
         let path = sql_query(
@@ -152,7 +153,7 @@ mod sqlite_tests {
 
         run_migrations(&conn)?;
 
-        let path = MerkleRadixOperations::new(&conn).get_path("state-root", "aabbcc")?;
+        let path = MerkleRadixOperations::new(&conn).get_path(1, "state-root", "aabbcc")?;
 
         assert!(path.is_empty());
 
@@ -208,7 +209,7 @@ mod sqlite_tests {
             ])
             .execute(&conn)?;
 
-        let path = MerkleRadixOperations::new(&conn).get_path("root-hash", "000000")?;
+        let path = MerkleRadixOperations::new(&conn).get_path(1, "root-hash", "000000")?;
 
         assert_eq!(
             path,
@@ -245,7 +246,7 @@ mod sqlite_tests {
         );
 
         // verify that a path that doesn't exist returns just the intermediate nodes.
-        let path = MerkleRadixOperations::new(&conn).get_path("root-hash", "000001")?;
+        let path = MerkleRadixOperations::new(&conn).get_path(1, "root-hash", "000001")?;
 
         assert_eq!(
             path,
@@ -275,7 +276,7 @@ mod sqlite_tests {
         );
 
         // verify that a path that is completely non-existent only returns the root node.
-        let path = MerkleRadixOperations::new(&conn).get_path("root-hash", "aabbcc")?;
+        let path = MerkleRadixOperations::new(&conn).get_path(1, "root-hash", "aabbcc")?;
 
         assert_eq!(
             path,
