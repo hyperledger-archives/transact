@@ -42,6 +42,7 @@ pub struct IndexableLeafInfo {
 pub trait MerkleRadixInsertNodesOperation {
     fn insert_nodes(
         &self,
+        tree_id: i64,
         nodes: &[InsertableNode],
     ) -> Result<Vec<IndexableLeafInfo>, InternalError>;
 }
@@ -50,6 +51,7 @@ pub trait MerkleRadixInsertNodesOperation {
 impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn insert_nodes(
         &self,
+        tree_id: i64,
         nodes: &[InsertableNode],
     ) -> Result<Vec<IndexableLeafInfo>, InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
@@ -70,7 +72,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
                             })?,
-                            tree_id: 1,
+                            tree_id,
                             address: &insertable_node.address,
                             data,
                         })
@@ -95,7 +97,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                 .map::<Result<MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
                     Ok(MerkleRadixTreeNode {
                         hash: insertable_node.hash.clone(),
-                        tree_id: 1,
+                        tree_id,
                         leaf_id: leaf_ids.get(insertable_node.address.as_str()).copied(),
                         children: node_to_children(&insertable_node.node)?,
                     })
@@ -156,14 +158,17 @@ mod tests {
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        let indexable_info = operations.insert_nodes(&vec![InsertableNode {
-            hash: "initial-state-root".into(),
-            node: Node {
-                value: None,
-                children: Default::default(),
-            },
-            address: String::new(),
-        }])?;
+        let indexable_info = operations.insert_nodes(
+            1,
+            &vec![InsertableNode {
+                hash: "initial-state-root".into(),
+                node: Node {
+                    value: None,
+                    children: Default::default(),
+                },
+                address: String::new(),
+            }],
+        )?;
 
         assert!(
             indexable_info.is_empty(),
@@ -239,7 +244,7 @@ mod tests {
             },
         ];
 
-        let indexable_info = operations.insert_nodes(&nodes)?;
+        let indexable_info = operations.insert_nodes(1, &nodes)?;
 
         let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
         assert_eq!(leaves.len(), 1);

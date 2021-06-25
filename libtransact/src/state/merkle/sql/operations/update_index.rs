@@ -45,6 +45,7 @@ impl<'data> ChangedLeaf<'data> {
 pub trait MerkleRadixUpdateIndexOperation {
     fn update_index(
         &self,
+        tree_id: i64,
         state_root: &str,
         parent_state_root: &str,
         changed_addresses: Vec<ChangedLeaf>,
@@ -55,11 +56,11 @@ pub trait MerkleRadixUpdateIndexOperation {
 impl<'a> MerkleRadixUpdateIndexOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn update_index(
         &self,
+        tree_id: i64,
         state_root: &str,
         parent_state_root: &str,
         changed_addresses: Vec<ChangedLeaf>,
     ) -> Result<(), InternalError> {
-        let tree_id: i64 = 1;
         self.conn
             .transaction::<_, diesel::result::Error, _>(|| {
                 let fork = merkle_radix_state_root::table
@@ -176,6 +177,7 @@ mod sqlite_tests {
             .execute(&conn)?;
 
         MerkleRadixOperations::new(&conn).update_index(
+            1,
             "new-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -227,6 +229,7 @@ mod sqlite_tests {
 
         // update the index
         MerkleRadixOperations::new(&conn).update_index(
+            1,
             "first-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -249,6 +252,7 @@ mod sqlite_tests {
             .execute(&conn)?;
 
         MerkleRadixOperations::new(&conn).update_index(
+            1,
             "second-state-root",
             "first-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -311,6 +315,7 @@ mod sqlite_tests {
 
         // update the index
         MerkleRadixOperations::new(&conn).update_index(
+            1,
             "first-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -335,6 +340,7 @@ mod sqlite_tests {
         // update the index as if it's transition from the initial state root again (i.e.
         // a new forked tree)
         MerkleRadixOperations::new(&conn).update_index(
+            1,
             "second-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {

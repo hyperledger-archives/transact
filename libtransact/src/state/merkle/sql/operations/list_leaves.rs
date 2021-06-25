@@ -28,6 +28,7 @@ use super::MerkleRadixOperations;
 pub trait MerkleRadixListLeavesOperation {
     fn list_leaves(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         prefix: Option<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
@@ -42,13 +43,18 @@ where
 {
     fn list_leaves(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         prefix: Option<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
         self.conn
             .transaction::<_, diesel::result::Error, _>(|| {
                 let state_root_id = merkle_radix_state_root::table
-                    .filter(merkle_radix_state_root::state_root.eq(state_root_hash))
+                    .filter(
+                        merkle_radix_state_root::state_root
+                            .eq(state_root_hash)
+                            .and(merkle_radix_state_root::tree_id.eq(tree_id)),
+                    )
                     .select(merkle_radix_state_root::id)
                     .get_result::<i64>(self.conn)?;
 
@@ -57,6 +63,7 @@ where
                     .filter(
                         merkle_radix_state_root_leaf_index::from_state_root_id
                             .le(state_root_id)
+                            .and(merkle_radix_state_root_leaf_index::tree_id.eq(tree_id))
                             .and(
                                 merkle_radix_state_root_leaf_index::to_state_root_id
                                     .is_null()
@@ -139,6 +146,7 @@ mod test {
 
         // update the index
         operations.update_index(
+            1,
             "first-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -158,6 +166,7 @@ mod test {
             .execute(&conn)?;
 
         operations.update_index(
+            1,
             "second-state-root",
             "first-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -166,15 +175,15 @@ mod test {
             }],
         )?;
 
-        let leaves = operations.list_leaves("initial-state-root", None)?;
+        let leaves = operations.list_leaves(1, "initial-state-root", None)?;
         assert!(leaves.is_empty());
 
-        let leaves = operations.list_leaves("first-state-root", None)?;
+        let leaves = operations.list_leaves(1, "first-state-root", None)?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].0, "aabbcc");
         assert_eq!(leaves[0].1, b"hello");
 
-        let leaves = operations.list_leaves("second-state-root", None)?;
+        let leaves = operations.list_leaves(1, "second-state-root", None)?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].0, "aabbcc");
         assert_eq!(leaves[0].1, b"goodbye");
@@ -216,6 +225,7 @@ mod test {
 
         // update the index
         operations.update_index(
+            1,
             "first-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -226,20 +236,21 @@ mod test {
 
         // insert the changed leaf
         operations.update_index(
+            1,
             "second-state-root",
             "first-state-root",
             vec![ChangedLeaf::Deleted("aabbcc")],
         )?;
 
-        let leaves = operations.list_leaves("initial-state-root", None)?;
+        let leaves = operations.list_leaves(1, "initial-state-root", None)?;
         assert!(leaves.is_empty());
 
-        let leaves = operations.list_leaves("first-state-root", None)?;
+        let leaves = operations.list_leaves(1, "first-state-root", None)?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].0, "aabbcc");
         assert_eq!(leaves[0].1, b"hello");
 
-        let leaves = operations.list_leaves("second-state-root", None)?;
+        let leaves = operations.list_leaves(1, "second-state-root", None)?;
         assert!(leaves.is_empty());
 
         Ok(())
@@ -280,6 +291,7 @@ mod test {
 
         // update the index
         operations.update_index(
+            1,
             "first-state-root",
             "initial-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -299,6 +311,7 @@ mod test {
             .execute(&conn)?;
 
         operations.update_index(
+            1,
             "second-state-root",
             "first-state-root",
             vec![ChangedLeaf::AddedOrUpdated {
@@ -307,15 +320,15 @@ mod test {
             }],
         )?;
 
-        let leaves = operations.list_leaves("initial-state-root", None)?;
+        let leaves = operations.list_leaves(1, "initial-state-root", None)?;
         assert!(leaves.is_empty());
 
-        let leaves = operations.list_leaves("first-state-root", None)?;
+        let leaves = operations.list_leaves(1, "first-state-root", None)?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].0, "aabbcc");
         assert_eq!(leaves[0].1, b"hello");
 
-        let leaves = operations.list_leaves("second-state-root", None)?;
+        let leaves = operations.list_leaves(1, "second-state-root", None)?;
         assert_eq!(leaves.len(), 2);
         assert_eq!(leaves[0].0, "112233");
         assert_eq!(leaves[0].1, b"goodbye");
@@ -323,7 +336,7 @@ mod test {
         assert_eq!(leaves[1].1, b"hello");
 
         // Test with a prefix
-        let leaves = operations.list_leaves("second-state-root", Some("aa"))?;
+        let leaves = operations.list_leaves(1, "second-state-root", Some("aa"))?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].0, "aabbcc");
         assert_eq!(leaves[0].1, b"hello");
