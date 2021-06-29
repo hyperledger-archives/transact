@@ -19,7 +19,7 @@ use std::error::Error;
 use transact::state::merkle::sql::{
     backend::{JournalMode, SqliteBackend, SqliteBackendBuilder},
     migration::MigrationManager,
-    SqlMerkleState,
+    SqlMerkleState, SqlMerkleStateBuilder,
 };
 use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
@@ -35,7 +35,15 @@ fn new_sql_merkle_state_and_root(
         .build()?;
     backend.run_migrations()?;
 
-    let state = SqlMerkleState::new(backend);
+    let state = SqlMerkleStateBuilder::new()
+        .with_backend(backend)
+        .with_tree(format!(
+            "test-{}",
+            GLOBAL_THREAD_COUNT.load(Ordering::SeqCst)
+        ))
+        .create_tree_if_necessary()
+        .build()?;
+
     let initial_state_root_hash = state.initial_state_root_hash()?;
 
     Ok((state, initial_state_root_hash))

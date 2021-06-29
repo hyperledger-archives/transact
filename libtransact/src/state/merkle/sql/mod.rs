@@ -130,14 +130,6 @@ pub struct SqlMerkleState<B: Backend + Clone> {
 }
 
 impl<B: Backend + Clone> SqlMerkleState<B> {
-    /// Constructs a new SqlMerkleState with the given backend.
-    pub fn new(backend: B) -> Self {
-        Self {
-            backend,
-            tree_id: 1,
-        }
-    }
-
     /// Returns the initial state root.
     ///
     /// This value is the state root that applies to a empty merkle radix tree.
