@@ -52,12 +52,16 @@ const TOKEN_SIZE: usize = 2;
 #[derive(Clone)]
 pub struct SqlMerkleState<B: Backend + Clone> {
     backend: B,
+    tree_id: i64,
 }
 
 impl<B: Backend + Clone> SqlMerkleState<B> {
     /// Constructs a new SqlMerkleState with the given backend.
     pub fn new(backend: B) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            tree_id: 1,
+        }
     }
 
     /// Returns the initial state root.
@@ -81,7 +85,8 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         let (next_state_id, changes) = overlay
             .generate_updates(state_changes)
@@ -105,7 +110,8 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -125,7 +131,8 @@ impl Read for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         if !overlay
             .has_root()
@@ -167,8 +174,11 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves =
-            MerkleRadixOperations::new(conn.as_inner()).list_leaves(1, state_id, subtree)?;
+        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(
+            self.tree_id,
+            state_id,
+            subtree,
+        )?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }
@@ -187,9 +197,9 @@ impl<'s, O> MerkleRadixOverlay<'s, O>
 where
     O: OverlayReader + OverlayWriter,
 {
-    fn new(state_root_hash: &'s str, inner: O) -> Self {
+    fn new(tree_id: i64, state_root_hash: &'s str, inner: O) -> Self {
         Self {
-            tree_id: 1,
+            tree_id,
             state_root_hash,
             inner,
         }
