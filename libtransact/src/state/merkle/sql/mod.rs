@@ -18,6 +18,7 @@
 //! SQL-backed merkle-radix state implementation.
 
 pub mod backend;
+mod error;
 pub mod migration;
 mod models;
 mod operations;
