@@ -16,6 +16,35 @@
  */
 
 //! SQL-backed merkle-radix state implementation.
+//!
+//! A merkle-radix tree can be applied to a SQL database using the [`SqlMerkleState`] struct.  This
+//! struct uses several specialized tables to represent the tree, with optimizations made depending
+//! on the specific SQL database platform.
+//!
+//! A instance can be constructed using a [`Backend`] instance and a tree name.  The tree name
+//! allows for multiple trees to be stored under the same set of tables.
+//!
+//! For example, an instance using SQLite:
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # use transact::state::merkle::sql::SqlMerkleStateBuilder;
+//! # use transact::state::merkle::sql::migration::MigrationManager;
+//! # use transact::state::merkle::sql::backend::{Backend, SqliteBackendBuilder};
+//! let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+//! # backend.run_migrations()?;
+//!
+//! let merkle_state = SqlMerkleStateBuilder::new()
+//!     .with_backend(backend)
+//!     .with_tree("example")
+//!     .create_tree_if_necessary()
+//!     .build()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The resulting `merkle_state` can then be used via the [`Read`], [`Write`] and
+//! [`MerkleRadixLeafReader`] traits.
 
 pub mod backend;
 mod error;
