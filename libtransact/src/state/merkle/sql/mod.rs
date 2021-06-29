@@ -27,7 +27,7 @@ mod schema;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
-use crate::error::InternalError;
+use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StateReadError, StateWriteError};
 #[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
@@ -36,8 +36,11 @@ use crate::state::{Read, StateChange, Write};
 use super::node::Node;
 
 use backend::{Backend, Connection};
+pub use error::SqlMerkleStateBuildError;
 use operations::get_leaves::MerkleRadixGetLeavesOperation as _;
+use operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
 use operations::get_path::MerkleRadixGetPathOperation as _;
+use operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use operations::has_root::MerkleRadixHasRootOperation as _;
 use operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use operations::list_leaves::MerkleRadixListLeavesOperation as _;
@@ -45,6 +48,76 @@ use operations::update_index::MerkleRadixUpdateIndexOperation as _;
 use operations::MerkleRadixOperations;
 
 const TOKEN_SIZE: usize = 2;
+
+/// Builds a new SqlMerkleState with a specific backend.
+#[derive(Default)]
+pub struct SqlMerkleStateBuilder<B: Backend + Clone> {
+    backend: Option<B>,
+    tree_name: Option<String>,
+    create_tree: bool,
+}
+
+impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
+    /// Constructs a new builder
+    pub fn new() -> Self {
+        Self {
+            backend: None,
+            tree_name: None,
+            create_tree: false,
+        }
+    }
+
+    /// Sets the backend instance to use with the resulting instance
+    pub fn with_backend(mut self, backend: B) -> Self {
+        self.backend = Some(backend);
+        self
+    }
+
+    /// Sets the tree name that the resulting instance will operate on
+    pub fn with_tree<S: Into<String>>(mut self, tree_name: S) -> Self {
+        self.tree_name = Some(tree_name.into());
+        self
+    }
+
+    /// Create the specified tree if it does not exist
+    pub fn create_tree_if_necessary(mut self) -> Self {
+        self.create_tree = true;
+        self
+    }
+}
+
+impl SqlMerkleStateBuilder<backend::SqliteBackend> {
+    /// Construct the final SqlMerkleState instance
+    ///
+    /// # Errors
+    ///
+    /// An error may be returned under the following circumstances:
+    /// * If a Backend has not been provided
+    /// * If a tree name has not been provided
+    /// * If an internal error occurs while trying to create or lookup the tree
+    pub fn build(self) -> Result<SqlMerkleState<backend::SqliteBackend>, SqlMerkleStateBuildError> {
+        let backend = self
+            .backend
+            .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
+
+        let tree_name = self
+            .tree_name
+            .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
+
+        let conn = backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+
+        let tree_id: i64 = if self.create_tree {
+            operations.get_or_create_tree(&tree_name)?
+        } else {
+            operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+                InvalidStateError::with_message("must provide the name of an existing tree".into())
+            })?
+        };
+
+        Ok(SqlMerkleState { backend, tree_id })
+    }
+}
 
 /// SqlMerkleState provides a merkle-radix implementation over a SQL database.
 ///
@@ -526,4 +599,86 @@ fn hash(input: &[u8]) -> Vec<u8> {
     bytes.extend(openssl::sha::sha512(input).iter());
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::state::merkle::sql::backend::SqliteBackendBuilder;
+    use crate::state::merkle::sql::migration::MigrationManager;
+
+    /// This test creates multiple trees in the same backend/db instance and verifies that values
+    /// added to one are not added to the other.
+    #[test]
+    fn test_multiple_trees() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        let tree_1 = SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .create_tree_if_necessary()
+            .build()?;
+
+        let initial_state_root_hash = tree_1.initial_state_root_hash()?;
+
+        let state_change_set = StateChange::Set {
+            key: "1234".to_string(),
+            value: "state_value".as_bytes().to_vec(),
+        };
+
+        let new_root = tree_1
+            .commit(&initial_state_root_hash, &[state_change_set])
+            .unwrap();
+        assert_read_value_at_address(&tree_1, &new_root, "1234", Some("state_value"));
+
+        let tree_2 = SqlMerkleStateBuilder::new()
+            .with_backend(backend)
+            .with_tree("test-2")
+            .create_tree_if_necessary()
+            .build()?;
+
+        assert!(tree_2.get(&new_root, &["1234".to_string()]).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_fails_without_explicit_create() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        assert!(SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .build()
+            .is_err());
+
+        Ok(())
+    }
+
+    fn assert_read_value_at_address<R>(
+        merkle_read: &R,
+        root_hash: &str,
+        address: &str,
+        expected_value: Option<&str>,
+    ) where
+        R: Read<StateId = String, Key = String, Value = Vec<u8>>,
+    {
+        let value = merkle_read
+            .get(&root_hash.to_string(), &[address.to_string()])
+            .and_then(|mut values| {
+                Ok(values.remove(address).map(|value| {
+                    String::from_utf8(value).expect("could not convert bytes to string")
+                }))
+            });
+
+        match value {
+            Ok(value) => assert_eq!(expected_value, value.as_deref()),
+            Err(err) => panic!("value at address {} produced an error: {}", address, err),
+        }
+    }
 }
