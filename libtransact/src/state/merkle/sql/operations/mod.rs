@@ -16,7 +16,9 @@
  */
 
 pub(super) mod get_leaves;
+pub(super) mod get_or_create_tree;
 pub(super) mod get_path;
+pub(super) mod get_tree_by_name;
 pub(super) mod has_root;
 pub(super) mod insert_nodes;
 pub(super) mod list_leaves;

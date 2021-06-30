@@ -17,18 +17,26 @@
 
 // Due to schema differences, this may have to be under a submodule specific to sqlite or postgres
 // (or other array-supporting dbs). This may only be the case with the merkle_radix_leaf table.
+table! {
+    merkle_radix_tree (id) {
+        id -> Int8,
+        name -> VarChar,
+    }
+}
 
 table! {
     merkle_radix_leaf (id) {
         id -> Int8,
+        tree_id -> Int8,
         address -> VarChar,
         data -> Blob,
     }
 }
 
 table! {
-    merkle_radix_tree_node (hash) {
+    merkle_radix_tree_node (hash, tree_id) {
         hash -> VarChar,
+        tree_id -> Int8,
         leaf_id -> Nullable<Int8>,
         // JSON children
         children -> Text,
@@ -38,6 +46,7 @@ table! {
 table! {
     merkle_radix_state_root (id) {
         id -> Int8,
+        tree_id -> Int8,
         state_root -> VarChar,
         parent_state_root -> VarChar,
     }
@@ -46,6 +55,7 @@ table! {
 table! {
     merkle_radix_state_root_leaf_index (id) {
         id -> Int8,
+        tree_id -> Int8,
         leaf_id -> Int8,
         from_state_root_id -> Int8,
         to_state_root_id -> Nullable<Int8>,
@@ -55,6 +65,7 @@ table! {
 joinable!(merkle_radix_state_root_leaf_index -> merkle_radix_leaf (leaf_id));
 
 allow_tables_to_appear_in_same_query!(
+    merkle_radix_tree,
     merkle_radix_leaf,
     merkle_radix_tree_node,
     merkle_radix_state_root,

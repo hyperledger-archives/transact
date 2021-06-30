@@ -25,7 +25,7 @@ use crate::state::merkle::sql::schema::merkle_radix_tree_node;
 use super::MerkleRadixOperations;
 
 pub trait MerkleRadixHasRootOperation {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError>;
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 }
 
 impl<'a, C> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, C>
@@ -34,10 +34,12 @@ where
     C::Backend: diesel::sql_types::HasSqlType<diesel::sql_types::Bool>,
     bool: diesel::deserialize::FromSql<diesel::sql_types::Bool, C::Backend>,
 {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError> {
-        select(exists(merkle_radix_tree_node::table.find(state_root_hash)))
-            .get_result::<bool>(self.conn)
-            .map_err(|e| InternalError::from_source(Box::new(e)))
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
+        select(exists(
+            merkle_radix_tree_node::table.find((state_root_hash, tree_id)),
+        ))
+        .get_result::<bool>(self.conn)
+        .map_err(|e| InternalError::from_source(Box::new(e)))
     }
 }
 
@@ -59,18 +61,19 @@ mod tests {
         run_migrations(&conn)?;
 
         // Does not exist
-        assert!(!MerkleRadixOperations::new(&conn).has_root("initial-state-root")?);
+        assert!(!MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
 
         // insert the root only into the tree:
         insert_into(merkle_radix_tree_node::table)
             .values(MerkleRadixTreeNode {
                 hash: "initial-state-root".into(),
+                tree_id: 1,
                 leaf_id: None,
                 children: Children(vec![]),
             })
             .execute(&conn)?;
 
-        assert!(MerkleRadixOperations::new(&conn).has_root("initial-state-root")?);
+        assert!(MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
 
         Ok(())
     }

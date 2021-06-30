@@ -22,10 +22,27 @@ use super::schema::*;
 
 #[derive(Insertable, Queryable, Identifiable)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_tree"]
+#[primary_key(id)]
+pub struct MerkleRadixTree {
+    pub id: i64,
+    pub name: String,
+}
+
+#[derive(Insertable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_tree"]
+pub struct NewMerkleRadixTree<'a> {
+    pub name: &'a str,
+}
+
+#[derive(Insertable, Queryable, Identifiable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 #[table_name = "merkle_radix_leaf"]
 #[primary_key(id)]
 pub struct MerkleRadixLeaf {
     pub id: i64,
+    pub tree_id: i64,
     pub address: String,
     pub data: Vec<u8>,
 }
@@ -35,6 +52,7 @@ pub struct MerkleRadixLeaf {
 #[table_name = "merkle_radix_leaf"]
 pub struct NewMerkleRadixLeaf<'a> {
     pub id: i64,
+    pub tree_id: i64,
     pub address: &'a str,
     pub data: &'a [u8],
 }
@@ -42,9 +60,10 @@ pub struct NewMerkleRadixLeaf<'a> {
 #[derive(Insertable, Queryable, QueryableByName, Identifiable)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[table_name = "merkle_radix_tree_node"]
-#[primary_key(hash)]
+#[primary_key(hash, tree_id)]
 pub struct MerkleRadixTreeNode {
     pub hash: String,
+    pub tree_id: i64,
     pub leaf_id: Option<i64>,
     pub children: Children,
 }
@@ -61,6 +80,7 @@ pub struct Children(pub Vec<Option<String>>);
 #[primary_key(id)]
 pub struct MerkleRadixStateRoot {
     pub id: i64,
+    pub tree_id: i64,
     pub state_root: String,
     pub parent_state_root: String,
 }
@@ -69,6 +89,7 @@ pub struct MerkleRadixStateRoot {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[table_name = "merkle_radix_state_root"]
 pub struct NewMerkleRadixStateRoot<'a> {
+    pub tree_id: i64,
     pub state_root: &'a str,
     pub parent_state_root: &'a str,
 }
@@ -79,6 +100,7 @@ pub struct NewMerkleRadixStateRoot<'a> {
 #[primary_key(id)]
 pub struct MerkleRadixStateRootLeafIndexEntry {
     pub id: i64,
+    pub tree_id: i64,
     pub leaf_id: i64,
     pub from_state_root_id: i64,
     pub to_state_root_id: Option<i64>,

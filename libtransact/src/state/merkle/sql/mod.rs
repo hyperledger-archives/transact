@@ -16,8 +16,38 @@
  */
 
 //! SQL-backed merkle-radix state implementation.
+//!
+//! A merkle-radix tree can be applied to a SQL database using the [`SqlMerkleState`] struct.  This
+//! struct uses several specialized tables to represent the tree, with optimizations made depending
+//! on the specific SQL database platform.
+//!
+//! A instance can be constructed using a [`Backend`] instance and a tree name.  The tree name
+//! allows for multiple trees to be stored under the same set of tables.
+//!
+//! For example, an instance using SQLite:
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! # use transact::state::merkle::sql::SqlMerkleStateBuilder;
+//! # use transact::state::merkle::sql::migration::MigrationManager;
+//! # use transact::state::merkle::sql::backend::{Backend, SqliteBackendBuilder};
+//! let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+//! # backend.run_migrations()?;
+//!
+//! let merkle_state = SqlMerkleStateBuilder::new()
+//!     .with_backend(backend)
+//!     .with_tree("example")
+//!     .create_tree_if_necessary()
+//!     .build()?;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The resulting `merkle_state` can then be used via the [`Read`], [`Write`] and
+//! [`MerkleRadixLeafReader`] traits.
 
 pub mod backend;
+mod error;
 pub mod migration;
 mod models;
 mod operations;
@@ -26,7 +56,7 @@ mod schema;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
-use crate::error::InternalError;
+use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StateReadError, StateWriteError};
 #[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
@@ -35,8 +65,11 @@ use crate::state::{Read, StateChange, Write};
 use super::node::Node;
 
 use backend::{Backend, Connection};
+pub use error::SqlMerkleStateBuildError;
 use operations::get_leaves::MerkleRadixGetLeavesOperation as _;
+use operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
 use operations::get_path::MerkleRadixGetPathOperation as _;
+use operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use operations::has_root::MerkleRadixHasRootOperation as _;
 use operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use operations::list_leaves::MerkleRadixListLeavesOperation as _;
@@ -45,6 +78,76 @@ use operations::MerkleRadixOperations;
 
 const TOKEN_SIZE: usize = 2;
 
+/// Builds a new SqlMerkleState with a specific backend.
+#[derive(Default)]
+pub struct SqlMerkleStateBuilder<B: Backend + Clone> {
+    backend: Option<B>,
+    tree_name: Option<String>,
+    create_tree: bool,
+}
+
+impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
+    /// Constructs a new builder
+    pub fn new() -> Self {
+        Self {
+            backend: None,
+            tree_name: None,
+            create_tree: false,
+        }
+    }
+
+    /// Sets the backend instance to use with the resulting instance
+    pub fn with_backend(mut self, backend: B) -> Self {
+        self.backend = Some(backend);
+        self
+    }
+
+    /// Sets the tree name that the resulting instance will operate on
+    pub fn with_tree<S: Into<String>>(mut self, tree_name: S) -> Self {
+        self.tree_name = Some(tree_name.into());
+        self
+    }
+
+    /// Create the specified tree if it does not exist
+    pub fn create_tree_if_necessary(mut self) -> Self {
+        self.create_tree = true;
+        self
+    }
+}
+
+impl SqlMerkleStateBuilder<backend::SqliteBackend> {
+    /// Construct the final SqlMerkleState instance
+    ///
+    /// # Errors
+    ///
+    /// An error may be returned under the following circumstances:
+    /// * If a Backend has not been provided
+    /// * If a tree name has not been provided
+    /// * If an internal error occurs while trying to create or lookup the tree
+    pub fn build(self) -> Result<SqlMerkleState<backend::SqliteBackend>, SqlMerkleStateBuildError> {
+        let backend = self
+            .backend
+            .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
+
+        let tree_name = self
+            .tree_name
+            .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
+
+        let conn = backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+
+        let tree_id: i64 = if self.create_tree {
+            operations.get_or_create_tree(&tree_name)?
+        } else {
+            operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+                InvalidStateError::with_message("must provide the name of an existing tree".into())
+            })?
+        };
+
+        Ok(SqlMerkleState { backend, tree_id })
+    }
+}
+
 /// SqlMerkleState provides a merkle-radix implementation over a SQL database.
 ///
 /// Databases are implemented using a Backend to provide connections. Note that the database must
@@ -52,14 +155,10 @@ const TOKEN_SIZE: usize = 2;
 #[derive(Clone)]
 pub struct SqlMerkleState<B: Backend + Clone> {
     backend: B,
+    tree_id: i64,
 }
 
 impl<B: Backend + Clone> SqlMerkleState<B> {
-    /// Constructs a new SqlMerkleState with the given backend.
-    pub fn new(backend: B) -> Self {
-        Self { backend }
-    }
-
     /// Returns the initial state root.
     ///
     /// This value is the state root that applies to a empty merkle radix tree.
@@ -81,7 +180,8 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         let (next_state_id, changes) = overlay
             .generate_updates(state_changes)
@@ -105,7 +205,8 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -125,7 +226,8 @@ impl Read for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(&*state_id, SqlOverlay::new(&self.backend));
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
 
         if !overlay
             .has_root()
@@ -167,13 +269,18 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(state_id, subtree)?;
+        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(
+            self.tree_id,
+            state_id,
+            subtree,
+        )?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }
 }
 
 struct MerkleRadixOverlay<'s, O> {
+    tree_id: i64,
     state_root_hash: &'s str,
     inner: O,
 }
@@ -185,8 +292,9 @@ impl<'s, O> MerkleRadixOverlay<'s, O>
 where
     O: OverlayReader + OverlayWriter,
 {
-    fn new(state_root_hash: &'s str, inner: O) -> Self {
+    fn new(tree_id: i64, state_root_hash: &'s str, inner: O) -> Self {
         Self {
+            tree_id,
             state_root_hash,
             inner,
         }
@@ -199,6 +307,7 @@ where
         deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         self.inner.write_changes(
+            self.tree_id,
             new_state_root,
             self.state_root_hash,
             node_changes,
@@ -209,13 +318,13 @@ where
     }
 
     fn has_root(&self) -> Result<bool, InternalError> {
-        self.inner.has_root(self.state_root_hash)
+        self.inner.has_root(self.tree_id, self.state_root_hash)
     }
 
     fn get_entries(&self, keys: &[String]) -> Result<HashMap<String, Vec<u8>>, InternalError> {
         let keys = keys.iter().map(|k| &**k).collect::<Vec<_>>();
         self.inner
-            .get_entries(self.state_root_hash, keys)
+            .get_entries(self.tree_id, self.state_root_hash, keys)
             .map(|result| result.into_iter().collect::<HashMap<_, _>>())
     }
 
@@ -237,7 +346,7 @@ where
             match state_change {
                 StateChange::Set { key, value } => {
                     let mut set_path_map = self
-                        .get_path(self.state_root_hash, &key)
+                        .get_path(&key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     {
                         let node = set_path_map
@@ -252,7 +361,7 @@ where
                 }
                 StateChange::Delete { key } => {
                     let del_path_map = self
-                        .get_path(self.state_root_hash, &key)
+                        .get_path(&key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     path_map.extend(del_path_map);
                     delete_items.push(key);
@@ -336,11 +445,7 @@ where
         Ok((key_hash_hex, batch))
     }
 
-    fn get_path(
-        &self,
-        state_root_hash: &str,
-        address: &str,
-    ) -> Result<HashMap<String, Node>, InternalError> {
+    fn get_path(&self, address: &str) -> Result<HashMap<String, Node>, InternalError> {
         // Build up the address along the path, starting with the empty address for the root, and
         // finishing with the complete address.
         let addresses_along_path: Vec<String> = (0..address.len())
@@ -351,7 +456,7 @@ where
 
         let node_path_iter = self
             .inner
-            .get_path(state_root_hash, address)?
+            .get_path(self.tree_id, &self.state_root_hash, address)?
             .into_iter()
             .map(|(_, node)| node)
             // include empty nodes after the queried path, to cover cases where the branch doesn't
@@ -366,16 +471,18 @@ where
 }
 
 trait OverlayReader {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError>;
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError>;
 
     fn get_entries(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
@@ -384,6 +491,7 @@ trait OverlayReader {
 trait OverlayWriter {
     fn write_changes(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         parent_state_root_hash: &str,
         changes: Vec<(String, Node, String)>,
@@ -403,33 +511,35 @@ impl<'b, B: Backend> SqlOverlay<'b, B> {
 
 #[cfg(feature = "sqlite")]
 impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
-    fn has_root(&self, state_root_hash: &str) -> Result<bool, InternalError> {
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.has_root(state_root_hash)
+        operations.has_root(tree_id, state_root_hash)
     }
 
     fn get_path(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_path(state_root_hash, address)
+        operations.get_path(tree_id, state_root_hash, address)
     }
 
     fn get_entries(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_leaves(state_root_hash, keys)
+        operations.get_leaves(tree_id, state_root_hash, keys)
     }
 }
 
@@ -437,6 +547,7 @@ impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
 impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
     fn write_changes(
         &self,
+        tree_id: i64,
         state_root_hash: &str,
         parent_state_root_hash: &str,
         changes: Vec<(String, Node, String)>,
@@ -456,7 +567,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
             )
             .collect::<Vec<_>>();
 
-        let indexable_info = operations.insert_nodes(&insertable_changes)?;
+        let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
 
         let changes = indexable_info
             .iter()
@@ -473,7 +584,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
             )
             .collect();
 
-        operations.update_index(state_root_hash, parent_state_root_hash, changes)?;
+        operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
 
         Ok(())
     }
@@ -509,4 +620,86 @@ fn hash(input: &[u8]) -> Vec<u8> {
     bytes.extend(openssl::sha::sha512(input).iter());
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::state::merkle::sql::backend::SqliteBackendBuilder;
+    use crate::state::merkle::sql::migration::MigrationManager;
+
+    /// This test creates multiple trees in the same backend/db instance and verifies that values
+    /// added to one are not added to the other.
+    #[test]
+    fn test_multiple_trees() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        let tree_1 = SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .create_tree_if_necessary()
+            .build()?;
+
+        let initial_state_root_hash = tree_1.initial_state_root_hash()?;
+
+        let state_change_set = StateChange::Set {
+            key: "1234".to_string(),
+            value: "state_value".as_bytes().to_vec(),
+        };
+
+        let new_root = tree_1
+            .commit(&initial_state_root_hash, &[state_change_set])
+            .unwrap();
+        assert_read_value_at_address(&tree_1, &new_root, "1234", Some("state_value"));
+
+        let tree_2 = SqlMerkleStateBuilder::new()
+            .with_backend(backend)
+            .with_tree("test-2")
+            .create_tree_if_necessary()
+            .build()?;
+
+        assert!(tree_2.get(&new_root, &["1234".to_string()]).is_err());
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_build_fails_without_explicit_create() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        assert!(SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .build()
+            .is_err());
+
+        Ok(())
+    }
+
+    fn assert_read_value_at_address<R>(
+        merkle_read: &R,
+        root_hash: &str,
+        address: &str,
+        expected_value: Option<&str>,
+    ) where
+        R: Read<StateId = String, Key = String, Value = Vec<u8>>,
+    {
+        let value = merkle_read
+            .get(&root_hash.to_string(), &[address.to_string()])
+            .and_then(|mut values| {
+                Ok(values.remove(address).map(|value| {
+                    String::from_utf8(value).expect("could not convert bytes to string")
+                }))
+            });
+
+        match value {
+            Ok(value) => assert_eq!(expected_value, value.as_deref()),
+            Err(err) => panic!("value at address {} produced an error: {}", address, err),
+        }
+    }
 }
