@@ -93,6 +93,7 @@ experimental = [
     "key-value-state",
     "redis-db",
     "sqlite-db",
+    "postgres",
     "sqlite",
     "state-merkle-leaf-reader",
     "state-merkle-sql",
@@ -113,6 +114,7 @@ family-command = []
 family-xo = ["rand_hc", "workload"]
 key-value-state = []
 redis-db = ["redis"]
+postgres = ["diesel/postgres"]
 sawtooth-compat = ["sawtooth-sdk"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
