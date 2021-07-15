@@ -15,21 +15,23 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Provides the MigrationManageer trait.
+//! Defines methods and utilities to interact with merkle radix tables in a PostgreSQL database.
 
-#[cfg(feature = "postgres")]
-pub(crate) mod postgres;
-#[cfg(feature = "sqlite")]
-pub(crate) mod sqlite;
+embed_migrations!("./src/state/merkle/sql/migration/postgres/migrations");
 
 use crate::error::InternalError;
 
-use super::backend::Backend;
-
-/// Provides backend migration execution.
+/// Run database migrations to create tables defined for the SqlMerkleState.
 ///
-/// Backend's that implement this trait can expose a migration operation on their underlying
-/// database system.
-pub trait MigrationManager: Backend {
-    fn run_migrations(&self) -> Result<(), InternalError>;
+/// # Arguments
+///
+/// * `conn` - Connection to Postgres database
+///
+#[allow(dead_code)]
+pub fn run_migrations(conn: &diesel::pg::PgConnection) -> Result<(), InternalError> {
+    embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+    info!("Successfully applied PostgreSQL migrations");
+
+    Ok(())
 }
