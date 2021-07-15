@@ -99,14 +99,13 @@ where
     }
 }
 
-#[cfg(feature = "sqlite")]
 #[cfg(test)]
 mod test {
     use super::*;
 
     use diesel::dsl::insert_into;
 
-    use crate::state::merkle::sql::migration::sqlite::run_migrations;
+    use crate::state::merkle::sql::migration;
     use crate::state::merkle::sql::models::MerkleRadixLeaf;
     use crate::state::merkle::sql::operations::update_index::{
         ChangedLeaf, MerkleRadixUpdateIndexOperation,
@@ -117,11 +116,12 @@ mod test {
     /// 1. No leaves are returned for the initial state root hash
     /// 2. The first leaf change is returned for first state root.
     /// 3. The second leaf change is returned for the second state root.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_list_leaves_at_state_root() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_list_leaves_at_state_root() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 
@@ -196,11 +196,12 @@ mod test {
     /// 1. No leaves are returned for the initial state root hash
     /// 2. The leaf is returned for first state root.
     /// 3. The leaf is no longer returned for the second state root.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_list_leaves_with_deletion() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_list_leaves_with_deletion() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 
@@ -262,11 +263,12 @@ mod test {
     /// 3. Verify that only the first leaf is returned with state root 1
     /// 4. Verify that both leaves are returned with state root 2
     /// 5. Verify that only one of the leaves is included in the list when a subtree is specified
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_list_leaves_at_state_root_larger_tree() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_list_leaves_at_state_root_larger_tree() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 

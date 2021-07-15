@@ -146,12 +146,11 @@ impl<'a> MerkleRadixUpdateIndexOperation for MerkleRadixOperations<'a, SqliteCon
     }
 }
 
-#[cfg(feature = "sqlite")]
 #[cfg(test)]
-mod sqlite_tests {
+mod tests {
     use super::*;
 
-    use crate::state::merkle::sql::migration::sqlite::run_migrations;
+    use crate::state::merkle::sql::migration;
     use crate::state::merkle::sql::models::{MerkleRadixLeaf, MerkleRadixStateRootLeafIndexEntry};
     use crate::state::merkle::sql::schema::merkle_radix_leaf;
 
@@ -160,11 +159,12 @@ mod sqlite_tests {
     /// 1. Verifies that the new state root hash specified is inserted into the state root table
     /// 2. Verifies that the leaf-state-root relationship is added to the index, with a null
     ///    to_state_root_id
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_update_index_initial_change() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_update_index_initial_change() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         // insert the leaf
         insert_into(merkle_radix_leaf::table)
@@ -211,11 +211,12 @@ mod sqlite_tests {
     /// 2. Verifies that the index contains two entries for the leaf, one that is valid only for
     ///    the first state root, and one that is valid for the current root, with a null
     ///    to_state_root_id (i.e. has not been changed yet).
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_update_index_single_change() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_update_index_single_change() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         // insert the initial leaf
         insert_into(merkle_radix_leaf::table)
@@ -297,11 +298,12 @@ mod sqlite_tests {
     ///    state root hash.
     /// 2. Verify that there is only one index entry for the leaf with the second state root hash
     ///    as its from_state_root_id and null for its to_state_root_id
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_update_index_single_change_fork() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_update_index_single_change_fork() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         // insert the initial leaf
         insert_into(merkle_radix_leaf::table)

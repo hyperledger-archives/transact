@@ -46,15 +46,17 @@ where
 mod test {
     use super::*;
 
-    use crate::state::merkle::sql::migration::sqlite::run_migrations;
-    use crate::state::merkle::sql::models::NewMerkleRadixTree;
     use diesel::dsl::insert_into;
 
+    use crate::state::merkle::sql::migration;
+    use crate::state::merkle::sql::models::NewMerkleRadixTree;
+
     /// This tests that a tree id can be returned from its name.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 

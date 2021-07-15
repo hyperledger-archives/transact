@@ -28,6 +28,7 @@ pub trait MerkleRadixGetOrCreateTreeOperation {
     fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError>;
 }
 
+#[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
@@ -56,11 +57,13 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, Sqlit
 mod test {
     use super::*;
 
+    #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration::sqlite::run_migrations;
 
     /// This tests that a tree id can be returned from its name.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_test_get_or_create_tree() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
         run_migrations(&conn)?;
 
