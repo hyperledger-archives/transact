@@ -115,6 +115,7 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
+    "postgres",
     "protocol-sabre-exec",
     "sqlite",
     "state-merkle-leaf-reader",
@@ -165,6 +166,7 @@ family-smallbank-workload = [
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
 key-value-state = []
+postgres = ["diesel/postgres"]
 protocol-batch = ["protocol-transaction"]
 protocol-batch-builder = ["cylinder", "protocol-batch"]
 protocol-transaction = []
