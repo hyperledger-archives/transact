@@ -16,7 +16,7 @@
  */
 
 #[cfg(feature = "sqlite")]
-mod sqlite;
+pub(in crate::state::merkle::sql) mod sqlite;
 
 use super::schema::*;
 
@@ -56,23 +56,6 @@ pub struct NewMerkleRadixLeaf<'a> {
     pub address: &'a str,
     pub data: &'a [u8],
 }
-
-#[derive(Insertable, Queryable, QueryableByName, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "merkle_radix_tree_node"]
-#[primary_key(hash, tree_id)]
-pub struct MerkleRadixTreeNode {
-    pub hash: String,
-    pub tree_id: i64,
-    pub leaf_id: Option<i64>,
-    pub children: Children,
-}
-
-#[derive(AsExpression, Debug, FromSqlRow)]
-#[cfg_attr(test, derive(PartialEq))]
-#[cfg_attr(feature = "sqlite", derive(Deserialize, Serialize))]
-#[cfg_attr(feature = "sqlite", sql_type = "diesel::sql_types::Text")]
-pub struct Children(pub Vec<Option<String>>);
 
 #[derive(Insertable, Queryable, Identifiable)]
 #[cfg_attr(test, derive(Debug, PartialEq))]

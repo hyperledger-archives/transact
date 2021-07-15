@@ -33,8 +33,10 @@ table! {
     }
 }
 
+#[cfg(feature = "sqlite")]
 table! {
-    merkle_radix_tree_node (hash, tree_id) {
+    #[sql_name = "merkle_radix_tree_node"]
+    sqlite_merkle_radix_tree_node (hash, tree_id) {
         hash -> VarChar,
         tree_id -> Int8,
         leaf_id -> Nullable<Int8>,
@@ -64,10 +66,11 @@ table! {
 
 joinable!(merkle_radix_state_root_leaf_index -> merkle_radix_leaf (leaf_id));
 
+#[cfg(feature = "sqlite")]
 allow_tables_to_appear_in_same_query!(
     merkle_radix_tree,
     merkle_radix_leaf,
-    merkle_radix_tree_node,
+    sqlite_merkle_radix_tree_node,
     merkle_radix_state_root,
     merkle_radix_state_root_leaf_index,
 );

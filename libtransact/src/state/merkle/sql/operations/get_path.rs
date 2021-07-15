@@ -19,18 +19,17 @@ use std::collections::BTreeMap;
 
 use diesel::prelude::*;
 use diesel::sql_query;
-#[cfg(feature = "sqlite")]
-use diesel::sql_types::{BigInt, Blob, Nullable, Text};
+use diesel::sql_types::{BigInt, Binary, Nullable, Text};
 
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-use crate::state::merkle::sql::models::Children;
+use crate::state::merkle::sql::models::sqlite;
 
 use super::MerkleRadixOperations;
 
 #[cfg(feature = "sqlite")]
 #[derive(QueryableByName)]
-struct ExtendedMerkleRadixTreeNode {
+struct SqliteExtendedMerkleRadixTreeNode {
     #[column_name = "hash"]
     #[sql_type = "Text"]
     pub hash: String,
@@ -41,10 +40,10 @@ struct ExtendedMerkleRadixTreeNode {
 
     #[column_name = "children"]
     #[sql_type = "Text"]
-    pub children: Children,
+    pub children: sqlite::Children,
 
     #[column_name = "data"]
-    #[sql_type = "Nullable<Blob>"]
+    #[sql_type = "Nullable<Binary>"]
     pub data: Option<Vec<u8>>,
 }
 
@@ -98,7 +97,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                 .map_err(|err| InternalError::from_source(Box::new(err)))?,
         )
         .bind::<BigInt, _>(tree_id)
-        .load::<ExtendedMerkleRadixTreeNode>(self.conn)
+        .load::<SqliteExtendedMerkleRadixTreeNode>(self.conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         Ok(path
@@ -116,42 +115,50 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
     }
 }
 
-impl From<Children> for BTreeMap<String, String> {
-    fn from(children: Children) -> Self {
-        let mut btree = BTreeMap::new();
-
-        for (i, hash_opt) in children
-            .0
-            .into_iter()
-            .enumerate()
-            .filter(|(_, opt)| opt.is_some())
-        {
-            if let Some(hash) = hash_opt {
-                btree.insert(format!("{:02x}", i), hash);
-            }
-        }
-        btree
+#[cfg(feature = "sqlite")]
+impl From<sqlite::Children> for BTreeMap<String, String> {
+    fn from(children: sqlite::Children) -> Self {
+        vec_to_btree(children.0)
     }
 }
 
-#[cfg(feature = "sqlite")]
+fn vec_to_btree(hashes: Vec<Option<String>>) -> BTreeMap<String, String> {
+    let mut btree = BTreeMap::new();
+
+    for (i, hash_opt) in hashes
+        .into_iter()
+        .enumerate()
+        .filter(|(_, opt)| opt.is_some())
+    {
+        if let Some(hash) = hash_opt {
+            btree.insert(format!("{:02x}", i), hash);
+        }
+    }
+    btree
+}
+
 #[cfg(test)]
-mod sqlite_tests {
+mod tests {
     use super::*;
 
     use diesel::dsl::{insert_into, select};
 
-    use crate::state::merkle::sql::migration::sqlite::run_migrations;
-    use crate::state::merkle::sql::models::{Children, MerkleRadixTreeNode, NewMerkleRadixLeaf};
+    #[cfg(feature = "sqlite")]
+    use crate::state::merkle::sql::{
+        migration, models::sqlite, schema::sqlite_merkle_radix_tree_node,
+    };
+
+    use crate::state::merkle::sql::models::NewMerkleRadixLeaf;
     use crate::state::merkle::sql::operations::last_insert_rowid;
-    use crate::state::merkle::sql::schema::{merkle_radix_leaf, merkle_radix_tree_node};
+    use crate::state::merkle::sql::schema::merkle_radix_leaf;
 
     /// Test that the get path on a non-existent root returns an empty path.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_get_path_empty_tree() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_get_path_empty_tree() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let path = MerkleRadixOperations::new(&conn).get_path(1, "state-root", "aabbcc")?;
 
@@ -163,11 +170,12 @@ mod sqlite_tests {
     /// Test that a single leaf, with intermediate nodes will return the correct path, transformed
     /// into the merkle Node representation. Additionally, verify that partial paths are returned
     /// for addresses that do not have leaves in the tree.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_get_path_single_entry() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_get_path_single_entry() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         insert_into(merkle_radix_leaf::table)
             .values(NewMerkleRadixLeaf {
@@ -180,31 +188,31 @@ mod sqlite_tests {
 
         let inserted_id = select(last_insert_rowid).get_result::<i64>(&conn)?;
 
-        insert_into(merkle_radix_tree_node::table)
+        insert_into(sqlite_merkle_radix_tree_node::table)
             .values(vec![
-                MerkleRadixTreeNode {
+                sqlite::MerkleRadixTreeNode {
                     hash: "000000-hash".into(),
                     tree_id: 1,
                     leaf_id: Some(inserted_id),
-                    children: Children(vec![]),
+                    children: sqlite::Children(vec![]),
                 },
-                MerkleRadixTreeNode {
+                sqlite::MerkleRadixTreeNode {
                     hash: "0000-hash".into(),
                     tree_id: 1,
                     leaf_id: None,
-                    children: Children(vec![Some("000000-hash".to_string())]),
+                    children: sqlite::Children(vec![Some("000000-hash".to_string())]),
                 },
-                MerkleRadixTreeNode {
+                sqlite::MerkleRadixTreeNode {
                     hash: "00-hash".into(),
                     tree_id: 1,
                     leaf_id: None,
-                    children: Children(vec![Some("0000-hash".to_string())]),
+                    children: sqlite::Children(vec![Some("0000-hash".to_string())]),
                 },
-                MerkleRadixTreeNode {
+                sqlite::MerkleRadixTreeNode {
                     hash: "root-hash".into(),
                     tree_id: 1,
                     leaf_id: None,
-                    children: Children(vec![Some("00-hash".to_string())]),
+                    children: sqlite::Children(vec![Some("00-hash".to_string())]),
                 },
             ])
             .execute(&conn)?;
