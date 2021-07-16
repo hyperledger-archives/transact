@@ -5,6 +5,7 @@ RUN apt-get update && \
     curl \
     unzip \
     gcc \
+    libpq-dev \
     libssl-dev \
     pkg-config \
     protobuf-compiler \
