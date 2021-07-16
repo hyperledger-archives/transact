@@ -15,6 +15,8 @@
  * -----------------------------------------------------------------------------
  */
 
+#[cfg(feature = "postgres")]
+pub(in crate::state::merkle::sql) mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
