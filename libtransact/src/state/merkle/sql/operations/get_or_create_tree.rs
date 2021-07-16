@@ -19,6 +19,8 @@ use diesel::dsl::{insert_into, select};
 use diesel::prelude::*;
 
 use crate::error::InternalError;
+#[cfg(feature = "postgres")]
+use crate::state::merkle::sql::models::MerkleRadixTree;
 use crate::state::merkle::sql::models::NewMerkleRadixTree;
 use crate::state::merkle::sql::schema::merkle_radix_tree;
 
@@ -53,10 +55,35 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, Sqlit
     }
 }
 
+#[cfg(feature = "postgres")]
+impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, PgConnection> {
+    fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError> {
+        self.conn.transaction::<_, InternalError, _>(|| {
+            if let Some(tree_id) = merkle_radix_tree::table
+                .filter(merkle_radix_tree::name.eq(tree_name))
+                .select(merkle_radix_tree::id)
+                .get_result(self.conn)
+                .optional()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?
+            {
+                return Ok(tree_id);
+            }
+
+            insert_into(merkle_radix_tree::table)
+                .values(NewMerkleRadixTree { name: tree_name })
+                .get_result::<MerkleRadixTree>(self.conn)
+                .map(|tree| tree.id)
+                .map_err(|e| InternalError::from_source(Box::new(e)))
+        })
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
 
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration::sqlite::run_migrations;
 
@@ -76,5 +103,23 @@ mod test {
         assert_eq!(1, id);
 
         Ok(())
+    }
+
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    #[test]
+    fn postgres_test_get_or_create_tree() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let conn = PgConnection::establish(&url)?;
+
+            let operations = MerkleRadixOperations::new(&conn);
+
+            let id = operations.get_or_create_tree("test")?;
+            assert_eq!(2, id);
+
+            let id = operations.get_or_create_tree("default")?;
+            assert_eq!(1, id);
+
+            Ok(())
+        })
     }
 }
