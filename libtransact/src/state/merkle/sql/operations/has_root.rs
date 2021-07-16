@@ -20,6 +20,8 @@ use diesel::prelude::*;
 use diesel::{dsl::exists, select};
 
 use crate::error::InternalError;
+#[cfg(feature = "postgres")]
+use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
 #[cfg(feature = "sqlite")]
 use crate::state::merkle::sql::schema::sqlite_merkle_radix_tree_node;
 
@@ -39,12 +41,24 @@ impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, SqliteConnect
     }
 }
 
+impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, PgConnection> {
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
+        select(exists(
+            postgres_merkle_radix_tree_node::table.find((state_root_hash, tree_id)),
+        ))
+        .get_result::<bool>(self.conn)
+        .map_err(|e| InternalError::from_source(Box::new(e)))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     use diesel::dsl::insert_into;
 
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    use crate::state::merkle::sql::{backend::postgres::test::run_postgres_test, models::postgres};
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::{migration, models::sqlite};
 
@@ -72,5 +86,31 @@ mod tests {
         assert!(MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
 
         Ok(())
+    }
+
+    /// Test that has_node succeeds if the root hash is in the tree table.
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    #[test]
+    fn postgres_has_root_from_tree_node() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let conn = PgConnection::establish(&url)?;
+
+            // Does not exist
+            assert!(!MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
+
+            // insert the root only into the tree:
+            insert_into(postgres_merkle_radix_tree_node::table)
+                .values(postgres::MerkleRadixTreeNode {
+                    hash: "initial-state-root".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: vec![],
+                })
+                .execute(&conn)?;
+
+            assert!(MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
+
+            Ok(())
+        })
     }
 }
