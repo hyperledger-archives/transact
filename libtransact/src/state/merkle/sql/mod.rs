@@ -115,6 +115,7 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl SqlMerkleStateBuilder<backend::SqliteBackend> {
     /// Construct the final SqlMerkleState instance
     ///
@@ -216,6 +217,7 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl Read for SqlMerkleState<backend::SqliteBackend> {
     type StateId = String;
     type Key = String;
