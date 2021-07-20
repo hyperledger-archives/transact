@@ -20,6 +20,9 @@
 embed_migrations!("./src/state/merkle/sql/migration/postgres/migrations");
 
 use crate::error::InternalError;
+use crate::state::merkle::sql::backend::{Backend, Connection, PostgresBackend};
+
+use super::MigrationManager;
 
 /// Run database migrations to create tables defined for the SqlMerkleState.
 ///
@@ -34,4 +37,10 @@ pub fn run_migrations(conn: &diesel::pg::PgConnection) -> Result<(), InternalErr
     info!("Successfully applied PostgreSQL migrations");
 
     Ok(())
+}
+
+impl MigrationManager for PostgresBackend {
+    fn run_migrations(&self) -> Result<(), InternalError> {
+        run_migrations(self.connection()?.as_inner())
+    }
 }
