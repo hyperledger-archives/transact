@@ -15,24 +15,15 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "postgres")]
-pub(in crate::state::merkle::sql) mod postgres;
-#[cfg(feature = "sqlite")]
-mod sqlite;
+use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
 
-use crate::error::InternalError;
-
-#[cfg(feature = "sqlite")]
-pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
-
-pub trait Connection {
-    type ConnectionType: diesel::Connection;
-
-    fn as_inner(&self) -> &Self::ConnectionType;
-}
-
-pub trait Backend: Sync + Send {
-    type Connection: Connection;
-
-    fn connection(&self) -> Result<Self::Connection, InternalError>;
+#[derive(Insertable, Queryable, QueryableByName, Identifiable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "postgres_merkle_radix_tree_node"]
+#[primary_key(hash, tree_id)]
+pub struct MerkleRadixTreeNode {
+    pub hash: String,
+    pub tree_id: i64,
+    pub leaf_id: Option<i64>,
+    pub children: Vec<Option<String>>,
 }

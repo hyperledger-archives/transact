@@ -45,7 +45,7 @@ build:
     cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=sawtooth-compat"
     echo "\033[1m$cmd\033[0m"
     $cmd
-    cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=experimental,state-merkle-redis-db-tests"
+    cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=experimental,state-merkle-redis-db-tests,state-merkle-sql-postgres-tests"
     echo "\033[1m$cmd\033[0m"
     $cmd
     echo "\n\033[92mBuild Success\033[0m\n"
@@ -89,12 +89,14 @@ ci-test:
 
     docker-compose -f docker/compose/docker-compose.yaml up --detach redis
 
+    docker-compose -f docker/compose/docker-compose.yaml up --detach postgres-db
+
     docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
        /bin/bash -c \
        "cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
           --features sawtooth-compat && \
         cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
-          --features experimental,state-merkle-redis-db-tests && \
+          --features experimental,state-merkle-redis-db-tests,state-merkle-sql-postgres-tests && \
         (cd examples/sabre_smallbank && cargo test)"
 
 clean:

@@ -46,15 +46,19 @@ where
 mod test {
     use super::*;
 
-    use crate::state::merkle::sql::migration::sqlite::run_migrations;
-    use crate::state::merkle::sql::models::NewMerkleRadixTree;
     use diesel::dsl::insert_into;
 
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
+    use crate::state::merkle::sql::migration;
+    use crate::state::merkle::sql::models::NewMerkleRadixTree;
+
     /// This tests that a tree id can be returned from its name.
+    #[cfg(feature = "sqlite")]
     #[test]
-    fn test_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
-        run_migrations(&conn)?;
+        migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 
@@ -72,5 +76,31 @@ mod test {
         assert_eq!(Some(2), id_opt);
 
         Ok(())
+    }
+
+    /// This tests that a tree id can be returned from its name.
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    #[test]
+    fn postgres_get_tree_id_by_name() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let conn = PgConnection::establish(&url)?;
+
+            let operations = MerkleRadixOperations::new(&conn);
+
+            let id_opt = operations.get_tree_id_by_name("test")?;
+            assert_eq!(None, id_opt);
+
+            let id_opt = operations.get_tree_id_by_name("default")?;
+            assert_eq!(Some(1), id_opt);
+
+            insert_into(merkle_radix_tree::table)
+                .values(NewMerkleRadixTree { name: "test" })
+                .execute(&conn)?;
+
+            let id_opt = operations.get_tree_id_by_name("test")?;
+            assert_eq!(Some(2), id_opt);
+
+            Ok(())
+        })
     }
 }

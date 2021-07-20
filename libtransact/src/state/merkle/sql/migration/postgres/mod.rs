@@ -15,24 +15,23 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "postgres")]
-pub(in crate::state::merkle::sql) mod postgres;
-#[cfg(feature = "sqlite")]
-mod sqlite;
+//! Defines methods and utilities to interact with merkle radix tables in a PostgreSQL database.
+
+embed_migrations!("./src/state/merkle/sql/migration/postgres/migrations");
 
 use crate::error::InternalError;
 
-#[cfg(feature = "sqlite")]
-pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
+/// Run database migrations to create tables defined for the SqlMerkleState.
+///
+/// # Arguments
+///
+/// * `conn` - Connection to Postgres database
+///
+#[allow(dead_code)]
+pub fn run_migrations(conn: &diesel::pg::PgConnection) -> Result<(), InternalError> {
+    embedded_migrations::run(conn).map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-pub trait Connection {
-    type ConnectionType: diesel::Connection;
+    info!("Successfully applied PostgreSQL migrations");
 
-    fn as_inner(&self) -> &Self::ConnectionType;
-}
-
-pub trait Backend: Sync + Send {
-    type Connection: Connection;
-
-    fn connection(&self) -> Result<Self::Connection, InternalError>;
+    Ok(())
 }
