@@ -105,7 +105,6 @@ impl PostgresBackendBuilder {
 }
 
 #[cfg(feature = "state-merkle-sql-postgres-tests")]
-#[cfg(test)]
 pub mod test {
     use std::env;
     use std::error::Error;
