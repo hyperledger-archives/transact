@@ -22,6 +22,8 @@ mod sqlite;
 
 use crate::error::InternalError;
 
+#[cfg(feature = "postgres")]
+pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
 #[cfg(feature = "sqlite")]
 pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
 
