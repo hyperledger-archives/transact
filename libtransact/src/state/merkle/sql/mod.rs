@@ -115,6 +115,7 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl SqlMerkleStateBuilder<backend::SqliteBackend> {
     /// Construct the final SqlMerkleState instance
     ///
@@ -125,6 +126,42 @@ impl SqlMerkleStateBuilder<backend::SqliteBackend> {
     /// * If a tree name has not been provided
     /// * If an internal error occurs while trying to create or lookup the tree
     pub fn build(self) -> Result<SqlMerkleState<backend::SqliteBackend>, SqlMerkleStateBuildError> {
+        let backend = self
+            .backend
+            .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
+
+        let tree_name = self
+            .tree_name
+            .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
+
+        let conn = backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+
+        let tree_id: i64 = if self.create_tree {
+            operations.get_or_create_tree(&tree_name)?
+        } else {
+            operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+                InvalidStateError::with_message("must provide the name of an existing tree".into())
+            })?
+        };
+
+        Ok(SqlMerkleState { backend, tree_id })
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl SqlMerkleStateBuilder<backend::PostgresBackend> {
+    /// Construct the final SqlMerkleState instance
+    ///
+    /// # Errors
+    ///
+    /// An error may be returned under the following circumstances:
+    /// * If a Backend has not been provided
+    /// * If a tree name has not been provided
+    /// * If an internal error occurs while trying to create or lookup the tree
+    pub fn build(
+        self,
+    ) -> Result<SqlMerkleState<backend::PostgresBackend>, SqlMerkleStateBuildError> {
         let backend = self
             .backend
             .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
@@ -216,7 +253,88 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
+#[cfg(feature = "sqlite")]
 impl Read for SqlMerkleState<backend::SqliteBackend> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn get(
+        &self,
+        state_id: &Self::StateId,
+        keys: &[Self::Key],
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+
+        if !overlay
+            .has_root()
+            .map_err(|e| StateReadError::StorageError(Box::new(e)))?
+        {
+            return Err(StateReadError::InvalidStateId(state_id.into()));
+        }
+
+        overlay
+            .get_entries(keys)
+            .map_err(|e| StateReadError::StorageError(Box::new(e)))
+    }
+
+    fn clone_box(
+        &self,
+    ) -> Box<dyn Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>> {
+        Box::new(self.clone())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl Write for SqlMerkleState<backend::PostgresBackend> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn commit(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange],
+    ) -> Result<Self::StateId, StateWriteError> {
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+
+        let (next_state_id, changes) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        let deleted_addresses = state_changes
+            .iter()
+            .filter(|change| matches!(change, StateChange::Delete { .. }))
+            .map(|change| change.key())
+            .collect::<Vec<_>>();
+
+        overlay
+            .write_updates(&next_state_id, changes, &deleted_addresses)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        Ok(next_state_id)
+    }
+
+    fn compute_state_id(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange],
+    ) -> Result<Self::StateId, StateWriteError> {
+        let overlay =
+            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+
+        let (next_state_id, _) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        Ok(next_state_id)
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl Read for SqlMerkleState<backend::PostgresBackend> {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -255,6 +373,32 @@ type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
 #[cfg(all(feature = "state-merkle-leaf-reader", feature = "sqlite"))]
 impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
+    /// Returns an iterator over the leaves of a merkle radix tree.
+    /// By providing an optional address prefix, the caller can limit the iteration
+    /// over the leaves in a specific subtree.
+    fn leaves(
+        &self,
+        state_id: &Self::StateId,
+        subtree: Option<&str>,
+    ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
+        let conn = self.backend.connection()?;
+
+        if &self.initial_state_root_hash()? == state_id {
+            return Ok(Box::new(std::iter::empty()));
+        }
+
+        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(
+            self.tree_id,
+            state_id,
+            subtree,
+        )?;
+
+        Ok(Box::new(leaves.into_iter().map(Ok)))
+    }
+}
+
+#[cfg(all(feature = "state-merkle-leaf-reader", feature = "postgres"))]
+impl MerkleRadixLeafReader for SqlMerkleState<backend::PostgresBackend> {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
     /// over the leaves in a specific subtree.
@@ -545,6 +689,87 @@ impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
 
 #[cfg(feature = "sqlite")]
 impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
+    fn write_changes(
+        &self,
+        tree_id: i64,
+        state_root_hash: &str,
+        parent_state_root_hash: &str,
+        changes: Vec<(String, Node, String)>,
+        deleted_addresses: &[&str],
+    ) -> Result<(), InternalError> {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+
+        let insertable_changes = changes
+            .into_iter()
+            .map(
+                |(hash, node, address)| operations::insert_nodes::InsertableNode {
+                    hash,
+                    node,
+                    address,
+                },
+            )
+            .collect::<Vec<_>>();
+
+        let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
+
+        let changes = indexable_info
+            .iter()
+            .map(
+                |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
+                    address: &leaf_info.address,
+                    leaf_id: leaf_info.leaf_id,
+                },
+            )
+            .chain(
+                deleted_addresses
+                    .iter()
+                    .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
+            )
+            .collect();
+
+        operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
+
+        Ok(())
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'b> OverlayReader for SqlOverlay<'b, backend::PostgresBackend> {
+    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
+        let conn = self.backend.connection()?;
+
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.has_root(tree_id, state_root_hash)
+    }
+
+    fn get_path(
+        &self,
+        tree_id: i64,
+        state_root_hash: &str,
+        address: &str,
+    ) -> Result<Vec<(String, Node)>, InternalError> {
+        let conn = self.backend.connection()?;
+
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.get_path(tree_id, state_root_hash, address)
+    }
+
+    fn get_entries(
+        &self,
+        tree_id: i64,
+        state_root_hash: &str,
+        keys: Vec<&str>,
+    ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
+        let conn = self.backend.connection()?;
+
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.get_leaves(tree_id, state_root_hash, keys)
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
     fn write_changes(
         &self,
         tree_id: i64,

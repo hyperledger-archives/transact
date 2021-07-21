@@ -15,8 +15,96 @@
  * -----------------------------------------------------------------------------
  */
 
+use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+
+use crate::error::{InternalError, InvalidStateError};
+
+use super::{Backend, Connection};
+
+pub struct PostgresConnection(
+    pub(in crate::state::merkle::sql) PooledConnection<ConnectionManager<diesel::pg::PgConnection>>,
+);
+
+impl Connection for PostgresConnection {
+    type ConnectionType = diesel::pg::PgConnection;
+
+    fn as_inner(&self) -> &Self::ConnectionType {
+        &*self.0
+    }
+}
+
+/// The Postgres Backend
+///
+/// This struct provides the backend implementation details for postgres databases.
+#[derive(Clone)]
+pub struct PostgresBackend {
+    connection_pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
+}
+
+impl Backend for PostgresBackend {
+    type Connection = PostgresConnection;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError> {
+        self.connection_pool
+            .get()
+            .map(PostgresConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))
+    }
+}
+
+/// A Builder for the PostgresBackend.
+#[derive(Default)]
+pub struct PostgresBackendBuilder {
+    url: Option<String>,
+}
+
+impl PostgresBackendBuilder {
+    /// Constructs a new builder.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Sets the URL for the postgres database instance.
+    ///
+    /// This URL should follow the format as documented at
+    /// [https://www.postgresql.org/docs/9.4/libpq-connect.html#LIBPQ-CONNSTRING](https://www.postgresql.org/docs/9.4/libpq-connect.html#LIBPQ-CONNSTRING).
+    ///
+    /// This is a required field.
+    pub fn with_url<S: Into<String>>(mut self, url: S) -> Self {
+        self.url = Some(url.into());
+        self
+    }
+
+    /// Constructs the [PostgresBackend] instance.
+    ///
+    /// # Errors
+    ///
+    /// This may return a [InvalidStateError] for a variety of reasons:
+    ///
+    /// * No URL provided
+    /// * Unable to connect to the database.
+    pub fn build(self) -> Result<PostgresBackend, InvalidStateError> {
+        let url = self.url.ok_or_else(|| {
+            InvalidStateError::with_message("must provide a postgres connection URL".into())
+        })?;
+
+        let connection_manager = ConnectionManager::<diesel::pg::PgConnection>::new(url);
+        let pool = Pool::builder()
+            .build(connection_manager)
+            .map_err(|err| InvalidStateError::with_message(err.to_string()))?;
+
+        // Validate that connections can be made
+        let _conn = pool
+            .get()
+            .map_err(|err| InvalidStateError::with_message(err.to_string()))?;
+
+        Ok(PostgresBackend {
+            connection_pool: pool,
+        })
+    }
+}
+
 #[cfg(feature = "state-merkle-sql-postgres-tests")]
-#[cfg(test)]
 pub mod test {
     use std::env;
     use std::error::Error;

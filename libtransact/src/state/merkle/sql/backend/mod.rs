@@ -22,6 +22,10 @@ mod sqlite;
 
 use crate::error::InternalError;
 
+#[cfg(feature = "state-merkle-sql-postgres-tests")]
+pub use postgres::test::run_postgres_test;
+#[cfg(feature = "postgres")]
+pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
 #[cfg(feature = "sqlite")]
 pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
 
