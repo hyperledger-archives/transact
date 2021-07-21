@@ -233,17 +233,16 @@ impl SqliteBackendBuilder {
         self
     }
 
-    /// Constructs the database instance.
+    /// Constructs the [SqliteBackend] instance.
     ///
     /// # Errors
     ///
-    /// This may return a InvalidStateError for a variety of reasons:
+    /// This may return a [InvalidStateError] for a variety of reasons:
     ///
     /// * No connection_path provided
     /// * Unable to connect to the database.
     /// * Unable to configure the provided memory map size
     /// * Unable to configure the journal mode, if requested
-    /// * Unable to create tables, as required.
     pub fn build(self) -> Result<SqliteBackend, InvalidStateError> {
         let path = self.connection_path.ok_or_else(|| {
             InvalidStateError::with_message("must provide a sqlite connection URI".into())
