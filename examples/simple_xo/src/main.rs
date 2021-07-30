@@ -101,7 +101,7 @@ fn new_signer() -> Box<dyn Signer> {
 }
 
 fn print_current_state(value: &[u8]) -> &str {
-    let val = match str::from_utf8(&value) {
+    let val = match str::from_utf8(value) {
         Ok(v) => v,
         Err(e) => panic!("Invalid UTF-8 sequence: {}", e),
     };

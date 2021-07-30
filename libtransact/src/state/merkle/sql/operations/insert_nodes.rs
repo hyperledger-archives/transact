@@ -131,7 +131,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
 fn node_to_sqlite_children(node: &Node) -> Result<sqlite::Children, InternalError> {
     let mut children = vec![None; 256];
     for (location, hash) in node.children.iter() {
-        let pos = u8::from_str_radix(&location, 16)
+        let pos = u8::from_str_radix(location, 16)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         children[pos as usize] = Some(hash.to_string());
@@ -216,7 +216,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
 fn node_to_postgres_children(node: &Node) -> Result<Vec<Option<String>>, InternalError> {
     let mut children = vec![None; 256];
     for (location, hash) in node.children.iter() {
-        let pos = u8::from_str_radix(&location, 16)
+        let pos = u8::from_str_radix(location, 16)
             .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
         children[pos as usize] = Some(hash.to_string());

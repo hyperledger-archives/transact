@@ -917,8 +917,8 @@ impl SabrePayloadBuilder {
         let (input_addresses, output_addresses) = match payload.action() {
             Action::CreateContract(CreateContractAction { name, version, .. }) => {
                 let addresses = vec![
-                    compute_contract_registry_address(&name)?,
-                    compute_contract_address(&name, &version)?,
+                    compute_contract_registry_address(name)?,
+                    compute_contract_address(name, version)?,
                 ];
                 (addresses.clone(), addresses)
             }
@@ -930,8 +930,8 @@ impl SabrePayloadBuilder {
                 ..
             }) => {
                 let addresses = vec![
-                    compute_contract_registry_address(&name)?,
-                    compute_contract_address(&name, &version)?,
+                    compute_contract_registry_address(name)?,
+                    compute_contract_address(name, version)?,
                 ];
 
                 let mut input_addresses = addresses.clone();
@@ -946,7 +946,7 @@ impl SabrePayloadBuilder {
                         }
                     };
                     input_addresses.push(compute_namespace_registry_address(namespace)?);
-                    input_addresses.push(parse_hex(&input)?);
+                    input_addresses.push(parse_hex(input)?);
                 }
 
                 let mut output_addresses = addresses;
@@ -961,14 +961,14 @@ impl SabrePayloadBuilder {
                         }
                     };
                     output_addresses.push(compute_namespace_registry_address(namespace)?);
-                    output_addresses.push(parse_hex(&output)?);
+                    output_addresses.push(parse_hex(output)?);
                 }
 
                 (input_addresses, output_addresses)
             }
             Action::CreateContractRegistry(CreateContractRegistryAction { name, .. }) => {
                 let addresses = vec![
-                    compute_contract_registry_address(&name)?,
+                    compute_contract_registry_address(name)?,
                     ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)
@@ -980,7 +980,7 @@ impl SabrePayloadBuilder {
                 CreateNamespaceRegistryPermissionAction { namespace, .. },
             ) => {
                 let addresses = vec![
-                    compute_namespace_registry_address(&namespace)?,
+                    compute_namespace_registry_address(namespace)?,
                     ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
                 ];
                 (addresses.clone(), addresses)

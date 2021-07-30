@@ -119,7 +119,7 @@ impl Context {
             .state_changes
             .iter()
             .rev()
-            .find(|state_change| state_change.has_key(&key))
+            .find(|state_change| state_change.has_key(key))
         {
             return Some(v);
         }
@@ -138,7 +138,7 @@ impl Context {
             .state_changes
             .iter_mut()
             .rev()
-            .find(|state_change| state_change.has_key(&key));
+            .find(|state_change| state_change.has_key(key));
         if let Some(StateChange::Set { .. }) = found_state_change {
             // If a StateChange::Set is found associated with the key, the value set is returned.
             let mut new_state_change: StateChange = StateChange::Delete {

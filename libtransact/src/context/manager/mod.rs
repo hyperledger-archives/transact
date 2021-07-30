@@ -115,10 +115,10 @@ impl ContextManager {
             for context_id in context.base_contexts().iter() {
                 contexts.push_back(self.get_context(context_id)?);
             }
-            if !context.contains(&key) && !contexts.is_empty() {
+            if !context.contains(key) && !contexts.is_empty() {
                 while let Some(current_context) = contexts.pop_front() {
                     context = current_context;
-                    if current_context.contains(&key) {
+                    if current_context.contains(key) {
                         break;
                     } else {
                         for context_id in context.base_contexts().iter() {
@@ -127,12 +127,12 @@ impl ContextManager {
                     }
                 }
             }
-            if context.contains(&key) {
+            if context.contains(key) {
                 if let Some(StateChange::Set { key: k, value: v }) = context
                     .state_changes()
                     .iter()
                     .rev()
-                    .find(|state_change| state_change.has_key(&key))
+                    .find(|state_change| state_change.has_key(key))
                 {
                     key_values.push((k.clone(), v.clone()));
                 }
@@ -184,7 +184,7 @@ impl ContextManager {
         }
 
         while let Some(context) = contexts.pop_front() {
-            if context.contains(&key) {
+            if context.contains(key) {
                 containing_context = context;
                 break;
             } else {
@@ -193,8 +193,8 @@ impl ContextManager {
                 }
             }
         }
-        if containing_context.contains(&key) {
-            if let Some(v) = containing_context.get_state(&key) {
+        if containing_context.contains(key) {
+            if let Some(v) = containing_context.get_state(key) {
                 return Ok(Some(v.to_vec()));
             }
         } else if let Some(value) = self
@@ -213,7 +213,7 @@ impl ContextManager {
         context_id: &ContextId,
         event: Event,
     ) -> Result<(), ContextManagerError> {
-        let context = self.get_context_mut(&context_id)?;
+        let context = self.get_context_mut(context_id)?;
         context.add_event(event);
         Ok(())
     }
@@ -224,7 +224,7 @@ impl ContextManager {
         context_id: &ContextId,
         data: Vec<u8>,
     ) -> Result<(), ContextManagerError> {
-        let context = self.get_context_mut(&context_id)?;
+        let context = self.get_context_mut(context_id)?;
         context.add_data(data);
         Ok(())
     }

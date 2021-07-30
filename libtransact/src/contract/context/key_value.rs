@@ -126,7 +126,7 @@ where
             .iter()
             .map(|k| {
                 self.addresser
-                    .compute(&k)
+                    .compute(k)
                     .map_err(ContractContextError::AddresserError)
             })
             .collect::<Result<Vec<String>, ContractContextError>>()?;
@@ -188,13 +188,13 @@ where
             .iter()
             .map(|k| {
                 self.addresser
-                    .compute(&k)
+                    .compute(k)
                     .map_err(ContractContextError::AddresserError)
             })
             .collect::<Result<Vec<String>, ContractContextError>>()?;
         let normalized_keys = keys
             .iter()
-            .map(|k| self.addresser.normalize(&k))
+            .map(|k| self.addresser.normalize(k))
             .collect::<Vec<String>>();
 
         let state_entries: Vec<StateEntry> = self.flatten_state_entries(&addresses)?;
@@ -326,7 +326,7 @@ where
         addresses: &[String],
     ) -> Result<HashMap<String, StateEntryList>, ContractContextError> {
         self.context
-            .get_state_entries(&addresses)?
+            .get_state_entries(addresses)?
             .iter()
             .map(|(addr, bytes_entry)| {
                 Ok((addr.to_string(), StateEntryList::from_bytes(bytes_entry)?))

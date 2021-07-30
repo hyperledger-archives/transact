@@ -417,7 +417,7 @@ impl ExecutorThread {
         fanout_threads: &HashMap<TransactionFamily, HashSet<NamedExecutionEventSender>>,
         parked: &mut ParkedExecutionEventsMap,
     ) {
-        let tf = TransactionFamily::from_pair(&execution_event.1.pair());
+        let tf = TransactionFamily::from_pair(execution_event.1.pair());
         if let Some(ea_senders) = fanout_threads.get(&tf) {
             if let Some(sender) = ea_senders.iter().next() {
                 if let Err(err) = sender.sender.send(ExecutionCommand::Event(execution_event)) {

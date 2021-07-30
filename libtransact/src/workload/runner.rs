@@ -414,7 +414,7 @@ fn slow_rate(
             }
             Err(TryRecvError::Empty) => {
                 // attempt to submit batch again
-                match submit_batch(target, &auth, batch_bytes.clone()) {
+                match submit_batch(target, auth, batch_bytes.clone()) {
                     Ok(()) => break,
                     Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
                     Err(err) => {

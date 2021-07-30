@@ -88,7 +88,7 @@ impl<T: Clone> RadixTree<T> {
     /// then the descendants of ADDRESS are yielded
     pub fn walk(&self, address: &str) -> Vec<(String, Option<T>)> {
         let mut return_nodes = Vec::new();
-        let accumulated_nodes = self.walk_to_address(&address);
+        let accumulated_nodes = self.walk_to_address(address);
         for node in accumulated_nodes.iter() {
             return_nodes.push((node.borrow().address.clone(), node.borrow().data.clone()));
         }
@@ -97,7 +97,7 @@ impl<T: Clone> RadixTree<T> {
             let mut to_process = VecDeque::new();
             let descendants = node.borrow().children.clone();
             for descendant in descendants.values() {
-                to_process.push_front(Rc::clone(&descendant));
+                to_process.push_front(Rc::clone(descendant));
             }
             while let Some(current_child) = to_process.pop_front() {
                 return_nodes.push((
@@ -106,7 +106,7 @@ impl<T: Clone> RadixTree<T> {
                 ));
                 let additional_descendants = &current_child.borrow().children;
                 for child in additional_descendants.values() {
-                    to_process.push_front(Rc::clone(&child));
+                    to_process.push_front(Rc::clone(child));
                 }
             }
         }
@@ -116,14 +116,14 @@ impl<T: Clone> RadixTree<T> {
     /// Walk as far down the tree as possible. If the desired address is reached, return that node.
     /// Otherwise, add a new one.
     fn get_or_create(&self, address: &str) -> Rc<RefCell<Node<T>>> {
-        let accumulated_nodes = self.walk_to_address(&address);
+        let accumulated_nodes = self.walk_to_address(address);
         let first_ancestor = accumulated_nodes
             .iter()
             .last()
             .expect("Node ancestors not formed correctly");
 
         if first_ancestor.borrow().address == address {
-            return Rc::clone(&first_ancestor);
+            return Rc::clone(first_ancestor);
         }
 
         // The address isn't in the tree, so a new node will need to be added
@@ -227,7 +227,7 @@ impl<T: Clone> RadixTree<T> {
     /// Walk to ADDRESS, creating nodes if necessary, and set the data there to
     /// UPDATER(data)
     pub fn update(&self, address: &str, updater: &dyn Fn(Option<T>) -> Option<T>, prune: bool) {
-        let node = self.get_or_create(&address);
+        let node = self.get_or_create(address);
         let existing_data = node.borrow_mut().data.take();
         node.borrow_mut().data = updater(existing_data);
 
@@ -238,7 +238,7 @@ impl<T: Clone> RadixTree<T> {
 
     /// Remove all children (and descendants) below ADDRESS
     pub fn prune(&self, address: &str) {
-        let accumulated_nodes = self.walk_to_address(&address);
+        let accumulated_nodes = self.walk_to_address(address);
         if let Some(node) = accumulated_nodes.iter().last() {
             node.borrow_mut().children.clear()
         }
