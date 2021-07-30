@@ -490,7 +490,7 @@ where
             match state_change {
                 StateChange::Set { key, value } => {
                     let mut set_path_map = self
-                        .get_path(&key)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     {
                         let node = set_path_map
@@ -505,7 +505,7 @@ where
                 }
                 StateChange::Delete { key } => {
                     let del_path_map = self
-                        .get_path(&key)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     path_map.extend(del_path_map);
                     delete_items.push(key);
@@ -592,15 +592,14 @@ where
     fn get_path(&self, address: &str) -> Result<HashMap<String, Node>, InternalError> {
         // Build up the address along the path, starting with the empty address for the root, and
         // finishing with the complete address.
-        let addresses_along_path: Vec<String> = (0..address.len())
+        let addresses_along_path = (0..address.len())
             .step_by(2)
             .map(|i| address[0..i].to_string())
-            .chain(std::iter::once(address.to_string()))
-            .collect();
+            .chain(std::iter::once(address.to_string()));
 
         let node_path_iter = self
             .inner
-            .get_path(self.tree_id, &self.state_root_hash, address)?
+            .get_path(self.tree_id, self.state_root_hash, address)?
             .into_iter()
             .map(|(_, node)| node)
             // include empty nodes after the queried path, to cover cases where the branch doesn't
@@ -608,7 +607,6 @@ where
             .chain(std::iter::repeat(Node::default()));
 
         Ok(addresses_along_path
-            .into_iter()
             .zip(node_path_iter)
             .collect::<HashMap<_, _>>())
     }

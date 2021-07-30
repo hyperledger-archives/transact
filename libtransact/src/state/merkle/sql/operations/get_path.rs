@@ -36,10 +36,6 @@ struct SqliteExtendedMerkleRadixTreeNode {
     #[sql_type = "Text"]
     pub hash: String,
 
-    #[column_name = "leaf_id"]
-    #[sql_type = "Nullable<BigInt>"]
-    pub leaf_id: Option<i64>,
-
     #[column_name = "children"]
     #[sql_type = "Text"]
     pub children: sqlite::Children,
@@ -55,10 +51,6 @@ struct PostgresExtendedMerkleRadixTreeNode {
     #[column_name = "hash"]
     #[sql_type = "Text"]
     pub hash: String,
-
-    #[column_name = "leaf_id"]
-    #[sql_type = "Nullable<BigInt>"]
-    pub leaf_id: Option<i64>,
 
     #[column_name = "children"]
     #[sql_type = "Array<Nullable<Text>>"]
@@ -107,7 +99,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                   '$[' || json_extract(?, '$[' || p.depth || ']') || ']'
                 )
             )
-            SELECT t.hash, t.leaf_id, t.children, l.data FROM tree_path t
+            SELECT t.hash, t.children, l.data FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
             WHERE t.tree_id = ?
             "#,
@@ -177,7 +169,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
                      (select $3 as indexes) as address
                 WHERE c.hash = p.children[address.indexes[p.depth]]
             )
-            SELECT t.hash, t.leaf_id, t.children, l.data FROM tree_path t
+            SELECT t.hash, t.children, l.data FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
             WHERE t.tree_id = $2
             "#,

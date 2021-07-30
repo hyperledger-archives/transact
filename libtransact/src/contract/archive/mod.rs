@@ -196,7 +196,7 @@ impl SmartContractArchive {
             ))
         })?;
 
-        validate_metadata(&name, &metadata.name)?;
+        validate_metadata(name, &metadata.name)?;
 
         Ok(SmartContractArchive { contract, metadata })
     }
