@@ -45,9 +45,8 @@ impl AdminPermission for SettingsAdminPermission {
 
         for entry in setting.get_entries() {
             if entry.key == ADMINISTRATORS_SETTING_KEY {
-                let values = entry.value.split(',');
-                let value_vec: Vec<&str> = values.collect();
-                return Ok(value_vec.contains(&signer));
+                let mut values = entry.value.split(',');
+                return Ok(values.any(|x| x == signer));
             }
         }
 
