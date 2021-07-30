@@ -592,11 +592,10 @@ where
     fn get_path(&self, address: &str) -> Result<HashMap<String, Node>, InternalError> {
         // Build up the address along the path, starting with the empty address for the root, and
         // finishing with the complete address.
-        let addresses_along_path: Vec<String> = (0..address.len())
+        let addresses_along_path = (0..address.len())
             .step_by(2)
             .map(|i| address[0..i].to_string())
-            .chain(std::iter::once(address.to_string()))
-            .collect();
+            .chain(std::iter::once(address.to_string()));
 
         let node_path_iter = self
             .inner
@@ -608,7 +607,6 @@ where
             .chain(std::iter::repeat(Node::default()));
 
         Ok(addresses_along_path
-            .into_iter()
             .zip(node_path_iter)
             .collect::<HashMap<_, _>>())
     }
