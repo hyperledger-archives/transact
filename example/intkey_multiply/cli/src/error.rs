@@ -20,21 +20,21 @@ use sawtooth_sdk::signing;
 pub enum CliError {
     /// The user has provided invalid inputs; error string
     /// is appropriate for display to the user without additional context
-    UserError(String),
-    IoError(std::io::Error),
-    SigningError(signing::Error),
-    ProtobufError(protobuf::ProtobufError),
-    HyperError(hyper::Error),
+    User(String),
+    Io(std::io::Error),
+    Signing(signing::Error),
+    Protobuf(protobuf::ProtobufError),
+    Hyper(hyper::Error),
 }
 
 impl StdError for CliError {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
-            CliError::UserError(_) => None,
-            CliError::IoError(err) => Some(err),
-            CliError::SigningError(err) => Some(err),
-            CliError::ProtobufError(err) => Some(err),
-            CliError::HyperError(err) => Some(err),
+            CliError::User(_) => None,
+            CliError::Io(err) => Some(err),
+            CliError::Signing(err) => Some(err),
+            CliError::Protobuf(err) => Some(err),
+            CliError::Hyper(err) => Some(err),
         }
     }
 }
@@ -42,35 +42,35 @@ impl StdError for CliError {
 impl std::fmt::Display for CliError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            CliError::UserError(ref s) => write!(f, "Error: {}", s),
-            CliError::IoError(ref err) => write!(f, "IoError: {}", err),
-            CliError::SigningError(ref err) => write!(f, "SigningError: {}", err),
-            CliError::ProtobufError(ref err) => write!(f, "ProtobufError: {}", err),
-            CliError::HyperError(ref err) => write!(f, "HyperError: {}", err),
+            CliError::User(ref s) => write!(f, "Error: {}", s),
+            CliError::Io(ref err) => write!(f, "IoError: {}", err),
+            CliError::Signing(ref err) => write!(f, "SigningError: {}", err),
+            CliError::Protobuf(ref err) => write!(f, "ProtobufError: {}", err),
+            CliError::Hyper(ref err) => write!(f, "HyperError: {}", err),
         }
     }
 }
 
 impl From<std::io::Error> for CliError {
     fn from(e: std::io::Error) -> Self {
-        CliError::IoError(e)
+        CliError::Io(e)
     }
 }
 
 impl From<protobuf::ProtobufError> for CliError {
     fn from(e: protobuf::ProtobufError) -> Self {
-        CliError::ProtobufError(e)
+        CliError::Protobuf(e)
     }
 }
 
 impl From<signing::Error> for CliError {
     fn from(e: signing::Error) -> Self {
-        CliError::SigningError(e)
+        CliError::Signing(e)
     }
 }
 
 impl From<hyper::Error> for CliError {
     fn from(e: hyper::Error) -> Self {
-        CliError::HyperError(e)
+        CliError::Hyper(e)
     }
 }
