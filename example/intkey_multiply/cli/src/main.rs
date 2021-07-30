@@ -57,7 +57,7 @@ fn run() -> Result<(), error::CliError> {
             .value_of("url")
             .unwrap_or("http://localhost:8008/");
 
-        multiply::do_multiply(name_a, name_b, name_c, output, key_name, &url)?;
+        multiply::do_multiply(name_a, name_b, name_c, output, key_name, url)?;
     }
 
     Ok(())

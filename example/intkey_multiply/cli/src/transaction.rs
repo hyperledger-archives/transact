@@ -112,7 +112,7 @@ pub fn create_transaction(
     txn_header.set_outputs(protobuf::RepeatedField::from_vec(output_addresses));
 
     let mut sha = Sha512::new();
-    sha.input(&payload);
+    sha.input(payload);
     let hash: &mut [u8] = &mut [0; 64];
     sha.result(hash);
     txn_header.set_payload_sha512(bytes_to_hex_str(hash));

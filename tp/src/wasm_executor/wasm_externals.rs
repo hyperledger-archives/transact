@@ -261,7 +261,7 @@ impl<'a> WasmExternals<'a> {
     /// error
     pub fn collect_ptrs(&mut self, raw_ptrs: Vec<u32>) -> Result<u32, ExternalsError> {
         info!("associating pointers: {:?}", raw_ptrs);
-        if raw_ptrs.iter().all(|x| self.ptrs.contains_key(&x)) {
+        if raw_ptrs.iter().all(|x| self.ptrs.contains_key(x)) {
             self.ptr_collections.insert(raw_ptrs[0], raw_ptrs.clone());
             Ok(raw_ptrs[0])
         } else {

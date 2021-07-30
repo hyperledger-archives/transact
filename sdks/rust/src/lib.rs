@@ -320,7 +320,7 @@ impl TransactionContext for SabreTransactionContext {
     ) -> Result<(), WasmSdkError> {
         unsafe {
             // Get the WasmBuffer of event_type
-            let event_type_buffer = WasmBuffer::new(&event_type.as_bytes())?;
+            let event_type_buffer = WasmBuffer::new(event_type.as_bytes())?;
 
             // Get the WasmBuffer of data
             let data_buffer = WasmBuffer::new(data)?;
