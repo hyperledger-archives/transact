@@ -490,7 +490,7 @@ where
             match state_change {
                 StateChange::Set { key, value } => {
                     let mut set_path_map = self
-                        .get_path(&key)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     {
                         let node = set_path_map
@@ -505,7 +505,7 @@ where
                 }
                 StateChange::Delete { key } => {
                     let del_path_map = self
-                        .get_path(&key)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     path_map.extend(del_path_map);
                     delete_items.push(key);
@@ -600,7 +600,7 @@ where
 
         let node_path_iter = self
             .inner
-            .get_path(self.tree_id, &self.state_root_hash, address)?
+            .get_path(self.tree_id, self.state_root_hash, address)?
             .into_iter()
             .map(|(_, node)| node)
             // include empty nodes after the queried path, to cover cases where the branch doesn't

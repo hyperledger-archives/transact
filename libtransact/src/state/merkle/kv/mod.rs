@@ -267,7 +267,7 @@ impl MerkleRadixTree {
                     .collect::<Vec<_>>();
                 parent_change_log.successors = new_successors;
 
-                write_change_log(&mut *db_writer, parent_root_bytes, &parent_change_log)?;
+                write_change_log(&mut *db_writer, parent_root_bytes, parent_change_log)?;
             }
 
             deletion_candidates.into_iter().collect()
@@ -305,7 +305,7 @@ impl MerkleRadixTree {
         deletions: Vec<Vec<u8>>,
     ) -> (Vec<StateHash>, Vec<StateHash>) {
         deletions.into_iter().partition(|key| {
-            if let Ok(count) = get_ref_count(db_reader, &key) {
+            if let Ok(count) = get_ref_count(db_reader, key) {
                 count == 0
             } else {
                 false
@@ -472,7 +472,7 @@ impl MerkleRadixTree {
         let root_hash_bytes = ::hex::decode(&self.root_hash).expect("Improper hex");
 
         for &(ref key, ref value) in batch {
-            match db_writer.put(::hex::encode(key).as_bytes(), &value) {
+            match db_writer.put(::hex::encode(key).as_bytes(), value) {
                 Ok(_) => continue,
                 Err(DatabaseError::DuplicateEntry) => {
                     increment_ref_count(&mut *db_writer, key)?;
@@ -719,7 +719,7 @@ fn to_bytes(num: u64) -> [u8; 8] {
 
 fn from_bytes(bytes: &[u8]) -> u64 {
     let mut num_bytes = [0u8; 8];
-    num_bytes.copy_from_slice(&bytes);
+    num_bytes.copy_from_slice(bytes);
     u64::from_le(unsafe { ::std::mem::transmute(num_bytes) })
 }
 

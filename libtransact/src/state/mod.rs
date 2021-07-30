@@ -56,8 +56,8 @@ impl Clone for StateChange {
 impl StateChange {
     pub fn key(&self) -> &str {
         match self {
-            StateChange::Set { key, .. } => &key,
-            StateChange::Delete { key } => &key,
+            StateChange::Set { key, .. } => key,
+            StateChange::Delete { key } => key,
         }
     }
 }
