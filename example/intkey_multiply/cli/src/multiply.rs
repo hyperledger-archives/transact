@@ -48,6 +48,6 @@ pub fn do_multiply(
     }
 
     let mut buffer = File::create(output)?;
-    buffer.write_all(&txn_payload).map_err(CliError::IoError)?;
+    buffer.write_all(txn_payload).map_err(CliError::Io)?;
     Ok(())
 }

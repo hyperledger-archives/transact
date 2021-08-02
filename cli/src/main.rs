@@ -204,7 +204,7 @@ fn run() -> Result<(), CliError> {
             } else if let Some(sp_matches) = matches.subcommand_matches("sp") {
                 smart_permission(sp_matches)?
             } else {
-                return Err(CliError::UserError("Subcommand required".into()));
+                return Err(CliError::User("Subcommand required".into()));
             };
 
         if wait > 0 {
@@ -238,11 +238,11 @@ fn upload(upload_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> 
         Ok(wait) => wait,
         Err(err) => match err.kind {
             clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::UserError("Wait must be an integer".into())),
+            _ => return Err(CliError::User("Wait must be an integer".into())),
         },
     };
 
-    let batch_link = upload::do_upload(&filename, key_name, &url, wasm_name)?;
+    let batch_link = upload::do_upload(filename, key_name, url, wasm_name)?;
     Ok((batch_link, wait))
 }
 
@@ -258,7 +258,7 @@ fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
         Ok(wait) => wait,
         Err(err) => match err.kind {
             clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::UserError("Wait must be an integer".into())),
+            _ => return Err(CliError::User("Wait must be an integer".into())),
         },
     };
 
@@ -266,22 +266,22 @@ fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
         .values_of("inputs")
         .map(|values| values.map(|v| v.into()).collect())
         .ok_or_else(|| {
-            CliError::UserError("exec action requires one or more --inputs arguments".into())
+            CliError::User("exec action requires one or more --inputs arguments".into())
         })?;
 
     let outputs = exec_matches
         .values_of("outputs")
         .map(|values| values.map(|v| v.into()).collect())
         .ok_or_else(|| {
-            CliError::UserError("exec action requires one or more --outputs arguments".into())
+            CliError::User("exec action requires one or more --outputs arguments".into())
         })?;
     let (name, version) = match contract.split(':').collect::<Vec<_>>() {
-        ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => Err(CliError::UserError(
-            "contract name must be specified".into(),
-        )),
+        ref v if (v.len() == 1 || v.len() == 2) && v[0].is_empty() => {
+            Err(CliError::User("contract name must be specified".into()))
+        }
         ref v if v.len() == 1 || v.len() == 2 && v[1].is_empty() => Ok((v[0], "latest")),
         ref v if v.len() == 2 => Ok((v[0], v[1])),
-        _ => Err(CliError::UserError(
+        _ => Err(CliError::User(
             "malformed contract argument, may contain at most one ':'".into(),
         )),
     }?;
@@ -299,7 +299,7 @@ fn execute(exec_matches: &clap::ArgMatches) -> Result<(String, u64), CliError> {
         .into_batch_builder(&*signer)?
         .build(&*signer)?;
 
-    let batch_link = submit_batches(&url, vec![batch])?;
+    let batch_link = submit_batches(url, vec![batch])?;
 
     Ok((batch_link, wait))
 }
@@ -317,7 +317,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
         Ok(wait) => wait,
         Err(err) => match err.kind {
             clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::UserError("Wait must be an integer".into())),
+            _ => return Err(CliError::User("Wait must be an integer".into())),
         },
     };
 
@@ -329,7 +329,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
 
     let batch_link = if ns_matches.is_present("update") {
         let owners = owners.ok_or_else(|| {
-            CliError::UserError("update action requires one or more --owner arguments".into())
+            CliError::User("update action requires one or more --owner arguments".into())
         })?;
 
         let batch = UpdateNamespaceRegistryOwnersActionBuilder::new()
@@ -340,10 +340,10 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     } else if ns_matches.is_present("delete") {
         if ns_matches.is_present("owner") {
-            return Err(CliError::UserError(
+            return Err(CliError::User(
                 "arguments --delete and --owner conflict".into(),
             ));
         }
@@ -355,10 +355,10 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     } else {
         let owners = owners.ok_or_else(|| {
-            CliError::UserError("create action requires one or more --owner arguments".into())
+            CliError::User("create action requires one or more --owner arguments".into())
         })?;
 
         let batch = CreateNamespaceRegistryActionBuilder::new()
@@ -369,7 +369,7 @@ fn namespace_registry(ns_matches: &clap::ArgMatches) -> Result<(String, u64), Cl
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     };
 
     Ok((batch_link, wait))
@@ -387,7 +387,7 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
         Ok(wait) => wait,
         Err(err) => match err.kind {
             clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::UserError("Wait must be an integer".into())),
+            _ => return Err(CliError::User("Wait must be an integer".into())),
         },
     };
 
@@ -401,13 +401,13 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     } else {
         let read = perm_matches.is_present("read");
         let write = perm_matches.is_present("write");
 
         if !(read || write) {
-            return Err(CliError::UserError("no permissions provided".into()));
+            return Err(CliError::User("no permissions provided".into()));
         }
 
         let batch = CreateNamespaceRegistryPermissionActionBuilder::new()
@@ -420,7 +420,7 @@ fn namespace_permission(perm_matches: &clap::ArgMatches) -> Result<(String, u64)
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     };
 
     Ok((batch_link, wait))
@@ -445,7 +445,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
 
     let batch_link = if cr_matches.is_present("update") {
         let owners = owners.ok_or_else(|| {
-            CliError::UserError("update action requires one or more --owner arguments".into())
+            CliError::User("update action requires one or more --owner arguments".into())
         })?;
 
         let batch = UpdateContractRegistryOwnersActionBuilder::new()
@@ -456,10 +456,10 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     } else if cr_matches.is_present("delete") {
         if cr_matches.is_present("owner") {
-            return Err(CliError::UserError(
+            return Err(CliError::User(
                 "arguments --delete and --owner conflict".into(),
             ));
         }
@@ -471,10 +471,10 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     } else {
         let owners = owners.ok_or_else(|| {
-            CliError::UserError("create action requires one or more --owner arguments".into())
+            CliError::User("create action requires one or more --owner arguments".into())
         })?;
 
         let batch = CreateContractRegistryActionBuilder::new()
@@ -485,7 +485,7 @@ fn contract_registry(cr_matches: &clap::ArgMatches) -> Result<(String, u64), Cli
             .into_batch_builder(&*signer)?
             .build(&*signer)?;
 
-        submit_batches(&url, vec![batch])?
+        submit_batches(url, vec![batch])?
     };
     Ok((batch_link, wait))
 }
@@ -499,7 +499,7 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
         Ok(wait) => wait,
         Err(err) => match err.kind {
             clap::ErrorKind::ArgumentNotFound => 0,
-            _ => return Err(CliError::UserError("Wait must be an integer".into())),
+            _ => return Err(CliError::User("Wait must be an integer".into())),
         },
     };
 
@@ -522,7 +522,7 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
                 .into_batch_builder(&*signer)?
                 .build(&*signer)?;
 
-            submit_batches(&url, vec![batch])?
+            submit_batches(url, vec![batch])?
         }
         ("update", Some(m)) => {
             let org_id = m.value_of("org_id").unwrap();
@@ -542,7 +542,7 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
                 .into_batch_builder(&*signer)?
                 .build(&*signer)?;
 
-            submit_batches(&url, vec![batch])?
+            submit_batches(url, vec![batch])?
         }
         ("delete", Some(m)) => {
             let org_id = m.value_of("org_id").unwrap();
@@ -558,10 +558,10 @@ fn smart_permission(sp_matches: &clap::ArgMatches) -> Result<(String, u64), CliE
                 .into_batch_builder(&*signer)?
                 .build(&*signer)?;
 
-            submit_batches(&url, vec![batch])?
+            submit_batches(url, vec![batch])?
         }
         _ => {
-            return Err(CliError::UserError(
+            return Err(CliError::User(
                 "Unrecognized smart permission subcommand".into(),
             ));
         }
@@ -579,14 +579,14 @@ fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
                 .value_of("format")
                 .expect("default not set for --format");
 
-            let registries = state::get_state_with_prefix(url, &CONTRACT_REGISTRY_ADDRESS_PREFIX)?
+            let registries = state::get_state_with_prefix(url, CONTRACT_REGISTRY_ADDRESS_PREFIX)?
                 .into_iter()
                 .map(|entry| {
                     base64::decode(entry.data)
-                        .map_err(|_| CliError::UserError("Unable to decode state".into()))
+                        .map_err(|_| CliError::User("Unable to decode state".into()))
                         .and_then(|bytes| {
                             ContractRegistryList::from_bytes(&bytes)
-                                .map_err(CliError::ProtoConversionError)
+                                .map_err(CliError::ProtoConversion)
                         })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -629,29 +629,29 @@ fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
 
             let contract = matches
                 .value_of("contract")
-                .ok_or_else(|| CliError::UserError("Missing contract".into()))?;
+                .ok_or_else(|| CliError::User("Missing contract".into()))?;
 
             let (name, version) = parse_name_version(contract).ok_or_else(|| {
-                CliError::UserError("--contract must be of the form 'name:version'".into())
+                CliError::User("--contract must be of the form 'name:version'".into())
             })?;
 
             let address = to_hex(&compute_contract_address(name, version).map_err(|err| {
-                CliError::UserError(format!("Unable to get contract address: {}", err))
+                CliError::User(format!("Unable to get contract address: {}", err))
             })?);
 
             let contract_bytes = state::get_state_with_prefix(url, &address)?
                 .get(0)
                 .cloned()
-                .ok_or_else(|| CliError::UserError(format!("contract '{}' not found", contract)))?;
+                .ok_or_else(|| CliError::User(format!("contract '{}' not found", contract)))?;
 
             let contract_list = ContractList::from_bytes(
                 &base64::decode(contract_bytes.data)
-                    .map_err(|_| CliError::UserError("Unable to decode state".into()))?,
+                    .map_err(|_| CliError::User("Unable to decode state".into()))?,
             )?;
             let contract = contract_list
                 .contracts()
                 .get(0)
-                .ok_or_else(|| CliError::UserError("contract list is empty".into()))?;
+                .ok_or_else(|| CliError::User("contract list is empty".into()))?;
 
             println!("{} {}", contract.name(), contract.version());
             println!("  inputs:");
@@ -666,7 +666,7 @@ fn contract(contract_matches: &clap::ArgMatches) -> Result<(), CliError> {
 
             Ok(())
         }
-        _ => Err(CliError::UserError("Invalid Subcommand".into())),
+        _ => Err(CliError::User("Invalid Subcommand".into())),
     }
 }
 
@@ -721,7 +721,7 @@ fn to_hex(bytes: &[u8]) -> String {
 
 fn load_bytes_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, CliError> {
     let file = File::open(&path).map_err(|e| {
-        CliError::UserError(format!(
+        CliError::User(format!(
             "Failed to open file \"{}\": {}",
             path.as_ref().display(),
             e
@@ -730,7 +730,7 @@ fn load_bytes_from_file<P: AsRef<Path>>(path: P) -> Result<Vec<u8>, CliError> {
     let mut buf_reader = BufReader::new(file);
     let mut contents = Vec::new();
     buf_reader.read_to_end(&mut contents).map_err(|e| {
-        CliError::UserError(format!(
+        CliError::User(format!(
             "IoError while reading file \"{}\": {}",
             path.as_ref().display(),
             e

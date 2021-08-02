@@ -30,20 +30,20 @@ pub fn submit_batch_list(url: &str, batch_list: &BatchList) -> Result<(), CliErr
     let post_url = String::from(url) + "/batches";
     let hyper_uri = match post_url.parse::<hyper::Uri>() {
         Ok(uri) => uri,
-        Err(e) => return Err(CliError::UserError(format!("Invalid URL: {}: {}", e, url))),
+        Err(e) => return Err(CliError::User(format!("Invalid URL: {}: {}", e, url))),
     };
 
     match hyper_uri.scheme() {
         Some(scheme) => {
             if scheme != "http" {
-                return Err(CliError::UserError(format!(
+                return Err(CliError::User(format!(
                     "Unsupported scheme ({}) in URL: {}",
                     scheme, url
                 )));
             }
         }
         None => {
-            return Err(CliError::UserError(format!("No scheme in URL: {}", url)));
+            return Err(CliError::User(format!("No scheme in URL: {}", url)));
         }
     }
 

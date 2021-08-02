@@ -610,7 +610,7 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
                 new_value
             )));
         };
-        state.set(&payload.get_name_a(), new_value as u32)?;
+        state.set(payload.get_name_a(), new_value as u32)?;
 
         // Send an event with the result and the current values of b & c
         // Compute the event data to be sent in Bvalue,Cvalue,Avalue format
