@@ -903,7 +903,7 @@ fn test_same_results(left: Box<dyn Database>, right: Box<dyn Database>) {
 ///
 /// 1. Perform set operations and verify the same result root
 /// 2. Perform a delete operation and verify the same result root
-#[cfg(all(feature = "state-merkle-sql", feature = "sqlite"))]
+#[cfg(any(feature = "state-merkle-sql-postgres-tests", feature = "sqlite"))]
 fn test_produce_same_state<L, R>(
     left_initial_state_root: String,
     left: L,

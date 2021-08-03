@@ -845,6 +845,7 @@ fn hash(input: &[u8]) -> Vec<u8> {
     hash.to_vec()
 }
 
+#[cfg(feature = "sqlite")]
 #[cfg(test)]
 mod test {
     use super::*;
