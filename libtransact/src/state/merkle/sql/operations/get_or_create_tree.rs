@@ -15,7 +15,9 @@
  * -----------------------------------------------------------------------------
  */
 
-use diesel::dsl::{insert_into, select};
+use diesel::dsl::insert_into;
+#[cfg(feature = "sqlite")]
+use diesel::dsl::select;
 use diesel::prelude::*;
 
 use crate::error::InternalError;
@@ -24,7 +26,9 @@ use crate::state::merkle::sql::models::MerkleRadixTree;
 use crate::state::merkle::sql::models::NewMerkleRadixTree;
 use crate::state::merkle::sql::schema::merkle_radix_tree;
 
-use super::{last_insert_rowid, MerkleRadixOperations};
+#[cfg(feature = "sqlite")]
+use super::last_insert_rowid;
+use super::MerkleRadixOperations;
 
 pub trait MerkleRadixGetOrCreateTreeOperation {
     fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError>;

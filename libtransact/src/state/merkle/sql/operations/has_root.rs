@@ -31,6 +31,7 @@ pub trait MerkleRadixHasRootOperation {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 }
 
+#[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         select(exists(
@@ -41,6 +42,7 @@ impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, SqliteConnect
     }
 }
 
+#[cfg(feature = "postgres")]
 impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, PgConnection> {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         select(exists(
