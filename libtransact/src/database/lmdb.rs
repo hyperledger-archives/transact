@@ -115,14 +115,14 @@ impl LmdbDatabase {
         let txn = lmdb::ReadTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::ReaderError(format!("Failed to create reader: {}", err))
         })?;
-        Ok(LmdbDatabaseReader { db: &self, txn })
+        Ok(LmdbDatabaseReader { db: self, txn })
     }
 
     pub fn writer(&self) -> Result<LmdbDatabaseWriter, DatabaseError> {
         let txn = lmdb::WriteTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::WriterError(format!("Failed to create writer: {}", err))
         })?;
-        Ok(LmdbDatabaseWriter { db: &self, txn })
+        Ok(LmdbDatabaseWriter { db: self, txn })
     }
 }
 
@@ -131,14 +131,14 @@ impl Database for LmdbDatabase {
         let txn = lmdb::ReadTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::ReaderError(format!("Failed to create reader: {}", err))
         })?;
-        Ok(Box::new(LmdbDatabaseReader { db: &self, txn }))
+        Ok(Box::new(LmdbDatabaseReader { db: self, txn }))
     }
 
     fn get_writer<'a>(&'a self) -> Result<Box<dyn DatabaseWriter + 'a>, DatabaseError> {
         let txn = lmdb::WriteTransaction::new(self.ctx.env.clone()).map_err(|err| {
             DatabaseError::WriterError(format!("Failed to create writer: {}", err))
         })?;
-        Ok(Box::new(LmdbDatabaseWriter { db: &self, txn }))
+        Ok(Box::new(LmdbDatabaseWriter { db: self, txn }))
     }
 
     fn clone_box(&self) -> Box<dyn Database> {

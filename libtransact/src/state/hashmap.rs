@@ -93,7 +93,7 @@ impl Write for HashMapState {
             StateWriteError::InvalidStateId(format!("Unknown state id {}", state_id))
         })?;
 
-        let (next_state_id, new_state_map) = HashMapState::next_state(&state, state_changes);
+        let (next_state_id, new_state_map) = HashMapState::next_state(state, state_changes);
 
         states.insert(next_state_id.clone(), new_state_map);
 
@@ -110,7 +110,7 @@ impl Write for HashMapState {
             StateWriteError::InvalidStateId(format!("Unknown state id {}", state_id))
         })?;
 
-        let (next_state_id, _) = HashMapState::next_state(&state, state_changes);
+        let (next_state_id, _) = HashMapState::next_state(state, state_changes);
 
         Ok(next_state_id)
     }
