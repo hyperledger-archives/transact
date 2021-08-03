@@ -17,7 +17,9 @@
 
 use std::collections::HashMap;
 
-use diesel::dsl::{insert_into, insert_or_ignore_into, max};
+#[cfg(feature = "sqlite")]
+use diesel::dsl::insert_or_ignore_into;
+use diesel::dsl::{insert_into, max};
 use diesel::prelude::*;
 
 use crate::error::InternalError;

@@ -25,6 +25,7 @@ use diesel::{pg::types::sql_types::Array, sql_types::SmallInt};
 
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
+#[cfg(feature = "sqlite")]
 use crate::state::merkle::sql::models::sqlite;
 
 use super::MerkleRadixOperations;
@@ -214,7 +215,9 @@ fn vec_to_btree(hashes: Vec<Option<String>>) -> BTreeMap<String, String> {
 mod tests {
     use super::*;
 
-    use diesel::dsl::{insert_into, select};
+    use diesel::dsl::insert_into;
+    #[cfg(feature = "sqlite")]
+    use diesel::dsl::select;
 
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     use crate::state::merkle::sql::{
@@ -227,6 +230,7 @@ mod tests {
     };
 
     use crate::state::merkle::sql::models::NewMerkleRadixLeaf;
+    #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::operations::last_insert_rowid;
     use crate::state::merkle::sql::schema::merkle_radix_leaf;
 

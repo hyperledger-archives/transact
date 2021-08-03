@@ -50,6 +50,7 @@ mod test {
 
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
+    #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration;
     use crate::state::merkle::sql::models::NewMerkleRadixTree;
 
