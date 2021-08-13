@@ -100,9 +100,10 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                   '$[' || json_extract(?, '$[' || p.depth || ']') || ']'
                 )
             )
-            SELECT t.hash, t.children, l.data FROM tree_path t
+            SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
             WHERE t.tree_id = ?
+            ORDER BY t.depth
             "#,
         )
         .bind::<Text, _>(state_root_hash)
@@ -166,13 +167,13 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
 
                 -- Recurse through the tree
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
-                FROM merkle_radix_tree_node c, tree_path p,
-                     (select $3 as indexes) as address
-                WHERE c.hash = p.children[address.indexes[p.depth]]
+                FROM merkle_radix_tree_node c, tree_path p
+                WHERE c.hash = p.children[$3[p.depth]]
             )
-            SELECT t.hash, t.children, l.data FROM tree_path t
+            SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
             WHERE t.tree_id = $2
+            ORDER BY t.depth
             "#,
         )
         .bind::<Text, _>(state_root_hash)
