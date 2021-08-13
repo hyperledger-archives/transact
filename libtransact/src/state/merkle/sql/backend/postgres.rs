@@ -152,9 +152,6 @@ pub mod test {
             let result = panic::catch_unwind(move || test(&test_url));
 
             // rollback
-            let url = env::var("STATE_MERKLE_SQL_POSTGRES_TEST_URL")
-                .ok()
-                .unwrap_or_else(|| "".into());
             let conn = PgConnection::establish(&url)?;
             let migration_result: Result<(), Box<dyn Error>> = loop {
                 match revert_latest_migration_in_directory(
