@@ -90,3 +90,47 @@ pub struct MerkleRadixStateRootLeafIndexEntry {
     pub from_state_root_id: i64,
     pub to_state_root_id: Option<i64>,
 }
+
+#[derive(Insertable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_change_log_addition"]
+pub struct NewMerkleRadixChangeLogAddition<'a> {
+    pub tree_id: i64,
+    pub state_root: &'a str,
+    pub parent_state_root: Option<&'a str>,
+    pub addition: &'a str,
+}
+
+#[derive(Queryable, QueryableByName, Identifiable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_change_log_addition"]
+#[primary_key(id)]
+pub struct MerkleRadixChangeLogAddition {
+    pub id: i64,
+    pub tree_id: i64,
+    pub state_root: String,
+    pub parent_state_root: Option<String>,
+    pub addition: String,
+}
+
+#[derive(Insertable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_change_log_deletion"]
+pub struct NewMerkleRadixChangeLogDeletion<'a> {
+    pub tree_id: i64,
+    pub successor_state_root: &'a str,
+    pub state_root: &'a str,
+    pub deletion: &'a str,
+}
+
+#[derive(Queryable, QueryableByName, Identifiable)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
+#[table_name = "merkle_radix_change_log_deletion"]
+#[primary_key(id)]
+pub struct MerkleRadixChangeLogDeletion {
+    pub id: i64,
+    pub tree_id: i64,
+    pub successor_state_root: String,
+    pub state_root: String,
+    pub deletion: String,
+}
