@@ -137,8 +137,9 @@ impl SqlMerkleStateBuilder<backend::SqliteBackend> {
         let conn = backend.connection()?;
         let operations = MerkleRadixOperations::new(conn.as_inner());
 
+        let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
         let tree_id: i64 = if self.create_tree {
-            operations.get_or_create_tree(&tree_name)?
+            operations.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
         } else {
             operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
                 InvalidStateError::with_message("must provide the name of an existing tree".into())
@@ -173,8 +174,9 @@ impl SqlMerkleStateBuilder<backend::PostgresBackend> {
         let conn = backend.connection()?;
         let operations = MerkleRadixOperations::new(conn.as_inner());
 
+        let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
         let tree_id: i64 = if self.create_tree {
-            operations.get_or_create_tree(&tree_name)?
+            operations.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
         } else {
             operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
                 InvalidStateError::with_message("must provide the name of an existing tree".into())
