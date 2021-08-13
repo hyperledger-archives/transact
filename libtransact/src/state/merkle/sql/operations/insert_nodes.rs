@@ -74,10 +74,9 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
 
             let leaves = nodes
                 .iter()
-                .filter(|insertable_node| insertable_node.node.value.is_some())
                 .enumerate()
-                .map(|(i, insertable_node)| {
-                    if let Some(data) = insertable_node.node.value.as_deref() {
+                .filter_map(|(i, insertable_node)| {
+                    insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
@@ -86,10 +85,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                             address: &insertable_node.address,
                             data,
                         })
-                    } else {
-                        // we already filtered out the None values
-                        unreachable!()
-                    }
+                    })
                 })
                 .collect::<Result<Vec<NewMerkleRadixLeaf>, InternalError>>()?;
 
@@ -158,10 +154,9 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
 
             let leaves = nodes
                 .iter()
-                .filter(|insertable_node| insertable_node.node.value.is_some())
                 .enumerate()
-                .map(|(i, insertable_node)| {
-                    if let Some(data) = insertable_node.node.value.as_deref() {
+                .filter_map(|(i, insertable_node)| {
+                    insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
@@ -170,10 +165,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                             address: &insertable_node.address,
                             data,
                         })
-                    } else {
-                        // we already filtered out the None values
-                        unreachable!()
-                    }
+                    })
                 })
                 .collect::<Result<Vec<NewMerkleRadixLeaf>, InternalError>>()?;
 

@@ -198,18 +198,11 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
 }
 
 fn vec_to_btree(hashes: Vec<Option<String>>) -> BTreeMap<String, String> {
-    let mut btree = BTreeMap::new();
-
-    for (i, hash_opt) in hashes
+    hashes
         .into_iter()
         .enumerate()
-        .filter(|(_, opt)| opt.is_some())
-    {
-        if let Some(hash) = hash_opt {
-            btree.insert(format!("{:02x}", i), hash);
-        }
-    }
-    btree
+        .filter_map(|(i, hash_opt)| hash_opt.map(|hash| (format!("{:02x}", i), hash)))
+        .collect()
 }
 
 #[cfg(test)]
