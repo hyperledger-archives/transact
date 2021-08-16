@@ -103,6 +103,15 @@ fn merkle_trie_prune_parent() -> Result<(), Box<dyn Error>> {
     })
 }
 
+#[test]
+fn merkle_trie_prune_successors() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_successors(orig_root, state);
+        Ok(())
+    })
+}
+
 #[cfg(feature = "state-merkle-leaf-reader")]
 #[test]
 fn leaf_iteration() -> Result<(), Box<dyn Error>> {

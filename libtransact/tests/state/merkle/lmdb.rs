@@ -107,6 +107,14 @@ fn merkle_trie_pruning_parent() {
 }
 
 #[test]
+fn merkle_trie_prune_successors() {
+    run_test(|merkle_path| {
+        let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+        test_merkle_trie_prune_successors(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_successors() {
     run_test(|merkle_path| {
         let db = make_lmdb(&merkle_path);
