@@ -191,7 +191,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                 .collect::<Result<Vec<_>, _>>()?;
 
             insert_into(postgres_merkle_radix_tree_node::table)
-                .values(node_models)
+                .values(&node_models)
                 .on_conflict_do_nothing()
                 .execute(self.conn)?;
 
