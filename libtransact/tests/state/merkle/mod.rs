@@ -800,7 +800,7 @@ where
 }
 
 /// This test creates a merkle trie with multiple entries and produces a
-/// successor with duplicate That changes one new leaf, followed by a second
+/// successor with duplicate that changes one new leaf, followed by a second
 /// successor that produces a leaf with the same hash.  When the pruning the
 /// initial root, the duplicate leaf node is not pruned as well.
 fn test_merkle_trie_pruning_duplicate_leaves(db: Box<dyn Database>) {
@@ -869,6 +869,68 @@ fn test_merkle_trie_pruning_duplicate_leaves(db: Box<dyn Database>) {
     );
 
     assert_value_at_address(&merkle_db, "ab0000", "0001");
+}
+
+/// This test creates a merkle trie with multiple entries and produces a
+/// successor with duplicate that changes one new leaf, followed by a second
+/// successor that produces a leaf with the same hash.  When the pruning the
+/// initial root, the duplicate leaf node is not pruned as well.
+fn test_merkle_trie_prune_duplicate_leaves<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>
+        + Prune<StateId = String, Key = String, Value = Vec<u8>>,
+{
+    let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "0001".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0a01".to_string(),
+        value: "0002".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "abff00".to_string(),
+        value: "0003".as_bytes().to_vec(),
+    });
+
+    let parent_root = merkle_state
+        .commit(&initial_state_root, &updates)
+        .expect("Update failed to work");
+
+    // create the middle root
+    updates.clear();
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "change0".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0001".to_string(),
+        value: "change1".as_bytes().to_vec(),
+    });
+
+    let successor_root_middle = merkle_state
+        .commit(&parent_root, &updates)
+        .expect("Update failed to work");
+
+    // Set the value back to the original
+    let successor_root_last = merkle_state
+        .commit(
+            &successor_root_middle,
+            &[StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "0001".as_bytes().to_vec(),
+            }],
+        )
+        .expect("Set failed to work");
+
+    let res = merkle_state
+        .prune(vec![parent_root.clone()])
+        .expect("Prune should have no errors");
+    assert_eq!(3, res.len());
+
+    assert_read_value_at_address(&merkle_state, &successor_root_last, "ab0000", Some("0001"));
 }
 
 /// This test creates a merkle trie with multiple entries and produces a

@@ -91,6 +91,12 @@ fn merkle_trie_pruning_successors() {
 }
 
 #[test]
+fn merkle_trie_prune_duplicate_leaves() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_duplicate_leaves(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_pruning_duplicate_leaves() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_duplicate_leaves(btree_db);
