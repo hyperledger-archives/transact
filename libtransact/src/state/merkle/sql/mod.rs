@@ -57,10 +57,10 @@ use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
 use crate::error::{InternalError, InvalidStateError};
-use crate::state::error::{StateReadError, StateWriteError};
+use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 #[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
-use crate::state::{Read, StateChange, Write};
+use crate::state::{Prune, Read, StateChange, Write};
 
 use super::node::Node;
 
@@ -73,6 +73,7 @@ use operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use operations::has_root::MerkleRadixHasRootOperation as _;
 use operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use operations::list_leaves::MerkleRadixListLeavesOperation as _;
+use operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
 use operations::update_index::MerkleRadixUpdateIndexOperation as _;
 use operations::MerkleRadixOperations;
@@ -289,6 +290,21 @@ impl Read for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
+#[cfg(feature = "sqlite")]
+impl Prune for SqlMerkleState<backend::SqliteBackend> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
+        let overlay = MerkleRadixPruner::new(self.tree_id, SqlOverlay::new(&self.backend));
+
+        overlay
+            .prune(&state_ids)
+            .map_err(|e| StatePruneError::StorageError(Box::new(e)))
+    }
+}
+
 #[cfg(feature = "postgres")]
 impl Write for SqlMerkleState<backend::PostgresBackend> {
     type StateId = String;
@@ -333,6 +349,21 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
             .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
 
         Ok(next_state_id)
+    }
+}
+
+#[cfg(feature = "postgres")]
+impl Prune for SqlMerkleState<backend::PostgresBackend> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
+        let overlay = MerkleRadixPruner::new(self.tree_id, SqlOverlay::new(&self.backend));
+
+        overlay
+            .prune(&state_ids)
+            .map_err(|e| StatePruneError::StorageError(Box::new(e)))
     }
 }
 
@@ -631,6 +662,29 @@ where
     }
 }
 
+struct MerkleRadixPruner<O> {
+    tree_id: i64,
+    inner: O,
+}
+
+impl<O> MerkleRadixPruner<O>
+where
+    O: OverlayWriter,
+{
+    fn new(tree_id: i64, inner: O) -> Self {
+        Self { tree_id, inner }
+    }
+
+    fn prune(&self, state_ids: &[String]) -> Result<Vec<String>, InternalError> {
+        let mut removed_hashes = vec![];
+        for state_id in state_ids {
+            let pruned = self.inner.prune(self.tree_id, state_id)?;
+            removed_hashes.extend(pruned.into_iter());
+        }
+        Ok(removed_hashes)
+    }
+}
+
 trait OverlayReader {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
@@ -658,6 +712,8 @@ trait OverlayWriter {
         tree_update: TreeUpdate,
         deleted_addresses: &[&str],
     ) -> Result<(), InternalError>;
+
+    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
 }
 
 struct SqlOverlay<'b, B: Backend> {
@@ -767,6 +823,12 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
 
         Ok(())
     }
+
+    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.prune_entries(tree_id, state_root)
+    }
 }
 
 #[cfg(feature = "postgres")]
@@ -865,6 +927,12 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
         )?;
 
         Ok(())
+    }
+
+    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.prune_entries(tree_id, state_root)
     }
 }
 
