@@ -70,7 +70,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
             let initial_id: i64 = merkle_radix_leaf::table
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
-                .unwrap_or(1);
+                .unwrap_or(0);
 
             let leaves = nodes
                 .iter()
@@ -150,7 +150,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
             let initial_id: i64 = merkle_radix_leaf::table
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
-                .unwrap_or(1);
+                .unwrap_or(0);
 
             let leaves = nodes
                 .iter()
