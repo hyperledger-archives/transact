@@ -56,6 +56,8 @@ mod schema;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
+use diesel::Connection as _;
+
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 #[cfg(feature = "state-merkle-leaf-reader")]
@@ -771,57 +773,59 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
         deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
+        conn.as_inner().transaction(|| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
 
-        let TreeUpdate {
-            node_changes,
-            deletions,
-        } = tree_update;
+            let TreeUpdate {
+                node_changes,
+                deletions,
+            } = tree_update;
 
-        let insertable_changes = node_changes
-            .into_iter()
-            .map(
-                |(hash, node, address)| operations::insert_nodes::InsertableNode {
-                    hash,
-                    node,
-                    address,
-                },
-            )
-            .collect::<Vec<_>>();
+            let insertable_changes = node_changes
+                .into_iter()
+                .map(
+                    |(hash, node, address)| operations::insert_nodes::InsertableNode {
+                        hash,
+                        node,
+                        address,
+                    },
+                )
+                .collect::<Vec<_>>();
 
-        let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
+            let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
 
-        let changes = indexable_info
-            .iter()
-            .map(
-                |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
-                    address: &leaf_info.address,
-                    leaf_id: leaf_info.leaf_id,
-                },
-            )
-            .chain(
-                deleted_addresses
-                    .iter()
-                    .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
-            )
-            .collect();
+            let changes = indexable_info
+                .iter()
+                .map(
+                    |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
+                        address: &leaf_info.address,
+                        leaf_id: leaf_info.leaf_id,
+                    },
+                )
+                .chain(
+                    deleted_addresses
+                        .iter()
+                        .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
+                )
+                .collect();
 
-        operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
+            operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
 
-        let additions = insertable_changes
-            .iter()
-            .map(|insertable| insertable.hash.as_ref())
-            .collect::<Vec<_>>();
-        let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-        operations.update_change_log(
-            tree_id,
-            state_root_hash,
-            parent_state_root_hash,
-            &additions,
-            &deletions,
-        )?;
+            let additions = insertable_changes
+                .iter()
+                .map(|insertable| insertable.hash.as_ref())
+                .collect::<Vec<_>>();
+            let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+            operations.update_change_log(
+                tree_id,
+                state_root_hash,
+                parent_state_root_hash,
+                &additions,
+                &deletions,
+            )?;
 
-        Ok(())
+            Ok(())
+        })
     }
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
@@ -876,57 +880,60 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
         deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
 
-        let TreeUpdate {
-            node_changes,
-            deletions,
-        } = tree_update;
+        conn.as_inner().transaction(|| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
 
-        let insertable_changes = node_changes
-            .into_iter()
-            .map(
-                |(hash, node, address)| operations::insert_nodes::InsertableNode {
-                    hash,
-                    node,
-                    address,
-                },
-            )
-            .collect::<Vec<_>>();
+            let TreeUpdate {
+                node_changes,
+                deletions,
+            } = tree_update;
 
-        let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
+            let insertable_changes = node_changes
+                .into_iter()
+                .map(
+                    |(hash, node, address)| operations::insert_nodes::InsertableNode {
+                        hash,
+                        node,
+                        address,
+                    },
+                )
+                .collect::<Vec<_>>();
 
-        let changes = indexable_info
-            .iter()
-            .map(
-                |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
-                    address: &leaf_info.address,
-                    leaf_id: leaf_info.leaf_id,
-                },
-            )
-            .chain(
-                deleted_addresses
-                    .iter()
-                    .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
-            )
-            .collect();
+            let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
 
-        operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
+            let changes = indexable_info
+                .iter()
+                .map(
+                    |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
+                        address: &leaf_info.address,
+                        leaf_id: leaf_info.leaf_id,
+                    },
+                )
+                .chain(
+                    deleted_addresses
+                        .iter()
+                        .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
+                )
+                .collect();
 
-        let additions = insertable_changes
-            .iter()
-            .map(|insertable| insertable.hash.as_ref())
-            .collect::<Vec<_>>();
-        let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-        operations.update_change_log(
-            tree_id,
-            state_root_hash,
-            parent_state_root_hash,
-            &additions,
-            &deletions,
-        )?;
+            operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
 
-        Ok(())
+            let additions = insertable_changes
+                .iter()
+                .map(|insertable| insertable.hash.as_ref())
+                .collect::<Vec<_>>();
+            let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+            operations.update_change_log(
+                tree_id,
+                state_root_hash,
+                parent_state_root_hash,
+                &additions,
+                &deletions,
+            )?;
+
+            Ok(())
+        })
     }
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
