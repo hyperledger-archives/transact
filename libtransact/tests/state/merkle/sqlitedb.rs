@@ -148,6 +148,14 @@ fn merkle_trie_pruning_parent() {
 }
 
 #[test]
+fn merkle_trie_prune_successors() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_successors(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_successors() {
     run_test(|db_path| {
         let db = Box::new(

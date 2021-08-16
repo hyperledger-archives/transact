@@ -79,6 +79,12 @@ fn merkle_trie_pruning_parent() {
 }
 
 #[test]
+fn merkle_trie_prune_successors() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_successors(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_pruning_successors() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_successors(btree_db);

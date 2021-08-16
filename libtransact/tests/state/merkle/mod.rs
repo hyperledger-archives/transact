@@ -711,6 +711,94 @@ fn test_merkle_trie_pruning_successors(db: Box<dyn Database>) {
     assert!(merkle_db.set_merkle_root(successor_root_left).is_err());
 }
 
+/// This test creates a merkle trie with multiple entries and produces two
+/// distinct successor tries from that first.
+///
+/// - it verifies that all the tries have a ChangeLogEntry
+/// - it prunes one of the successors
+/// - it verifies the nodes from that successor are removed
+/// - it verifies that the pruned successor's ChangeLogEntry is removed
+/// - it verifies the original and the remaining successor still are
+///   persisted
+fn test_merkle_trie_prune_successors<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>
+        + Prune<StateId = String, Key = String, Value = Vec<u8>>,
+{
+    let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "0001".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0a01".to_string(),
+        value: "0002".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "abff00".to_string(),
+        value: "0003".as_bytes().to_vec(),
+    });
+
+    let parent_root = merkle_state
+        .commit(&initial_state_root, &updates)
+        .expect("Update failed to work");
+
+    assert_read_value_at_address(&merkle_state, &parent_root, "ab0000", Some("0001"));
+    assert_read_value_at_address(&merkle_state, &parent_root, "ab0a01", Some("0002"));
+    assert_read_value_at_address(&merkle_state, &parent_root, "abff00", Some("0003"));
+
+    let successor_root_left = merkle_state
+        .commit(
+            &parent_root,
+            &[StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "left".as_bytes().to_vec(),
+            }],
+        )
+        .expect("Set failed to work");
+
+    let successor_root_right = merkle_state
+        .commit(
+            &parent_root,
+            &[StateChange::Set {
+                key: "ab0a01".to_string(),
+                value: "right".as_bytes().to_vec(),
+            }],
+        )
+        .expect("Set failed to work");
+
+    // Let's prune the left successor:
+    let res = merkle_state
+        .prune(vec![successor_root_left.clone()])
+        .expect("Prune should have no errors");
+    assert_eq!(4, res.len());
+
+    // Verify that the values still exist for the parent root
+    assert_read_value_at_address(&merkle_state, &parent_root, "ab0000", Some("0001"));
+    assert_read_value_at_address(&merkle_state, &parent_root, "ab0a01", Some("0002"));
+    assert_read_value_at_address(&merkle_state, &parent_root, "abff00", Some("0003"));
+
+    // Verify that the values still exist for the alternate successor root
+    assert_read_value_at_address(&merkle_state, &successor_root_right, "ab0000", Some("0001"));
+    assert_read_value_at_address(
+        &merkle_state,
+        &successor_root_right,
+        "ab0a01",
+        Some("right"),
+    );
+    assert_read_value_at_address(&merkle_state, &successor_root_right, "abff00", Some("0003"));
+
+    let res = merkle_state.get(&successor_root_left, &["ab0000".to_string()]);
+    assert!(
+        matches!(res, Err(StateReadError::InvalidStateId(_))),
+        "expected {:?} but was {:?}",
+        StateReadError::InvalidStateId(successor_root_left),
+        res
+    );
+}
+
 /// This test creates a merkle trie with multiple entries and produces a
 /// successor with duplicate That changes one new leaf, followed by a second
 /// successor that produces a leaf with the same hash.  When the pruning the
