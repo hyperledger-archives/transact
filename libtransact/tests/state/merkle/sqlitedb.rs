@@ -130,6 +130,14 @@ fn merkle_trie_update_same_address_space_with_no_children() {
 }
 
 #[test]
+fn merkle_trie_prune_parent() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_parent(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_parent() {
     run_test(|db_path| {
         let db = Box::new(
