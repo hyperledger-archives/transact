@@ -67,6 +67,12 @@ fn merkle_trie_update_same_address_space_with_no_children() {
 }
 
 #[test]
+fn merkle_trie_prune_parent() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_parent(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_pruning_parent() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_parent(btree_db);
