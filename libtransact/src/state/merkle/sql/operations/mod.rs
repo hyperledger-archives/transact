@@ -22,6 +22,7 @@ pub(super) mod get_tree_by_name;
 pub(super) mod has_root;
 pub(super) mod insert_nodes;
 pub(super) mod list_leaves;
+pub(super) mod update_change_log;
 pub(super) mod update_index;
 
 #[cfg(feature = "sqlite")]
