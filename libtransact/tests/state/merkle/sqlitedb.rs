@@ -184,6 +184,14 @@ fn merkle_trie_pruning_duplicate_leaves() {
 }
 
 #[test]
+fn merkle_trie_prune_successor_duplicate_leaves() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_successor_duplicate_leaves() {
     run_test(|db_path| {
         let db = Box::new(
