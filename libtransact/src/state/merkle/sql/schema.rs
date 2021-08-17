@@ -57,25 +57,6 @@ table! {
 }
 
 table! {
-    merkle_radix_state_root (id) {
-        id -> Int8,
-        tree_id -> Int8,
-        state_root -> VarChar,
-        parent_state_root -> VarChar,
-    }
-}
-
-table! {
-    merkle_radix_state_root_leaf_index (id) {
-        id -> Int8,
-        tree_id -> Int8,
-        leaf_id -> Int8,
-        from_state_root_id -> Int8,
-        to_state_root_id -> Nullable<Int8>,
-    }
-}
-
-table! {
     merkle_radix_change_log_addition (id) {
         id -> Int8,
         tree_id -> Int8,
@@ -95,16 +76,12 @@ table! {
     }
 }
 
-joinable!(merkle_radix_state_root_leaf_index -> merkle_radix_leaf (leaf_id));
-
 #[cfg(all(feature = "sqlite", feature = "postgres"))]
 allow_tables_to_appear_in_same_query!(
     merkle_radix_tree,
     merkle_radix_leaf,
     sqlite_merkle_radix_tree_node,
     postgres_merkle_radix_tree_node,
-    merkle_radix_state_root,
-    merkle_radix_state_root_leaf_index,
 );
 
 #[cfg(all(feature = "sqlite", not(feature = "postgres")))]
@@ -112,8 +89,6 @@ allow_tables_to_appear_in_same_query!(
     merkle_radix_tree,
     merkle_radix_leaf,
     sqlite_merkle_radix_tree_node,
-    merkle_radix_state_root,
-    merkle_radix_state_root_leaf_index,
 );
 
 #[cfg(all(not(feature = "sqlite"), feature = "postgres"))]
@@ -121,6 +96,4 @@ allow_tables_to_appear_in_same_query!(
     merkle_radix_tree,
     merkle_radix_leaf,
     postgres_merkle_radix_tree_node,
-    merkle_radix_state_root,
-    merkle_radix_state_root_leaf_index,
 );
