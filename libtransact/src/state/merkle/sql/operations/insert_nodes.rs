@@ -43,27 +43,13 @@ pub struct InsertableNode {
     pub address: String,
 }
 
-#[cfg_attr(test, derive(Debug, PartialEq))]
-pub struct IndexableLeafInfo {
-    pub address: String,
-    pub leaf_id: i64,
-}
-
 pub trait MerkleRadixInsertNodesOperation {
-    fn insert_nodes(
-        &self,
-        tree_id: i64,
-        nodes: &[InsertableNode],
-    ) -> Result<Vec<IndexableLeafInfo>, InternalError>;
+    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError>;
 }
 
 #[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteConnection> {
-    fn insert_nodes(
-        &self,
-        tree_id: i64,
-        nodes: &[InsertableNode],
-    ) -> Result<Vec<IndexableLeafInfo>, InternalError> {
+    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             // We manually increment the id, so we don't have to insert one at a time and fetch
             // back the resulting id.
@@ -114,13 +100,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                 .values(node_models)
                 .execute(self.conn)?;
 
-            Ok(leaf_ids
-                .into_iter()
-                .map(|(address, leaf_id)| IndexableLeafInfo {
-                    address: address.into(),
-                    leaf_id,
-                })
-                .collect())
+            Ok(())
         })
     }
 }
@@ -139,11 +119,7 @@ fn node_to_sqlite_children(node: &Node) -> Result<sqlite::Children, InternalErro
 
 #[cfg(feature = "postgres")]
 impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnection> {
-    fn insert_nodes(
-        &self,
-        tree_id: i64,
-        nodes: &[InsertableNode],
-    ) -> Result<Vec<IndexableLeafInfo>, InternalError> {
+    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             // We manually increment the id, so we don't have to insert one at a time and fetch
             // back the resulting id.
@@ -195,13 +171,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                 .on_conflict_do_nothing()
                 .execute(self.conn)?;
 
-            Ok(leaf_ids
-                .into_iter()
-                .map(|(address, leaf_id)| IndexableLeafInfo {
-                    address: address.into(),
-                    leaf_id,
-                })
-                .collect())
+            Ok(())
         })
     }
 }
@@ -249,7 +219,7 @@ mod tests {
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        let indexable_info = operations.insert_nodes(
+        operations.insert_nodes(
             1,
             &vec![InsertableNode {
                 hash: "initial-state-root".into(),
@@ -260,11 +230,6 @@ mod tests {
                 address: String::new(),
             }],
         )?;
-
-        assert!(
-            indexable_info.is_empty(),
-            "Expected no indexable information, but received some"
-        );
 
         assert_eq!(
             merkle_radix_leaf::table
@@ -300,7 +265,7 @@ mod tests {
 
             let operations = MerkleRadixOperations::new(&conn);
 
-            let indexable_info = operations.insert_nodes(
+            operations.insert_nodes(
                 1,
                 &vec![InsertableNode {
                     hash: "initial-state-root".into(),
@@ -311,11 +276,6 @@ mod tests {
                     address: String::new(),
                 }],
             )?;
-
-            assert!(
-                indexable_info.is_empty(),
-                "Expected no indexable information, but received some"
-            );
 
             assert_eq!(
                 merkle_radix_leaf::table
@@ -389,20 +349,12 @@ mod tests {
             },
         ];
 
-        let indexable_info = operations.insert_nodes(1, &nodes)?;
+        operations.insert_nodes(1, &nodes)?;
 
         let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
         assert_eq!(leaves.len(), 1);
         assert_eq!(leaves[0].address, "0a01ff");
         assert_eq!(leaves[0].data, b"hello");
-
-        assert_eq!(
-            indexable_info,
-            vec![IndexableLeafInfo {
-                address: "0a01ff".into(),
-                leaf_id: leaves[0].id
-            }]
-        );
 
         let nodes = sqlite_merkle_radix_tree_node::table
             .get_results::<sqlite::MerkleRadixTreeNode>(&conn)?;
@@ -486,20 +438,12 @@ mod tests {
                 },
             ];
 
-            let indexable_info = operations.insert_nodes(1, &nodes)?;
+            operations.insert_nodes(1, &nodes)?;
 
             let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
             assert_eq!(leaves.len(), 1);
             assert_eq!(leaves[0].address, "0a01ff");
             assert_eq!(leaves[0].data, b"hello");
-
-            assert_eq!(
-                indexable_info,
-                vec![IndexableLeafInfo {
-                    address: "0a01ff".into(),
-                    leaf_id: leaves[0].id
-                }]
-            );
 
             let nodes = postgres_merkle_radix_tree_node::table
                 .get_results::<postgres::MerkleRadixTreeNode>(&conn)?;
