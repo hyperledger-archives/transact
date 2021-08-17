@@ -139,6 +139,14 @@ fn merkle_trie_pruning_duplicate_leaves() {
 }
 
 #[test]
+fn merkle_trie_prune_successor_duplicate_leaves() {
+    run_test(|merkle_path| {
+        let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+        test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_successor_duplicate_leaves() {
     run_test(|merkle_path| {
         let db = make_lmdb(&merkle_path);
