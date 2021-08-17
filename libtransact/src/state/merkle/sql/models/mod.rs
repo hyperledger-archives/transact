@@ -59,38 +59,6 @@ pub struct NewMerkleRadixLeaf<'a> {
     pub data: &'a [u8],
 }
 
-#[derive(Insertable, Queryable, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "merkle_radix_state_root"]
-#[primary_key(id)]
-pub struct MerkleRadixStateRoot {
-    pub id: i64,
-    pub tree_id: i64,
-    pub state_root: String,
-    pub parent_state_root: String,
-}
-
-#[derive(Insertable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "merkle_radix_state_root"]
-pub struct NewMerkleRadixStateRoot<'a> {
-    pub tree_id: i64,
-    pub state_root: &'a str,
-    pub parent_state_root: &'a str,
-}
-
-#[derive(Insertable, Queryable, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "merkle_radix_state_root_leaf_index"]
-#[primary_key(id)]
-pub struct MerkleRadixStateRootLeafIndexEntry {
-    pub id: i64,
-    pub tree_id: i64,
-    pub leaf_id: i64,
-    pub from_state_root_id: i64,
-    pub to_state_root_id: Option<i64>,
-}
-
 #[derive(Insertable)]
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[table_name = "merkle_radix_change_log_addition"]
