@@ -22,21 +22,19 @@ use diesel::prelude::*;
 
 use crate::error::InternalError;
 use crate::state::merkle::sql::models::{
-    MerkleRadixChangeLogAddition, MerkleRadixChangeLogDeletion, MerkleRadixStateRoot,
+    MerkleRadixChangeLogAddition, MerkleRadixChangeLogDeletion,
 };
 #[cfg(feature = "postgres")]
 use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
 #[cfg(feature = "sqlite")]
 use crate::state::merkle::sql::schema::sqlite_merkle_radix_tree_node;
 use crate::state::merkle::sql::schema::{
-    merkle_radix_change_log_addition, merkle_radix_change_log_deletion, merkle_radix_state_root,
-    merkle_radix_state_root_leaf_index,
+    merkle_radix_change_log_addition, merkle_radix_change_log_deletion,
 };
 
 use super::MerkleRadixOperations;
 
 const NULL_PARENT: Option<String> = None;
-const NULL_STATE_ROOT_ID: Option<i64> = None;
 
 pub trait MerkleRadixPruneEntriesOperation {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
@@ -47,9 +45,6 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteCo
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
         self.conn.transaction(|| {
             let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
-
-            // delete from the index
-            update_indexes(self.conn, tree_id, state_root)?;
 
             // Remove the change logs for this root
             // delete its additions entry
@@ -116,9 +111,6 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, PgConnec
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
         self.conn.transaction(|| {
             let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
-
-            // delete from the index
-            update_indexes(self.conn, tree_id, state_root)?;
 
             // Remove the change logs for this root
             // delete its additions entry
@@ -240,79 +232,4 @@ where
     };
 
     Ok(deletion_candidates)
-}
-
-fn update_indexes<C>(conn: &C, tree_id: i64, pruned_state_root: &str) -> Result<(), InternalError>
-where
-    C: diesel::Connection,
-    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
-    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
-{
-    let (root_id, successor) = {
-        use self::merkle_radix_state_root::dsl::*;
-        let root_id = merkle_radix_state_root
-            .select(id)
-            .filter(tree_id.eq(tree_id).and(state_root.eq(pruned_state_root)))
-            .get_result::<i64>(conn)
-            .optional()?;
-
-        let successor = merkle_radix_state_root
-            .filter(
-                tree_id
-                    .eq(tree_id)
-                    .and(parent_state_root.eq(pruned_state_root)),
-            )
-            .get_result::<MerkleRadixStateRoot>(conn)
-            .optional()?;
-
-        (root_id, successor)
-    };
-
-    let root_id = match root_id {
-        Some(id) => id,
-        // Branch is not in the index
-        None => return Ok(()),
-    };
-
-    update(
-        merkle_radix_state_root_leaf_index::table.filter(
-            merkle_radix_state_root_leaf_index::tree_id
-                .eq(tree_id)
-                .and(merkle_radix_state_root_leaf_index::to_state_root_id.eq(root_id)),
-        ),
-    )
-    .set(merkle_radix_state_root_leaf_index::to_state_root_id.eq(NULL_STATE_ROOT_ID))
-    .execute(conn)?;
-
-    if let Some(successor) = successor {
-        // move the starting root ID to the successor root
-        update(
-            merkle_radix_state_root_leaf_index::table.filter(
-                merkle_radix_state_root_leaf_index::tree_id
-                    .eq(tree_id)
-                    .and(merkle_radix_state_root_leaf_index::from_state_root_id.eq(root_id)),
-            ),
-        )
-        .set(merkle_radix_state_root_leaf_index::from_state_root_id.eq(successor.id))
-        .execute(conn)?;
-
-        // Set the root parent to itself.
-        update(merkle_radix_state_root::table.find(successor.id))
-            .set(merkle_radix_state_root::parent_state_root.eq(successor.state_root))
-            .execute(conn)?;
-    } else {
-        // remove any leaves added on this root
-        delete(
-            merkle_radix_state_root_leaf_index::table.filter(
-                merkle_radix_state_root_leaf_index::tree_id
-                    .eq(tree_id)
-                    .and(merkle_radix_state_root_leaf_index::from_state_root_id.eq(root_id)),
-            ),
-        )
-        .execute(conn)?;
-    }
-
-    delete(merkle_radix_state_root::table.find(root_id)).execute(conn)?;
-
-    Ok(())
 }
