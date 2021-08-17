@@ -24,7 +24,6 @@ pub(super) mod insert_nodes;
 pub(super) mod list_leaves;
 pub(super) mod prune_entries;
 pub(super) mod update_change_log;
-pub(super) mod update_index;
 
 #[cfg(feature = "sqlite")]
 no_arg_sql_function!(
