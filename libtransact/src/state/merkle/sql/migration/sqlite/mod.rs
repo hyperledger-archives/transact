@@ -15,7 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Defines methods and utilities to interact with biome tables in a SQLite database.
+//! Defines methods and utilities to interact with merkle-radix tables in a SQLite database.
 
 embed_migrations!("./src/state/merkle/sql/migration/sqlite/migrations");
 
@@ -24,7 +24,7 @@ use crate::state::merkle::sql::backend::{Backend, Connection, SqliteBackend};
 
 use super::MigrationManager;
 
-/// Run database migrations to create tables defined by biome
+/// Run database migrations to create tables defined for the SqlMerkleState.
 ///
 /// # Arguments
 ///
