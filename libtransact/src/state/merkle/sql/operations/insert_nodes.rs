@@ -70,14 +70,13 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
             let initial_id: i64 = merkle_radix_leaf::table
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
-                .unwrap_or(1);
+                .unwrap_or(0);
 
             let leaves = nodes
                 .iter()
-                .filter(|insertable_node| insertable_node.node.value.is_some())
                 .enumerate()
-                .map(|(i, insertable_node)| {
-                    if let Some(data) = insertable_node.node.value.as_deref() {
+                .filter_map(|(i, insertable_node)| {
+                    insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
@@ -86,10 +85,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                             address: &insertable_node.address,
                             data,
                         })
-                    } else {
-                        // we already filtered out the None values
-                        unreachable!()
-                    }
+                    })
                 })
                 .collect::<Result<Vec<NewMerkleRadixLeaf>, InternalError>>()?;
 
@@ -154,14 +150,13 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
             let initial_id: i64 = merkle_radix_leaf::table
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
-                .unwrap_or(1);
+                .unwrap_or(0);
 
             let leaves = nodes
                 .iter()
-                .filter(|insertable_node| insertable_node.node.value.is_some())
                 .enumerate()
-                .map(|(i, insertable_node)| {
-                    if let Some(data) = insertable_node.node.value.as_deref() {
+                .filter_map(|(i, insertable_node)| {
+                    insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
                             id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
@@ -170,10 +165,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                             address: &insertable_node.address,
                             data,
                         })
-                    } else {
-                        // we already filtered out the None values
-                        unreachable!()
-                    }
+                    })
                 })
                 .collect::<Result<Vec<NewMerkleRadixLeaf>, InternalError>>()?;
 
@@ -199,7 +191,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                 .collect::<Result<Vec<_>, _>>()?;
 
             insert_into(postgres_merkle_radix_tree_node::table)
-                .values(node_models)
+                .values(&node_models)
                 .on_conflict_do_nothing()
                 .execute(self.conn)?;
 

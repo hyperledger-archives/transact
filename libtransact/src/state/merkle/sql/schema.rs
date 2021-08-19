@@ -75,6 +75,26 @@ table! {
     }
 }
 
+table! {
+    merkle_radix_change_log_addition (id) {
+        id -> Int8,
+        tree_id -> Int8,
+        state_root -> VarChar,
+        parent_state_root -> Nullable<VarChar>,
+        addition -> VarChar,
+    }
+}
+
+table! {
+    merkle_radix_change_log_deletion (id) {
+        id -> Int8,
+        tree_id -> Int8,
+        successor_state_root -> VarChar,
+        state_root -> VarChar,
+        deletion -> VarChar,
+    }
+}
+
 joinable!(merkle_radix_state_root_leaf_index -> merkle_radix_leaf (leaf_id));
 
 #[cfg(all(feature = "sqlite", feature = "postgres"))]

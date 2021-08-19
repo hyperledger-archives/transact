@@ -94,6 +94,42 @@ fn merkle_trie_update_same_address_space_with_no_children() -> Result<(), Box<dy
     })
 }
 
+#[test]
+fn merkle_trie_prune_parent() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_parent(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
+fn merkle_trie_prune_successors() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_successors(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
+fn merkle_trie_prune_duplicate_leaves() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_duplicate_leaves(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
+fn merkle_trie_prune_successor_duplicate_leaves() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
+        Ok(())
+    })
+}
+
 #[cfg(feature = "state-merkle-leaf-reader")]
 #[test]
 fn leaf_iteration() -> Result<(), Box<dyn Error>> {

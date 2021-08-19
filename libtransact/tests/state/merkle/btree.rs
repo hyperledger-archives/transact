@@ -67,15 +67,33 @@ fn merkle_trie_update_same_address_space_with_no_children() {
 }
 
 #[test]
+fn merkle_trie_prune_parent() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_parent(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_pruning_parent() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_parent(btree_db);
 }
 
 #[test]
+fn merkle_trie_prune_successors() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_successors(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_pruning_successors() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_successors(btree_db);
+}
+
+#[test]
+fn merkle_trie_prune_duplicate_leaves() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_duplicate_leaves(orig_root, state);
 }
 
 #[test]
@@ -88,6 +106,12 @@ fn merkle_trie_pruning_duplicate_leaves() {
 fn merkle_trie_pruning_successor_duplicate_leaves() {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     test_merkle_trie_pruning_successor_duplicate_leaves(btree_db);
+}
+
+#[test]
+fn merkle_trie_prune_successor_duplicate_leaves() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
 }
 
 #[cfg(feature = "state-merkle-leaf-reader")]

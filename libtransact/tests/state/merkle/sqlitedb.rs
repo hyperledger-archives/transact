@@ -130,12 +130,28 @@ fn merkle_trie_update_same_address_space_with_no_children() {
 }
 
 #[test]
+fn merkle_trie_prune_parent() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_parent(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_parent() {
     run_test(|db_path| {
         let db = Box::new(
             SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
         );
         test_merkle_trie_pruning_parent(db);
+    })
+}
+
+#[test]
+fn merkle_trie_prune_successors() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_successors(orig_root, state);
     })
 }
 
@@ -150,12 +166,28 @@ fn merkle_trie_pruning_successors() {
 }
 
 #[test]
+fn merkle_trie_prune_duplicate_leaves() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_duplicate_leaves(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_pruning_duplicate_leaves() {
     run_test(|db_path| {
         let db = Box::new(
             SqliteDatabase::new(&db_path, &INDEXES).expect("Unable to create Sqlite database"),
         );
         test_merkle_trie_pruning_duplicate_leaves(db);
+    })
+}
+
+#[test]
+fn merkle_trie_prune_successor_duplicate_leaves() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
     })
 }
 

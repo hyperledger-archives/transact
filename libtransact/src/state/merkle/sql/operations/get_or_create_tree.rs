@@ -21,22 +21,35 @@ use diesel::dsl::select;
 use diesel::prelude::*;
 
 use crate::error::InternalError;
-#[cfg(feature = "postgres")]
-use crate::state::merkle::sql::models::MerkleRadixTree;
 use crate::state::merkle::sql::models::NewMerkleRadixTree;
 use crate::state::merkle::sql::schema::merkle_radix_tree;
+#[cfg(feature = "sqlite")]
+use crate::state::merkle::sql::{models::sqlite, schema::sqlite_merkle_radix_tree_node};
+#[cfg(feature = "postgres")]
+use crate::state::merkle::sql::{
+    models::{postgres, MerkleRadixTree},
+    schema::postgres_merkle_radix_tree_node,
+};
 
 #[cfg(feature = "sqlite")]
 use super::last_insert_rowid;
 use super::MerkleRadixOperations;
 
 pub trait MerkleRadixGetOrCreateTreeOperation {
-    fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError>;
+    fn get_or_create_tree(
+        &self,
+        tree_name: &str,
+        initial_state_root: &str,
+    ) -> Result<i64, InternalError>;
 }
 
 #[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, SqliteConnection> {
-    fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError> {
+    fn get_or_create_tree(
+        &self,
+        tree_name: &str,
+        initial_state_root: &str,
+    ) -> Result<i64, InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             if let Some(tree_id) = merkle_radix_tree::table
                 .filter(merkle_radix_tree::name.eq(tree_name))
@@ -52,16 +65,31 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, Sqlit
                 .values(NewMerkleRadixTree { name: tree_name })
                 .execute(self.conn)?;
 
-            select(last_insert_rowid)
+            let tree_id = select(last_insert_rowid)
                 .get_result::<i64>(self.conn)
-                .map_err(|e| InternalError::from_source(Box::new(e)))
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            insert_into(sqlite_merkle_radix_tree_node::table)
+                .values(sqlite::MerkleRadixTreeNode {
+                    hash: initial_state_root.to_string(),
+                    tree_id,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![None; 256]),
+                })
+                .execute(self.conn)?;
+
+            Ok(tree_id)
         })
     }
 }
 
 #[cfg(feature = "postgres")]
 impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, PgConnection> {
-    fn get_or_create_tree(&self, tree_name: &str) -> Result<i64, InternalError> {
+    fn get_or_create_tree(
+        &self,
+        tree_name: &str,
+        initial_state_root: &str,
+    ) -> Result<i64, InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             if let Some(tree_id) = merkle_radix_tree::table
                 .filter(merkle_radix_tree::name.eq(tree_name))
@@ -73,11 +101,22 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, PgCon
                 return Ok(tree_id);
             }
 
-            insert_into(merkle_radix_tree::table)
+            let tree_id = insert_into(merkle_radix_tree::table)
                 .values(NewMerkleRadixTree { name: tree_name })
                 .get_result::<MerkleRadixTree>(self.conn)
                 .map(|tree| tree.id)
-                .map_err(|e| InternalError::from_source(Box::new(e)))
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            insert_into(postgres_merkle_radix_tree_node::table)
+                .values(postgres::MerkleRadixTreeNode {
+                    hash: initial_state_root.to_string(),
+                    tree_id,
+                    leaf_id: None,
+                    children: vec![None; 256],
+                })
+                .execute(self.conn)?;
+
+            Ok(tree_id)
         })
     }
 }
@@ -100,10 +139,24 @@ mod test {
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        let id = operations.get_or_create_tree("test")?;
+        let id = operations.get_or_create_tree("test", "test-root")?;
         assert_eq!(2, id);
 
-        let id = operations.get_or_create_tree("default")?;
+        let nodes = sqlite_merkle_radix_tree_node::table
+            .get_results::<sqlite::MerkleRadixTreeNode>(&conn)?;
+
+        assert_eq!(nodes.len(), 1);
+        assert_eq!(
+            nodes[0],
+            sqlite::MerkleRadixTreeNode {
+                hash: "test-root".into(),
+                tree_id: 2,
+                leaf_id: None,
+                children: sqlite::Children(vec![None; 256]),
+            }
+        );
+
+        let id = operations.get_or_create_tree("default", "test-root")?;
         assert_eq!(1, id);
 
         Ok(())
@@ -117,10 +170,24 @@ mod test {
 
             let operations = MerkleRadixOperations::new(&conn);
 
-            let id = operations.get_or_create_tree("test")?;
+            let id = operations.get_or_create_tree("test", "test_root")?;
             assert_eq!(2, id);
 
-            let id = operations.get_or_create_tree("default")?;
+            let nodes = postgres_merkle_radix_tree_node::table
+                .get_results::<postgres::MerkleRadixTreeNode>(&conn)?;
+
+            assert_eq!(nodes.len(), 1);
+            assert_eq!(
+                nodes[0],
+                postgres::MerkleRadixTreeNode {
+                    hash: "test_root".into(),
+                    tree_id: 2,
+                    leaf_id: None,
+                    children: vec![None; 256],
+                }
+            );
+
+            let id = operations.get_or_create_tree("default", "test_root")?;
             assert_eq!(1, id);
 
             Ok(())
