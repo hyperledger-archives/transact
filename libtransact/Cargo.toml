@@ -155,7 +155,13 @@ database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
-family-command-workload = ["cylinder", "family-command", "protocol-transaction-builder"]
+family-command-workload = [
+    "cylinder",
+    "family-command",
+    "protocol-sabre-exec",
+    "protocol-transaction-builder",
+    "workload",
+]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
   "family-smallbank",
