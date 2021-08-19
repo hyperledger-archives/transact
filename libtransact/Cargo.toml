@@ -155,14 +155,20 @@ database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
-family-command-workload = ["cylinder", "family-command", "protocol-transaction-builder"]
+family-command-workload = [
+    "cylinder",
+    "family-command",
+    "protocol-sabre-exec",
+    "protocol-transaction-builder",
+    "workload",
+]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
-  "family-smallbank",
-  "protocol-sabre-exec",
-  "yaml-rust",
-  "workload",
-  "workload-runner"
+    "family-smallbank",
+    "protocol-sabre-exec",
+    "yaml-rust",
+    "workload",
+    "workload-runner"
 ]
 family-xo = ["handler", "rand_hc", "workload"]
 handler = ["protocol-transaction"]
@@ -190,17 +196,18 @@ state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
 workload = []
 workload-batch-gen = ["workload"]
 workload-runner = [
-  "chrono",
-  "reqwest",
-  "serde",
-  "serde_derive",
-  "workload-batch-gen"]
+    "chrono",
+    "reqwest",
+    "serde",
+    "serde_derive",
+    "workload-batch-gen"
+]
 
 [package.metadata.docs.rs]
 features = [
-  "default",
-  "nightly",
-  "experimental",
-  "sawtooth-compat",
-  "stable",
+    "default",
+    "nightly",
+    "experimental",
+    "sawtooth-compat",
+    "stable",
 ]
