@@ -133,9 +133,9 @@ workload = []
 
 [package.metadata.docs.rs]
 features = [
-  "default",
-  "nightly",
-  "experimental",
-  "sawtooth-compat",
-  "stable",
+    "default",
+    "nightly",
+    "experimental",
+    "sawtooth-compat",
+    "stable",
 ]
