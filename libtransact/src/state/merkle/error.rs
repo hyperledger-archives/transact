@@ -20,9 +20,18 @@ use std::fmt;
 
 use crate::error::{InternalError, InvalidStateError};
 
+/// Error variants that may occur while reading Merkle Radix tree leaves.
 #[derive(Debug)]
 pub enum MerkleRadixLeafReadError {
+    /// An internal error occurred.
+    ///
+    /// This error may be caused by an issue outside of the control of the application, such as
+    /// invalid storage.
     InternalError(InternalError),
+    /// An invalid state error occurred.
+    ///
+    /// This error may occur in cases where the reader has been provided invalid state, such as a
+    /// non-existent state root hash.
     InvalidStateError(InvalidStateError),
 }
 

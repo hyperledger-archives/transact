@@ -40,11 +40,20 @@ type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
 #[cfg(feature = "state-merkle-leaf-reader")]
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
+/// A Merkle-Radix tree leaf reader.
+///
+/// This trait provides an interface to a Merkle-Radix state implementation in order to return an
+/// iterator over the leaves of the tree at a given state root hash.
 #[cfg(feature = "state-merkle-leaf-reader")]
 pub trait MerkleRadixLeafReader: Read<StateId = String, Key = String, Value = Vec<u8>> {
     /// Returns an iterator over the leaves of a merkle radix tree.
+    ///
+    /// The leaves returned by this iterator are tied to a specific state ID - in the merkle tree,
+    /// this is defined as a specific state root hash. The leaves are returned in natural address
+    /// order.
+    ///
     /// By providing an optional address prefix, the caller can limit the iteration
-    /// over the leaves in a specific subtree.
+    /// over the leaves in a specific sub-tree.
     fn leaves(
         &self,
         state_id: &Self::StateId,
