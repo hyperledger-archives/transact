@@ -71,7 +71,6 @@ copy-env:
 lint: lint-ignore
     #!/usr/bin/env sh
     set -e
-    echo "\033[1mcargo fmt -- --check\033[0m"
     for crate in $(echo {{crates}})
     do
         cmd="cargo fmt --manifest-path=$crate/Cargo.toml -- --check"
