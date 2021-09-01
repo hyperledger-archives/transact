@@ -54,7 +54,14 @@ build:
     echo "\n\033[92mBuild Success\033[0m\n"
 
 clean:
-    cargo clean
+    #!/usr/bin/env sh
+    set -e
+    for crate in $(echo {{crates}})
+    do
+        cmd="cargo clean --manifest-path=$crate/Cargo.toml"
+        echo "\033[1m$cmd\033[0m"
+        $cmd
+    done
 
 copy-env:
     #!/usr/bin/env sh
