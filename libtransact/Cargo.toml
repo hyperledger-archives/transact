@@ -184,7 +184,7 @@ sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec", "log", "openssl"]
-state-merkle-leaf-reader = []
+state-merkle-leaf-reader = ["state-merkle"]
 state-merkle-sql = ["diesel", "diesel_migrations"]
 # This feature must be enabled to run tests using a postgres db it is not
 # enabled by default, due to its requirement of an external postgres db
