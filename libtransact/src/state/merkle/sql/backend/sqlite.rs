@@ -63,6 +63,14 @@ impl Backend for SqliteBackend {
     }
 }
 
+impl From<Pool<ConnectionManager<sqlite::SqliteConnection>>> for SqliteBackend {
+    fn from(pool: Pool<ConnectionManager<sqlite::SqliteConnection>>) -> Self {
+        Self {
+            connection_pool: pool,
+        }
+    }
+}
+
 /// The default size
 pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 

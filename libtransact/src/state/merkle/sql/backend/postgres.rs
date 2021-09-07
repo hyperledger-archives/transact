@@ -52,6 +52,14 @@ impl Backend for PostgresBackend {
     }
 }
 
+impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend {
+    fn from(pool: Pool<ConnectionManager<diesel::pg::PgConnection>>) -> Self {
+        Self {
+            connection_pool: pool,
+        }
+    }
+}
+
 /// A Builder for the PostgresBackend.
 #[derive(Default)]
 pub struct PostgresBackendBuilder {
