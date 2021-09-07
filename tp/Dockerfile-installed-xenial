@@ -56,5 +56,5 @@ FROM ubuntu:xenial
 COPY --from=sabre-tp-builder /project/tp/target/debian/sawtooth-sabre_*.deb /tmp
 
 RUN apt-get update \
- && dpkg -i /tmp/sawtooth-sabre_*.deb || true \
+ && dpkg --unpack /tmp/sawtooth-sabre_*.deb \
  && apt-get -f -y install

@@ -61,6 +61,6 @@ RUN echo "deb [arch=amd64] http://repo.sawtooth.me/ubuntu/nightly xenial univers
  && apt-get -f -y install \
     python3-sawtooth-cli \
     python3-sawtooth-sdk \
- && dpkg -i /tmp/pike-cli*.deb || true
+ && dpkg --unpack  /tmp/pike-cli*.deb
 
 ENTRYPOINT ["tail", "-f", "/dev/null"]
