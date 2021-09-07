@@ -77,7 +77,6 @@ use operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
-use operations::update_index::MerkleRadixUpdateIndexOperation as _;
 use operations::MerkleRadixOperations;
 
 const TOKEN_SIZE: usize = 2;
@@ -230,14 +229,8 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
             .generate_updates(state_changes)
             .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
 
-        let deleted_addresses = state_changes
-            .iter()
-            .filter(|change| matches!(change, StateChange::Delete { .. }))
-            .map(|change| change.key())
-            .collect::<Vec<_>>();
-
         overlay
-            .write_updates(&next_state_id, tree_update, &deleted_addresses)
+            .write_updates(&next_state_id, tree_update)
             .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
 
         Ok(next_state_id)
@@ -325,14 +318,8 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
             .generate_updates(state_changes)
             .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
 
-        let deleted_addresses = state_changes
-            .iter()
-            .filter(|change| matches!(change, StateChange::Delete { .. }))
-            .map(|change| change.key())
-            .collect::<Vec<_>>();
-
         overlay
-            .write_updates(&next_state_id, tree_update, &deleted_addresses)
+            .write_updates(&next_state_id, tree_update)
             .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
 
         Ok(next_state_id)
@@ -490,7 +477,6 @@ where
         &self,
         new_state_root: &str,
         tree_update: TreeUpdate,
-        deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         if tree_update.node_changes.is_empty() {
             return Ok(());
@@ -501,7 +487,6 @@ where
             new_state_root,
             self.state_root_hash,
             tree_update,
-            deleted_addresses,
         )?;
 
         Ok(())
@@ -712,7 +697,6 @@ trait OverlayWriter {
         state_root_hash: &str,
         parent_state_root_hash: &str,
         tree_update: TreeUpdate,
-        deleted_addresses: &[&str],
     ) -> Result<(), InternalError>;
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
@@ -770,7 +754,6 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
         state_root_hash: &str,
         parent_state_root_hash: &str,
         tree_update: TreeUpdate,
-        deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
         conn.as_inner().transaction(|| {
@@ -792,24 +775,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
                 )
                 .collect::<Vec<_>>();
 
-            let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
-
-            let changes = indexable_info
-                .iter()
-                .map(
-                    |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
-                        address: &leaf_info.address,
-                        leaf_id: leaf_info.leaf_id,
-                    },
-                )
-                .chain(
-                    deleted_addresses
-                        .iter()
-                        .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
-                )
-                .collect();
-
-            operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
+            operations.insert_nodes(tree_id, &insertable_changes)?;
 
             let additions = insertable_changes
                 .iter()
@@ -877,7 +843,6 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
         state_root_hash: &str,
         parent_state_root_hash: &str,
         tree_update: TreeUpdate,
-        deleted_addresses: &[&str],
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
 
@@ -900,24 +865,7 @@ impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
                 )
                 .collect::<Vec<_>>();
 
-            let indexable_info = operations.insert_nodes(tree_id, &insertable_changes)?;
-
-            let changes = indexable_info
-                .iter()
-                .map(
-                    |leaf_info| operations::update_index::ChangedLeaf::AddedOrUpdated {
-                        address: &leaf_info.address,
-                        leaf_id: leaf_info.leaf_id,
-                    },
-                )
-                .chain(
-                    deleted_addresses
-                        .iter()
-                        .map(|address| operations::update_index::ChangedLeaf::Deleted(address)),
-                )
-                .collect();
-
-            operations.update_index(tree_id, state_root_hash, parent_state_root_hash, changes)?;
+            operations.insert_nodes(tree_id, &insertable_changes)?;
 
             let additions = insertable_changes
                 .iter()
