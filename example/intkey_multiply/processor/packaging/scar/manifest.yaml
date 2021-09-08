@@ -15,10 +15,8 @@
 name: intkey_multiply
 version: '1.0'
 inputs:
-  - '00ec03'
   - '1cf126'
   - 'cad11d'
 outputs:
-  - '00ec03'
   - '1cf126'
   - 'cad11d'
