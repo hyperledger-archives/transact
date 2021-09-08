@@ -15,3 +15,6 @@
 
 DROP TABLE IF EXISTS merkle_radix_change_log_addition;
 DROP TABLE IF EXISTS merkle_radix_change_log_deletion;
+DROP TABLE IF EXISTS merkle_radix_tree_node;
+DROP TABLE IF EXISTS merkle_radix_leaf;
+DROP TABLE IF EXISTS merkle_radix_tree;

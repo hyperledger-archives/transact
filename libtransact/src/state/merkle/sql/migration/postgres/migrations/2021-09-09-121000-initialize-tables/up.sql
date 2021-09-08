@@ -13,8 +13,34 @@
 -- limitations under the License.
 -- -----------------------------------------------------------------------------
 
+CREATE TABLE IF NOT EXISTS merkle_radix_tree (
+    id BIGSERIAL PRIMARY KEY,
+    name VARCHAR(512),
+    UNIQUE(name)
+);
+
+INSERT INTO merkle_radix_tree (name) VALUES ('default');
+
+CREATE TABLE IF NOT EXISTS merkle_radix_leaf (
+    id BIGSERIAL PRIMARY KEY,
+    tree_id BIGINT NOT NULL,
+    address VARCHAR(70) NOT NULL,
+    data BYTEA,
+    FOREIGN KEY(tree_id) REFERENCES merkle_radix_tree (id)
+);
+
+CREATE TABLE IF NOT EXISTS merkle_radix_tree_node (
+    hash VARCHAR(64) NOT NULL,
+    tree_id BIGINT NOT NULL,
+    leaf_id BIGINT,
+    children VARCHAR(64)[],
+    PRIMARY KEY (hash, tree_id),
+    FOREIGN KEY(tree_id) REFERENCES merkle_radix_tree(id),
+    FOREIGN KEY(leaf_id) REFERENCES merkle_radix_leaf(id)
+);
+
 create TABLE IF NOT EXISTS merkle_radix_change_log_addition (
-    id INTEGER PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     tree_id BIGINT NOT NULL,
     state_root VARCHAR(64) NOT NULL,
     parent_state_root VARCHAR(64),
@@ -25,7 +51,7 @@ create TABLE IF NOT EXISTS merkle_radix_change_log_addition (
 );
 
 create TABLE IF NOT EXISTS merkle_radix_change_log_deletion (
-    id INTEGER PRIMARY KEY,
+    id BIGSERIAL PRIMARY KEY,
     tree_id BIGINT NOT NULL,
     successor_state_root VARCHAR(64) NOT NULL,
     state_root VARCHAR(64) NOT NULL,
