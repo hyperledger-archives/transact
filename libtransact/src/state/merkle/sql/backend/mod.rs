@@ -15,6 +15,10 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Database Backends
+//!
+//! A Backend provides a light-weight abstraction over database connections.
+
 #[cfg(feature = "postgres")]
 pub(in crate::state::merkle::sql) mod postgres;
 #[cfg(feature = "sqlite")]
@@ -29,14 +33,22 @@ pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
 #[cfg(feature = "sqlite")]
 pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
 
+/// A database connection.
 pub trait Connection {
+    /// The underlying internal connection.
     type ConnectionType: diesel::Connection;
 
+    /// Access the internal connection.
     fn as_inner(&self) -> &Self::ConnectionType;
 }
 
+/// A database backend.
+///
+/// A Backend provides a light-weight abstraction over database connections.
 pub trait Backend: Sync + Send {
+    /// The database connection.
     type Connection: Connection;
 
+    /// Acquire a database connection.
     fn connection(&self) -> Result<Self::Connection, InternalError>;
 }
