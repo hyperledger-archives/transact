@@ -25,9 +25,6 @@ const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &str = "00ec02";
 
-/// The smart permission prefix for global state (00ec03)
-const SMART_PERMISSION_PREFIX: &str = "00ec03";
-
 const PIKE_AGENT_PREFIX: &str = "cad11d00";
 
 const PIKE_ORG_PREFIX: &str = "cad11d01";
@@ -79,24 +76,6 @@ pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyE
         }
     };
     Ok(NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)?)
-}
-
-/// Returns a state address for a smart permission
-///
-/// # Arguments
-///
-/// * `name` - smart permission name
-/// * `org_id - ID of the organization that owns the smart permission`
-pub fn compute_smart_permission_address(org_id: &str, name: &str) -> String {
-    let mut sha_org_id = Sha512::new();
-    sha_org_id.input(org_id.as_bytes());
-
-    let mut sha_name = Sha512::new();
-    sha_name.input(name.as_bytes());
-
-    String::from(SMART_PERMISSION_PREFIX)
-        + &sha_org_id.result_str()[..6].to_string()
-        + &sha_name.result_str()[..58].to_string()
 }
 
 /// Returns a state address for a given agent name

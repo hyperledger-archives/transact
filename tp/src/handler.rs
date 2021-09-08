@@ -18,7 +18,7 @@ use crypto::digest::Digest;
 use crypto::sha2::Sha512;
 use sabre_sdk::protocol::state::{
     ContractBuilder, ContractRegistry, ContractRegistryBuilder, NamespaceRegistry,
-    NamespaceRegistryBuilder, PermissionBuilder, SmartPermissionBuilder, VersionBuilder,
+    NamespaceRegistryBuilder, PermissionBuilder, VersionBuilder,
 };
 use sawtooth_sdk::messages::processor::TpProcessRequest;
 use sawtooth_sdk::processor::handler::ApplyError;
@@ -31,11 +31,9 @@ use crate::state::SabreState;
 use crate::wasm_executor::wasm_module::WasmModule;
 use sabre_sdk::protocol::payload::{
     Action, CreateContractAction, CreateContractRegistryAction, CreateNamespaceRegistryAction,
-    CreateNamespaceRegistryPermissionAction, CreateSmartPermissionAction, DeleteContractAction,
-    DeleteContractRegistryAction, DeleteNamespaceRegistryAction,
-    DeleteNamespaceRegistryPermissionAction, DeleteSmartPermissionAction, ExecuteContractAction,
+    CreateNamespaceRegistryPermissionAction, DeleteContractAction, DeleteContractRegistryAction,
+    DeleteNamespaceRegistryAction, DeleteNamespaceRegistryPermissionAction, ExecuteContractAction,
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
-    UpdateSmartPermissionAction,
 };
 use sabre_sdk::protocol::SABRE_PROTOCOL_VERSION;
 
@@ -200,14 +198,12 @@ impl TransactionHandler for SabreTransactionHandler {
                 &mut state,
                 &*self.admin_permissions,
             ),
-            Action::CreateSmartPermission(payload) => {
-                create_smart_permission(payload, signer, &mut state)
-            }
-            Action::UpdateSmartPermission(payload) => {
-                update_smart_permission(payload, signer, &mut state)
-            }
-            Action::DeleteSmartPermission(payload) => {
-                delete_smart_permission(payload, signer, &mut state)
+            Action::CreateSmartPermission(_)
+            | Action::UpdateSmartPermission(_)
+            | Action::DeleteSmartPermission(_) => {
+                return Err(ApplyError::InvalidTransaction(
+                    "Smart Permissions not supported in this version of Sabre".into(),
+                ));
             }
         }
     }
@@ -885,166 +881,6 @@ fn delete_namespace_registry_permission(
             ApplyError::InvalidTransaction(String::from("Cannot build namespace registry"))
         })?;
     state.set_namespace_registry(namespace, namespace_registry)
-}
-
-pub(crate) fn is_admin(
-    signer: &str,
-    org_id: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    let admin = match state.get_agent(signer) {
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Signer is not an agent: {}",
-                signer,
-            )));
-        }
-        Ok(Some(admin)) => admin,
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Failed to retrieve state: {}",
-                err,
-            )));
-        }
-    };
-
-    if admin.org_id() != org_id {
-        return Err(ApplyError::InvalidTransaction(format!(
-            "Signer is not associated with the organization: {}",
-            signer,
-        )));
-    }
-    if !admin.roles().contains(&"admin".to_string()) {
-        return Err(ApplyError::InvalidTransaction(format!(
-            "Signer is not an admin: {}",
-            signer,
-        )));
-    };
-
-    if !admin.active() {
-        return Err(ApplyError::InvalidTransaction(format!(
-            "Admin is not currently an active agent: {}",
-            signer,
-        )));
-    }
-    Ok(())
-}
-
-fn create_smart_permission(
-    payload: CreateSmartPermissionAction,
-    signer: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    // verify the signer of the transaction is authorized to create smart permissions
-    is_admin(signer, payload.org_id(), state)?;
-
-    // Check if the smart permissions already exists
-    match state.get_smart_permission(payload.org_id(), payload.name()) {
-        Ok(None) => (),
-        Ok(Some(_)) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Smart Permission already exists: {} ",
-                payload.name(),
-            )));
-        }
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Failed to retrieve state: {}",
-                err,
-            )));
-        }
-    };
-
-    // Check that organizations exists
-    match state.get_organization(payload.org_id()) {
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Organization does not exist exists: {}",
-                payload.org_id(),
-            )));
-        }
-        Ok(Some(_)) => (),
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Failed to retrieve state: {}",
-                err,
-            )));
-        }
-    };
-
-    let smart_permission = SmartPermissionBuilder::new()
-        .with_name(payload.name().to_string())
-        .with_org_id(payload.org_id().to_string())
-        .with_function(payload.function().to_vec())
-        .build()
-        .map_err(|_| {
-            ApplyError::InvalidTransaction(String::from("Cannot build smart permission"))
-        })?;
-
-    state.set_smart_permission(payload.org_id(), payload.name(), smart_permission)
-}
-
-fn update_smart_permission(
-    payload: UpdateSmartPermissionAction,
-    signer: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    // verify the signer of the transaction is authorized to update smart permissions
-    is_admin(signer, payload.org_id(), state)?;
-
-    // verify that the smart permission exists
-    let smart_permission = match state.get_smart_permission(payload.org_id(), payload.name()) {
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Smart Permission does not exist: {} ",
-                payload.name(),
-            )));
-        }
-        Ok(Some(smart_permission)) => smart_permission,
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Failed to retrieve state: {}",
-                err,
-            )));
-        }
-    };
-
-    let smart_permission = smart_permission
-        .into_builder()
-        .with_function(payload.function().to_vec())
-        .build()
-        .map_err(|_| {
-            ApplyError::InvalidTransaction(String::from("Cannot build smart permission"))
-        })?;
-    state.set_smart_permission(payload.org_id(), payload.name(), smart_permission)
-}
-
-fn delete_smart_permission(
-    payload: DeleteSmartPermissionAction,
-    signer: &str,
-    state: &mut SabreState,
-) -> Result<(), ApplyError> {
-    // verify the signer of the transaction is authorized to delete smart permissions
-    is_admin(signer, payload.org_id(), state)?;
-
-    // verify that the smart permission exists
-    match state.get_smart_permission(payload.org_id(), payload.name()) {
-        Ok(None) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Smart Permission does not exists: {} ",
-                payload.name(),
-            )));
-        }
-        Ok(Some(_)) => (),
-        Err(err) => {
-            return Err(ApplyError::InvalidTransaction(format!(
-                "Failed to retrieve state: {}",
-                err,
-            )));
-        }
-    };
-
-    state.delete_smart_permission(payload.org_id(), payload.name())
 }
 
 // helper function to check if the signer is allowed to update a namespace_registry
