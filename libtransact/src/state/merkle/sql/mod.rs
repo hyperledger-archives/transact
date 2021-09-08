@@ -45,6 +45,8 @@
 //!
 //! The resulting `merkle_state` can then be used via the [`Read`], [`Write`] and
 //! [`MerkleRadixLeafReader`] traits.
+//!
+//! Available if the feature "state-merkle-sql" is enabled.
 
 pub mod backend;
 mod error;
