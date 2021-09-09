@@ -16,6 +16,8 @@
  */
 
 //! A Backend implementation for SQLite databases.
+//!
+//! Available if the feature "sqlite" is enabled.
 
 use std::convert::TryFrom;
 use std::fmt;
@@ -32,6 +34,8 @@ use crate::error::{InternalError, InvalidStateError};
 use super::{Backend, Connection};
 
 /// A connection to a SQLite database.
+///
+/// Available if the feature "sqlite" is enabled.
 pub struct SqliteConnection(
     pub(in crate::state::merkle::sql) PooledConnection<ConnectionManager<sqlite::SqliteConnection>>,
 );
@@ -47,6 +51,8 @@ impl Connection for SqliteConnection {
 /// The SQLite Backend
 ///
 /// This struct provides the backend implementation details for SQLite databases.
+///
+/// Available if the feature "sqlite" is enabled.
 #[derive(Clone)]
 pub struct SqliteBackend {
     connection_pool: Pool<ConnectionManager<sqlite::SqliteConnection>>,
@@ -78,6 +84,8 @@ pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 ///
 /// See the [PRAGMA "synchronous"](https://sqlite.org/pragma.html#pragma_journal_mode)
 /// documentation for more details.
+///
+/// Available if the feature "sqlite" is enabled.
 #[derive(Debug)]
 pub enum Synchronous {
     /// With synchronous Off, SQLite continues without syncing as soon as it has handed data
@@ -118,6 +126,8 @@ impl fmt::Display for Synchronous {
 ///
 /// See the [PRAGMA "journal_mode"](https://sqlite.org/pragma.html#pragma_journal_mode)
 /// documentation for more details.
+///
+/// Available if the feature "sqlite" is enabled.
 #[derive(Debug)]
 pub enum JournalMode {
     /// The DELETE journaling mode is the normal behavior. In the DELETE mode, the rollback journal
@@ -159,6 +169,9 @@ impl fmt::Display for JournalMode {
     }
 }
 
+/// A builder for a [SqliteBackend].
+///
+/// Available if the feature "sqlite" is enabled.
 pub struct SqliteBackendBuilder {
     connection_path: Option<String>,
     create: bool,
@@ -181,14 +194,15 @@ impl SqliteBackendBuilder {
         }
     }
 
-    /// Configures the SqliteBackend instance as a memory database, with a connection pool size of 1.
+    /// Configures the [SqliteBackend] instance as a memory database, with a connection pool size of
+    /// 1.
     pub fn with_memory_database(mut self) -> Self {
         self.connection_path = Some(":memory:".into());
         self.pool_size = Some(1);
         self
     }
 
-    /// Set the path for the Sqlite database.
+    /// Set the path for the SQLite database.
     ///
     /// This is a required field.
     pub fn with_connection_path<S: Into<String>>(mut self, connection_path: S) -> Self {
@@ -210,7 +224,7 @@ impl SqliteBackendBuilder {
 
     /// Set the size used for Memory-Mapped I/O.
     ///
-    /// This can be disabled by setting the value to `0`
+    /// This can be disabled by setting the value to `0`.
     pub fn with_memory_map_size(mut self, memory_map_size: u64) -> Self {
         // The try from would fail if the u64 is greater than max i64, so we can unwrap this as
         // such.

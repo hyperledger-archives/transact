@@ -15,12 +15,19 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Postgres Database Backend
+//!
+//! Available if the feature "postgres" is enabled.
+
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
 use crate::error::{InternalError, InvalidStateError};
 
 use super::{Backend, Connection};
 
+/// A connection to a Postgres database.
+///
+/// Available if the feature "postgres" is enabled.
 pub struct PostgresConnection(
     pub(in crate::state::merkle::sql) PooledConnection<ConnectionManager<diesel::pg::PgConnection>>,
 );
@@ -35,7 +42,9 @@ impl Connection for PostgresConnection {
 
 /// The Postgres Backend
 ///
-/// This struct provides the backend implementation details for postgres databases.
+/// This struct provides the [Backend] implementation details for Postgres databases.
+///
+/// Available if the feature "postgres" is enabled.
 #[derive(Clone)]
 pub struct PostgresBackend {
     connection_pool: Pool<ConnectionManager<diesel::pg::PgConnection>>,
@@ -61,6 +70,8 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend
 }
 
 /// A Builder for the PostgresBackend.
+///
+/// Available if the feature "postgres" is enabled.
 #[derive(Default)]
 pub struct PostgresBackendBuilder {
     url: Option<String>,
