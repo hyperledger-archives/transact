@@ -11,8 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-#[cfg(not(target_arch = "wasm32"))]
-use cylinder::Signer;
+
 use protobuf::Message;
 use protobuf::RepeatedField;
 #[cfg(not(target_arch = "wasm32"))]
@@ -28,9 +27,9 @@ use crate::protos::{
 use super::AddressingError;
 #[cfg(not(target_arch = "wasm32"))]
 use super::{
-    compute_agent_address, compute_contract_address, compute_contract_registry_address,
-    compute_namespace_registry_address, compute_org_address, compute_smart_permission_address,
-    ADMINISTRATORS_SETTING_ADDRESS_BYTES, SABRE_PROTOCOL_VERSION,
+    compute_contract_address, compute_contract_registry_address,
+    compute_namespace_registry_address, ADMINISTRATORS_SETTING_ADDRESS_BYTES,
+    SABRE_PROTOCOL_VERSION,
 };
 
 /// Native implementation for SabrePayload_Action
@@ -47,9 +46,6 @@ pub enum Action {
     UpdateNamespaceRegistryOwners(UpdateNamespaceRegistryOwnersAction),
     CreateNamespaceRegistryPermission(CreateNamespaceRegistryPermissionAction),
     DeleteNamespaceRegistryPermission(DeleteNamespaceRegistryPermissionAction),
-    CreateSmartPermission(CreateSmartPermissionAction),
-    UpdateSmartPermission(UpdateSmartPermissionAction),
-    DeleteSmartPermission(DeleteSmartPermissionAction),
 }
 
 impl std::fmt::Display for Action {
@@ -74,9 +70,6 @@ impl std::fmt::Display for Action {
             Action::DeleteNamespaceRegistryPermission(_) => {
                 write!(f, "Delete Namespace Registry Permission")
             }
-            Action::CreateSmartPermission(_) => write!(f, "Create smart permission"),
-            Action::UpdateSmartPermission(_) => write!(f, "Update smart permission"),
-            Action::DeleteSmartPermission(_) => write!(f, "Delete smart permission"),
         }
     }
 }
@@ -144,24 +137,6 @@ impl From<CreateNamespaceRegistryPermissionAction> for Action {
 impl From<DeleteNamespaceRegistryPermissionAction> for Action {
     fn from(action: DeleteNamespaceRegistryPermissionAction) -> Self {
         Action::DeleteNamespaceRegistryPermission(action)
-    }
-}
-
-impl From<CreateSmartPermissionAction> for Action {
-    fn from(action: CreateSmartPermissionAction) -> Self {
-        Action::CreateSmartPermission(action)
-    }
-}
-
-impl From<UpdateSmartPermissionAction> for Action {
-    fn from(action: UpdateSmartPermissionAction) -> Self {
-        Action::UpdateSmartPermission(action)
-    }
-}
-
-impl From<DeleteSmartPermissionAction> for Action {
-    fn from(action: DeleteSmartPermissionAction) -> Self {
-        Action::DeleteSmartPermission(action)
     }
 }
 
@@ -1582,378 +1557,6 @@ impl DeleteNamespaceRegistryPermissionActionBuilder {
     }
 }
 
-/// Native implementation for CreateSmartPermissionAction
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct CreateSmartPermissionAction {
-    name: String,
-    org_id: String,
-    function: Vec<u8>,
-}
-
-impl CreateSmartPermissionAction {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn org_id(&self) -> &str {
-        &self.org_id
-    }
-
-    pub fn function(&self) -> &[u8] {
-        &self.function
-    }
-}
-
-impl FromProto<protos::payload::CreateSmartPermissionAction> for CreateSmartPermissionAction {
-    fn from_proto(
-        proto: protos::payload::CreateSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        Ok(CreateSmartPermissionAction {
-            name: proto.get_name().to_string(),
-            org_id: proto.get_org_id().to_string(),
-            function: proto.get_function().to_vec(),
-        })
-    }
-}
-
-impl FromNative<CreateSmartPermissionAction> for protos::payload::CreateSmartPermissionAction {
-    fn from_native(
-        create_smart_permission_action: CreateSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::CreateSmartPermissionAction::new();
-        proto.set_name(create_smart_permission_action.name().to_string());
-        proto.set_org_id(create_smart_permission_action.org_id().to_string());
-        proto.set_function(create_smart_permission_action.function().to_vec());
-        Ok(proto)
-    }
-}
-
-impl FromBytes<CreateSmartPermissionAction> for CreateSmartPermissionAction {
-    fn from_bytes(bytes: &[u8]) -> Result<CreateSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::CreateSmartPermissionAction = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get CreateSmartPermissionAction from bytes".to_string(),
-                )
-            })?;
-        proto.into_native()
-    }
-}
-
-impl IntoBytes for CreateSmartPermissionAction {
-    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
-        let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from CreateSmartPermissionAction".to_string(),
-            )
-        })?;
-        Ok(bytes)
-    }
-}
-
-impl IntoProto<protos::payload::CreateSmartPermissionAction> for CreateSmartPermissionAction {}
-impl IntoNative<CreateSmartPermissionAction> for protos::payload::CreateSmartPermissionAction {}
-
-/// Builder used to create CreateSmartPermissionAction
-#[derive(Default, Clone)]
-pub struct CreateSmartPermissionActionBuilder {
-    name: Option<String>,
-    org_id: Option<String>,
-    function: Vec<u8>,
-}
-
-impl CreateSmartPermissionActionBuilder {
-    pub fn new() -> Self {
-        CreateSmartPermissionActionBuilder::default()
-    }
-
-    pub fn with_name(mut self, name: String) -> CreateSmartPermissionActionBuilder {
-        self.name = Some(name);
-        self
-    }
-
-    pub fn with_org_id(mut self, org_id: String) -> CreateSmartPermissionActionBuilder {
-        self.org_id = Some(org_id);
-        self
-    }
-
-    pub fn with_function(mut self, function: Vec<u8>) -> CreateSmartPermissionActionBuilder {
-        self.function = function;
-        self
-    }
-
-    pub fn build(self) -> Result<CreateSmartPermissionAction, ActionBuildError> {
-        let name = self.name.ok_or_else(|| {
-            ActionBuildError::MissingField("'name' field is required".to_string())
-        })?;
-
-        let org_id = self.org_id.ok_or_else(|| {
-            ActionBuildError::MissingField("'org_id' field is required".to_string())
-        })?;
-
-        let function = {
-            if self.function.is_empty() {
-                return Err(ActionBuildError::MissingField(
-                    "'function' field is required".to_string(),
-                ));
-            } else {
-                self.function
-            }
-        };
-
-        Ok(CreateSmartPermissionAction {
-            name,
-            org_id,
-            function,
-        })
-    }
-
-    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
-        self.build()
-            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
-    }
-}
-
-/// Native implementation for UpdateSmartPermissionAction
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct UpdateSmartPermissionAction {
-    name: String,
-    org_id: String,
-    function: Vec<u8>,
-}
-
-impl UpdateSmartPermissionAction {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn org_id(&self) -> &str {
-        &self.org_id
-    }
-
-    pub fn function(&self) -> &[u8] {
-        &self.function
-    }
-}
-
-impl FromProto<protos::payload::UpdateSmartPermissionAction> for UpdateSmartPermissionAction {
-    fn from_proto(
-        proto: protos::payload::UpdateSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        Ok(UpdateSmartPermissionAction {
-            name: proto.get_name().to_string(),
-            org_id: proto.get_org_id().to_string(),
-            function: proto.get_function().to_vec(),
-        })
-    }
-}
-
-impl FromNative<UpdateSmartPermissionAction> for protos::payload::UpdateSmartPermissionAction {
-    fn from_native(
-        update_smart_permission_action: UpdateSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::UpdateSmartPermissionAction::new();
-        proto.set_name(update_smart_permission_action.name().to_string());
-        proto.set_org_id(update_smart_permission_action.org_id().to_string());
-        proto.set_function(update_smart_permission_action.function().to_vec());
-        Ok(proto)
-    }
-}
-
-impl FromBytes<UpdateSmartPermissionAction> for UpdateSmartPermissionAction {
-    fn from_bytes(bytes: &[u8]) -> Result<UpdateSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::UpdateSmartPermissionAction = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get UpdateSmartPermissionAction from bytes".to_string(),
-                )
-            })?;
-        proto.into_native()
-    }
-}
-
-impl IntoBytes for UpdateSmartPermissionAction {
-    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
-        let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from UpdateSmartPermissionAction".to_string(),
-            )
-        })?;
-        Ok(bytes)
-    }
-}
-
-impl IntoProto<protos::payload::UpdateSmartPermissionAction> for UpdateSmartPermissionAction {}
-impl IntoNative<UpdateSmartPermissionAction> for protos::payload::UpdateSmartPermissionAction {}
-
-/// Builder used to create UpdateSmartPermissionAction
-#[derive(Default, Clone)]
-pub struct UpdateSmartPermissionActionBuilder {
-    name: Option<String>,
-    org_id: Option<String>,
-    function: Vec<u8>,
-}
-
-impl UpdateSmartPermissionActionBuilder {
-    pub fn new() -> Self {
-        UpdateSmartPermissionActionBuilder::default()
-    }
-
-    pub fn with_name(mut self, name: String) -> UpdateSmartPermissionActionBuilder {
-        self.name = Some(name);
-        self
-    }
-
-    pub fn with_org_id(mut self, org_id: String) -> UpdateSmartPermissionActionBuilder {
-        self.org_id = Some(org_id);
-        self
-    }
-
-    pub fn with_function(mut self, function: Vec<u8>) -> UpdateSmartPermissionActionBuilder {
-        self.function = function;
-        self
-    }
-
-    pub fn build(self) -> Result<UpdateSmartPermissionAction, ActionBuildError> {
-        let name = self.name.ok_or_else(|| {
-            ActionBuildError::MissingField("'name' field is required".to_string())
-        })?;
-
-        let org_id = self.org_id.ok_or_else(|| {
-            ActionBuildError::MissingField("'org_id' field is required".to_string())
-        })?;
-
-        let function = {
-            if self.function.is_empty() {
-                return Err(ActionBuildError::MissingField(
-                    "'function' field is required".to_string(),
-                ));
-            } else {
-                self.function
-            }
-        };
-
-        Ok(UpdateSmartPermissionAction {
-            name,
-            org_id,
-            function,
-        })
-    }
-
-    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
-        self.build()
-            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
-    }
-}
-
-/// Native implementation for DeleteSmartPermissionAction
-#[derive(Default, Debug, Clone, PartialEq)]
-pub struct DeleteSmartPermissionAction {
-    name: String,
-    org_id: String,
-}
-
-impl DeleteSmartPermissionAction {
-    pub fn name(&self) -> &str {
-        &self.name
-    }
-
-    pub fn org_id(&self) -> &str {
-        &self.org_id
-    }
-}
-
-impl FromProto<protos::payload::DeleteSmartPermissionAction> for DeleteSmartPermissionAction {
-    fn from_proto(
-        proto: protos::payload::DeleteSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        Ok(DeleteSmartPermissionAction {
-            name: proto.get_name().to_string(),
-            org_id: proto.get_org_id().to_string(),
-        })
-    }
-}
-
-impl FromNative<DeleteSmartPermissionAction> for protos::payload::DeleteSmartPermissionAction {
-    fn from_native(
-        delete_smart_permission_action: DeleteSmartPermissionAction,
-    ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::DeleteSmartPermissionAction::new();
-        proto.set_name(delete_smart_permission_action.name().to_string());
-        proto.set_org_id(delete_smart_permission_action.org_id().to_string());
-        Ok(proto)
-    }
-}
-
-impl FromBytes<DeleteSmartPermissionAction> for DeleteSmartPermissionAction {
-    fn from_bytes(bytes: &[u8]) -> Result<DeleteSmartPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteSmartPermissionAction = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get DeleteSmartPermissionAction from bytes".to_string(),
-                )
-            })?;
-        proto.into_native()
-    }
-}
-
-impl IntoBytes for DeleteSmartPermissionAction {
-    fn into_bytes(self) -> Result<Vec<u8>, ProtoConversionError> {
-        let proto = self.into_proto()?;
-        let bytes = proto.write_to_bytes().map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get bytes from DeleteSmartPermissionAction".to_string(),
-            )
-        })?;
-        Ok(bytes)
-    }
-}
-
-impl IntoProto<protos::payload::DeleteSmartPermissionAction> for DeleteSmartPermissionAction {}
-impl IntoNative<DeleteSmartPermissionAction> for protos::payload::DeleteSmartPermissionAction {}
-
-/// Builder used to create DeleteSmartPermissionAction
-#[derive(Default, Clone)]
-pub struct DeleteSmartPermissionActionBuilder {
-    name: Option<String>,
-    org_id: Option<String>,
-}
-
-impl DeleteSmartPermissionActionBuilder {
-    pub fn new() -> Self {
-        DeleteSmartPermissionActionBuilder::default()
-    }
-
-    pub fn with_name(mut self, name: String) -> DeleteSmartPermissionActionBuilder {
-        self.name = Some(name);
-        self
-    }
-
-    pub fn with_org_id(mut self, org_id: String) -> DeleteSmartPermissionActionBuilder {
-        self.org_id = Some(org_id);
-        self
-    }
-
-    pub fn build(self) -> Result<DeleteSmartPermissionAction, ActionBuildError> {
-        let name = self.name.ok_or_else(|| {
-            ActionBuildError::MissingField("'name' field is required".to_string())
-        })?;
-
-        let org_id = self.org_id.ok_or_else(|| {
-            ActionBuildError::MissingField("'org_id' field is required".to_string())
-        })?;
-
-        Ok(DeleteSmartPermissionAction { name, org_id })
-    }
-
-    pub fn into_payload_builder(self) -> Result<SabrePayloadBuilder, ActionBuildError> {
-        self.build()
-            .map(|action| SabrePayloadBuilder::new().with_action(Action::from(action)))
-    }
-}
-
 /// Native implementation for SabrePayload
 #[derive(Debug, Clone, PartialEq)]
 pub struct SabrePayload {
@@ -2026,24 +1629,6 @@ impl FromProto<protos::payload::SabrePayload> for SabrePayload {
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::CREATE_SMART_PERMISSION => {
-                CreateSmartPermissionAction::from_proto(
-                    proto.get_create_smart_permission().clone(),
-                )?
-                .into()
-            }
-            protos::payload::SabrePayload_Action::UPDATE_SMART_PERMISSION => {
-                UpdateSmartPermissionAction::from_proto(
-                    proto.get_update_smart_permission().clone(),
-                )?
-                .into()
-            }
-            protos::payload::SabrePayload_Action::DELETE_SMART_PERMISSION => {
-                DeleteSmartPermissionAction::from_proto(
-                    proto.get_delete_smart_permission().clone(),
-                )?
-                .into()
-            }
             protos::payload::SabrePayload_Action::ACTION_UNSET => {
                 return Err(ProtoConversionError::InvalidTypeError(
                     "Cannot convert SabrePayload_Action with type unset.".to_string(),
@@ -2111,19 +1696,6 @@ impl FromNative<SabrePayload> for protos::payload::SabrePayload {
                     protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION,
                 );
                 proto.set_delete_namespace_registry_permission(payload.clone().into_proto()?);
-            }
-
-            Action::CreateSmartPermission(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::CREATE_SMART_PERMISSION);
-                proto.set_create_smart_permission(payload.clone().into_proto()?);
-            }
-            Action::UpdateSmartPermission(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::UPDATE_SMART_PERMISSION);
-                proto.set_update_smart_permission(payload.clone().into_proto()?);
-            }
-            Action::DeleteSmartPermission(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::DELETE_SMART_PERMISSION);
-                proto.set_delete_smart_permission(payload.clone().into_proto()?);
             }
         }
 
@@ -2225,14 +1797,8 @@ impl SabrePayloadBuilder {
 
     /// Convert the `SabrePayloadBuilder` into a `TransactionBuilder`, filling in all required
     /// fields.
-    ///
-    /// NOTE: a signer is required because some input/output addresses of smart permission payloads
-    /// are calculated using the signer's public key.
     #[cfg(not(target_arch = "wasm32"))]
-    pub fn into_transaction_builder(
-        self,
-        signer: &dyn Signer,
-    ) -> Result<TransactionBuilder, SabrePayloadBuildError> {
+    pub fn into_transaction_builder(self) -> Result<TransactionBuilder, SabrePayloadBuildError> {
         let payload = self.build()?;
 
         let (input_addresses, output_addresses) = match payload.action() {
@@ -2319,25 +1885,6 @@ impl SabrePayloadBuilder {
                 let addresses = vec![
                     compute_namespace_registry_address(namespace)?,
                     ADMINISTRATORS_SETTING_ADDRESS_BYTES.to_vec(),
-                ];
-                (addresses.clone(), addresses)
-            }
-            Action::CreateSmartPermission(CreateSmartPermissionAction { org_id, name, .. })
-            | Action::UpdateSmartPermission(UpdateSmartPermissionAction { org_id, name, .. })
-            | Action::DeleteSmartPermission(DeleteSmartPermissionAction { org_id, name, .. }) => {
-                let public_key = signer.public_key().map_err(|err| {
-                    SabrePayloadBuildError::SigningError(format!(
-                        "Unable to get public key from signer: {}",
-                        err
-                    ))
-                })?;
-                let addresses = vec![
-                    compute_smart_permission_address(org_id, name)?,
-                    // This converts the public key to a hex string and gets the raw bytes of that
-                    // string; this is required because it is how the agent addresses is calculated
-                    // by the Sabre transaction processor.
-                    compute_agent_address(public_key.as_hex().as_bytes())?,
-                    compute_org_address(org_id)?,
                 ];
                 (addresses.clone(), addresses)
             }
@@ -2733,102 +2280,6 @@ mod tests {
     }
 
     #[test]
-    // check that a create smart permsion action is built correctly
-    fn check_create_smart_permission_action() {
-        let builder = CreateSmartPermissionActionBuilder::new();
-        let action = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .build()
-            .unwrap();
-
-        assert_eq!(action.name(), "SmartPermission");
-        assert_eq!(action.org_id(), "org_id");
-        assert_eq!(action.function(), b"test");
-    }
-
-    #[test]
-    // check that create smart permission can be converted to bytes and back
-    fn check_create_smart_permission_action_bytes() {
-        let builder = CreateSmartPermissionActionBuilder::new();
-        let original = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .build()
-            .unwrap();
-
-        let bytes = original.clone().into_bytes().unwrap();
-
-        let create = CreateSmartPermissionAction::from_bytes(&bytes).unwrap();
-        assert_eq!(create, original);
-    }
-
-    #[test]
-    // check that a update smart permission action is built correctly
-    fn check_update_smart_permission_action() {
-        let builder = UpdateSmartPermissionActionBuilder::new();
-        let action = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .build()
-            .unwrap();
-
-        assert_eq!(action.name(), "SmartPermission");
-        assert_eq!(action.org_id(), "org_id");
-        assert_eq!(action.function(), b"test");
-    }
-
-    #[test]
-    // check that a update smart permission can be converted to bytes and back
-    fn check_update_smart_permission_action_bytes() {
-        let builder = UpdateSmartPermissionActionBuilder::new();
-        let original = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .build()
-            .unwrap();
-
-        let bytes = original.clone().into_bytes().unwrap();
-
-        let create = UpdateSmartPermissionAction::from_bytes(&bytes).unwrap();
-        assert_eq!(create, original);
-    }
-
-    #[test]
-    // check that a delete smart permission action is built correctly
-    fn check_delete_smart_permission_action() {
-        let builder = DeleteSmartPermissionActionBuilder::new();
-        let action = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .build()
-            .unwrap();
-
-        assert_eq!(action.name(), "SmartPermission");
-        assert_eq!(action.org_id(), "org_id");
-    }
-
-    #[test]
-    // check that a delete smart permission can be converted to bytes and back
-    fn check_delete_smart_permission_action_bytes() {
-        let builder = DeleteSmartPermissionActionBuilder::new();
-        let original = builder
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .build()
-            .unwrap();
-
-        let bytes = original.clone().into_bytes().unwrap();
-
-        let create = DeleteSmartPermissionAction::from_bytes(&bytes).unwrap();
-        assert_eq!(create, original);
-    }
-
-    #[test]
     // check that a sabre payload with execute action is built correctly
     fn check_payload() {
         let builder = ExecuteContractActionBuilder::new();
@@ -2882,7 +2333,7 @@ mod tests {
             .with_contract(b"test".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -2908,7 +2359,7 @@ mod tests {
             .with_version("0.1".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -2937,7 +2388,7 @@ mod tests {
             .with_payload(b"test_payload".to_vec())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -2963,7 +2414,7 @@ mod tests {
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -2988,7 +2439,7 @@ mod tests {
             .with_name("TestContract".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3014,7 +2465,7 @@ mod tests {
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3040,7 +2491,7 @@ mod tests {
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3065,7 +2516,7 @@ mod tests {
             .with_namespace("TestNamespace".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3091,7 +2542,7 @@ mod tests {
             .with_owners(vec!["test".to_string(), "owner".to_string()])
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3119,7 +2570,7 @@ mod tests {
             .with_write(true)
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");
@@ -3145,87 +2596,7 @@ mod tests {
             .with_contract_name("TestContract".to_string())
             .into_payload_builder()
             .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
-            .expect("failed to convert to transaction builder")
-            .build_pair(&*signer)
-            .expect("failed to build transaction pair");
-
-        let txn_header = txn_pair.header();
-
-        assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(
-            txn_header.family_version(),
-            SABRE_PROTOCOL_VERSION.to_string()
-        );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
-    }
-
-    #[test]
-    // check that a create smart permission can be converted -> sabre payload builder ->
-    // transaction builder -> transaction
-    fn create_smart_permission_into_transaction() {
-        let signer = new_signer();
-
-        let txn_pair = CreateSmartPermissionActionBuilder::new()
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .into_payload_builder()
-            .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
-            .expect("failed to convert to transaction builder")
-            .build_pair(&*signer)
-            .expect("failed to build transaction pair");
-
-        let txn_header = txn_pair.header();
-
-        assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(
-            txn_header.family_version(),
-            SABRE_PROTOCOL_VERSION.to_string()
-        );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
-    }
-
-    #[test]
-    // check that a update smart permission can be converted -> sabre payload builder ->
-    // transaction builder -> transaction
-    fn update_smart_permission_into_transaction() {
-        let signer = new_signer();
-
-        let txn_pair = UpdateSmartPermissionActionBuilder::new()
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .with_function(b"test".to_vec())
-            .into_payload_builder()
-            .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
-            .expect("failed to convert to transaction builder")
-            .build_pair(&*signer)
-            .expect("failed to build transaction pair");
-
-        let txn_header = txn_pair.header();
-
-        assert_eq!(txn_header.family_name(), "sabre");
-        assert_eq!(
-            txn_header.family_version(),
-            SABRE_PROTOCOL_VERSION.to_string()
-        );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
-    }
-
-    #[test]
-    // check that a delete smart permission can be converted -> sabre payload builder ->
-    // transaction builder -> transaction
-    fn delete_smart_permission_into_transaction() {
-        let signer = new_signer();
-
-        let txn_pair = DeleteSmartPermissionActionBuilder::new()
-            .with_name("SmartPermission".to_string())
-            .with_org_id("org_id".to_string())
-            .into_payload_builder()
-            .expect("failed to convert to payload builder")
-            .into_transaction_builder(&*signer)
+            .into_transaction_builder()
             .expect("failed to convert to transaction builder")
             .build_pair(&*signer)
             .expect("failed to build transaction pair");

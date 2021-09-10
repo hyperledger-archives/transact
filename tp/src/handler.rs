@@ -198,13 +198,6 @@ impl TransactionHandler for SabreTransactionHandler {
                 &mut state,
                 &*self.admin_permissions,
             ),
-            Action::CreateSmartPermission(_)
-            | Action::UpdateSmartPermission(_)
-            | Action::DeleteSmartPermission(_) => {
-                return Err(ApplyError::InvalidTransaction(
-                    "Smart Permissions not supported in this version of Sabre".into(),
-                ));
-            }
         }
     }
 }
