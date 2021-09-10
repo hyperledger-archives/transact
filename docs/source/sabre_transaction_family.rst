@@ -126,42 +126,6 @@ Contracts whose addresses collide are stored in a ContractList.
       repeated Contract contracts = 1;
     }
 
-Smart Permission
-----------------
-
-A smart permission is an executable piece of WebAssembly code. A smart permission is named,
-and associated with an organization created via the Pike transaction processor.
-
-A smart permission is defined with three fields:
-
-- name: the name of the smart permission function as defined by a ``CreateContractAction`` 
-- function: a byte array that stores the executable code of the smart permission
-- org_id: The identifier of the organization to which the smart permission
-  function belongs. This organization is created via the Pike transaction
-  processor
-
-.. code-block:: protobuf
-
-    message SmartPermission {
-      string name = 1;
-      string org_id = 2;
-      bytes function = 3;
-    }
-
-Smart Permission List
----------------------
-
-Smart Permissions whose addresses collide are stored in a smart permission
-list. A smart permission list contains one field:
-
-- smart_permissions: a list of smart permissions
-
-.. code-block:: protobuf
-
-    message SmartPermissionList {
-        repeated SmartPermission smart_permissions = 1;
-    }
-
 Addressing
 ----------
 
@@ -221,9 +185,6 @@ defined in the SabrePayload.
       UPDATE_NAMESPACE_REGISTRY_OWNERS = 9;
       CREATE_NAMESPACE_REGISTRY_PERMISSION = 10;
       DELETE_NAMESPACE_REGISTRY_PERMISSION = 11;
-      CREATE_SMART_PERMISSION = 12;
-      UPDATE_SMART_PERMISSION= 13;
-      DELETE_SMART_PERMISSION = 14;
     }
 
     Action action = 1;
@@ -241,10 +202,6 @@ defined in the SabrePayload.
     UpdateNamespaceRegistryOwnersAction update_namespace_registry_owners = 10;
     CreateNamespaceRegistryPermissionAction create_namespace_registry_permission = 11;
     DeleteNamespaceRegistryPermissionAction delete_namespace_registry_permission = 12;
-
-    CreateSmartPermissionAction create_smart_permission = 13;
-    UpdateSmartPermissionAction update_smart_permission = 14;
-    DeleteSmartPermissionAction delete_smart_permission = 15;
   }
 
 CreateContractAction
@@ -610,60 +567,6 @@ The inputs for DeleteNamespaceRegistryPermissionAction must include:
 The outputs for DeleteNamespaceRegistryPermissionAction must include:
 
 * the address for the namespace registry
-
-CreateSmartPermissionAction
----------------------------
-
-This operation loads a smart permission into Global State.  The
-bytes provided are compiled smart permission code.  org_id is the Organization
-identifier (smart permissions are organization-specific).  name is the name of the
-function known to application transaction processors using this smart permission 
-during that transaction processor's permission function evaluation. Only an agent
-that holds an admin role for the included organization can create smart 
-permissions for the organization. Agents and Organization are created and
-registered by the Pike transaction processor.
-
-.. code-block:: protobuf
-
-  message CreateSmartPermissionAction {
-    string name = 1;
-    string org_id = 2;
-    bytes function = 3;
-  }
-
-UpdateSmartPermissionAction
----------------------------
-
-This operation updates the bytes of smart permission function stored in
-Global State. Only an agent that holds an admin role for the included
-organization can update smart permissions for the organization. Agents
-and Organization are created and registered by the Pike transaction processor.
-
-
-.. code-block:: protobuf
-
-  message UpdateSmartPermissionAction {
-    string name = 1;
-    string org_id = 2;
-    bytes function = 3;
-  }
-
-DeleteSmartPermissionAction
----------------------------
-
-This operation deletes an existing smart permission function stored in
-Global State. Only an agent that holds an admin role for the included
-organization can delete smart permissions for the organization. Agents 
-and Organization are created and registered by the Pike transaction
-processor.
-
-
-.. code-block:: protobuf
-
-    message DeleteSmartPermissionAction {
-      string name = 1;
-      string org_id = 2;
-  }
 
 Transaction Header
 ==================
