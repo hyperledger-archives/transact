@@ -24,7 +24,6 @@ import {
     get_ptr_collection_len,
     add_to_collection,
     create_collection,
-    invoke_smart_permission,
     log_buffer,
     log_level,
     get_ptr_from_collection
@@ -349,46 +348,6 @@ export class TransactionContext {
 
         return resultArray;
     }
-}
-
-export function invokeSmartPermission(
-    contractAddr: string,
-    name: string,
-    roles: Array<string>,
-    orgId: string,
-    publicKey: string,
-    payload: ArrayBuffer
-): i32 {
-    if (!roles.length) {
-        const err = "No roles set";
-        error(err);
-        throw new Error(err);
-    }
-
-    const head = roles[0];
-
-    const headerRoleBuffer = WasmBuffer.init(String.UTF8.encode(head));
-    create_collection(headerRoleBuffer.getRaw());
-
-    for (let i = 1; i < roles.length; i++) {
-        const wasmBuffer = WasmBuffer.init(String.UTF8.encode(roles[i]));
-        add_to_collection(headerRoleBuffer.getRaw(), wasmBuffer.getRaw());
-    }
-
-    const contractAddrBuffer = WasmBuffer.init(String.UTF8.encode(contractAddr));
-    const nameBuffer = WasmBuffer.init(String.UTF8.encode(name));
-    const orgIdBuffer = WasmBuffer.init(String.UTF8.encode(orgId));
-    const publicKeyBuffer = WasmBuffer.init(String.UTF8.encode(publicKey));
-    const payloadBuffer = WasmBuffer.init(payload);
-
-    return invoke_smart_permission(
-        contractAddrBuffer.getRaw(),
-        nameBuffer.getRaw(),
-        headerRoleBuffer.getRaw(),
-        orgIdBuffer.getRaw(),
-        publicKeyBuffer.getRaw(),
-        payloadBuffer.getRaw()
-    );
 }
 
 /**
