@@ -598,20 +598,14 @@ The ``sawtooth-sabre`` repository includes an example contract definition file,
       version: '1.0'
       wasm: processor/target/wasm32-unknown-unknown/release/intkey-multiply.wasm
       inputs:
-        - 'cad11d'
         - '1cf126'
-        - '00ec03'
       outputs:
         - '1cf126'
-        - 'cad11d'
-        - '00ec03'
 
    The inputs and outputs specify the namespaces that the contract can read from
    and write to. This example uses the following namespace prefixes:
 
    * ``1cf126``: intkey namespace
-   * ``00ec03``: Sabre smart permission namespace
-   * ``cad11d``: Pike (identity management) namespace
 
 3. Run the following command to upload this contract definition file to Sabre.
 
@@ -677,28 +671,6 @@ explicit namespace read and write permissions to the contract.
 
    This command gives ``intkey-multiply`` both read and write permissions for
    the intkey namespace (``1cf126``). For more information on command options,
-   run ``sabre perm --help``.
-
-#. Use ``sabre ns`` to create the namespace registry for pike. Replace
-   ``{owner-key}`` with your public key.
-
-   .. code-block:: console
-
-      # sabre ns --create cad11d --owner {owner-key} --url http://rest-api:9708
-
-   This command specifies the pike namespace prefix (``cad11d``) and defines
-   root as the namespace registry owner.
-   For more information on command options, run ``sabre ns --help``.
-
-#. Use ``sabre perm`` to grant the appropriate namespace permissions for your
-   smart contract.
-
-   .. code-block:: console
-
-     # sabre perm cad11d intkey_multiply --read --url http://rest-api:9708
-
-   This command gives ``intkey-multiply`` read permissions for the pike
-   namespace (``cad11d``). For more information on command options,
    run ``sabre perm --help``.
 
 Step 7. Execute the Smart Contract
