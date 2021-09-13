@@ -370,43 +370,6 @@ pub trait TransactionHandler {
     ) -> Result<(), ApplyError>;
 }
 
-pub fn invoke_smart_permission(
-    contract_addr: String,
-    name: String,
-    roles: Vec<String>,
-    org_id: String,
-    public_key: String,
-    payload: &[u8],
-) -> Result<i32, WasmSdkError> {
-    unsafe {
-        if roles.is_empty() {
-            return Err(WasmSdkError::InvalidTransaction("No roles ".into()));
-        }
-        let head = &roles[0];
-        let header_role_buffer = WasmBuffer::new(head.as_bytes())?;
-        externs::create_collection(header_role_buffer.to_raw());
-
-        for role in roles[1..].iter() {
-            let wasm_buffer = WasmBuffer::new(role.as_bytes())?;
-            externs::add_to_collection(header_role_buffer.to_raw(), wasm_buffer.to_raw());
-        }
-        let contract_addr_buffer = WasmBuffer::new(contract_addr.as_bytes())?;
-        let name_buffer = WasmBuffer::new(name.as_bytes())?;
-        let org_id_buffer = WasmBuffer::new(org_id.as_bytes())?;
-        let public_key_buffer = WasmBuffer::new(public_key.as_bytes())?;
-        let payload_buffer = WasmBuffer::new(payload)?;
-
-        Ok(externs::invoke_smart_permission(
-            contract_addr_buffer.to_raw(),
-            name_buffer.to_raw(),
-            header_role_buffer.to_raw(),
-            org_id_buffer.to_raw(),
-            public_key_buffer.to_raw(),
-            payload_buffer.to_raw(),
-        ))
-    }
-}
-
 /// -1: Failed to deserialize payload
 /// -2: Failed to deserialize signer
 /// -3: apply returned InvalidTransaction
@@ -509,92 +472,6 @@ impl Request {
 
     pub fn get_payload<T>(&self) -> Vec<u8> {
         self.payload.clone()
-    }
-}
-
-/// Error Codes:
-///
-/// -1: Failed to deserialize roles
-/// -2: Failed to deserialize org_id
-/// -3: Failed to deserialize public_key
-/// -4: Failed to deserialize payload
-/// -5: Failed to execute smart permission
-/// -6: StateSetError
-/// -7: AllocError
-/// -8: MemoryRetrievalError
-/// -9: Utf8EncodeError
-/// -10: ProtobufError
-///
-/// # Safety
-///
-/// This function is unsafe due to the call to WasmBuffer::from_raw which converts a WasmPtr
-/// to a WasmBuffer to access a location in executor memory
-pub unsafe fn execute_smart_permission_entrypoint<F>(
-    roles_ptr: WasmPtrList,
-    org_id_ptr: WasmPtr,
-    public_key_ptr: WasmPtr,
-    payload_ptr: WasmPtr,
-    has_permission: F,
-) -> i32
-where
-    F: Fn(Request) -> Result<bool, WasmSdkError>,
-{
-    let roles = if let Ok(i) = WasmBuffer::from_list(roles_ptr) {
-        let results: Vec<Result<String, WasmSdkError>> = i.iter().map(|x| x.to_string()).collect();
-
-        if results.iter().any(|x| x.is_err()) {
-            return -1;
-        } else {
-            results.into_iter().map(|x| x.unwrap()).collect()
-        }
-    } else {
-        return -1;
-    };
-
-    let org_id = if let Ok(i) = WasmBuffer::from_raw(org_id_ptr) {
-        match i.to_string() {
-            Ok(s) => s,
-            Err(_) => {
-                return -2;
-            }
-        }
-    } else {
-        return -2;
-    };
-
-    let public_key = if let Ok(i) = WasmBuffer::from_raw(public_key_ptr) {
-        match i.to_string() {
-            Ok(s) => s,
-            Err(_) => {
-                return -3;
-            }
-        }
-    } else {
-        return -3;
-    };
-
-    let payload = if let Ok(i) = WasmBuffer::from_raw(payload_ptr) {
-        i.to_bytes()
-    } else {
-        return -4;
-    };
-
-    match has_permission(Request::new(roles, org_id, public_key, payload)) {
-        Ok(r) => {
-            if r {
-                1
-            } else {
-                0
-            }
-        }
-        Err(WasmSdkError::StateSetError(_)) => -5,
-        Err(WasmSdkError::AllocError(_)) => -6,
-        Err(WasmSdkError::MemoryWriteError(_)) => -7,
-        Err(WasmSdkError::MemoryRetrievalError(_)) => -8,
-        Err(WasmSdkError::Utf8EncodeError(_)) => -9,
-        Err(WasmSdkError::ProtobufError(_)) => -10,
-        Err(WasmSdkError::InvalidTransaction(_)) => -11,
-        Err(WasmSdkError::InternalError(_)) => -12,
     }
 }
 
