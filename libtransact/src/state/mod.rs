@@ -53,6 +53,15 @@ impl Clone for StateChange {
     }
 }
 
+impl StateChange {
+    pub fn key(&self) -> &str {
+        match self {
+            StateChange::Set { key, .. } => key,
+            StateChange::Delete { key } => key,
+        }
+    }
+}
+
 /// `state::Write` provides a way to write to a particular state storage system.
 ///
 /// It provides the ability for the caller to either compute the next `StateId` -

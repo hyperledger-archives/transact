@@ -15,52 +15,46 @@
  * -----------------------------------------------------------------------------
  */
 
+//! Errors related to SQL-backed merkle-radix state representation.
+
 use std::error::Error;
 use std::fmt;
 
 use crate::error::{InternalError, InvalidStateError};
 
-/// Error variants that may occur while reading Merkle Radix tree leaves.
+/// This error may occur during the construction of a SqlMerkeState instance.
 #[derive(Debug)]
-pub enum MerkleRadixLeafReadError {
-    /// An internal error occurred.
-    ///
-    /// This error may be caused by an issue outside of the control of the application, such as
-    /// invalid storage.
+pub enum SqlMerkleStateBuildError {
     InternalError(InternalError),
-    /// An invalid state error occurred.
-    ///
-    /// This error may occur in cases where the reader has been provided invalid state, such as a
-    /// non-existent state root hash.
     InvalidStateError(InvalidStateError),
 }
 
-impl fmt::Display for MerkleRadixLeafReadError {
+impl fmt::Display for SqlMerkleStateBuildError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            MerkleRadixLeafReadError::InternalError(err) => f.write_str(&err.to_string()),
-            MerkleRadixLeafReadError::InvalidStateError(err) => f.write_str(&err.to_string()),
+            SqlMerkleStateBuildError::InternalError(e) => f.write_str(&e.to_string()),
+            SqlMerkleStateBuildError::InvalidStateError(e) => f.write_str(&e.to_string()),
         }
     }
 }
 
-impl Error for MerkleRadixLeafReadError {
+impl Error for SqlMerkleStateBuildError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
-        match self {
-            MerkleRadixLeafReadError::InternalError(ref err) => Some(err),
-            MerkleRadixLeafReadError::InvalidStateError(ref err) => Some(err),
+        match *self {
+            SqlMerkleStateBuildError::InternalError(ref e) => Some(&*e),
+            SqlMerkleStateBuildError::InvalidStateError(ref e) => Some(&*e),
         }
     }
 }
 
-impl From<InternalError> for MerkleRadixLeafReadError {
+impl From<InternalError> for SqlMerkleStateBuildError {
     fn from(err: InternalError) -> Self {
-        MerkleRadixLeafReadError::InternalError(err)
+        SqlMerkleStateBuildError::InternalError(err)
     }
 }
 
-impl From<InvalidStateError> for MerkleRadixLeafReadError {
+impl From<InvalidStateError> for SqlMerkleStateBuildError {
     fn from(err: InvalidStateError) -> Self {
-        MerkleRadixLeafReadError::InvalidStateError(err)
+        SqlMerkleStateBuildError::InvalidStateError(err)
     }
 }
