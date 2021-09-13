@@ -25,10 +25,6 @@ const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 /// The contract prefix for global state (00ec02)
 const CONTRACT_PREFIX: &str = "00ec02";
 
-const PIKE_AGENT_PREFIX: &str = "cad11d00";
-
-const PIKE_ORG_PREFIX: &str = "cad11d01";
-
 pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
     let mut sha = Sha512::new();
     sha.input_str(to_hash);
@@ -43,18 +39,6 @@ pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
         }
     };
     Ok(hash.into())
-}
-
-/// Returns a hex string representation of the supplied bytes
-///
-/// # Arguments
-///
-/// * `b` - input bytes
-fn bytes_to_hex_str(b: &[u8]) -> String {
-    b.iter()
-        .map(|b| format!("{:02x}", b))
-        .collect::<Vec<_>>()
-        .join("")
 }
 
 pub fn make_contract_address(name: &str, version: &str) -> Result<String, ApplyError> {
@@ -76,34 +60,4 @@ pub fn make_namespace_registry_address(namespace: &str) -> Result<String, ApplyE
         }
     };
     Ok(NAMESPACE_REGISTRY_PREFIX.to_string() + &hash(prefix, 64)?)
-}
-
-/// Returns a state address for a given agent name
-///
-/// # Arguments
-///
-/// * `name` - the agent's name
-pub fn compute_agent_address(public_key: &str) -> String {
-    let hash: &mut [u8] = &mut [0; 64];
-
-    let mut sha = Sha512::new();
-    sha.input(public_key.as_bytes());
-    sha.result(hash);
-
-    String::from(PIKE_AGENT_PREFIX) + &bytes_to_hex_str(hash)[..62]
-}
-
-/// Returns a state address for a given organization id
-///
-/// # Arguments
-///
-/// * `id` - the organization's id
-pub fn compute_org_address(id: &str) -> String {
-    let hash: &mut [u8] = &mut [0; 64];
-
-    let mut sha = Sha512::new();
-    sha.input(id.as_bytes());
-    sha.result(hash);
-
-    String::from(PIKE_ORG_PREFIX) + &bytes_to_hex_str(hash)[..62]
 }

@@ -13,7 +13,6 @@
 // limitations under the License.
 use protobuf::Message;
 
-use sabre_sdk::protocol::pike::state::{Agent, AgentList, Organization, OrganizationList};
 use sabre_sdk::protocol::state::{
     Contract, ContractList, ContractListBuilder, ContractRegistry, ContractRegistryList,
     ContractRegistryListBuilder, NamespaceRegistry, NamespaceRegistryList,
@@ -26,8 +25,7 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 
 use crate::addressing::{
-    compute_agent_address, compute_org_address, make_contract_address,
-    make_contract_registry_address, make_namespace_registry_address,
+    make_contract_address, make_contract_registry_address, make_namespace_registry_address,
 };
 
 pub struct SabreState<'a> {
@@ -364,49 +362,5 @@ impl<'a> SabreState<'a> {
             )));
         };
         Ok(())
-    }
-
-    pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
-        let address = compute_org_address(id);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let orgs = OrganizationList::from_bytes(packed.as_slice()).map_err(|err| {
-                    ApplyError::InvalidTransaction(format!(
-                        "Cannot deserialize organization list: {:?}",
-                        err,
-                    ))
-                })?;
-
-                Ok(orgs
-                    .organizations()
-                    .iter()
-                    .find(|org| org.org_id() == id)
-                    .cloned())
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
-        let address = compute_agent_address(public_key);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let agents = AgentList::from_bytes(packed.as_slice()).map_err(|err| {
-                    ApplyError::InvalidTransaction(format!(
-                        "Cannot deserialize agent list: {:?}",
-                        err,
-                    ))
-                })?;
-
-                Ok(agents
-                    .agents()
-                    .iter()
-                    .find(|agent| agent.public_key() == public_key)
-                    .cloned())
-            }
-            None => Ok(None),
-        }
     }
 }
