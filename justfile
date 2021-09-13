@@ -16,16 +16,6 @@ crates := '\
     sdks/rust \
     cli \
     tp \
-    contracts/sawtooth-pike/sp_sdk \
-    contracts/sawtooth-pike/tp \
-    contracts/sawtooth-pike/cli \
-    contracts/sawtooth-pike/examples/intkey \
-    contracts/sawtooth-pike/addresser \
-    contracts/sawtooth-pike/examples/white_list_permission \
-    contracts/sawtooth-pike/examples/proposal_permission \
-    contracts/sawtooth-pike/db/pike_db \
-    contracts/sawtooth-pike/api \
-    contracts/sawtooth-pike/state_delta_export \
     example/intkey_multiply/processor \
     example/intkey_multiply/cli \
     integration \
