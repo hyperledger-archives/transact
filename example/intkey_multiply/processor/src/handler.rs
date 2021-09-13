@@ -27,7 +27,6 @@ cfg_if! {
         use sabre_sdk::TpProcessRequest;
         use sabre_sdk::{WasmPtr, execute_entrypoint};
         use sabre_sdk::protos::FromBytes;
-        use sabre_sdk::protocol::pike::state::{Agent, AgentList, Organization, OrganizationList};
     } else {
         use sawtooth_sdk::processor::handler::ApplyError;
         use sawtooth_sdk::processor::handler::TransactionContext;
@@ -39,34 +38,10 @@ cfg_if! {
 const MAX_VALUE: u32 = 4_294_967_295;
 const MAX_NAME_LEN: usize = 20;
 
-#[cfg(target_arch = "wasm32")]
-const PIKE_AGENT_PREFIX: &'static str = "cad11d00";
-
-#[cfg(target_arch = "wasm32")]
-const PIKE_ORG_PREFIX: &'static str = "cad11d01";
-
 fn get_intkey_prefix() -> String {
     let mut sha = Sha512::new();
     sha.input_str("intkey");
     sha.result_str()[..6].to_string()
-}
-
-cfg_if! {
-    if #[cfg(target_arch = "wasm32")] {
-        fn compute_agent_address(name: &str) -> String {
-            let mut sha = Sha512::new();
-            sha.input(name.as_bytes());
-
-            String::from(PIKE_AGENT_PREFIX) + &sha.result_str()[..62].to_string()
-        }
-
-        fn compute_org_address(name: &str) -> String {
-            let mut sha = Sha512::new();
-            sha.input(name.as_bytes());
-
-            String::from(PIKE_ORG_PREFIX) + &sha.result_str()[..62].to_string()
-        }
-    }
 }
 
 fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError> {
@@ -379,60 +354,6 @@ impl<'a> IntkeyState<'a> {
             .map_err(|err| ApplyError::InternalError(format!("{}", err)))?;
 
         Ok(())
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
-        let address = compute_agent_address(public_key);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let agents = match AgentList::from_bytes(packed.as_slice()) {
-                    Ok(agents) => agents,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize record container: {:?}",
-                            err,
-                        )));
-                    }
-                };
-
-                for agent in agents.agents() {
-                    if agent.public_key() == public_key {
-                        return Ok(Some(agent.clone()));
-                    }
-                }
-                Ok(None)
-            }
-            None => Ok(None),
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
-        let address = compute_org_address(id);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let orgs = match OrganizationList::from_bytes(packed.as_slice()) {
-                    Ok(orgs) => orgs,
-                    Err(err) => {
-                        return Err(ApplyError::InternalError(format!(
-                            "Cannot deserialize organization list: {:?}",
-                            err,
-                        )));
-                    }
-                };
-
-                for org in orgs.organizations() {
-                    if org.org_id() == id {
-                        return Ok(Some(org.clone()));
-                    }
-                }
-                Ok(None)
-            }
-            None => Ok(None),
-        }
     }
 }
 
