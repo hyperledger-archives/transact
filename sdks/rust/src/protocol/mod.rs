@@ -13,7 +13,6 @@
 // limitations under the License.
 
 pub mod payload;
-pub mod pike;
 pub mod state;
 
 use std::error::Error;
