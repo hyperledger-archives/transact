@@ -21,6 +21,10 @@ crates := '\
     integration \
     '
 
+crates_wasm := '\
+    sdks/rust \
+    example/intkey_multiply/processor \
+    '
 
 features := '\
     --features=experimental \
@@ -37,6 +41,12 @@ build:
         for crate in $(echo {{crates}})
         do
             cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
+            echo "\033[1m$cmd\033[0m"
+            $cmd
+        done
+        for crate in $(echo {{crates_wasm}})
+        do
+            cmd="cargo build --target wasm32-unknown-unknown --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
