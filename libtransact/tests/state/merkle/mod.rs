@@ -30,13 +30,11 @@ use std::str::from_utf8;
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
 
-#[cfg(feature = "state-merkle-leaf-reader")]
-use transact::state::merkle::MerkleRadixLeafReader;
 use transact::{
     database::{error::DatabaseError, Database},
     protos::merkle::ChangeLogEntry,
     state::{
-        merkle::{MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
+        merkle::{MerkleRadixLeafReader, MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
         Prune, Read, StateChange, StateReadError, Write,
     },
 };
@@ -1063,7 +1061,6 @@ where
     assert_read_value_at_address(&merkle_state, &parent_root, "ab0000", Some("0001"));
 }
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 /// Test iteration over leaves.
 fn test_leaf_iteration<M>(initial_state_root: String, merkle_state: M)
 where
