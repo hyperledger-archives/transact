@@ -17,7 +17,6 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 mod error;
 pub mod kv;
 #[cfg(feature = "state-merkle-sql")]
@@ -25,10 +24,8 @@ mod node;
 #[cfg(feature = "state-merkle-sql")]
 pub mod sql;
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::Read;
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 pub use error::MerkleRadixLeafReadError;
 pub use kv::{
     MerkleRadixTree, MerkleState, StateDatabaseError, CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX,
@@ -36,16 +33,13 @@ pub use kv::{
 };
 
 // These types make the clippy happy
-#[cfg(feature = "state-merkle-leaf-reader")]
 type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
-#[cfg(feature = "state-merkle-leaf-reader")]
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
 /// A Merkle-Radix tree leaf reader.
 ///
 /// This trait provides an interface to a Merkle-Radix state implementation in order to return an
 /// iterator over the leaves of the tree at a given state root hash.
-#[cfg(feature = "state-merkle-leaf-reader")]
 pub trait MerkleRadixLeafReader: Read<StateId = String, Key = String, Value = Vec<u8>> {
     /// Returns an iterator over the leaves of a merkle radix tree.
     ///

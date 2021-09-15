@@ -96,7 +96,6 @@ experimental = [
     "sqlite-db",
     "postgres",
     "sqlite",
-    "state-merkle-leaf-reader",
     "state-merkle-sql",
     "workload",
 ]
@@ -120,7 +119,6 @@ sawtooth-compat = ["sawtooth-sdk"]
 sqlite-db = ["rusqlite", "r2d2", "r2d2_sqlite"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec"]
-state-merkle-leaf-reader = ["state-merkle"]
 state-merkle-sql = ["diesel", "diesel_migrations"]
 # This feature must be enabled to run tests using a postgres db it is not
 # enabled by default, due to its requirement of an external postgres db

@@ -29,12 +29,10 @@ use cbor::value::{Bytes, Key, Text, Value};
 
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
-#[cfg(feature = "state-merkle-leaf-reader")]
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use crate::state::{Prune, Read, StateChange, Write};
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 use super::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
 
 use self::change_log::{ChangeLogEntry, Successor};
@@ -134,12 +132,9 @@ impl Read for MerkleState {
 }
 
 // These types make the clippy happy
-#[cfg(feature = "state-merkle-leaf-reader")]
 type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
-#[cfg(feature = "state-merkle-leaf-reader")]
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 impl MerkleRadixLeafReader for MerkleState {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
