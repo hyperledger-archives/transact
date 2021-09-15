@@ -110,7 +110,7 @@ copy-env:
 doc:
     #!/usr/bin/env sh
     set -e
-    cargo doc
+    cargo doc --no-deps
 
 lint:
     #!/usr/bin/env sh
