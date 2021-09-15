@@ -1,5 +1,32 @@
 # Release Notes
 
+## Changes in Transact 0.3.8
+
+### Highlights
+
+* Experimental support for merkle state stored in Postgres and SQLite databases.
+  This is available via new struct `SqlMerkleState` and activated by the
+  features `"state-merkle-sql"` with `"postgres"` and/or `"sqlite"` enabled for
+  either database.
+
+### libtransact updates
+
+* Move existing key-value `MerkleState` implementation to
+  `transact::state::merkle::kv`.  This implementation is backed by the key-value
+  `Database` abstraction.  It is re-exported in the `transact::state::merkle`
+  module for backwards compatibility.
+
+* Add experimental `SqlMerkelState` available in the module
+  `transact::state::merkle::sql`. This is activated by the features
+  `"state-merkle-sql"` with `"postgres"` and/or `"sqlite"` enabled for either
+  database.
+
+* Add `transact::error::InternalError`, copied from the splinter library.
+
+* Add `transact::error::InvalidStateError`, copied from the splinter library.
+
+* Expand SQLite journal configuration in experimental `SqliteDatabase`
+
 ## Changes in Transact 0.3.7
 
 * Update `semver` dependency from `0.9` to `1.0`.
