@@ -1907,6 +1907,7 @@ impl SabrePayloadBuilder {
     }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
     if hex.len() % 2 != 0 {
         return Err(AddressingError::InvalidInput(format!(
@@ -1926,6 +1927,7 @@ fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
 }
 
 #[cfg(test)]
+#[cfg(not(target_arch = "wasm32"))]
 mod tests {
     use super::*;
 
