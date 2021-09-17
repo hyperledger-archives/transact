@@ -26,7 +26,6 @@ cfg_if! {
         use sabre_sdk::TransactionHandler;
         use sabre_sdk::TpProcessRequest;
         use sabre_sdk::{WasmPtr, execute_entrypoint};
-        use sabre_sdk::protos::FromBytes;
     } else {
         use sawtooth_sdk::processor::handler::ApplyError;
         use sawtooth_sdk::processor::handler::TransactionContext;
@@ -412,9 +411,6 @@ impl TransactionHandler for IntkeyMultiplyTransactionHandler {
             payload.get_name_b(),
             payload.get_name_c()
         );
-
-        #[cfg(target_arch = "wasm32")]
-        let signer = request.get_header().get_signer_public_key();
 
         match state.get(payload.get_name_a()) {
             Ok(None) => (),
