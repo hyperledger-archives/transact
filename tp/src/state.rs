@@ -13,11 +13,10 @@
 // limitations under the License.
 use protobuf::Message;
 
-use sabre_sdk::protocol::pike::state::{Agent, AgentList, Organization, OrganizationList};
 use sabre_sdk::protocol::state::{
     Contract, ContractList, ContractListBuilder, ContractRegistry, ContractRegistryList,
     ContractRegistryListBuilder, NamespaceRegistry, NamespaceRegistryList,
-    NamespaceRegistryListBuilder, SmartPermission, SmartPermissionList, SmartPermissionListBuilder,
+    NamespaceRegistryListBuilder,
 };
 use sabre_sdk::protocol::ADMINISTRATORS_SETTING_ADDRESS;
 use sabre_sdk::protos::{FromBytes, IntoBytes};
@@ -26,7 +25,6 @@ use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 
 use crate::addressing::{
-    compute_agent_address, compute_org_address, compute_smart_permission_address,
     make_contract_address, make_contract_registry_address, make_namespace_registry_address,
 };
 
@@ -364,147 +362,5 @@ impl<'a> SabreState<'a> {
             )));
         };
         Ok(())
-    }
-
-    pub fn get_smart_permission(
-        &mut self,
-        org_id: &str,
-        name: &str,
-    ) -> Result<Option<SmartPermission>, ApplyError> {
-        let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let smart_permissions = SmartPermissionList::from_bytes(packed.as_slice())
-                    .map_err(|err| {
-                        ApplyError::InvalidTransaction(format!(
-                            "Cannot deserialize smart permissions list: {:?}",
-                            err,
-                        ))
-                    })?;
-
-                Ok(smart_permissions
-                    .smart_permissions()
-                    .iter()
-                    .find(|sp| sp.name() == name)
-                    .cloned())
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub fn set_smart_permission(
-        &mut self,
-        org_id: &str,
-        name: &str,
-        new_smart_permission: SmartPermission,
-    ) -> Result<(), ApplyError> {
-        let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.get_state_entry(&address)?;
-        let mut smart_permissions = match d {
-            Some(packed) => match SmartPermissionList::from_bytes(packed.as_slice()) {
-                Ok(smart_permissions) => {
-                    // remove old smart_permission if it exists
-                    smart_permissions
-                        .smart_permissions()
-                        .iter()
-                        .filter(|sp| sp.name() != name)
-                        .cloned()
-                        .collect::<Vec<SmartPermission>>()
-                }
-                Err(err) => {
-                    return Err(ApplyError::InvalidTransaction(format!(
-                        "Cannot deserialize smart permission list: {}",
-                        err,
-                    )));
-                }
-            },
-            None => vec![],
-        };
-
-        smart_permissions.push(new_smart_permission);
-        // sort the smart_permission by name
-        smart_permissions.sort_by_key(|sp| sp.name().to_string());
-
-        let smart_permission_list = SmartPermissionListBuilder::new()
-            .with_smart_permissions(smart_permissions)
-            .build()
-            .map_err(|_| {
-                ApplyError::InvalidTransaction(String::from("Cannot build smart permission list"))
-            })?;
-
-        let serialized = smart_permission_list.into_bytes().map_err(|err| {
-            ApplyError::InvalidTransaction(format!(
-                "Cannot serialize smart permission list: {:?}",
-                err,
-            ))
-        })?;
-        self.context
-            .set_state_entry(address, serialized)
-            .map_err(|err| ApplyError::InvalidTransaction(format!("{}", err)))?;
-        Ok(())
-    }
-
-    pub fn delete_smart_permission(&mut self, org_id: &str, name: &str) -> Result<(), ApplyError> {
-        let address = compute_smart_permission_address(org_id, name);
-        let d = self.context.delete_state_entry(&address)?;
-        let deleted = match d {
-            Some(deleted) => deleted,
-            None => {
-                return Err(ApplyError::InvalidTransaction(String::from(
-                    "Cannot delete smart_permission",
-                )));
-            }
-        };
-        if deleted != address {
-            return Err(ApplyError::InvalidTransaction(String::from(
-                "Cannot delete smart_permission",
-            )));
-        };
-        Ok(())
-    }
-
-    pub fn get_organization(&mut self, id: &str) -> Result<Option<Organization>, ApplyError> {
-        let address = compute_org_address(id);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let orgs = OrganizationList::from_bytes(packed.as_slice()).map_err(|err| {
-                    ApplyError::InvalidTransaction(format!(
-                        "Cannot deserialize organization list: {:?}",
-                        err,
-                    ))
-                })?;
-
-                Ok(orgs
-                    .organizations()
-                    .iter()
-                    .find(|org| org.org_id() == id)
-                    .cloned())
-            }
-            None => Ok(None),
-        }
-    }
-
-    pub fn get_agent(&mut self, public_key: &str) -> Result<Option<Agent>, ApplyError> {
-        let address = compute_agent_address(public_key);
-        let d = self.context.get_state_entry(&address)?;
-        match d {
-            Some(packed) => {
-                let agents = AgentList::from_bytes(packed.as_slice()).map_err(|err| {
-                    ApplyError::InvalidTransaction(format!(
-                        "Cannot deserialize agent list: {:?}",
-                        err,
-                    ))
-                })?;
-
-                Ok(agents
-                    .agents()
-                    .iter()
-                    .find(|agent| agent.public_key() == public_key)
-                    .cloned())
-            }
-            None => Ok(None),
-        }
     }
 }

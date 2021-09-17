@@ -19,14 +19,12 @@ use std::string::FromUtf8Error;
 use std::time::Instant;
 
 use log::{max_level, LevelFilter};
-use sabre_sdk::protocol::state::{SmartPermission, SmartPermissionList};
-use sabre_sdk::protos::FromBytes;
 use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasmi::memory_units::Pages;
 use wasmi::{
-    Error, Externals, FuncInstance, FuncRef, HostError, ImportsBuilder, MemoryDescriptor,
-    MemoryInstance, MemoryRef, Module, ModuleImportResolver, ModuleInstance, RuntimeArgs,
-    RuntimeValue, Signature, Trap, TrapKind, ValueType,
+    Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor, MemoryInstance,
+    MemoryRef, ModuleImportResolver, RuntimeArgs, RuntimeValue, Signature, Trap, TrapKind,
+    ValueType,
 };
 
 // External function indices
@@ -132,21 +130,6 @@ const CREATE_COLLECTION: usize = 10;
 /// valid, and -1 otherwise
 ///
 const ADD_TO_COLLECTION: usize = 11;
-
-/// Args
-///
-/// 1) Smart permissions full address
-/// 2) Name of smart permission
-/// 3) Smart permission roles
-/// 4) Organization ID
-/// 5) Public Key
-/// 6) Payload for smart permission
-///
-/// Returns - pointer to smart permission result if successful, -1 if roles were
-/// not successfully retrieved from state, or -2 if the smart contract was not
-/// successfully retrieved from state.
-///
-const SMART_PERMISSION: usize = 12;
 
 /// Args
 ///
@@ -287,84 +270,6 @@ impl<'a> WasmExternals<'a> {
         info!("create_collection: {:?}", head);
         self.ptr_collections.insert(head, vec![head]);
         Ok(head)
-    }
-
-    pub fn get_smart_permission(
-        &mut self,
-        address: &str,
-        name: &str,
-    ) -> Result<Option<SmartPermission>, ExternalsError> {
-        let d = self.context.get_state_entry(address)?;
-        match d {
-            Some(packed) => {
-                let smart_permissions = match SmartPermissionList::from_bytes(packed.as_slice()) {
-                    Ok(smart_permissions) => smart_permissions,
-                    Err(err) => {
-                        return Err(ExternalsError {
-                            message: format!("Cannot deserialize smart permission list: {:?}", err),
-                        });
-                    }
-                };
-
-                for smart_permission in smart_permissions.smart_permissions() {
-                    if smart_permission.name() == name {
-                        return Ok(Some(smart_permission.clone()));
-                    }
-                }
-                Ok(None)
-            }
-            None => Ok(None),
-        }
-    }
-
-    fn smart_permission(&mut self, args: RuntimeArgs) -> Result<Option<RuntimeValue>, Trap> {
-        let timer = Instant::now();
-        let contract_addr_ptr: i32 = args.nth(0);
-        let name: i32 = args.nth(1);
-        let roles_head_ptr: u32 = args.nth(2);
-        let org_id_ptr: i32 = args.nth(3);
-        let public_key_ptr: i32 = args.nth(4);
-        let payload_ptr: i32 = args.nth(5);
-
-        let roles = match self.ptr_collections.get(&roles_head_ptr) {
-            Some(roles) => roles.clone(),
-            None => return Ok(Some(RuntimeValue::I32(-1))),
-        };
-        let mut role_vec = Vec::new();
-        for role in roles {
-            let role_str = self.ptr_to_string(role).map_err(ExternalsError::from)?;
-            role_vec.push(role_str);
-        }
-        let org_id = self.ptr_to_string(org_id_ptr as u32)?;
-        let public_key = self.ptr_to_string(public_key_ptr as u32)?;
-        let payload = self.ptr_to_vec(payload_ptr as u32)?;
-        let name = self.ptr_to_string(name as u32)?;
-        let contract_addr = self.ptr_to_string(contract_addr_ptr as u32)?;
-
-        let contract = if let Some(sp) = self.get_smart_permission(&contract_addr, &name)? {
-            sp
-        } else {
-            return Ok(Some(RuntimeValue::I32(-2)));
-        };
-
-        // Invoke Smart Permission
-        let mut module = SmartPermissionModule::new(contract.function(), self.context)
-            .expect("Failed to create can_add module");
-        let result = module
-            .entrypoint(role_vec, org_id, public_key, payload.to_vec())
-            .map_err(|e| ExternalsError::from(format!("{:?}", e)))?;
-
-        match result {
-            Some(x) => {
-                info!(
-                    "SMART_PERMISSION Execution time: {} secs {} ms",
-                    timer.elapsed().as_secs(),
-                    timer.elapsed().subsec_millis()
-                );
-                Ok(Some(RuntimeValue::I32(x)))
-            }
-            None => Err(ExternalsError::trap("No result returned".into())),
-        }
     }
 
     fn get_state(
@@ -652,7 +557,6 @@ impl<'a> Externals for WasmExternals<'a> {
                 self.add_to_collection(head_ptr, raw_ptr)?;
                 Ok(Some(RuntimeValue::I32(head_ptr as i32)))
             }
-            SMART_PERMISSION => self.smart_permission(args),
             LOG => {
                 let log_level: u32 = args.nth(0);
                 let log_ptr: u32 = args.nth(1);
@@ -700,20 +604,6 @@ impl<'a> ModuleImportResolver for WasmExternals<'a> {
                     Some(ValueType::I32),
                 ),
                 ADD_EVENT_IDX,
-            )),
-            "invoke_smart_permission" => Ok(FuncInstance::alloc_host(
-                Signature::new(
-                    &[
-                        ValueType::I32,
-                        ValueType::I32,
-                        ValueType::I32,
-                        ValueType::I32,
-                        ValueType::I32,
-                        ValueType::I32,
-                    ][..],
-                    Some(ValueType::I32),
-                ),
-                SMART_PERMISSION,
             )),
             "get_ptr_len" => Ok(FuncInstance::alloc_host(
                 Signature::new(&[ValueType::I32][..], Some(ValueType::I32)),
@@ -854,87 +744,6 @@ impl From<ContextError> for ExternalsError {
     fn from(e: ContextError) -> Self {
         ExternalsError {
             message: format!("{:?}", e),
-        }
-    }
-}
-
-struct SmartPermissionModule<'a> {
-    context: &'a mut dyn TransactionContext,
-    module: Module,
-}
-
-impl<'a> SmartPermissionModule<'a> {
-    pub fn new(
-        wasm: &[u8],
-        context: &'a mut dyn TransactionContext,
-    ) -> Result<SmartPermissionModule<'a>, ExternalsError> {
-        let module = Module::from_buffer(wasm)?;
-        Ok(SmartPermissionModule { context, module })
-    }
-
-    pub fn entrypoint(
-        &mut self,
-        roles: Vec<String>,
-        org_id: String,
-        public_key: String,
-        payload: Vec<u8>,
-    ) -> Result<Option<i32>, ExternalsError> {
-        let mut env = WasmExternals::new(None, self.context)?;
-
-        let instance = ModuleInstance::new(
-            &self.module,
-            &ImportsBuilder::new().with_resolver("env", &env),
-        )?
-        .assert_no_start();
-
-        info!("Writing roles to memory");
-
-        let roles_write_results: Vec<Result<u32, ExternalsError>> = roles
-            .into_iter()
-            .map(|i| env.write_data(i.into_bytes()))
-            .collect();
-
-        let mut role_ptrs = Vec::new();
-
-        for i in roles_write_results {
-            if let Err(err) = i {
-                return Err(err);
-            }
-            role_ptrs.push(i.unwrap());
-        }
-
-        let role_list_ptr = if !role_ptrs.is_empty() {
-            env.collect_ptrs(role_ptrs)? as i32
-        } else {
-            -1
-        };
-
-        info!("Roles written to memory: {:?}", role_list_ptr);
-
-        let org_id_ptr = env.write_data(org_id.into_bytes())? as i32;
-        info!("Organization ID written to memory");
-
-        let public_key_ptr = env.write_data(public_key.into_bytes())? as i32;
-        info!("Public key written to memory");
-
-        let payload_ptr = env.write_data(payload)? as i32;
-        info!("Payload written to memory");
-
-        let result = instance.invoke_export(
-            "entrypoint",
-            &[
-                RuntimeValue::I32(role_list_ptr),
-                RuntimeValue::I32(org_id_ptr),
-                RuntimeValue::I32(public_key_ptr),
-                RuntimeValue::I32(payload_ptr),
-            ],
-            &mut env,
-        )?;
-
-        if let Some(RuntimeValue::I32(i)) = result {
-            Ok(Some(i))
-        } else {
-            Ok(None)
         }
     }
 }

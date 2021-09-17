@@ -16,21 +16,15 @@ crates := '\
     sdks/rust \
     cli \
     tp \
-    contracts/sawtooth-pike/sp_sdk \
-    contracts/sawtooth-pike/tp \
-    contracts/sawtooth-pike/cli \
-    contracts/sawtooth-pike/examples/intkey \
-    contracts/sawtooth-pike/addresser \
-    contracts/sawtooth-pike/examples/white_list_permission \
-    contracts/sawtooth-pike/examples/proposal_permission \
-    contracts/sawtooth-pike/db/pike_db \
-    contracts/sawtooth-pike/api \
-    contracts/sawtooth-pike/state_delta_export \
     example/intkey_multiply/processor \
     example/intkey_multiply/cli \
     integration \
     '
 
+crates_wasm := '\
+    sdks/rust \
+    example/intkey_multiply/processor \
+    '
 
 features := '\
     --features=experimental \
@@ -47,6 +41,12 @@ build:
         for crate in $(echo {{crates}})
         do
             cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
+            echo "\033[1m$cmd\033[0m"
+            $cmd
+        done
+        for crate in $(echo {{crates_wasm}})
+        do
+            cmd="cargo build --target wasm32-unknown-unknown --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done

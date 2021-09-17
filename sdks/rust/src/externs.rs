@@ -28,14 +28,6 @@ extern "C" {
     pub fn get_ptr_from_collection(ptr: WasmPtrList, index: u32) -> WasmPtr;
     pub fn add_to_collection(head: WasmPtr, ptr: WasmPtr) -> WasmPtr;
     pub fn create_collection(head: WasmPtr) -> WasmPtr;
-    pub fn invoke_smart_permission(
-        contract_addr: WasmPtr,
-        name: WasmPtr,
-        roles: WasmPtrList,
-        org_id: WasmPtr,
-        public_key: WasmPtr,
-        payload: WasmPtr,
-    ) -> i32;
     pub fn log_buffer(log_level: WasmPtr, log_string: WasmPtr);
     pub fn log_level() -> WasmPtr;
 }

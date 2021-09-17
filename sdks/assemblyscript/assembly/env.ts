@@ -23,13 +23,5 @@ export declare function get_ptr_from_collection(ptr: i32, index: i32): i32;
 export declare function get_ptr_collection_len(ptr: i32): isize;
 export declare function add_to_collection(head: i32, ptr: i32): i32; 
 export declare function create_collection(head: i32): i32;
-export declare function invoke_smart_permission(
-    contract_addr: i32,
-    name: i32,
-    roles: i32,
-    org_id: i32,
-    public_key: i32,
-    payload: i32,
-): i32;
 export declare function log_buffer(log_level: i32, log_string: i32): void;
 export declare function log_level(): i32;

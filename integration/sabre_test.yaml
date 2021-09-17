@@ -45,33 +45,6 @@ services:
     build:
       context: integration
 
-  build_pike:
-    image:  build_pike:${ISOLATION_ID}
-    container_name: build_pike
-    volumes:
-      - .:/project
-    entrypoint: "bash -c \"\
-        cd /project/contracts/sawtooth-pike/tp && \
-        cargo build --target wasm32-unknown-unknown --release && \
-        tail -f /dev/null \
-        \""
-    build:
-      context: integration
-
-  build_intkey:
-    image:  build_intkey:${ISOLATION_ID}
-    container_name: build_intkey
-    volumes:
-      - .:/project
-    entrypoint: "bash -c \"\
-        cd /project/contracts/sawtooth-pike/examples/intkey && \
-        cargo build --target wasm32-unknown-unknown --release && \
-        tail -f /dev/null \
-        \""
-    build:
-      context: integration
-
-
   test_sabre:
     image: test_sabre:${ISOLATION_ID}
     container_name: test_sabre

@@ -190,57 +190,6 @@ impl SabreRequestPayload {
                     )));
                 }
             }
-            Action::CreateSmartPermission(create_smart_permission) => {
-                if create_smart_permission.org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Organization ID required".into(),
-                    ));
-                }
-
-                if create_smart_permission.name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Smart permission name required".into(),
-                    ));
-                }
-
-                if create_smart_permission.function().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Function body required".into(),
-                    ));
-                }
-            }
-            Action::UpdateSmartPermission(update_smart_permission) => {
-                if update_smart_permission.org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Organization ID required".into(),
-                    ));
-                }
-
-                if update_smart_permission.name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Smart permission name required".into(),
-                    ));
-                }
-
-                if update_smart_permission.function().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Function body required".into(),
-                    ));
-                }
-            }
-            Action::DeleteSmartPermission(delete_smart_permission) => {
-                if delete_smart_permission.org_id().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Organization ID required".into(),
-                    ));
-                }
-
-                if delete_smart_permission.name().is_empty() {
-                    return Err(ApplyError::InvalidTransaction(
-                        "Smart permission name required".into(),
-                    ));
-                }
-            }
         };
 
         Ok(Some(SabreRequestPayload {

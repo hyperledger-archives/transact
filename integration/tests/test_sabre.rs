@@ -29,22 +29,11 @@ use std::io::{BufRead, BufReader};
 
 const INTKEY_MULTIPLY_DEF: &str = "/project/example/intkey_multiply/intkey_multiply.yaml";
 
-const PIKE_DEF: &str = "/project/contracts/sawtooth-pike/pike.yaml";
-
-const INTKEY_SMART_PERMISSION: &str =
-    "/project/contracts/sawtooth-pike/examples/intkey/target/wasm32-unknown-unknown/release/intkey.wasm";
-
 // Path to a payload to multiply intkey value B and C and store in A.
 const GOOD_PAYLOAD: &str = "/project/integration/payloads/A_B_C_payload";
 // Path to a payload to multiply intkey value C and nonexisties and store in A.
 const BAD_PAYLOAD: &str = "/project/integration/payloads/A_Bad_C_payload";
 const SIGNER: &str = "/root/.sawtooth/keys/root.pub";
-
-/// Path to a Pike payload to create an Organization
-///
-/// Created using the following command
-/// pike-cli org create FooOrg000 FooOrg Address --output create_org
-const CREATE_ORG_PAYLOAD: &str = "/project/integration/payloads/create_org";
 
 #[derive(Debug)]
 pub enum TestError {
@@ -102,37 +91,6 @@ fn sabre_cli(command: String) -> Result<Value, TestError> {
     return Err(TestError::TestError("No response received".into()));
 }
 
-fn pike_setup(signer: &str) -> Result<(), TestError> {
-    // Configure Pike Smart Contract and upload int key smart permission
-    //
-    // 1) Create name registry
-    // 2) Upload Pike smart contract
-    // 3) Create namespace cad11d
-    // 4) Create namespace 00ec03
-    // 5) Add read and write perms for cad11d for pike
-    // 6) Add read and write perms for cad11d for intkey_multiply
-    // 7) Add read and write perms for 00ec03 for intkey_multiply
-    // 8) Create foo organization
-
-    println!("Creating Pike name registry");
-    let response = sabre_cli(format!("cr --create pike --owner {}", signer))?;
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    println!("Uploading Pike smart contract");
-    let response = sabre_cli(format!("upload --filename {}", PIKE_DEF))?;
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    println!("Creating Pike namespace");
-    let response = sabre_cli("ns --create cad11d --owner test_owner".to_string())?;
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    println!("Configuring pike permissions");
-    let response = sabre_cli("perm cad11d pike --read --write".to_string())?;
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    Ok(())
-}
-
 /// The following test tests the Sabre Cli, Sabre Transaction Processor and the Intkey Multiply
 /// example smart contract.
 /// The tests executes sabre cli commands to upload and executes the smart contract and then
@@ -147,10 +105,6 @@ fn test_sabre() {
 
     // remove newline character
     signer.pop();
-
-    if let Err(err) = pike_setup(&signer) {
-        panic!(format!("Pike setup error {}", err));
-    }
 
     // Test that Sabre will return an invalid transaction when the Contract does not
     // exist
@@ -261,19 +215,6 @@ fn test_sabre() {
     };
     assert!(response["data"][0]["status"] == "COMMITTED");
 
-    // Test that Sabre will set a new Namespace Registry.
-    //
-    // Send CreateNamespaceRegistryAction with the following:
-    //      Namespace: 00ec03
-    //      Owner: test_owner
-    //
-    // Result: Committed
-    let response = match sabre_cli("ns --create 00ec03 --owner test_owner".to_string()) {
-        Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err)),
-    };
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
     // Test that Sabre will return an invalid transaction when the Contract does not
     // have permissions to access the namespace.
     //
@@ -314,63 +255,6 @@ fn test_sabre() {
     };
     assert!(response["data"][0]["status"] == "COMMITTED");
 
-    // Test that Sabre will add a permission to the intkey namespace registry to give Intkey
-    // Multiply read and write permissions.
-    //
-    // Send CreateNamespaceRegistryPermissionAction with the following:
-    //      Namespace: cad11d
-    //      Contract_name: intkey_multiply
-    //      Read: true
-    //      Write: true
-    //
-    // Result: Committed
-    let response = match sabre_cli("perm cad11d intkey_multiply --read --write".to_string()) {
-        Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err)),
-    };
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    // Test that Sabre will add a permission to the intkey namespace registry to give Intkey
-    // Multiply read and write permissions.
-    //
-    // Send CreateNamespaceRegistryPermissionAction with the following:
-    //      Namespace: 00ec03
-    //      Contract_name: intkey_multiply
-    //      Read: true
-    //      Write: true
-    //
-    // Result: Committed
-    let response = match sabre_cli("perm 00ec03 intkey_multiply --read --write".to_string()) {
-        Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err)),
-    };
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    let response = match sabre_cli(format!(
-        "exec --contract pike:1.0 --payload {} --inputs cad11d --outputs cad11d",
-        CREATE_ORG_PAYLOAD
-    )) {
-        Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err)),
-    };
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
-    // Test that Sabre will add a smart permission
-    //
-    // Send CreateSmartPermissionAction with the following:
-    //      name: test
-    //      org_id: FooOrg000
-    //
-    // Result: Committed
-    let response = match sabre_cli(format!(
-        "sp --url http://rest-api:9708 --wait 300 create FooOrg000 test --filename {}",
-        INTKEY_SMART_PERMISSION
-    )) {
-        Ok(x) => x,
-        Err(err) => panic!(format!("No Response {}", err)),
-    };
-    assert!(response["data"][0]["status"] == "COMMITTED");
-
     // Test that Sabre will successfully execute the contract.
     //
     // Send ExecuteContractAction with the following:
@@ -384,7 +268,7 @@ fn test_sabre() {
     let response = match sabre_cli(
         "exec --contract intkey_multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
-            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+            + " --inputs 1cf126 --outputs 1cf126",
     ) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
@@ -405,7 +289,7 @@ fn test_sabre() {
     let response = match sabre_cli(
         "exec --contract intkey_multiply:1.0 --payload ".to_string()
             + &GOOD_PAYLOAD
-            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+            + " --inputs 1cf126 --outputs 1cf126",
     ) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),
@@ -429,7 +313,7 @@ fn test_sabre() {
     let response = match sabre_cli(
         "exec --contract intkey_multiply:1.0 --payload ".to_string()
             + &BAD_PAYLOAD
-            + " --inputs 1cf126 cad11d 00ec03 --outputs 1cf126",
+            + " --inputs 1cf126 --outputs 1cf126",
     ) {
         Ok(x) => x,
         Err(err) => panic!(format!("No Response {}", err)),

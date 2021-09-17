@@ -13,7 +13,6 @@
 // limitations under the License.
 
 pub mod payload;
-pub mod pike;
 pub mod state;
 
 use std::error::Error;
@@ -83,26 +82,6 @@ pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, Ad
     let s = String::from(name) + "," + version;
     let hash = sha512_hash(s.as_bytes());
     Ok([CONTRACT_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
-}
-
-/// Compute a state address for a given smart permission.
-///
-/// # Arguments
-///
-/// * `org_id` - the organization's id
-/// * `name` - smart permission name
-pub fn compute_smart_permission_address(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<u8>, AddressingError> {
-    let org_id_hash = sha512_hash(org_id.as_bytes());
-    let name_hash = sha512_hash(name.as_bytes());
-    Ok([
-        SMART_PERMISSION_ADDRESS_PREFIX_BYTES,
-        &org_id_hash[..3],
-        &name_hash[..29],
-    ]
-    .concat())
 }
 
 /// Compute a state address for a given agent name.

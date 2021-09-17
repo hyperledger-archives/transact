@@ -10,7 +10,6 @@ Welcome to Sabre's documentation!
     sabre_transaction_family.rst
     application_developer_guide.rst
     sabre_cli.rst
-    smart_permissions.rst
     version_compatibility.rst
 
 .. Licensed under Creative Commons Attribution 4.0 International License
