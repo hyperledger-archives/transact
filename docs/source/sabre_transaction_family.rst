@@ -134,16 +134,12 @@ Sabre objects are stored under 4 namespaces:
   - ``00ec00``: Namespace for NamespaceRegistry
   - ``00ec01``: Namespace for ContractRegistry
   - ``00ec02``: Namespace for Contracts
-  - ``00ec03``: Namespace for Smart Permissions
 
 The remaining 64 characters of the object's address is the following:
   - NamespaceRegistry: the first 64 characters of the hash of the first 6
     characters of the namespaces.
   - ContractRegistry: the first 64 characters of the hash of the name.
   - Contract: the first 64 characters of the hash of "name,version"
-  - Smart Permission: first 6 characters of the hash of the organization ID
-    and the first 58 characters of the hash of the smart permission
-    name.
 
 For example, the address for a contract with name "example" and version "1.0"
 address would be:
