@@ -15,6 +15,7 @@
 //! SQL-backed tests for the merkle state implementation
 
 use std::error::Error;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use transact::state::merkle::sql::{
     backend::{JournalMode, SqliteBackend, SqliteBackendBuilder},
@@ -24,6 +25,8 @@ use transact::state::merkle::sql::{
 use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
 use super::*;
+
+static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 fn new_sql_merkle_state_and_root(
     dbpath: &str,
@@ -158,8 +161,6 @@ fn merkle_produce_same_state_as_btree() -> Result<(), Box<dyn Error>> {
     })
 }
 
-use std::sync::atomic::{AtomicUsize, Ordering};
-
 fn run_test<T>(test: T) -> Result<(), Box<dyn Error>>
 where
     T: FnOnce(&str) -> Result<(), Box<dyn Error>> + std::panic::UnwindSafe,
@@ -178,8 +179,6 @@ where
         }
     }
 }
-
-static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 fn temp_db_path() -> String {
     let mut temp_dir = std::env::temp_dir();
