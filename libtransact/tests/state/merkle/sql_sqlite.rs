@@ -28,30 +28,6 @@ use super::*;
 
 static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
-fn new_sql_merkle_state_and_root(
-    dbpath: &str,
-) -> Result<(SqlMerkleState<SqliteBackend>, String), Box<dyn Error>> {
-    let backend = SqliteBackendBuilder::new()
-        .with_connection_path(dbpath)
-        .with_journal_mode(JournalMode::Wal)
-        .with_create()
-        .build()?;
-    backend.run_migrations()?;
-
-    let state = SqlMerkleStateBuilder::new()
-        .with_backend(backend)
-        .with_tree(format!(
-            "test-{}",
-            GLOBAL_THREAD_COUNT.load(Ordering::SeqCst)
-        ))
-        .create_tree_if_necessary()
-        .build()?;
-
-    let initial_state_root_hash = state.initial_state_root_hash()?;
-
-    Ok((state, initial_state_root_hash))
-}
-
 #[test]
 fn merkle_trie_empty_changes() -> Result<(), Box<dyn Error>> {
     run_test(|db_path| {
@@ -159,6 +135,30 @@ fn merkle_produce_same_state_as_btree() -> Result<(), Box<dyn Error>> {
 
         Ok(())
     })
+}
+
+fn new_sql_merkle_state_and_root(
+    dbpath: &str,
+) -> Result<(SqlMerkleState<SqliteBackend>, String), Box<dyn Error>> {
+    let backend = SqliteBackendBuilder::new()
+        .with_connection_path(dbpath)
+        .with_journal_mode(JournalMode::Wal)
+        .with_create()
+        .build()?;
+    backend.run_migrations()?;
+
+    let state = SqlMerkleStateBuilder::new()
+        .with_backend(backend)
+        .with_tree(format!(
+            "test-{}",
+            GLOBAL_THREAD_COUNT.load(Ordering::SeqCst)
+        ))
+        .create_tree_if_necessary()
+        .build()?;
+
+    let initial_state_root_hash = state.initial_state_root_hash()?;
+
+    Ok((state, initial_state_root_hash))
 }
 
 fn run_test<T>(test: T) -> Result<(), Box<dyn Error>>
