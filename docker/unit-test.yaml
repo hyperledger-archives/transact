@@ -25,6 +25,6 @@ services:
       - ../:/project/sawtooth-sabre
     command: |
         bash -c "
-          cd /project/sawtooth-sabre/sdks/rust && cargo test
+          cd /project/sawtooth-sabre && just test
         "
     stop_signal: SIGKILL
