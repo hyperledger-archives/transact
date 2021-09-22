@@ -80,7 +80,7 @@ impl SmartContractArchive {
     /// latest contract (based on semver requirement rules) that matches the given name and meets
     /// the version requirements will be loaded.
     ///
-    /// For more info on semver: https://semver.org/
+    /// For more info on semver: <https://semver.org/>
     ///
     /// # Example
     ///
