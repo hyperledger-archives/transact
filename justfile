@@ -101,9 +101,11 @@ test:
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
-            echo "\033[1m$cmd\033[0m"
-            $cmd
+            if [ $crate != "integration" ]; then
+                cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
+                echo "\033[1m$cmd\033[0m"
+                $cmd
+            fi
         done
     done
     echo "\n\033[92mTest Success\033[0m\n"
