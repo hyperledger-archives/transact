@@ -52,4 +52,4 @@ RUN rustup component add rustfmt \
 
 WORKDIR /project/sawtooth-sabre
 
-CMD run_lint
+CMD just lint
