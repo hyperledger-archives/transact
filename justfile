@@ -95,7 +95,10 @@ ci-test:
 doc:
     #!/usr/bin/env sh
     set -e
-    cargo doc
+    cargo doc \
+        --manifest-path libtransact/Cargo.toml \
+        --features stable,experimental \
+        --no-deps
 
 lint:
     #!/usr/bin/env sh
