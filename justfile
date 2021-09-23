@@ -110,7 +110,10 @@ copy-env:
 doc:
     #!/usr/bin/env sh
     set -e
-    cargo doc --no-deps
+    cargo doc \
+        --manifest-path libtransact/Cargo.toml \
+        --features stable,experimental \
+        --no-deps
 
 lint:
     #!/usr/bin/env sh
