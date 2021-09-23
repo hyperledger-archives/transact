@@ -1,6 +1,13 @@
 # Release Notes
 
-## Changes in Transact 0.3.8
+## Changes in Transact 0.3.9
+
+### libtransact updates
+
+* Remove `StateDatabaseError::InternalError` variant.  This change was not
+  backwards compatible.
+
+## Changes in Transact 0.3.8 (yanked)
 
 ### Highlights
 
