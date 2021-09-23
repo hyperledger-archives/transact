@@ -20,7 +20,12 @@ mod change_log;
 mod error;
 
 use std::cmp::Reverse;
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::io::Cursor;
+
+use cbor::decoder::GenericDecoder;
+use cbor::encoder::GenericEncoder;
+use cbor::value::{Bytes, Key, Text, Value};
 
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
@@ -29,7 +34,6 @@ use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use crate::state::{Prune, Read, StateChange, Write};
 
-use super::node::Node;
 #[cfg(feature = "state-merkle-leaf-reader")]
 use super::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
 
@@ -785,6 +789,91 @@ fn get_node_by_hash(db: &dyn Database, hash: &str) -> Result<Node, StateDatabase
     match db.get_reader()?.get(hash.as_bytes())? {
         Some(bytes) => Node::from_bytes(&bytes).map_err(StateDatabaseError::from),
         None => Err(StateDatabaseError::NotFound(hash.to_string())),
+    }
+}
+
+/// Internal Node structure of the Radix tree
+#[derive(Default, Debug, PartialEq, Clone)]
+struct Node {
+    value: Option<Vec<u8>>,
+    children: BTreeMap<String, String>,
+}
+
+impl Node {
+    /// Consumes this node and serializes it to bytes
+    fn into_bytes(self) -> Result<Vec<u8>, StateDatabaseError> {
+        let mut e = GenericEncoder::new(Cursor::new(Vec::new()));
+
+        let mut map = BTreeMap::new();
+        map.insert(
+            Key::Text(Text::Text("v".to_string())),
+            match self.value {
+                Some(bytes) => Value::Bytes(Bytes::Bytes(bytes)),
+                None => Value::Null,
+            },
+        );
+
+        let children = self
+            .children
+            .into_iter()
+            .map(|(k, v)| (Key::Text(Text::Text(k)), Value::Text(Text::Text(v))))
+            .collect();
+
+        map.insert(Key::Text(Text::Text("c".to_string())), Value::Map(children));
+
+        e.value(&Value::Map(map))?;
+
+        Ok(e.into_inner().into_writer().into_inner())
+    }
+
+    /// Deserializes the given bytes to a Node
+    fn from_bytes(bytes: &[u8]) -> Result<Node, StateDatabaseError> {
+        let input = Cursor::new(bytes);
+        let mut decoder = GenericDecoder::new(cbor::Config::default(), input);
+        let decoder_value = decoder.value()?;
+        let (val, children_raw) = match decoder_value {
+            Value::Map(mut root_map) => (
+                root_map.remove(&Key::Text(Text::Text("v".to_string()))),
+                root_map.remove(&Key::Text(Text::Text("c".to_string()))),
+            ),
+            _ => return Err(StateDatabaseError::InvalidRecord),
+        };
+
+        let value = match val {
+            Some(Value::Bytes(Bytes::Bytes(bytes))) => Some(bytes),
+            Some(Value::Null) => None,
+            _ => return Err(StateDatabaseError::InvalidRecord),
+        };
+
+        let children = match children_raw {
+            Some(Value::Map(child_map)) => {
+                let mut result = BTreeMap::new();
+                for (k, v) in child_map {
+                    result.insert(key_to_string(k)?, text_to_string(v)?);
+                }
+                result
+            }
+            None => BTreeMap::new(),
+            _ => return Err(StateDatabaseError::InvalidRecord),
+        };
+
+        Ok(Node { value, children })
+    }
+}
+
+/// Converts a CBOR Key to its String content
+fn key_to_string(key_val: Key) -> Result<String, StateDatabaseError> {
+    match key_val {
+        Key::Text(Text::Text(s)) => Ok(s),
+        _ => Err(StateDatabaseError::InvalidRecord),
+    }
+}
+
+/// Converts a CBOR Text Value to its String content
+fn text_to_string(text_val: Value) -> Result<String, StateDatabaseError> {
+    match text_val {
+        Value::Text(Text::Text(s)) => Ok(s),
+        _ => Err(StateDatabaseError::InvalidRecord),
     }
 }
 
