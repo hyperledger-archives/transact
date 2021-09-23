@@ -17,7 +17,6 @@
 use std::error::Error;
 use std::fmt;
 
-use crate::error::InternalError;
 use crate::protos::ProtoConversionError;
 use cbor::decoder::DecodeError;
 use cbor::encoder::EncodeError;
@@ -31,7 +30,6 @@ pub enum StateDatabaseError {
     DeserializationError(DecodeError),
     SerializationError(EncodeError),
     ChangeLogEncodingError(String),
-    InternalError(InternalError),
     InvalidRecord,
     InvalidHash(String),
     InvalidChangeLogIndex(String),
@@ -53,7 +51,6 @@ impl fmt::Display for StateDatabaseError {
             StateDatabaseError::ChangeLogEncodingError(ref msg) => {
                 write!(f, "Unable to serialize change log entry: {}", msg)
             }
-            StateDatabaseError::InternalError(ref err) => f.write_str(&err.to_string()),
             StateDatabaseError::InvalidRecord => write!(f, "A node was malformed"),
             StateDatabaseError::InvalidHash(ref msg) => {
                 write!(f, "The given hash is invalid: {}", msg)
@@ -79,7 +76,6 @@ impl Error for StateDatabaseError {
             StateDatabaseError::DeserializationError(ref err) => Some(err),
             StateDatabaseError::SerializationError(ref err) => Some(err),
             StateDatabaseError::ChangeLogEncodingError(_) => None,
-            StateDatabaseError::InternalError(ref err) => Some(err),
             StateDatabaseError::InvalidRecord => None,
             StateDatabaseError::InvalidHash(_) => None,
             StateDatabaseError::InvalidChangeLogIndex(_) => None,
@@ -125,11 +121,5 @@ impl From<ProtobufError> for StateDatabaseError {
 impl From<ProtoConversionError> for StateDatabaseError {
     fn from(err: ProtoConversionError) -> Self {
         StateDatabaseError::ProtobufConversionError(err)
-    }
-}
-
-impl From<InternalError> for StateDatabaseError {
-    fn from(err: InternalError) -> Self {
-        StateDatabaseError::InternalError(err)
     }
 }

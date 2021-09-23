@@ -20,6 +20,7 @@
 #[cfg(feature = "state-merkle-leaf-reader")]
 mod error;
 pub mod kv;
+#[cfg(feature = "state-merkle-sql")]
 mod node;
 #[cfg(feature = "state-merkle-sql")]
 pub mod sql;
