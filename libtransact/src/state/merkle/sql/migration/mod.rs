@@ -15,7 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
-//! Provides the MigrationManageer trait.
+//! Provides the MigrationManager trait.
 
 #[cfg(feature = "postgres")]
 pub(crate) mod postgres;
