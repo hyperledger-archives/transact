@@ -15,6 +15,7 @@
 //! SQL-backed tests for the merkle state implementation
 
 use std::error::Error;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use transact::state::merkle::sql::{
     backend::{JournalMode, SqliteBackend, SqliteBackendBuilder},
@@ -25,29 +26,7 @@ use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
 use super::*;
 
-fn new_sql_merkle_state_and_root(
-    dbpath: &str,
-) -> Result<(SqlMerkleState<SqliteBackend>, String), Box<dyn Error>> {
-    let backend = SqliteBackendBuilder::new()
-        .with_connection_path(dbpath)
-        .with_journal_mode(JournalMode::Wal)
-        .with_create()
-        .build()?;
-    backend.run_migrations()?;
-
-    let state = SqlMerkleStateBuilder::new()
-        .with_backend(backend)
-        .with_tree(format!(
-            "test-{}",
-            GLOBAL_THREAD_COUNT.load(Ordering::SeqCst)
-        ))
-        .create_tree_if_necessary()
-        .build()?;
-
-    let initial_state_root_hash = state.initial_state_root_hash()?;
-
-    Ok((state, initial_state_root_hash))
-}
+static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 #[test]
 fn merkle_trie_empty_changes() -> Result<(), Box<dyn Error>> {
@@ -158,7 +137,29 @@ fn merkle_produce_same_state_as_btree() -> Result<(), Box<dyn Error>> {
     })
 }
 
-use std::sync::atomic::{AtomicUsize, Ordering};
+fn new_sql_merkle_state_and_root(
+    dbpath: &str,
+) -> Result<(SqlMerkleState<SqliteBackend>, String), Box<dyn Error>> {
+    let backend = SqliteBackendBuilder::new()
+        .with_connection_path(dbpath)
+        .with_journal_mode(JournalMode::Wal)
+        .with_create()
+        .build()?;
+    backend.run_migrations()?;
+
+    let state = SqlMerkleStateBuilder::new()
+        .with_backend(backend)
+        .with_tree(format!(
+            "test-{}",
+            GLOBAL_THREAD_COUNT.load(Ordering::SeqCst)
+        ))
+        .create_tree_if_necessary()
+        .build()?;
+
+    let initial_state_root_hash = state.initial_state_root_hash()?;
+
+    Ok((state, initial_state_root_hash))
+}
 
 fn run_test<T>(test: T) -> Result<(), Box<dyn Error>>
 where
@@ -178,8 +179,6 @@ where
         }
     }
 }
-
-static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
 fn temp_db_path() -> String {
     let mut temp_dir = std::env::temp_dir();
