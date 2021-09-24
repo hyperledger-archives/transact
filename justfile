@@ -53,6 +53,35 @@ build:
     done
     echo "\n\033[92mBuild Success\033[0m\n"
 
+build-docs:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docs/docker-compose.yaml up
+
+ci:
+    just ci-lint
+    just ci-test
+    just ci-integration-test
+    just ci-build-docs
+    just ci-docker-build
+
+ci-build-docs: build-docs
+
+ci-docker-build: docker-build
+
+ci-lint:
+    #!/usr/bin/env sh
+    set -e
+    docker build . -f docker/lint -t lint-sabre
+    docker run --rm -v $(pwd):/project/sawtooth-sabre lint-sabre
+
+ci-integration-test: integration-test
+
+ci-test:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/unit-test.yaml up --build --exit-code-from unit-test-sabre
+
 clean:
     #!/usr/bin/env sh
     set -e
@@ -67,6 +96,14 @@ copy-env:
     #!/usr/bin/env sh
     set -e
     find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
+
+
+docker-build:
+    #!/usr/bin/env sh
+    set -e
+    export VERSION=AUTO_STRICT
+    export REPO_VERSION=$(./bin/get_version)
+    docker-compose -f docker-compose-installed.yaml build
 
 lint: lint-ignore
     #!/usr/bin/env sh
@@ -94,6 +131,16 @@ lint-ignore:
     diff -u .dockerignore .gitignore
     echo "\n\033[92mLint Ignore Files Success\033[0m\n"
 
+integration-test:
+    #!/usr/bin/env sh
+    docker-compose \
+      -f docker-compose.yaml \
+      -f integration/sabre_test.yaml \
+      up \
+      --build \
+      --abort-on-container-exit \
+      --exit-code-from test_sabre
+
 test:
     #!/usr/bin/env sh
     set -e
@@ -101,9 +148,11 @@ test:
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
-            echo "\033[1m$cmd\033[0m"
-            $cmd
+            if [ $crate != "integration" ]; then
+                cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
+                echo "\033[1m$cmd\033[0m"
+                $cmd
+            fi
         done
     done
     echo "\n\033[92mTest Success\033[0m\n"

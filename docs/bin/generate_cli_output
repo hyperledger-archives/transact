@@ -45,5 +45,3 @@ save_usage sabre ns
 save_usage sabre perm
 
 save_usage sabre upload
-
-save_usage sabre sp

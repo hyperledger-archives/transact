@@ -30,6 +30,9 @@ RUN apt-get update \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
+# Install just
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  && chmod +x /usr/bin/rustup-init \
@@ -49,4 +52,4 @@ RUN rustup component add rustfmt \
 
 WORKDIR /project/sawtooth-sabre
 
-CMD run_lint
+CMD just lint

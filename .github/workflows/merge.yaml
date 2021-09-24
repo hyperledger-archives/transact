@@ -1,0 +1,195 @@
+name: Merge
+
+on:
+  push:
+  schedule:
+    - cron: "0 7 * * *"
+
+env:
+  CARGO_TERM_COLOR: always
+  slack-channel: 'alerts'
+
+concurrency:
+  group: "${{ github.ref }}-${{ github.workflow }}"
+  cancel-in-progress: true
+
+jobs:
+
+  lint_sabre:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run Lint/Clippy on Sabre
+        run: just ci-lint
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  unit_test_sabre:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Unit Test Sabre
+        run: just ci-test
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  integration_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run Integration Tests
+        run: just integration-test
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Build Docs
+        run: just build-docs
+
+      - name: Archive Artifacts
+        run: zip -r sabre-docs.zip docs/build/html/*
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: sabre-docs
+          path: sabre-docs.zip
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  build_docker:
+    runs-on: ubuntu-latest
+    if: >-
+      github.repository_owner == 'hyperledger'
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Test Docker Build
+        run: just docker-build
+
+      - name: Copy Artifacts
+        run: docker-compose -f docker/compose/copy-artifacts.yaml up
+
+      - name: Archive Artifacts
+        run: zip -r sabre.zip build/*
+
+      - uses: actions/upload-artifact@v2
+        with:
+          name: sabre
+          path: sabre.zip
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  publish_artifacts:
+    needs: [lint_sabre, unit_test_sabre, integration_tests, build_docs, build_docker]
+    if: >-
+      github.repository_owner == 'hyperledger'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Display envvars
+        run: env
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: sabre
+
+      - uses: actions/download-artifact@v2
+        with:
+          name: sabre-docs
+
+      - name: Upload Artifacts To S3
+        run: |
+          export BRANCH=$(echo $GITHUB_REF | awk -F'/' '{ print $NF }')
+          echo $BRANCH
+          aws s3 cp ./sabre.zip s3://${{ secrets.AWS_S3_BUCKET }}/sawtooth-sabre/$BRANCH/
+          aws s3 cp ./sabre-docs.zip s3://${{ secrets.AWS_S3_BUCKET }}/sawtooth-sabre/$BRANCH/
+
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
