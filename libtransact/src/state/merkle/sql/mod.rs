@@ -43,8 +43,9 @@
 //! # }
 //! ```
 //!
-//! The resulting `merkle_state` can then be used via the [`Read`], [`Write`] and
-//! [`MerkleRadixLeafReader`] traits.
+//! The resulting `merkle_state` can then be used via the [`Read`](crate::state::Read),
+//! [`Write`](crate::state::Write) and [`MerkleRadixLeafReader`](super::MerkleRadixLeafReader)
+//! traits.
 //!
 //! Available if the feature "state-merkle-sql" is enabled.
 

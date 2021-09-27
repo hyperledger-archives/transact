@@ -18,6 +18,9 @@ RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
     chmod +x /usr/bin/rustup-init && \
     rustup-init -y
 
+# Install just
+RUN curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to /usr/local/bin
+
 ENV PATH=$PATH:/root/.cargo/bin \
     CARGO_INCREMENTAL=0
 

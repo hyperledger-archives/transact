@@ -33,16 +33,72 @@ build:
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo build --tests --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done
     done
+    cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=sawtooth-compat"
+    echo "\033[1m$cmd\033[0m"
+    $cmd
+    cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=experimental,state-merkle-redis-db-tests"
+    echo "\033[1m$cmd\033[0m"
+    $cmd
     echo "\n\033[92mBuild Success\033[0m\n"
+
+ci:
+    just ci-lint
+    just ci-test
+    just ci-doc
 
 clean:
     cargo clean
 
+copy-env:
+    #!/usr/bin/env sh
+    set -e
+    find . -name .env | xargs -I '{}' sh -c "echo 'Copying to {}'; rsync .env {}"
+
+ci-doc:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just doc" --abort-on-container-exit transact
+
+ci-lint:
+    #!/usr/bin/env sh
+    set -e
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just lint" --abort-on-container-exit transact
+
+ci-test:
+    #!/usr/bin/env sh
+    set -e
+
+    trap "docker-compose -f docker/compose/docker-compose.yaml down" EXIT
+
+    docker-compose -f docker/compose/docker-compose.yaml build
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+      /bin/bash -c "just test" --abort-on-container-exit transact
+
+    docker-compose -f docker/compose/docker-compose.yaml up --detach redis
+
+    docker-compose -f docker/compose/docker-compose.yaml run --rm transact \
+       /bin/bash -c \
+       "cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
+          --features sawtooth-compat && \
+        cargo test --manifest-path /project/transact/libtransact/Cargo.toml \
+          --features experimental,state-merkle-redis-db-tests"
+
+doc:
+    #!/usr/bin/env sh
+    set -e
+    cargo doc \
+        --manifest-path libtransact/Cargo.toml \
+        --features stable,experimental \
+        --no-deps
 
 lint:
     #!/usr/bin/env sh
@@ -67,7 +123,7 @@ test: build
     do
         for crate in $(echo {{crates}})
         do
-            cmd="cargo test --manifest-path=$crate/Cargo.toml $feature"
+            cmd="cargo test --manifest-path=$crate/Cargo.toml $TEST_MODE $feature"
             echo "\033[1m$cmd\033[0m"
             $cmd
         done

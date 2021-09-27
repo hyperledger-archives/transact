@@ -21,6 +21,7 @@ services:
     environment:
         REDIS_URL: redis://redis:6379
         STATE_MERKLE_SQL_POSTGRES_TEST_URL: postgres://postgres:test@postgres-db:5432/transact
+        TEST_MODE: --verbose --release
 
   redis:
     image: redis
