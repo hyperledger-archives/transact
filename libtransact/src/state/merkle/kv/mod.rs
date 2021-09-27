@@ -146,6 +146,7 @@ impl MerkleRadixLeafReader for MerkleState {
     ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
         let merkle_tree =
             MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
+                // the state ID doesn't exist
                 StateDatabaseError::NotFound(msg) => MerkleRadixLeafReadError::InvalidStateError(
                     InvalidStateError::with_message(msg),
                 ),
@@ -158,10 +159,16 @@ impl MerkleRadixLeafReader for MerkleState {
             .leaves(subtree)
             .map(|iter| {
                 Box::new(iter.map(|item| {
-                    item.map_err(|e| {
-                        MerkleRadixLeafReadError::InternalError(InternalError::from_source(
+                    item.map_err(|e| match e {
+                        // the subtree doesn't exist
+                        StateDatabaseError::NotFound(msg) => {
+                            MerkleRadixLeafReadError::InvalidStateError(
+                                InvalidStateError::with_message(msg),
+                            )
+                        }
+                        _ => MerkleRadixLeafReadError::InternalError(InternalError::from_source(
                             Box::new(e),
-                        ))
+                        )),
                     })
                 })) as Box<dyn Iterator<Item = _>>
             })
