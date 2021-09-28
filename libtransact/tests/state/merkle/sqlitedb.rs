@@ -201,7 +201,6 @@ fn merkle_trie_pruning_successor_duplicate_leaves() {
     })
 }
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 #[test]
 fn leaf_iteration() {
     run_test(|db_path| {

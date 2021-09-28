@@ -114,7 +114,6 @@ fn merkle_trie_prune_successor_duplicate_leaves() {
     test_merkle_trie_prune_successor_duplicate_leaves(orig_root, state);
 }
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 #[test]
 fn leaf_iteration() {
     let (state, orig_root) = new_btree_state_and_root();

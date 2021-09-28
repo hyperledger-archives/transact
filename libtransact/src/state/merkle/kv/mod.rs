@@ -29,12 +29,10 @@ use cbor::value::{Bytes, Key, Text, Value};
 
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
-#[cfg(feature = "state-merkle-leaf-reader")]
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use crate::state::{Prune, Read, StateChange, Write};
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 use super::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
 
 use self::change_log::{ChangeLogEntry, Successor};
@@ -134,12 +132,9 @@ impl Read for MerkleState {
 }
 
 // These types make the clippy happy
-#[cfg(feature = "state-merkle-leaf-reader")]
 type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
-#[cfg(feature = "state-merkle-leaf-reader")]
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 impl MerkleRadixLeafReader for MerkleState {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
@@ -151,6 +146,7 @@ impl MerkleRadixLeafReader for MerkleState {
     ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
         let merkle_tree =
             MerkleRadixTree::new(self.db.clone(), Some(state_id)).map_err(|err| match err {
+                // the state ID doesn't exist
                 StateDatabaseError::NotFound(msg) => MerkleRadixLeafReadError::InvalidStateError(
                     InvalidStateError::with_message(msg),
                 ),
@@ -170,8 +166,14 @@ impl MerkleRadixLeafReader for MerkleState {
                     })
                 })) as Box<dyn Iterator<Item = _>>
             })
-            .map_err(|e| {
-                MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(e)))
+            .map_err(|e| match e {
+                // the subtree doesn't exist
+                StateDatabaseError::NotFound(msg) => MerkleRadixLeafReadError::InvalidStateError(
+                    InvalidStateError::with_message(msg),
+                ),
+                _ => {
+                    MerkleRadixLeafReadError::InternalError(InternalError::from_source(Box::new(e)))
+                }
             })
     }
 }
@@ -885,4 +887,46 @@ fn hash(input: &[u8]) -> Vec<u8> {
     bytes.extend(openssl::sha::sha512(input).iter());
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::database::btree::BTreeDatabase;
+
+    #[test]
+    /// This test checks that the MerkleRadixLeafReader produces the correct error types under the
+    /// correct conditions:
+    /// 1: Invalid state ID => InvalidStateError on initial result
+    /// 2: Missing subtree => InvalidStateError on initial result
+    fn leaf_read_errors() -> Result<(), Box<dyn std::error::Error>> {
+        let btree_db = BTreeDatabase::new(&INDEXES);
+
+        let merkle_state = MerkleState::new(Box::new(btree_db.clone()));
+
+        // invalid state id
+        let res = merkle_state.leaves(&"abcdef0123456789".to_string(), None);
+
+        assert!(matches!(
+            res,
+            Err(MerkleRadixLeafReadError::InvalidStateError(_))
+        ));
+
+        let initial_state_root_hash =
+            MerkleRadixTree::new(Box::new(btree_db), None)?.get_merkle_root();
+
+        let res = merkle_state
+            .leaves(&initial_state_root_hash, None)
+            .map(|iter| iter.collect::<Vec<_>>())?;
+        assert!(res.is_empty());
+
+        let res = merkle_state.leaves(&initial_state_root_hash, Some("0123456789abcdef"));
+        assert!(matches!(
+            res,
+            Err(MerkleRadixLeafReadError::InvalidStateError(_))
+        ));
+
+        Ok(())
+    }
 }

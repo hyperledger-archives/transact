@@ -121,7 +121,6 @@ fn merkle_trie_prune_successor_duplicate_leaves() -> Result<(), Box<dyn Error>> 
     })
 }
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 #[test]
 fn leaf_iteration() -> Result<(), Box<dyn Error>> {
     run_postgres_test(|db_url| {

@@ -63,7 +63,6 @@ use diesel::Connection as _;
 
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
-#[cfg(feature = "state-merkle-leaf-reader")]
 use crate::state::merkle::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{Prune, Read, StateChange, Write};
 
@@ -392,12 +391,10 @@ impl Read for SqlMerkleState<backend::PostgresBackend> {
     }
 }
 
-#[cfg(feature = "state-merkle-leaf-reader")]
 type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
-#[cfg(feature = "state-merkle-leaf-reader")]
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
-#[cfg(all(feature = "state-merkle-leaf-reader", feature = "sqlite"))]
+#[cfg(feature = "sqlite")]
 impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
@@ -423,7 +420,7 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-leaf-reader", feature = "postgres"))]
+#[cfg(feature = "postgres")]
 impl MerkleRadixLeafReader for SqlMerkleState<backend::PostgresBackend> {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
