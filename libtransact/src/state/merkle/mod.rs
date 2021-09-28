@@ -31,8 +31,8 @@ use crate::state::Read;
 #[cfg(feature = "state-merkle-leaf-reader")]
 pub use error::MerkleRadixLeafReadError;
 pub use kv::{
-    MerkleRadixTree, MerkleState, StateDatabaseError, CHANGE_LOG_INDEX, DUPLICATE_LOG_INDEX,
-    INDEXES,
+    MerkleLeafIterator, MerkleRadixTree, MerkleState, StateDatabaseError, CHANGE_LOG_INDEX,
+    DUPLICATE_LOG_INDEX, INDEXES,
 };
 
 // These types make the clippy happy
