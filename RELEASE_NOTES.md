@@ -1,5 +1,33 @@
 # Release Notes
 
+## Changes in Transact 0.3.10
+
+### Highlights
+
+* The `"state-merkle-leaf-reader"` feature has been stabilized by being removed.
+  This makes the `MerkleLeafReader` trait part of the standard, stable API.
+
+### libtransact updates
+
+* Generalize the feature guard over `serde_derive`.  This change removes the
+  possibility of the macros being unavailable if a specific libtransact feature
+  is not enabled.  Now any feature that depends on `serde_derive` will have the
+  macros available.
+
+* Re-export `transact::state::merkle::kv::MerkelLeafIterator` in the parent
+  module for backwards-compatibility.  This type was previously part of the
+  public API.
+
+* Soft-deprecate the type `transact::state::merkle::kv::MerkelLeafIterator`, as
+  this type should not be part of the public API, and may be removed in a future
+  release.
+
+* Return `InvalidStateError` when a `StateDatabaseError::NotFound` variant is
+  encountered during leaf iteration when implemented on `kv::MerkleState`.
+
+* Stabilize `"state-merkle-leaf-reader"` feature by removing it. This makes the
+  `MerkleLeafReader` trait part of the standard, stable API.
+
 ## Changes in Transact 0.3.9
 
 ### libtransact updates
