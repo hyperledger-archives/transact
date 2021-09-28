@@ -593,8 +593,10 @@ impl MerkleRadixTree {
     }
 }
 
-// A MerkleLeafIterator is fixed to iterate over the state address/value pairs
-// the merkle root hash at the time of its creation.
+/// A MerkleLeafIterator is fixed to iterate over the state address/value pairs
+/// the merkle root hash at the time of its creation.
+///
+/// This struct is soft-deprecated, as it should not be directly referenced.
 pub struct MerkleLeafIterator {
     merkle_db: MerkleRadixTree,
     visited: VecDeque<(String, Node)>,
