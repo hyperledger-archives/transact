@@ -38,8 +38,9 @@ use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{
-    MerkleRadixOverlay, MerkleRadixPruner, MerkleRadixStore, SqlMerkleRadixStore, SqlMerkleState,
-    SqlMerkleStateBuildError, SqlMerkleStateBuilder, TreeUpdate,
+    store::{MerkleRadixStore, SqlMerkleRadixStore},
+    MerkleRadixOverlay, MerkleRadixPruner, SqlMerkleState, SqlMerkleStateBuildError,
+    SqlMerkleStateBuilder, TreeUpdate,
 };
 
 impl SqlMerkleStateBuilder<backend::SqliteBackend> {
