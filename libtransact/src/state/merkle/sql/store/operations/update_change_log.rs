@@ -19,7 +19,7 @@ use diesel::dsl::insert_into;
 use diesel::prelude::*;
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::{
+use crate::state::merkle::sql::store::{
     models::{NewMerkleRadixChangeLogAddition, NewMerkleRadixChangeLogDeletion},
     schema::merkle_radix_change_log_addition,
     schema::merkle_radix_change_log_deletion,
@@ -132,12 +132,15 @@ mod test {
 
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    use crate::state::merkle::sql::store::{
+        models::postgres, schema::postgres_merkle_radix_tree_node,
+    };
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::{
-        migration, models::sqlite, schema::sqlite_merkle_radix_tree_node,
+        migration,
+        store::{models::sqlite, schema::sqlite_merkle_radix_tree_node},
     };
-    #[cfg(feature = "state-merkle-sql-postgres-tests")]
-    use crate::state::merkle::sql::{models::postgres, schema::postgres_merkle_radix_tree_node};
 
     #[cfg(feature = "sqlite")]
     #[test]

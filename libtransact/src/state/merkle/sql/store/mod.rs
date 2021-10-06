@@ -18,8 +18,11 @@
 //! Provides a trait for the low-level store operations required to read and write changes to the
 //! merkle radix tree.
 
+mod models;
+mod operations;
 #[cfg(feature = "postgres")]
 mod postgres;
+mod schema;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 
@@ -62,8 +65,11 @@ pub(in crate::state::merkle::sql) trait MerkleRadixStore {
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
 
-    fn list_entries(&self,
-        tree_id: i64, state_root_hash: &str, prefix: Option<&str>
+    fn list_entries(
+        &self,
+        tree_id: i64,
+        state_root_hash: &str,
+        prefix: Option<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
 
     fn write_changes(

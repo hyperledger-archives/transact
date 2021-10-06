@@ -28,7 +28,7 @@ use super::encode_and_hash;
 use super::{
     store::{MerkleRadixStore, SqlMerkleRadixStore},
     MerkleRadixOverlay, MerkleRadixPruner, SqlMerkleState, SqlMerkleStateBuildError,
-    SqlMerkleStateBuilder
+    SqlMerkleStateBuilder,
 };
 
 impl SqlMerkleStateBuilder<backend::PostgresBackend> {
