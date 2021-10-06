@@ -59,6 +59,7 @@ mod postgres;
 mod schema;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+mod store;
 
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
@@ -71,6 +72,7 @@ use super::node::Node;
 
 use backend::Backend;
 pub use error::SqlMerkleStateBuildError;
+use store::{TreeUpdate, MerkleRadixStore};
 
 const TOKEN_SIZE: usize = 2;
 
@@ -130,15 +132,6 @@ impl<B: Backend + Clone> SqlMerkleState<B> {
 
         Ok(hex::encode(&hash))
     }
-}
-
-// (Hash, packed bytes, path address)
-type NodeChanges = Vec<(String, Node, String)>;
-
-#[derive(Default)]
-struct TreeUpdate {
-    node_changes: NodeChanges,
-    deletions: HashSet<String>,
 }
 
 struct MerkleRadixOverlay<'s, S> {
@@ -355,56 +348,6 @@ where
             removed_hashes.extend(pruned.into_iter());
         }
         Ok(removed_hashes)
-    }
-}
-
-trait MerkleRadixStore {
-    fn get_or_create_tree(
-        &self,
-        tree_name: &str,
-        initial_state_root_hash: &str,
-    ) -> Result<i64, InternalError>;
-
-    fn get_tree_id_by_name(&self, tree_name: &str) -> Result<Option<i64>, InternalError>;
-
-    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
-
-    fn get_path(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        address: &str,
-    ) -> Result<Vec<(String, Node)>, InternalError>;
-
-    fn get_entries(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        keys: Vec<&str>,
-    ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
-
-    fn list_entries(&self,
-        tree_id: i64, state_root_hash: &str, prefix: Option<&str>
-    ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
-
-    fn write_changes(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        parent_state_root_hash: &str,
-        tree_update: TreeUpdate,
-    ) -> Result<(), InternalError>;
-
-    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
-}
-
-struct SqlMerkleRadixStore<'b, B: Backend> {
-    backend: &'b B,
-}
-
-impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
-    fn new(backend: &'b B) -> Self {
-        Self { backend }
     }
 }
 
