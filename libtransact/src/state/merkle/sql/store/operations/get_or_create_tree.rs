@@ -21,12 +21,12 @@ use diesel::dsl::select;
 use diesel::prelude::*;
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::models::NewMerkleRadixTree;
-use crate::state::merkle::sql::schema::merkle_radix_tree;
+use crate::state::merkle::sql::store::models::NewMerkleRadixTree;
+use crate::state::merkle::sql::store::schema::merkle_radix_tree;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::{models::sqlite, schema::sqlite_merkle_radix_tree_node};
+use crate::state::merkle::sql::store::{models::sqlite, schema::sqlite_merkle_radix_tree_node};
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::{
+use crate::state::merkle::sql::store::{
     models::{postgres, MerkleRadixTree},
     schema::postgres_merkle_radix_tree_node,
 };

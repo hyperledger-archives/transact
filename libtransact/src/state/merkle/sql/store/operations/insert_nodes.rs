@@ -25,15 +25,15 @@ use diesel::prelude::*;
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::models::postgres;
+use crate::state::merkle::sql::store::models::postgres;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::models::sqlite;
-use crate::state::merkle::sql::models::NewMerkleRadixLeaf;
-use crate::state::merkle::sql::schema::merkle_radix_leaf;
+use crate::state::merkle::sql::store::models::sqlite;
+use crate::state::merkle::sql::store::models::NewMerkleRadixLeaf;
+use crate::state::merkle::sql::store::schema::merkle_radix_leaf;
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::schema::sqlite_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::sqlite_merkle_radix_tree_node;
 
 use super::MerkleRadixOperations;
 
@@ -206,7 +206,7 @@ mod tests {
     use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration;
-    use crate::state::merkle::sql::models::MerkleRadixLeaf;
+    use crate::state::merkle::sql::store::models::MerkleRadixLeaf;
 
     /// This test inserts a single node (that of the initial state root) and verifies that it is
     /// correctly inserted into the node table.

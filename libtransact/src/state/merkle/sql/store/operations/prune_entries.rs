@@ -21,14 +21,14 @@ use diesel::dsl::{delete, update};
 use diesel::prelude::*;
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::models::{
+use crate::state::merkle::sql::store::models::{
     MerkleRadixChangeLogAddition, MerkleRadixChangeLogDeletion,
 };
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::schema::sqlite_merkle_radix_tree_node;
-use crate::state::merkle::sql::schema::{
+use crate::state::merkle::sql::store::schema::sqlite_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::{
     merkle_radix_change_log_addition, merkle_radix_change_log_deletion,
 };
 

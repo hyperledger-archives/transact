@@ -52,11 +52,8 @@
 pub mod backend;
 mod error;
 pub mod migration;
-mod models;
-mod operations;
 #[cfg(feature = "postgres")]
 mod postgres;
-mod schema;
 #[cfg(feature = "sqlite")]
 mod sqlite;
 mod store;
@@ -72,7 +69,7 @@ use super::node::Node;
 
 use backend::Backend;
 pub use error::SqlMerkleStateBuildError;
-use store::{TreeUpdate, MerkleRadixStore};
+use store::{MerkleRadixStore, TreeUpdate};
 
 const TOKEN_SIZE: usize = 2;
 

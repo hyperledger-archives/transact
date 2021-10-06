@@ -18,22 +18,19 @@
 use diesel::Connection as _;
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::backend::{self, Backend, Connection};
-use crate::state::merkle::sql::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
-use crate::state::merkle::sql::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
-use crate::state::merkle::sql::operations::get_path::MerkleRadixGetPathOperation as _;
-use crate::state::merkle::sql::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
-use crate::state::merkle::sql::operations::has_root::MerkleRadixHasRootOperation as _;
-use crate::state::merkle::sql::operations::insert_nodes::{
-    InsertableNode, MerkleRadixInsertNodesOperation as _,
-};
-use crate::state::merkle::sql::operations::list_leaves::MerkleRadixListLeavesOperation as _;
-use crate::state::merkle::sql::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
-use crate::state::merkle::sql::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
-use crate::state::merkle::sql::operations::MerkleRadixOperations;
-
 use crate::state::merkle::node::Node;
+use crate::state::merkle::sql::backend::{self, Backend, Connection};
 
+use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
+use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
+use super::operations::get_path::MerkleRadixGetPathOperation as _;
+use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
+use super::operations::has_root::MerkleRadixHasRootOperation as _;
+use super::operations::insert_nodes::{InsertableNode, MerkleRadixInsertNodesOperation as _};
+use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
+use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
+use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
+use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
 impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> {
@@ -114,13 +111,11 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
 
             let insertable_changes = node_changes
                 .into_iter()
-                .map(
-                    |(hash, node, address)| InsertableNode {
-                        hash,
-                        node,
-                        address,
-                    },
-                )
+                .map(|(hash, node, address)| InsertableNode {
+                    hash,
+                    node,
+                    address,
+                })
                 .collect::<Vec<_>>();
 
             operations.insert_nodes(tree_id, &insertable_changes)?;

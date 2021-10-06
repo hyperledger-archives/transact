@@ -26,7 +26,7 @@ use diesel::{pg::types::sql_types::Array, sql_types::SmallInt};
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::models::sqlite;
+use crate::state::merkle::sql::store::models::sqlite;
 
 use super::MerkleRadixOperations;
 
@@ -215,18 +215,19 @@ mod tests {
 
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     use crate::state::merkle::sql::{
-        backend::postgres::test::run_postgres_test, models::postgres,
-        schema::postgres_merkle_radix_tree_node,
+        backend::postgres::test::run_postgres_test,
+        store::{models::postgres, schema::postgres_merkle_radix_tree_node},
     };
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::{
-        migration, models::sqlite, schema::sqlite_merkle_radix_tree_node,
+        migration,
+        store::{models::sqlite, schema::sqlite_merkle_radix_tree_node},
     };
 
-    use crate::state::merkle::sql::models::NewMerkleRadixLeaf;
+    use crate::state::merkle::sql::store::models::NewMerkleRadixLeaf;
     #[cfg(feature = "sqlite")]
-    use crate::state::merkle::sql::operations::last_insert_rowid;
-    use crate::state::merkle::sql::schema::merkle_radix_leaf;
+    use crate::state::merkle::sql::store::operations::last_insert_rowid;
+    use crate::state::merkle::sql::store::schema::merkle_radix_leaf;
 
     /// Test that the get path on a non-existent root returns an empty path.
     #[cfg(feature = "sqlite")]
