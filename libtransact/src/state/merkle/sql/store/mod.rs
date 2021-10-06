@@ -18,6 +18,11 @@
 //! Provides a trait for the low-level store operations required to read and write changes to the
 //! merkle radix tree.
 
+#[cfg(feature = "postgres")]
+mod postgres;
+#[cfg(feature = "sqlite")]
+mod sqlite;
+
 use std::collections::HashSet;
 
 use crate::error::InternalError;
