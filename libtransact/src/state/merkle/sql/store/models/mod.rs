@@ -16,9 +16,9 @@
  */
 
 #[cfg(feature = "postgres")]
-pub(in crate::state::merkle::sql) mod postgres;
+pub(super) mod postgres;
 #[cfg(feature = "sqlite")]
-pub(in crate::state::merkle::sql) mod sqlite;
+pub(super) mod sqlite;
 
 use super::schema::*;
 
