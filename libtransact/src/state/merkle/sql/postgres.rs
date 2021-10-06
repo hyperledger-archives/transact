@@ -310,3 +310,85 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         operations.prune_entries(tree_id, state_root)
     }
 }
+
+#[cfg(feature = "state-merkle-sql-postgres-tests")]
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    use crate::state::merkle::sql::backend::{run_postgres_test, PostgresBackendBuilder};
+
+    /// This test creates multiple trees in the same backend/db instance and verifies that values
+    /// added to one are not added to the other.
+    #[test]
+    fn test_multiple_trees() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|db_url| {
+            let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
+
+            let tree_1 = SqlMerkleStateBuilder::new()
+                .with_backend(backend.clone())
+                .with_tree("test-1")
+                .create_tree_if_necessary()
+                .build()?;
+
+            let initial_state_root_hash = tree_1.initial_state_root_hash()?;
+
+            let state_change_set = StateChange::Set {
+                key: "1234".to_string(),
+                value: "state_value".as_bytes().to_vec(),
+            };
+
+            let new_root = tree_1
+                .commit(&initial_state_root_hash, &[state_change_set])
+                .unwrap();
+            assert_read_value_at_address(&tree_1, &new_root, "1234", Some("state_value"));
+
+            let tree_2 = SqlMerkleStateBuilder::new()
+                .with_backend(backend)
+                .with_tree("test-2")
+                .create_tree_if_necessary()
+                .build()?;
+
+            assert!(tree_2.get(&new_root, &["1234".to_string()]).is_err());
+
+            Ok(())
+        })
+    }
+
+    #[test]
+    fn test_build_fails_without_explicit_create() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|db_url| {
+            let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
+
+            assert!(SqlMerkleStateBuilder::new()
+                .with_backend(backend.clone())
+                .with_tree("test-1")
+                .build()
+                .is_err());
+
+            Ok(())
+        })
+    }
+
+    fn assert_read_value_at_address<R>(
+        merkle_read: &R,
+        root_hash: &str,
+        address: &str,
+        expected_value: Option<&str>,
+    ) where
+        R: Read<StateId = String, Key = String, Value = Vec<u8>>,
+    {
+        let value = merkle_read
+            .get(&root_hash.to_string(), &[address.to_string()])
+            .and_then(|mut values| {
+                Ok(values.remove(address).map(|value| {
+                    String::from_utf8(value).expect("could not convert bytes to string")
+                }))
+            });
+
+        match value {
+            Ok(value) => assert_eq!(expected_value, value.as_deref()),
+            Err(err) => panic!("value at address {} produced an error: {}", address, err),
+        }
+    }
+}
