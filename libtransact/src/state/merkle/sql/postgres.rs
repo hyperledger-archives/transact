@@ -38,8 +38,8 @@ use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{
-    MerkleRadixOverlay, MerkleRadixPruner, OverlayReader, OverlayWriter, SqlMerkleState,
-    SqlMerkleStateBuildError, SqlMerkleStateBuilder, SqlOverlay, TreeUpdate,
+    MerkleRadixOverlay, MerkleRadixPruner, MerkleRadixStore, SqlMerkleRadixStore, SqlMerkleState,
+    SqlMerkleStateBuildError, SqlMerkleStateBuilder, TreeUpdate,
 };
 
 impl SqlMerkleStateBuilder<backend::PostgresBackend> {
@@ -62,14 +62,13 @@ impl SqlMerkleStateBuilder<backend::PostgresBackend> {
             .tree_name
             .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
-        let conn = backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
+        let store = SqlMerkleRadixStore::new(&backend);
 
         let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
         let tree_id: i64 = if self.create_tree {
-            operations.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
+            store.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
         } else {
-            operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+            store.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
                 InvalidStateError::with_message("must provide the name of an existing tree".into())
             })?
         };
@@ -88,8 +87,11 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -107,8 +109,11 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -124,7 +129,7 @@ impl Prune for SqlMerkleState<backend::PostgresBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixPruner::new(self.tree_id, SqlMerkleRadixStore::new(&self.backend));
 
         overlay
             .prune(&state_ids)
@@ -142,8 +147,11 @@ impl Read for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         if !overlay
             .has_root()
@@ -176,13 +184,11 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         subtree: Option<&str>,
     ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
-        let conn = self.backend.connection()?;
-
         if &self.initial_state_root_hash()? == state_id {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(
+        let leaves = SqlMerkleRadixStore::new(&self.backend).list_entries(
             self.tree_id,
             state_id,
             subtree,
@@ -192,7 +198,22 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::PostgresBackend> {
     }
 }
 
-impl<'b> OverlayReader for SqlOverlay<'b, backend::PostgresBackend> {
+impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> {
+    fn get_or_create_tree(
+        &self,
+        tree_name: &str,
+        initial_state_root_hash: &str,
+    ) -> Result<i64, InternalError> {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.get_or_create_tree(tree_name, initial_state_root_hash)
+    }
+
+    fn get_tree_id_by_name(&self, tree_name: &str) -> Result<Option<i64>, InternalError> {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.get_tree_id_by_name(tree_name)
+    }
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         let conn = self.backend.connection()?;
 
@@ -223,9 +244,19 @@ impl<'b> OverlayReader for SqlOverlay<'b, backend::PostgresBackend> {
         let operations = MerkleRadixOperations::new(conn.as_inner());
         operations.get_leaves(tree_id, state_root_hash, keys)
     }
-}
 
-impl<'b> OverlayWriter for SqlOverlay<'b, backend::PostgresBackend> {
+    fn list_entries(
+        &self,
+        tree_id: i64,
+        state_root_hash: &str,
+        prefix: Option<&str>,
+    ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
+        let conn = self.backend.connection()?;
+
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.list_leaves(tree_id, state_root_hash, prefix)
+    }
+
     fn write_changes(
         &self,
         tree_id: i64,

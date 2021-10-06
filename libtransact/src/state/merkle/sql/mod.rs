@@ -132,12 +132,6 @@ impl<B: Backend + Clone> SqlMerkleState<B> {
     }
 }
 
-struct MerkleRadixOverlay<'s, O> {
-    tree_id: i64,
-    state_root_hash: &'s str,
-    inner: O,
-}
-
 // (Hash, packed bytes, path address)
 type NodeChanges = Vec<(String, Node, String)>;
 
@@ -147,11 +141,17 @@ struct TreeUpdate {
     deletions: HashSet<String>,
 }
 
-impl<'s, O> MerkleRadixOverlay<'s, O>
+struct MerkleRadixOverlay<'s, S> {
+    tree_id: i64,
+    state_root_hash: &'s str,
+    inner: S,
+}
+
+impl<'s, S> MerkleRadixOverlay<'s, S>
 where
-    O: OverlayReader + OverlayWriter,
+    S: MerkleRadixStore,
 {
-    fn new(tree_id: i64, state_root_hash: &'s str, inner: O) -> Self {
+    fn new(tree_id: i64, state_root_hash: &'s str, inner: S) -> Self {
         Self {
             tree_id,
             state_root_hash,
@@ -335,16 +335,16 @@ where
     }
 }
 
-struct MerkleRadixPruner<O> {
+struct MerkleRadixPruner<S> {
     tree_id: i64,
-    inner: O,
+    inner: S,
 }
 
-impl<O> MerkleRadixPruner<O>
+impl<S> MerkleRadixPruner<S>
 where
-    O: OverlayWriter,
+    S: MerkleRadixStore,
 {
-    fn new(tree_id: i64, inner: O) -> Self {
+    fn new(tree_id: i64, inner: S) -> Self {
         Self { tree_id, inner }
     }
 
@@ -358,7 +358,15 @@ where
     }
 }
 
-trait OverlayReader {
+trait MerkleRadixStore {
+    fn get_or_create_tree(
+        &self,
+        tree_name: &str,
+        initial_state_root_hash: &str,
+    ) -> Result<i64, InternalError>;
+
+    fn get_tree_id_by_name(&self, tree_name: &str) -> Result<Option<i64>, InternalError>;
+
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
     fn get_path(
@@ -374,9 +382,11 @@ trait OverlayReader {
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
-}
 
-trait OverlayWriter {
+    fn list_entries(&self,
+        tree_id: i64, state_root_hash: &str, prefix: Option<&str>
+    ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
+
     fn write_changes(
         &self,
         tree_id: i64,
@@ -388,11 +398,11 @@ trait OverlayWriter {
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
 }
 
-struct SqlOverlay<'b, B: Backend> {
+struct SqlMerkleRadixStore<'b, B: Backend> {
     backend: &'b B,
 }
 
-impl<'b, B: Backend> SqlOverlay<'b, B> {
+impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
     fn new(backend: &'b B) -> Self {
         Self { backend }
     }
