@@ -15,7 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
-use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 
 #[derive(Insertable, Queryable, QueryableByName, Identifiable)]
 #[cfg_attr(test, derive(Debug, PartialEq))]

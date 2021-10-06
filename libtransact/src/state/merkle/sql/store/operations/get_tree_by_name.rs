@@ -18,7 +18,7 @@
 use diesel::prelude::*;
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::schema::merkle_radix_tree;
+use crate::state::merkle::sql::store::schema::merkle_radix_tree;
 
 use super::MerkleRadixOperations;
 
@@ -52,7 +52,7 @@ mod test {
     use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration;
-    use crate::state::merkle::sql::models::NewMerkleRadixTree;
+    use crate::state::merkle::sql::store::models::NewMerkleRadixTree;
 
     /// This tests that a tree id can be returned from its name.
     #[cfg(feature = "sqlite")]

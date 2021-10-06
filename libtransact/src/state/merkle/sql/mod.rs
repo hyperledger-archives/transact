@@ -52,13 +52,11 @@
 pub mod backend;
 mod error;
 pub mod migration;
-mod models;
-mod operations;
 #[cfg(feature = "postgres")]
 mod postgres;
-mod schema;
 #[cfg(feature = "sqlite")]
 mod sqlite;
+mod store;
 
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
@@ -71,6 +69,7 @@ use super::node::Node;
 
 use backend::Backend;
 pub use error::SqlMerkleStateBuildError;
+use store::{MerkleRadixStore, TreeUpdate};
 
 const TOKEN_SIZE: usize = 2;
 
@@ -132,26 +131,17 @@ impl<B: Backend + Clone> SqlMerkleState<B> {
     }
 }
 
-struct MerkleRadixOverlay<'s, O> {
+struct MerkleRadixOverlay<'s, S> {
     tree_id: i64,
     state_root_hash: &'s str,
-    inner: O,
+    inner: S,
 }
 
-// (Hash, packed bytes, path address)
-type NodeChanges = Vec<(String, Node, String)>;
-
-#[derive(Default)]
-struct TreeUpdate {
-    node_changes: NodeChanges,
-    deletions: HashSet<String>,
-}
-
-impl<'s, O> MerkleRadixOverlay<'s, O>
+impl<'s, S> MerkleRadixOverlay<'s, S>
 where
-    O: OverlayReader + OverlayWriter,
+    S: MerkleRadixStore,
 {
-    fn new(tree_id: i64, state_root_hash: &'s str, inner: O) -> Self {
+    fn new(tree_id: i64, state_root_hash: &'s str, inner: S) -> Self {
         Self {
             tree_id,
             state_root_hash,
@@ -335,16 +325,16 @@ where
     }
 }
 
-struct MerkleRadixPruner<O> {
+struct MerkleRadixPruner<S> {
     tree_id: i64,
-    inner: O,
+    inner: S,
 }
 
-impl<O> MerkleRadixPruner<O>
+impl<S> MerkleRadixPruner<S>
 where
-    O: OverlayWriter,
+    S: MerkleRadixStore,
 {
-    fn new(tree_id: i64, inner: O) -> Self {
+    fn new(tree_id: i64, inner: S) -> Self {
         Self { tree_id, inner }
     }
 
@@ -355,46 +345,6 @@ where
             removed_hashes.extend(pruned.into_iter());
         }
         Ok(removed_hashes)
-    }
-}
-
-trait OverlayReader {
-    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
-
-    fn get_path(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        address: &str,
-    ) -> Result<Vec<(String, Node)>, InternalError>;
-
-    fn get_entries(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        keys: Vec<&str>,
-    ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
-}
-
-trait OverlayWriter {
-    fn write_changes(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        parent_state_root_hash: &str,
-        tree_update: TreeUpdate,
-    ) -> Result<(), InternalError>;
-
-    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
-}
-
-struct SqlOverlay<'b, B: Backend> {
-    backend: &'b B,
-}
-
-impl<'b, B: Backend> SqlOverlay<'b, B> {
-    fn new(backend: &'b B) -> Self {
-        Self { backend }
     }
 }
 

@@ -17,29 +17,18 @@
 
 use std::collections::HashMap;
 
-use diesel::Connection as _;
-
-use crate::error::{InternalError, InvalidStateError};
+use crate::error::InvalidStateError;
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{
     Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, Write,
 };
 
-use super::backend::{self, Backend, Connection};
+use super::backend;
 use super::encode_and_hash;
-use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
-use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
-use super::operations::get_path::MerkleRadixGetPathOperation as _;
-use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
-use super::operations::has_root::MerkleRadixHasRootOperation as _;
-use super::operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
-use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
-use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
-use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
-use super::operations::MerkleRadixOperations;
 use super::{
-    MerkleRadixOverlay, MerkleRadixPruner, OverlayReader, OverlayWriter, SqlMerkleState,
-    SqlMerkleStateBuildError, SqlMerkleStateBuilder, SqlOverlay, TreeUpdate,
+    store::{MerkleRadixStore, SqlMerkleRadixStore},
+    MerkleRadixOverlay, MerkleRadixPruner, SqlMerkleState, SqlMerkleStateBuildError,
+    SqlMerkleStateBuilder,
 };
 
 impl SqlMerkleStateBuilder<backend::SqliteBackend> {
@@ -60,14 +49,13 @@ impl SqlMerkleStateBuilder<backend::SqliteBackend> {
             .tree_name
             .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
-        let conn = backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
+        let store = SqlMerkleRadixStore::new(&backend);
 
         let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
         let tree_id: i64 = if self.create_tree {
-            operations.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
+            store.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
         } else {
-            operations.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+            store.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
                 InvalidStateError::with_message("must provide the name of an existing tree".into())
             })?
         };
@@ -86,8 +74,11 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -105,8 +96,11 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -126,8 +120,11 @@ impl Read for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay =
-            MerkleRadixOverlay::new(self.tree_id, &*state_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixOverlay::new(
+            self.tree_id,
+            &*state_id,
+            SqlMerkleRadixStore::new(&self.backend),
+        );
 
         if !overlay
             .has_root()
@@ -154,7 +151,7 @@ impl Prune for SqlMerkleState<backend::SqliteBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, SqlOverlay::new(&self.backend));
+        let overlay = MerkleRadixPruner::new(self.tree_id, SqlMerkleRadixStore::new(&self.backend));
 
         overlay
             .prune(&state_ids)
@@ -174,106 +171,17 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
         state_id: &Self::StateId,
         subtree: Option<&str>,
     ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
-        let conn = self.backend.connection()?;
-
         if &self.initial_state_root_hash()? == state_id {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = MerkleRadixOperations::new(conn.as_inner()).list_leaves(
+        let leaves = SqlMerkleRadixStore::new(&self.backend).list_entries(
             self.tree_id,
             state_id,
             subtree,
         )?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
-    }
-}
-
-impl<'b> OverlayReader for SqlOverlay<'b, backend::SqliteBackend> {
-    fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.has_root(tree_id, state_root_hash)
-    }
-
-    fn get_path(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        address: &str,
-    ) -> Result<Vec<(String, Node)>, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_path(tree_id, state_root_hash, address)
-    }
-
-    fn get_entries(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        keys: Vec<&str>,
-    ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_leaves(tree_id, state_root_hash, keys)
-    }
-}
-
-impl<'b> OverlayWriter for SqlOverlay<'b, backend::SqliteBackend> {
-    fn write_changes(
-        &self,
-        tree_id: i64,
-        state_root_hash: &str,
-        parent_state_root_hash: &str,
-        tree_update: TreeUpdate,
-    ) -> Result<(), InternalError> {
-        let conn = self.backend.connection()?;
-        conn.as_inner().transaction(|| {
-            let operations = MerkleRadixOperations::new(conn.as_inner());
-
-            let TreeUpdate {
-                node_changes,
-                deletions,
-            } = tree_update;
-
-            let insertable_changes = node_changes
-                .into_iter()
-                .map(
-                    |(hash, node, address)| super::operations::insert_nodes::InsertableNode {
-                        hash,
-                        node,
-                        address,
-                    },
-                )
-                .collect::<Vec<_>>();
-
-            operations.insert_nodes(tree_id, &insertable_changes)?;
-
-            let additions = insertable_changes
-                .iter()
-                .map(|insertable| insertable.hash.as_ref())
-                .collect::<Vec<_>>();
-            let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-            operations.update_change_log(
-                tree_id,
-                state_root_hash,
-                parent_state_root_hash,
-                &additions,
-                &deletions,
-            )?;
-
-            Ok(())
-        })
-    }
-
-    fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
-        let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.prune_entries(tree_id, state_root)
     }
 }
 
