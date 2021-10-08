@@ -53,7 +53,7 @@ impl WorkloadRunner {
     /// * `workload` - The `BatchWorkload` used to generate the batches that will be submitted
     /// * `targets` - A list of URL for submitting the batches. The URL provided must be the full
     ///              URL before adding `/batches` for submission
-    /// * `rate`- How many tranactions per second to submit
+    /// * `time_to_wait`- The amount of time to wait between batch submissions
     /// * `auth` - The string to be set in the Authorization header for the request
     /// * `update_time` - The time between updates on the workload
     ///
@@ -200,7 +200,7 @@ impl WorkerBuilder {
     ///
     /// # Arguments
     ///
-    ///  * `time_to_wait` - How many batches to submit per second
+    ///  * `time_to_wait` - The amount of time to wait between batch submissions
     pub fn with_time_to_wait(mut self, time_to_wait: Duration) -> WorkerBuilder {
         self.time_to_wait = Some(time_to_wait);
         self
