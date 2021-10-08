@@ -15,8 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-use diesel::Connection as _;
-
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 use crate::state::merkle::sql::backend::{self, Backend, Connection};
@@ -29,7 +27,6 @@ use super::operations::has_root::MerkleRadixHasRootOperation as _;
 use super::operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
-use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
@@ -101,31 +98,15 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
 
-        conn.as_inner().transaction(|| {
-            let operations = MerkleRadixOperations::new(conn.as_inner());
+        let operations = MerkleRadixOperations::new(conn.as_inner());
 
-            operations.insert_nodes(tree_id, &tree_update)?;
-
-            let additions = tree_update
-                .node_changes
-                .iter()
-                .map(|(hash, _, _)| hash.as_ref())
-                .collect::<Vec<_>>();
-            let deletions = tree_update
-                .deletions
-                .iter()
-                .map(|s| s.as_ref())
-                .collect::<Vec<_>>();
-            operations.update_change_log(
-                tree_id,
-                state_root_hash,
-                parent_state_root_hash,
-                &additions,
-                &deletions,
-            )?;
-
-            Ok(())
-        })
+        operations.insert_nodes(
+            tree_id,
+            state_root_hash,
+            parent_state_root_hash,
+            &tree_update,
+        )?;
+        Ok(())
     }
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
