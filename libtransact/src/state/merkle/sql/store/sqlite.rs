@@ -26,7 +26,7 @@ use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation a
 use super::operations::get_path::MerkleRadixGetPathOperation as _;
 use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use super::operations::has_root::MerkleRadixHasRootOperation as _;
-use super::operations::insert_nodes::{InsertableNode, MerkleRadixInsertNodesOperation as _};
+use super::operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
@@ -104,27 +104,18 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::SqliteBackend> {
         conn.as_inner().transaction(|| {
             let operations = MerkleRadixOperations::new(conn.as_inner());
 
-            let TreeUpdate {
-                node_changes,
-                deletions,
-            } = tree_update;
+            operations.insert_nodes(tree_id, &tree_update)?;
 
-            let insertable_changes = node_changes
-                .into_iter()
-                .map(|(hash, node, address)| InsertableNode {
-                    hash,
-                    node,
-                    address,
-                })
-                .collect::<Vec<_>>();
-
-            operations.insert_nodes(tree_id, &insertable_changes)?;
-
-            let additions = insertable_changes
+            let additions = tree_update
+                .node_changes
                 .iter()
-                .map(|insertable| insertable.hash.as_ref())
+                .map(|(hash, _, _)| hash.as_ref())
                 .collect::<Vec<_>>();
-            let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
+            let deletions = tree_update
+                .deletions
+                .iter()
+                .map(|s| s.as_ref())
+                .collect::<Vec<_>>();
             operations.update_change_log(
                 tree_id,
                 state_root_hash,
