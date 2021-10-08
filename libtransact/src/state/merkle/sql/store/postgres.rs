@@ -24,9 +24,9 @@ use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation a
 use super::operations::get_path::MerkleRadixGetPathOperation as _;
 use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use super::operations::has_root::MerkleRadixHasRootOperation as _;
-use super::operations::insert_nodes::MerkleRadixInsertNodesOperation as _;
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
+use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
@@ -100,7 +100,7 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
 
-        operations.insert_nodes(
+        operations.write_changes(
             tree_id,
             state_root_hash,
             parent_state_root_hash,
