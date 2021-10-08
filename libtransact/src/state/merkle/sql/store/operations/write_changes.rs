@@ -48,8 +48,8 @@ struct InsertableNode<'a> {
     pub address: &'a str,
 }
 
-pub(in crate::state::merkle::sql) trait MerkleRadixInsertNodesOperation {
-    fn insert_nodes(
+pub(in crate::state::merkle::sql) trait MerkleRadixWriteChangesOperation {
+    fn write_changes(
         &self,
         tree_id: i64,
         state_root: &str,
@@ -59,8 +59,8 @@ pub(in crate::state::merkle::sql) trait MerkleRadixInsertNodesOperation {
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteConnection> {
-    fn insert_nodes(
+impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteConnection> {
+    fn write_changes(
         &self,
         tree_id: i64,
         state_root: &str,
@@ -185,8 +185,8 @@ fn node_to_sqlite_children(node: &Node) -> Result<sqlite::Children, InternalErro
 }
 
 #[cfg(feature = "postgres")]
-impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnection> {
-    fn insert_nodes(
+impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnection> {
+    fn write_changes(
         &self,
         tree_id: i64,
         state_root: &str,
@@ -342,7 +342,7 @@ mod tests {
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        operations.insert_nodes(
+        operations.write_changes(
             1,
             "initial-state-root",
             "initial-state-root",
@@ -393,7 +393,7 @@ mod tests {
 
             let operations = MerkleRadixOperations::new(&conn);
 
-            operations.insert_nodes(
+            operations.write_changes(
                 1,
                 "initial-state-root",
                 "initial-state-root",
@@ -440,7 +440,7 @@ mod tests {
     /// the leaf table.
     #[cfg(feature = "sqlite")]
     #[test]
-    fn sqlite_insert_nodes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_write_changes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
         migration::sqlite::run_migrations(&conn)?;
@@ -485,7 +485,7 @@ mod tests {
             ..Default::default()
         };
 
-        operations.insert_nodes(1, "state-root", "state-root", &update)?;
+        operations.write_changes(1, "state-root", "state-root", &update)?;
 
         let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
         assert_eq!(leaves.len(), 1);
@@ -533,7 +533,7 @@ mod tests {
     /// the leaf table.
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     #[test]
-    fn postgres_insert_nodes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
+    fn postgres_write_changes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
 
@@ -577,7 +577,7 @@ mod tests {
                 ..Default::default()
             };
 
-            operations.insert_nodes(1, "state-root", "state-root", &update)?;
+            operations.write_changes(1, "state-root", "state-root", &update)?;
 
             let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
             assert_eq!(leaves.len(), 1);
