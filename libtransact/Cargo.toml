@@ -94,6 +94,7 @@ stable = [
     "default",
     # The following features are stable:
     "contract-archive",
+    "state-merkle-sql",
 ]
 
 experimental = [
@@ -119,7 +120,6 @@ experimental = [
     "postgres",
     "protocol-sabre-exec",
     "sqlite",
-    "state-merkle-sql",
     "workload",
     "workload-batch-gen",
     "workload-runner"
