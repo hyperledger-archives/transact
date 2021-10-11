@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License
 
-use crate::action::rate::{Rate, TimeUnit};
+use crate::action::time::{Time, TimeType, TimeUnit};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use clap::ArgMatches;
 use cylinder::Signer;
@@ -56,7 +57,7 @@ impl Action for WorkloadAction {
 
         let rate = args.value_of("target_rate").unwrap_or("1/s").to_string();
 
-        let (min, max): (Rate, Rate) = {
+        let (min, max): (Time, Time) = {
             if rate.contains('-') {
                 let split_rate: Vec<String> = rate.split('-').map(String::from).collect();
                 let min_string = split_rate
@@ -67,15 +68,15 @@ impl Action for WorkloadAction {
                     .ok_or_else(|| CliError::ActionError("Max target rate not provided".into()))?;
 
                 let min = min_string
-                    .parse::<Rate>()
-                    .or_else(|_| min_string.parse::<f64>().map(Rate::from))
+                    .parse::<Time>()
+                    .or_else(|_| min_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::UnparseableArg("Unable to parse provided min target rate".into())
                     })?;
 
                 let max = max_string
-                    .parse::<Rate>()
-                    .or_else(|_| max_string.parse::<f64>().map(Rate::from))
+                    .parse::<Time>()
+                    .or_else(|_| max_string.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::UnparseableArg("Unable to parse provided max target rate".into())
                     })?;
@@ -84,7 +85,7 @@ impl Action for WorkloadAction {
             } else {
                 let min = rate
                     .parse()
-                    .or_else(|_| rate.parse::<f64>().map(Rate::from))
+                    .or_else(|_| rate.parse::<f64>().map(Time::from))
                     .map_err(|_| {
                         CliError::ActionError("Unable to parse provided target rate".into())
                     })?;
@@ -115,6 +116,14 @@ impl Action for WorkloadAction {
             }
         };
 
+        let duration = args
+            .value_of("duration")
+            .map(|d| {
+                Time::make_duration_type_time(d)
+                    .map_err(|err| CliError::ActionError(format!("{}", err)))
+            })
+            .transpose()?;
+
         let mut workload_runner = WorkloadRunner::default();
 
         match workload {
@@ -137,6 +146,7 @@ impl Action for WorkloadAction {
                     update,
                     seed,
                     num_accounts,
+                    duration,
                 )?;
             }
             "command" => {
@@ -149,6 +159,7 @@ impl Action for WorkloadAction {
                     signer,
                     update,
                     seed,
+                    duration,
                 )?;
             }
             _ => {
@@ -158,6 +169,9 @@ impl Action for WorkloadAction {
                 )))
             }
         }
+
+        // calculate the end time based on the duration given
+        let end_time = duration.map(|d| Instant::now() + Duration::from(d));
 
         // setup control-c handling
         let running = Arc::new(AtomicBool::new(true));
@@ -170,7 +184,15 @@ impl Action for WorkloadAction {
             CliError::ActionError("Unable to set up workload ctrlc handler".to_string())
         })?;
 
-        while running.load(Ordering::SeqCst) {}
+        while running.load(Ordering::SeqCst) {
+            // if a duration was given stop the workload a signal shutdown when the end time
+            // is reached
+            if let Some(end_time) = end_time {
+                if end_time <= Instant::now() {
+                    running.store(false, Ordering::SeqCst);
+                }
+            }
+        }
         // shutdown all workloads
         workload_runner.shutdown();
 
@@ -182,13 +204,14 @@ impl Action for WorkloadAction {
 fn start_smallbank_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: Rate,
-    target_rate_max: Rate,
+    target_rate_min: Time,
+    target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
     seed: u64,
     num_accounts: usize,
+    total_duration: Option<Time>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -202,15 +225,18 @@ fn start_smallbank_workloads(
             target_rate_min
         } else {
             let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
-            Rate {
+            Time {
                 numeric: numeric / 1000.0,
                 unit: TimeUnit::Second,
+                time_type: TimeType::Rate,
             }
         };
 
         info!(
-            "Starting Smallbank-Workload-{} with target rate {}",
-            i, rate
+            "Starting Smallbank-Workload-{} with target rate {} and duration {}",
+            i,
+            rate,
+            total_duration.map_or("indefinite".into(), |t| format!("{}", t))
         );
         workload_runner
             .add_workload(
@@ -231,12 +257,13 @@ fn start_smallbank_workloads(
 fn start_command_workloads(
     workload_runner: &mut WorkloadRunner,
     targets: Vec<Vec<String>>,
-    target_rate_min: Rate,
-    target_rate_max: Rate,
+    target_rate_min: Time,
+    target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
     update: u32,
     seed: u64,
+    total_duration: Option<Time>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -250,13 +277,19 @@ fn start_command_workloads(
             target_rate_min
         } else {
             let numeric = rng.gen_range(target_rate_min.to_milli()..=target_rate_max.to_milli());
-            Rate {
+            Time {
                 numeric: numeric / 1000.0,
                 unit: TimeUnit::Second,
+                time_type: TimeType::Rate,
             }
         };
 
-        info!("Starting Command-Workload-{} with target rate {}", i, rate);
+        info!(
+            "Starting Command-Workload-{} with target rate {} and duration {}",
+            i,
+            rate,
+            total_duration.map_or("indefinite".into(), |t| format!("{}", t))
+        );
 
         workload_runner
             .add_workload(
