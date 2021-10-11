@@ -15,8 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-use diesel::Connection as _;
-
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 use crate::state::merkle::sql::backend::{self, Backend, Connection};
@@ -26,10 +24,9 @@ use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation a
 use super::operations::get_path::MerkleRadixGetPathOperation as _;
 use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use super::operations::has_root::MerkleRadixHasRootOperation as _;
-use super::operations::insert_nodes::{InsertableNode, MerkleRadixInsertNodesOperation as _};
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
-use super::operations::update_change_log::MerkleRadixUpdateUpdateChangeLogOperation as _;
+use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
@@ -101,40 +98,16 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::SqliteBackend> {
         tree_update: TreeUpdate,
     ) -> Result<(), InternalError> {
         let conn = self.backend.connection()?;
-        conn.as_inner().transaction(|| {
-            let operations = MerkleRadixOperations::new(conn.as_inner());
+        let operations = MerkleRadixOperations::new(conn.as_inner());
 
-            let TreeUpdate {
-                node_changes,
-                deletions,
-            } = tree_update;
+        operations.write_changes(
+            tree_id,
+            state_root_hash,
+            parent_state_root_hash,
+            &tree_update,
+        )?;
 
-            let insertable_changes = node_changes
-                .into_iter()
-                .map(|(hash, node, address)| InsertableNode {
-                    hash,
-                    node,
-                    address,
-                })
-                .collect::<Vec<_>>();
-
-            operations.insert_nodes(tree_id, &insertable_changes)?;
-
-            let additions = insertable_changes
-                .iter()
-                .map(|insertable| insertable.hash.as_ref())
-                .collect::<Vec<_>>();
-            let deletions = deletions.iter().map(|s| s.as_ref()).collect::<Vec<_>>();
-            operations.update_change_log(
-                tree_id,
-                state_root_hash,
-                parent_state_root_hash,
-                &additions,
-                &deletions,
-            )?;
-
-            Ok(())
-        })
+        Ok(())
     }
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
