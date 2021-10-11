@@ -24,22 +24,6 @@ use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
 use super::*;
 
-fn new_sql_merkle_state_and_root(
-    db_url: &str,
-) -> Result<(SqlMerkleState<PostgresBackend>, String), Box<dyn Error>> {
-    let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
-
-    let state = SqlMerkleStateBuilder::new()
-        .with_backend(backend)
-        .with_tree("test-tree")
-        .create_tree_if_necessary()
-        .build()?;
-
-    let initial_state_root_hash = state.initial_state_root_hash()?;
-
-    Ok((state, initial_state_root_hash))
-}
-
 #[test]
 fn merkle_trie_empty_changes() -> Result<(), Box<dyn Error>> {
     run_postgres_test(|db_url| {
@@ -147,4 +131,20 @@ fn merkle_produce_same_state_as_btree() -> Result<(), Box<dyn Error>> {
 
         Ok(())
     })
+}
+
+fn new_sql_merkle_state_and_root(
+    db_url: &str,
+) -> Result<(SqlMerkleState<PostgresBackend>, String), Box<dyn Error>> {
+    let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
+
+    let state = SqlMerkleStateBuilder::new()
+        .with_backend(backend)
+        .with_tree("test-tree")
+        .create_tree_if_necessary()
+        .build()?;
+
+    let initial_state_root_hash = state.initial_state_root_hash()?;
+
+    Ok((state, initial_state_root_hash))
 }

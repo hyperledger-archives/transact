@@ -15,8 +15,6 @@
  * -----------------------------------------------------------------------------
  */
 
-// Due to schema differences, this may have to be under a submodule specific to sqlite or postgres
-// (or other array-supporting dbs). This may only be the case with the merkle_radix_leaf table.
 table! {
     merkle_radix_tree (id) {
         id -> Int8,

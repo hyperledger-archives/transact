@@ -25,31 +25,48 @@ use diesel::prelude::*;
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::models::postgres;
+use crate::state::merkle::sql::store::models::postgres;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::models::sqlite;
-use crate::state::merkle::sql::models::NewMerkleRadixLeaf;
-use crate::state::merkle::sql::schema::merkle_radix_leaf;
+use crate::state::merkle::sql::store::models::sqlite;
+use crate::state::merkle::sql::store::models::{
+    NewMerkleRadixChangeLogAddition, NewMerkleRadixChangeLogDeletion, NewMerkleRadixLeaf,
+};
 #[cfg(feature = "postgres")]
-use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 #[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::schema::sqlite_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::sqlite_merkle_radix_tree_node;
+use crate::state::merkle::sql::store::schema::{
+    merkle_radix_change_log_addition, merkle_radix_change_log_deletion, merkle_radix_leaf,
+};
+use crate::state::merkle::sql::store::TreeUpdate;
 
 use super::MerkleRadixOperations;
 
-pub struct InsertableNode {
-    pub hash: String,
-    pub node: Node,
-    pub address: String,
+struct InsertableNode<'a> {
+    pub hash: &'a str,
+    pub node: &'a Node,
+    pub address: &'a str,
 }
 
-pub trait MerkleRadixInsertNodesOperation {
-    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError>;
+pub(in crate::state::merkle::sql) trait MerkleRadixWriteChangesOperation {
+    fn write_changes(
+        &self,
+        tree_id: i64,
+        state_root: &str,
+        parent_state_root: &str,
+        update: &TreeUpdate,
+    ) -> Result<(), InternalError>;
 }
 
 #[cfg(feature = "sqlite")]
-impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteConnection> {
-    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError> {
+impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteConnection> {
+    fn write_changes(
+        &self,
+        tree_id: i64,
+        state_root: &str,
+        parent_state_root: &str,
+        update: &TreeUpdate,
+    ) -> Result<(), InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             // We manually increment the id, so we don't have to insert one at a time and fetch
             // back the resulting id.
@@ -57,6 +74,16 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
                 .unwrap_or(0);
+
+            let nodes = update
+                .node_changes
+                .iter()
+                .map(|(hash, node, address)| InsertableNode {
+                    hash,
+                    node,
+                    address,
+                })
+                .collect::<Vec<_>>();
 
             let leaves = nodes
                 .iter()
@@ -68,7 +95,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                                 InternalError::with_message("exceeded id space".into())
                             })?,
                             tree_id,
-                            address: &insertable_node.address,
+                            address: insertable_node.address,
                             data,
                         })
                     })
@@ -88,16 +115,56 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, SqliteCon
                 .iter()
                 .map::<Result<sqlite::MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
                     Ok(sqlite::MerkleRadixTreeNode {
-                        hash: insertable_node.hash.clone(),
+                        hash: insertable_node.hash.to_string(),
                         tree_id,
-                        leaf_id: leaf_ids.get(insertable_node.address.as_str()).copied(),
-                        children: node_to_sqlite_children(&insertable_node.node)?,
+                        leaf_id: leaf_ids.get(insertable_node.address).copied(),
+                        children: node_to_sqlite_children(insertable_node.node)?,
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
             insert_or_ignore_into(sqlite_merkle_radix_tree_node::table)
                 .values(node_models)
+                .execute(self.conn)?;
+
+            // Update the change log
+            let additions = update
+                .node_changes
+                .iter()
+                .map(|(hash, _, _)| hash.as_ref())
+                .collect::<Vec<_>>();
+            let deletions = update
+                .deletions
+                .iter()
+                .map(|s| s.as_ref())
+                .collect::<Vec<_>>();
+
+            let change_log_additions = additions
+                .iter()
+                .map(|hash| NewMerkleRadixChangeLogAddition {
+                    state_root,
+                    tree_id,
+                    parent_state_root: Some(parent_state_root),
+                    addition: hash,
+                })
+                .collect::<Vec<_>>();
+
+            insert_into(merkle_radix_change_log_addition::table)
+                .values(change_log_additions)
+                .execute(self.conn)?;
+
+            let change_log_deletions = deletions
+                .iter()
+                .map(|hash| NewMerkleRadixChangeLogDeletion {
+                    state_root: parent_state_root,
+                    tree_id,
+                    successor_state_root: state_root,
+                    deletion: hash,
+                })
+                .collect::<Vec<_>>();
+
+            insert_into(merkle_radix_change_log_deletion::table)
+                .values(change_log_deletions)
                 .execute(self.conn)?;
 
             Ok(())
@@ -118,8 +185,14 @@ fn node_to_sqlite_children(node: &Node) -> Result<sqlite::Children, InternalErro
 }
 
 #[cfg(feature = "postgres")]
-impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnection> {
-    fn insert_nodes(&self, tree_id: i64, nodes: &[InsertableNode]) -> Result<(), InternalError> {
+impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnection> {
+    fn write_changes(
+        &self,
+        tree_id: i64,
+        state_root: &str,
+        parent_state_root: &str,
+        update: &TreeUpdate,
+    ) -> Result<(), InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
             // We manually increment the id, so we don't have to insert one at a time and fetch
             // back the resulting id.
@@ -127,6 +200,16 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                 .select(max(merkle_radix_leaf::id))
                 .first::<Option<i64>>(self.conn)?
                 .unwrap_or(0);
+
+            let nodes = update
+                .node_changes
+                .iter()
+                .map(|(hash, node, address)| InsertableNode {
+                    hash,
+                    node,
+                    address,
+                })
+                .collect::<Vec<_>>();
 
             let leaves = nodes
                 .iter()
@@ -138,7 +221,7 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                                 InternalError::with_message("exceeded id space".into())
                             })?,
                             tree_id,
-                            address: &insertable_node.address,
+                            address: insertable_node.address,
                             data,
                         })
                     })
@@ -158,10 +241,10 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
                 .iter()
                 .map::<Result<postgres::MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
                     Ok(postgres::MerkleRadixTreeNode {
-                        hash: insertable_node.hash.clone(),
+                        hash: insertable_node.hash.to_string(),
                         tree_id,
-                        leaf_id: leaf_ids.get(insertable_node.address.as_str()).copied(),
-                        children: node_to_postgres_children(&insertable_node.node)?,
+                        leaf_id: leaf_ids.get(insertable_node.address).copied(),
+                        children: node_to_postgres_children(insertable_node.node)?,
                     })
                 })
                 .collect::<Result<Vec<_>, _>>()?;
@@ -169,6 +252,46 @@ impl<'a> MerkleRadixInsertNodesOperation for MerkleRadixOperations<'a, PgConnect
             insert_into(postgres_merkle_radix_tree_node::table)
                 .values(&node_models)
                 .on_conflict_do_nothing()
+                .execute(self.conn)?;
+
+            // Update the change log
+            let additions = update
+                .node_changes
+                .iter()
+                .map(|(hash, _, _)| hash.as_ref())
+                .collect::<Vec<_>>();
+            let deletions = update
+                .deletions
+                .iter()
+                .map(|s| s.as_ref())
+                .collect::<Vec<_>>();
+
+            let change_log_additions = additions
+                .iter()
+                .map(|hash| NewMerkleRadixChangeLogAddition {
+                    state_root,
+                    tree_id,
+                    parent_state_root: Some(parent_state_root),
+                    addition: hash,
+                })
+                .collect::<Vec<_>>();
+
+            insert_into(merkle_radix_change_log_addition::table)
+                .values(change_log_additions)
+                .execute(self.conn)?;
+
+            let change_log_deletions = deletions
+                .iter()
+                .map(|hash| NewMerkleRadixChangeLogDeletion {
+                    state_root: parent_state_root,
+                    tree_id,
+                    successor_state_root: state_root,
+                    deletion: hash,
+                })
+                .collect::<Vec<_>>();
+
+            insert_into(merkle_radix_change_log_deletion::table)
+                .values(change_log_deletions)
                 .execute(self.conn)?;
 
             Ok(())
@@ -206,7 +329,7 @@ mod tests {
     use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration;
-    use crate::state::merkle::sql::models::MerkleRadixLeaf;
+    use crate::state::merkle::sql::store::models::MerkleRadixLeaf;
 
     /// This test inserts a single node (that of the initial state root) and verifies that it is
     /// correctly inserted into the node table.
@@ -219,16 +342,21 @@ mod tests {
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        operations.insert_nodes(
+        operations.write_changes(
             1,
-            &vec![InsertableNode {
-                hash: "initial-state-root".into(),
-                node: Node {
-                    value: None,
-                    children: Default::default(),
-                },
-                address: String::new(),
-            }],
+            "initial-state-root",
+            "initial-state-root",
+            &TreeUpdate {
+                node_changes: vec![(
+                    "initial-state-root".into(),
+                    Node {
+                        value: None,
+                        children: Default::default(),
+                    },
+                    String::new(),
+                )],
+                ..Default::default()
+            },
         )?;
 
         assert_eq!(
@@ -265,16 +393,21 @@ mod tests {
 
             let operations = MerkleRadixOperations::new(&conn);
 
-            operations.insert_nodes(
+            operations.write_changes(
                 1,
-                &vec![InsertableNode {
-                    hash: "initial-state-root".into(),
-                    node: Node {
-                        value: None,
-                        children: Default::default(),
-                    },
-                    address: String::new(),
-                }],
+                "initial-state-root",
+                "initial-state-root",
+                &TreeUpdate {
+                    node_changes: vec![(
+                        "initial-state-root".into(),
+                        Node {
+                            value: None,
+                            children: Default::default(),
+                        },
+                        String::new(),
+                    )],
+                    ..Default::default()
+                },
             )?;
 
             assert_eq!(
@@ -307,49 +440,52 @@ mod tests {
     /// the leaf table.
     #[cfg(feature = "sqlite")]
     #[test]
-    fn sqlite_insert_nodes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
+    fn sqlite_write_changes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
 
         migration::sqlite::run_migrations(&conn)?;
 
         let operations = MerkleRadixOperations::new(&conn);
 
-        let nodes = vec![
-            InsertableNode {
-                hash: "state-root".into(),
-                node: Node {
-                    value: None,
-                    children: single_child_btree("0a", "first-node-hash"),
-                },
-                address: String::new(),
-            },
-            InsertableNode {
-                hash: "first-node-hash".into(),
-                node: Node {
-                    value: None,
-                    children: single_child_btree("01", "second-node-hash"),
-                },
-                address: "0a".into(),
-            },
-            InsertableNode {
-                hash: "second-node-hash".into(),
-                node: Node {
-                    value: None,
-                    children: single_child_btree("ff", "leaf-node-hash"),
-                },
-                address: "0a01".into(),
-            },
-            InsertableNode {
-                hash: "leaf-node-hash".into(),
-                node: Node {
-                    value: Some(b"hello".to_vec()),
-                    children: BTreeMap::default(),
-                },
-                address: "0a01ff".into(),
-            },
-        ];
+        let update = TreeUpdate {
+            node_changes: vec![
+                (
+                    "state-root".into(),
+                    Node {
+                        value: None,
+                        children: single_child_btree("0a", "first-node-hash"),
+                    },
+                    String::new(),
+                ),
+                (
+                    "first-node-hash".into(),
+                    Node {
+                        value: None,
+                        children: single_child_btree("01", "second-node-hash"),
+                    },
+                    "0a".into(),
+                ),
+                (
+                    "second-node-hash".into(),
+                    Node {
+                        value: None,
+                        children: single_child_btree("ff", "leaf-node-hash"),
+                    },
+                    "0a01".into(),
+                ),
+                (
+                    "leaf-node-hash".into(),
+                    Node {
+                        value: Some(b"hello".to_vec()),
+                        children: BTreeMap::default(),
+                    },
+                    "0a01ff".into(),
+                ),
+            ],
+            ..Default::default()
+        };
 
-        operations.insert_nodes(1, &nodes)?;
+        operations.write_changes(1, "state-root", "state-root", &update)?;
 
         let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
         assert_eq!(leaves.len(), 1);
@@ -397,48 +533,51 @@ mod tests {
     /// the leaf table.
     #[cfg(feature = "state-merkle-sql-postgres-tests")]
     #[test]
-    fn postgres_insert_nodes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
+    fn postgres_write_changes_with_leaf() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
 
             let operations = MerkleRadixOperations::new(&conn);
 
-            let nodes = vec![
-                InsertableNode {
-                    hash: "state-root".into(),
-                    node: Node {
-                        value: None,
-                        children: single_child_btree("0a", "first-node-hash"),
-                    },
-                    address: String::new(),
-                },
-                InsertableNode {
-                    hash: "first-node-hash".into(),
-                    node: Node {
-                        value: None,
-                        children: single_child_btree("01", "second-node-hash"),
-                    },
-                    address: "0a".into(),
-                },
-                InsertableNode {
-                    hash: "second-node-hash".into(),
-                    node: Node {
-                        value: None,
-                        children: single_child_btree("ff", "leaf-node-hash"),
-                    },
-                    address: "0a01".into(),
-                },
-                InsertableNode {
-                    hash: "leaf-node-hash".into(),
-                    node: Node {
-                        value: Some(b"hello".to_vec()),
-                        children: BTreeMap::default(),
-                    },
-                    address: "0a01ff".into(),
-                },
-            ];
+            let update = TreeUpdate {
+                node_changes: vec![
+                    (
+                        "state-root".into(),
+                        Node {
+                            value: None,
+                            children: single_child_btree("0a", "first-node-hash"),
+                        },
+                        String::new(),
+                    ),
+                    (
+                        "first-node-hash".into(),
+                        Node {
+                            value: None,
+                            children: single_child_btree("01", "second-node-hash"),
+                        },
+                        "0a".into(),
+                    ),
+                    (
+                        "second-node-hash".into(),
+                        Node {
+                            value: None,
+                            children: single_child_btree("ff", "leaf-node-hash"),
+                        },
+                        "0a01".into(),
+                    ),
+                    (
+                        "leaf-node-hash".into(),
+                        Node {
+                            value: Some(b"hello".to_vec()),
+                            children: BTreeMap::default(),
+                        },
+                        "0a01ff".into(),
+                    ),
+                ],
+                ..Default::default()
+            };
 
-            operations.insert_nodes(1, &nodes)?;
+            operations.write_changes(1, "state-root", "state-root", &update)?;
 
             let leaves = merkle_radix_leaf::table.get_results::<MerkleRadixLeaf>(&conn)?;
             assert_eq!(leaves.len(), 1);

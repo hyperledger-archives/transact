@@ -15,15 +15,34 @@
  * -----------------------------------------------------------------------------
  */
 
-use crate::state::merkle::sql::schema::postgres_merkle_radix_tree_node;
+pub(super) mod get_leaves;
+pub(super) mod get_or_create_tree;
+pub(super) mod get_path;
+pub(super) mod get_tree_by_name;
+pub(super) mod has_root;
+pub(super) mod list_leaves;
+pub(super) mod prune_entries;
+pub(super) mod write_changes;
 
-#[derive(Insertable, Queryable, QueryableByName, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
-#[table_name = "postgres_merkle_radix_tree_node"]
-#[primary_key(hash, tree_id)]
-pub struct MerkleRadixTreeNode {
-    pub hash: String,
-    pub tree_id: i64,
-    pub leaf_id: Option<i64>,
-    pub children: Vec<Option<String>>,
+#[cfg(feature = "sqlite")]
+no_arg_sql_function!(
+    last_insert_rowid,
+    diesel::sql_types::BigInt,
+    "Represents the SQLite last_insert_rowid() function"
+);
+
+pub struct MerkleRadixOperations<'a, C>
+where
+    C: diesel::Connection,
+{
+    conn: &'a C,
+}
+
+impl<'a, C> MerkleRadixOperations<'a, C>
+where
+    C: diesel::Connection,
+{
+    pub fn new(conn: &'a C) -> Self {
+        MerkleRadixOperations { conn }
+    }
 }
