@@ -76,6 +76,7 @@ stable = [
     "default",
     # The following features are stable:
     "contract-archive",
+    "sqlite",
     "state-merkle-sql",
 ]
 
@@ -96,7 +97,6 @@ experimental = [
     "redis-db",
     "sqlite-db",
     "postgres",
-    "sqlite",
     "workload",
 ]
 
