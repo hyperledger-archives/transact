@@ -1,5 +1,35 @@
 # Release Notes
 
+## Changes in Transact 0.3.11
+
+### Highlights
+
+* The `"state-merkle-sql"` feature has been stabilized, along with the
+  `"postgres"` and `"sqlite"` features.
+
+### libtransact updates
+
+* Stabilize `"state-merkle-sql"` by moving it to the `"stable"` feature group.
+
+* Stabilize `"postgres"` by moving it to the `"stable"` feature group.
+
+* Stabilize `"sqlite"` by moving it to the `"stable"` feature group.
+
+* Replace `OverlayReader` and `-Writer` with `MerkleRadixStore`.
+
+* Move operations, schema, and models to `store` module.
+
+* Merge `insert_node` and `update_change_log` operations into single
+  `write_changes` operation.
+
+* Separate all Postgres- and SQLite-specific code into respective `postgres` and
+  `sqlite` submodules, relative to the parent module.
+
+* Allow migrations to be run against a single connection.  This allows
+  migrations to be run in an instance where the caller does not have access to a
+  connection pool or the connection string and, therefore, cannot use a
+  `Backend` instance via the `MigrationManager` trait.
+
 ## Changes in Transact 0.3.10
 
 ### Highlights
