@@ -26,6 +26,11 @@ use crate::error::InternalError;
 
 use super::backend::Backend;
 
+#[cfg(feature = "postgres")]
+pub use postgres::run_migrations as run_postgres_migrations;
+#[cfg(feature = "sqlite")]
+pub use sqlite::run_migrations as run_sqlite_migrations;
+
 /// Provides backend migration execution.
 ///
 /// Backend's that implement this trait can expose a migration operation on their underlying
