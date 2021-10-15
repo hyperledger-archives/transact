@@ -34,7 +34,9 @@ use crate::protocol::{
 use crate::protos::smallbank::{
     SmallbankTransactionPayload, SmallbankTransactionPayload_PayloadType,
 };
-use crate::workload::{error::WorkloadError, BatchWorkload, TransactionWorkload};
+use crate::workload::{
+    error::WorkloadError, BatchWorkload, ExpectedBatchResult, TransactionWorkload,
+};
 
 use self::playlist::make_addresses;
 use self::playlist::SmallbankGeneratingIter;
@@ -101,7 +103,9 @@ impl SmallbankTransactionWorkload {
 }
 
 impl TransactionWorkload for SmallbankTransactionWorkload {
-    fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError> {
+    fn next_transaction(
+        &mut self,
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
         let payload = self
             .generator
             .next()
@@ -141,7 +145,7 @@ impl TransactionWorkload for SmallbankTransactionWorkload {
             txn_pair.transaction().header_signature().to_owned(),
         );
 
-        Ok(txn_pair)
+        Ok((txn_pair, None))
     }
 }
 
@@ -163,10 +167,14 @@ impl SmallbankBatchWorkload {
 }
 
 impl BatchWorkload for SmallbankBatchWorkload {
-    fn next_batch(&mut self) -> Result<BatchPair, WorkloadError> {
-        Ok(BatchBuilder::new()
-            .with_transactions(vec![self.transaction_workload.next_transaction()?.take().0])
-            .build_pair(&*self.signer)?)
+    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+        let (txn, result) = self.transaction_workload.next_transaction()?;
+        Ok((
+            BatchBuilder::new()
+                .with_transactions(vec![txn.take().0])
+                .build_pair(&*self.signer)?,
+            result,
+        ))
     }
 }
 
@@ -230,7 +238,7 @@ mod tests {
 
         let mut acc = 0;
         for _ in 0..100 {
-            let txn_pair = transaction_workload
+            let (txn_pair, _) = transaction_workload
                 .next_transaction()
                 .expect("Unable to get txn pair");
             let (txn, header) = txn_pair.take();
@@ -246,7 +254,7 @@ mod tests {
         assert_eq!(acc, 0);
 
         for _ in 0..NUM_TO_CONSIDER {
-            let txn_pair = transaction_workload
+            let (txn_pair, _) = transaction_workload
                 .next_transaction()
                 .expect("Unable to get txn pair");
             let header = txn_pair.header();

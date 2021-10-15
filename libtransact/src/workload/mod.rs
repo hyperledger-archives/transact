@@ -31,11 +31,19 @@ pub use crate::workload::runner::{
 };
 
 pub trait TransactionWorkload: Send {
-    fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError>;
+    fn next_transaction(
+        &mut self,
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError>;
 }
 
 pub trait BatchWorkload: Send {
-    fn next_batch(&mut self) -> Result<BatchPair, WorkloadError>;
+    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError>;
+}
+
+#[derive(Clone)]
+pub enum ExpectedBatchResult {
+    Invalid,
+    Valid,
 }
 
 #[cfg(test)]

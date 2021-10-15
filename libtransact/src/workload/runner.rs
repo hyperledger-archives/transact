@@ -296,7 +296,8 @@ impl WorkerBuilder {
                                 };
 
                                 // get next batch
-                                let batch = workload.next_batch().expect("Unable to get batch");
+                                let (batch, expected_result) =
+                                    workload.next_batch().expect("Unable to get batch");
                                 let batch_bytes = match vec![batch.batch().clone()].into_bytes() {
                                     Ok(bytes) => bytes,
                                     Err(err) => {
