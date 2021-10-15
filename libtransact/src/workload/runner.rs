@@ -32,8 +32,13 @@ use crate::protos::IntoBytes;
 use super::batch_gen::BatchListFeeder;
 use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
+use super::ExpectedBatchResult;
 
 pub const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
+
+/// This type maps the status link used to check the result of the batch after it has been submitted
+/// to the target URL that a batch was submitted to and the result that was expected of the batch
+type ExpectedBatchResults = HashMap<String, (String, Option<ExpectedBatchResult>)>;
 
 /// Keeps track of the currenlty running workloads.
 ///
@@ -277,6 +282,7 @@ impl WorkerBuilder {
             thread::Builder::new()
                 .name(id.to_string())
                 .spawn(move || {
+                    let mut batch_status_links: ExpectedBatchResults = HashMap::new();
                     // set first target
                     let mut next_target = 0;
                     let mut workload = workload;
@@ -319,7 +325,13 @@ impl WorkerBuilder {
 
                                 // submit batch to the target
                                 match submit_batch(target, &auth, batch_bytes.clone()) {
-                                    Ok(()) => {
+                                    Ok(link) => {
+                                        if get_batch_status {
+                                            batch_status_links.insert(
+                                                link,
+                                                (target.to_string(), expected_result),
+                                            );
+                                        }
                                         submitted_batches += 1;
                                         http_counter.increment_sent()
                                     }
@@ -336,8 +348,22 @@ impl WorkerBuilder {
                                                 submitted_batches,
                                                 &receiver,
                                             ) {
-                                                Ok(true) => break,
-                                                Ok(false) => {
+                                                Ok((true, _)) => break,
+                                                Ok((false, Some(link))) => {
+                                                    if get_batch_status {
+                                                        batch_status_links.insert(
+                                                            link,
+                                                            (target.to_string(), expected_result),
+                                                        );
+                                                    }
+                                                    submitted_batches = 1;
+                                                    start_time = time::Instant::now();
+                                                    http_counter.increment_sent()
+                                                }
+                                                Ok((false, None)) => {
+                                                    if get_batch_status {
+                                                        error!("Failed to get batch status link");
+                                                    }
                                                     submitted_batches = 1;
                                                     start_time = time::Instant::now();
                                                     http_counter.increment_sent()
@@ -399,9 +425,10 @@ fn slow_rate(
     start_time: time::Instant,
     submitted_batches: u32,
     receiver: &Receiver<ShutdownMessage>,
-) -> Result<bool, WorkloadRunnerError> {
+) -> Result<(bool, Option<String>), WorkloadRunnerError> {
     debug!("Received TooManyRequests message from target, attempting to resubmit batch");
     let mut shutdown = false;
+    let mut link = None;
 
     let time = (time::Instant::now() - start_time).as_secs() as u32;
 
@@ -427,7 +454,10 @@ fn slow_rate(
             Err(TryRecvError::Empty) => {
                 // attempt to submit batch again
                 match submit_batch(target, auth, batch_bytes.clone()) {
-                    Ok(()) => break,
+                    Ok(l) => {
+                        link = Some(l);
+                        break;
+                    }
                     Err(WorkloadRunnerError::TooManyRequests) => thread::sleep(wait),
                     Err(err) => {
                         return Err(WorkloadRunnerError::SubmitError(format!(
@@ -443,10 +473,14 @@ fn slow_rate(
             }
         }
     }
-    Ok(shutdown)
+    Ok((shutdown, link))
 }
 
-fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), WorkloadRunnerError> {
+fn submit_batch(
+    target: &str,
+    auth: &str,
+    batch_bytes: Vec<u8>,
+) -> Result<String, WorkloadRunnerError> {
     Client::new()
         .post(&format!("{}/batches", target))
         .header(header::CONTENT_TYPE, "octet-stream")
@@ -457,7 +491,12 @@ fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), Wo
         .and_then(|res| {
             let status = res.status();
             if status.is_success() {
-                Ok(())
+                let status_link: Link = res.json().map_err(|_| {
+                    WorkloadRunnerError::SubmitError(
+                        "Failed to deserialize response body".to_string(),
+                    )
+                })?;
+                Ok(status_link.link)
             } else {
                 if status == StatusCode::TOO_MANY_REQUESTS {
                     return Err(WorkloadRunnerError::TooManyRequests);
@@ -480,6 +519,12 @@ fn submit_batch(target: &str, auth: &str, batch_bytes: Vec<u8>) -> Result<(), Wo
                 )))
             }
         })
+}
+
+/// Used for deserializing `POST /batches` responses.
+#[derive(Debug, Deserialize)]
+pub struct Link {
+    link: String,
 }
 
 /// Counts sent and queue full for Batches submmissions from the target REST Api.
@@ -592,7 +637,7 @@ pub fn submit_batches_from_source(
 
         // submit batch to the target
         match submit_batch(target, &auth, batch_bytes) {
-            Ok(()) => http_counter.increment_sent(),
+            Ok(_) => http_counter.increment_sent(),
             Err(err) => {
                 if err == WorkloadRunnerError::TooManyRequests {
                     http_counter.increment_queue_full()
