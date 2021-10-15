@@ -56,9 +56,12 @@ impl WorkloadRunner {
     /// * `time_to_wait`- The amount of time to wait between batch submissions
     /// * `auth` - The string to be set in the Authorization header for the request
     /// * `update_time` - The time between updates on the workload
+    /// * `get_batch_status` - Determines if the workload should compare the result of a batch after
+    ///                      it is submitted to the expected result
     ///
     /// Returns an error if a workload with that ID is already running or if the workload thread
     /// could not be started
+    #[allow(clippy::too_many_arguments)]
     pub fn add_workload(
         &mut self,
         id: String,
@@ -67,6 +70,7 @@ impl WorkloadRunner {
         time_to_wait: Duration,
         auth: String,
         update_time: u32,
+        get_batch_status: bool,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
@@ -82,6 +86,7 @@ impl WorkloadRunner {
             .with_time_to_wait(time_to_wait)
             .with_auth(auth)
             .with_update_time(update_time)
+            .get_batch_status(get_batch_status)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -162,6 +167,7 @@ struct WorkerBuilder {
     time_to_wait: Option<Duration>,
     auth: Option<String>,
     update_time: Option<u32>,
+    get_batch_status: Option<bool>,
 }
 
 impl WorkerBuilder {
@@ -223,6 +229,11 @@ impl WorkerBuilder {
     ///  * `update_time` - How often to provide an update about the workload
     pub fn with_update_time(mut self, update_time: u32) -> WorkerBuilder {
         self.update_time = Some(update_time);
+        self
+    }
+
+    pub fn get_batch_status(mut self, get_batch_status: bool) -> WorkerBuilder {
+        self.get_batch_status = Some(get_batch_status);
         self
     }
 
