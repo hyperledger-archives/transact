@@ -22,7 +22,7 @@ use std::fmt;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 use std::{thread, time};
 
 use reqwest::{blocking::Client, header, StatusCode};
@@ -273,6 +273,8 @@ impl WorkerBuilder {
             )
         })?;
 
+        let get_batch_status = self.get_batch_status.unwrap_or(false);
+
         let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
 
         let (sender, receiver) = channel();
@@ -379,6 +381,17 @@ impl WorkerBuilder {
                                 // log http submission stats if its been longer then update time
                                 log(&http_counter, &mut last_log_time, update_time);
 
+                                if get_batch_status {
+                                    match check_batch_status(batch_status_links, &auth) {
+                                        // set `batch_status_links` to be the updated list of links
+                                        // returned by `check_batch_status`
+                                        Ok(status_links) => batch_status_links = status_links,
+                                        Err(err) => {
+                                            error!("{}", err);
+                                            std::process::exit(1);
+                                        }
+                                    }
+                                }
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
                                 let diff = time::Instant::now() - submission_start;
@@ -521,10 +534,165 @@ fn submit_batch(
         })
 }
 
+/// Takes a mutable hashmap of batch status links and checks each link once to get the status of
+/// the associated batch. If the returned status of the batch matches the result that was
+/// expected for that batch, the status link is removed from the hashmap. If the returned status is
+/// "pending", the link is left in the map to be checked again in a future call. The updated hash
+/// map of status links is returned after all links have been checked.
+///
+/// # Arguments
+///
+/// `status_links` - A hashmap of batch status links mapped to the target URL that the associated
+///  batch was originally submitted to and the expected result of the batch
+/// `auth` - The string used in the authorization header of the request
+///
+/// # Errors
+///
+/// Returns a `WorkloadRunnerError` if the status of a batch does not match the expected result
+fn check_batch_status(
+    mut status_links: ExpectedBatchResults,
+    auth: &str,
+) -> Result<ExpectedBatchResults, WorkloadRunnerError> {
+    for (status_link, (target, expected_result)) in status_links.clone() {
+        let url = get_batch_status_url(target, &status_link);
+        Client::new()
+            .get(url)
+            .header("Authorization", auth)
+            .send()
+            .map_err(|err| {
+                WorkloadRunnerError::SubmitError(format!(
+                    "Failed to get status of submitted batch: {}",
+                    err
+                ))
+            })
+            .and_then(|res| {
+                let status = res.status();
+                if status.is_success() {
+                    let batch_info: Vec<BatchInfo> = res.json().map_err(|_| {
+                        WorkloadRunnerError::SubmitError(
+                            "Failed to deserialize response body".to_string(),
+                        )
+                    })?;
+                    for info in batch_info {
+                        match info.status {
+                            BatchStatus::Invalid(invalid_txns) => match expected_result {
+                                Some(ExpectedBatchResult::Valid) => {
+                                    return Err(WorkloadRunnerError::SubmitError(format!(
+                                        "Expected valid result, received invalid {:?}",
+                                        invalid_txns
+                                    )));
+                                }
+                                Some(ExpectedBatchResult::Invalid) => {
+                                    status_links.remove(&status_link);
+                                }
+                                // If the expected result is not set there is nothing to be done
+                                // for the batch
+                                None => (),
+                            },
+                            // If the transactions have been successfully applied and returned
+                            // a `BatchStatus::Valid` or `BatchStatus::Committed` response, remove
+                            // the status link from the list
+                            BatchStatus::Valid(valid_txns) | BatchStatus::Committed(valid_txns) => {
+                                match expected_result {
+                                    Some(ExpectedBatchResult::Valid) => {
+                                        status_links.remove(&status_link);
+                                    }
+                                    Some(ExpectedBatchResult::Invalid) => {
+                                        return Err(WorkloadRunnerError::SubmitError(format!(
+                                            "expected invalid result, received valid {:?}",
+                                            valid_txns
+                                        )));
+                                    }
+                                    // If the expected result is not set there is nothing to be done
+                                    // for the batch
+                                    None => (),
+                                }
+                            }
+                            // If the status is pending or unknown leave it in the list to be
+                            // checked again later and skip to the next batch
+                            BatchStatus::Pending | BatchStatus::Unknown => (),
+                        }
+                    }
+                    Ok(())
+                } else {
+                    let message = res
+                        .json::<ServerError>()
+                        .map_err(|_| {
+                            WorkloadRunnerError::SubmitError(format!(
+                                "Batch status request failed with status code '{}', but \
+                                    error response was not valid",
+                                status
+                            ))
+                        })?
+                        .message;
+
+                    Err(WorkloadRunnerError::SubmitError(format!(
+                        "Failed to get submitted batch status: {}",
+                        message
+                    )))
+                }
+            })?;
+    }
+    Ok(status_links)
+}
+
+/// Takes the original target URL and a batch status link and removes the overlapping portion of the
+/// target URL that is also given in the status link so that the two can be combined to create the
+/// full URL that can be used to check the status of the associated batch
+///
+/// For example, if the target is 'http://127.0.0.1:8080/service/12345-ABCDE/a000' and the
+/// status_link is '/service/12345-ABCDE/a000/batch_statuses?ids=6ff35474a572087e08fd6a54d56' the
+/// then the duplicate '/service/12345-ABCDE/a000' will be removed from the target making it
+/// 'http://127.0.0.1:8080' so that it can be combined with the status link to create the full URL
+/// that can be queried to get the batch status,
+/// 'http://127.0.0.1:8080/service/12345-ABCDE/a000/batch_statuses?ids=6ff35474a572087e08fd6a54d56'
+fn get_batch_status_url(mut target: String, status_link: &str) -> String {
+    let status_link_parts = status_link.splitn(5, '/');
+    for p in status_link_parts {
+        if !p.is_empty() && target.contains(format!("/{}", p).as_str()) {
+            target = target.replacen(format!("/{}", p).as_str(), "", 1);
+        }
+    }
+    format!("{}{}", target, status_link)
+}
+
 /// Used for deserializing `POST /batches` responses.
 #[derive(Debug, Deserialize)]
 pub struct Link {
     link: String,
+}
+
+/// Used for deserializing `GET /batch_status` responses.
+#[derive(Debug, Deserialize)]
+struct BatchInfo {
+    pub id: String,
+    pub status: BatchStatus,
+    pub timestamp: SystemTime,
+}
+
+/// Used by `BatchInfo` for deserializing `GET /batch_status` responses.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "statusType", content = "message")]
+enum BatchStatus {
+    Unknown,
+    Pending,
+    Invalid(Vec<InvalidTransaction>),
+    Valid(Vec<ValidTransaction>),
+    Committed(Vec<ValidTransaction>),
+}
+
+/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+#[derive(Debug, Deserialize)]
+struct ValidTransaction {
+    pub transaction_id: String,
+}
+
+/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+#[derive(Debug, Deserialize)]
+struct InvalidTransaction {
+    pub transaction_id: String,
+    pub error_message: String,
+    pub error_data: Vec<u8>,
 }
 
 /// Counts sent and queue full for Batches submmissions from the target REST Api.
