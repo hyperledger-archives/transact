@@ -99,6 +99,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                   p.children,
                   '$[' || json_extract(?, '$[' || p.depth || ']') || ']'
                 )
+                AND c.tree_id = ?
             )
             SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
@@ -112,6 +113,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
             serde_json::to_string(&address_bytes)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?,
         )
+        .bind::<BigInt, _>(tree_id)
         .bind::<BigInt, _>(tree_id)
         .load::<SqliteExtendedMerkleRadixTreeNode>(self.conn)
         .map_err(|err| InternalError::from_source(Box::new(err)))?;
@@ -169,6 +171,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p
                 WHERE c.hash = p.children[$3[p.depth]]
+                AND c.tree_id = $2
             )
             SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
