@@ -49,6 +49,12 @@ fn merkle_trie_delete() {
 }
 
 #[test]
+fn merkle_trie_multithread_read() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_multithread_read(orig_root, state);
+}
+
+#[test]
 fn merkle_trie_update() {
     let (state, orig_root) = new_btree_state_and_root();
     test_merkle_trie_update(orig_root, state);

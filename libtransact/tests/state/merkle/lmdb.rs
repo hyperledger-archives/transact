@@ -67,6 +67,14 @@ fn merkle_trie_delete() {
 }
 
 #[test]
+fn merkle_trie_multithread_read() {
+    run_test(|merkle_path| {
+        let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
+        test_merkle_trie_multithread_read(orig_root, state);
+    })
+}
+
+#[test]
 fn merkle_trie_update_multiple_entries() {
     run_test(|merkle_path| {
         let (state, orig_root) = new_lmdb_state_and_root(merkle_path);
