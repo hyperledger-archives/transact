@@ -328,6 +328,12 @@ impl SqliteCustomizer {
 
         if let Some(journal_mode) = journal_mode {
             on_connect_sql += &format!("PRAGMA journal_mode={};", journal_mode);
+            if matches!(journal_mode, JournalMode::Wal) {
+                on_connect_sql += r#"
+                    PRAGMA wal_checkpoint(truncate);
+                    PRAGMA busy_timeout = 2000;
+                    "#;
+            }
         }
 
         if let Some(synchronous) = synchronous {
