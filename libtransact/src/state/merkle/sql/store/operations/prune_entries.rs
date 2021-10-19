@@ -43,7 +43,7 @@ pub trait MerkleRadixPruneEntriesOperation {
 #[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
-        self.conn.transaction(|| {
+        self.conn.immediate_transaction(|| {
             let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
 
             // Remove the change logs for this root

@@ -67,7 +67,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
         parent_state_root: &str,
         update: &TreeUpdate,
     ) -> Result<(), InternalError> {
-        self.conn.transaction::<_, InternalError, _>(|| {
+        self.conn.immediate_transaction::<_, InternalError, _>(|| {
             // We manually increment the id, so we don't have to insert one at a time and fetch
             // back the resulting id.
             let initial_id: i64 = merkle_radix_leaf::table
