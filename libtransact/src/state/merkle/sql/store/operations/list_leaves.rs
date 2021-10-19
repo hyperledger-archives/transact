@@ -66,6 +66,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, SqliteConn
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p, json_each(p.children)
                 WHERE c.hash = json_each.value
+                AND c.tree_id = ?
             )
             SELECT l.address, l.data
             FROM tree_path t, merkle_radix_leaf l
@@ -74,6 +75,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, SqliteConn
             "#,
         )
         .bind::<VarChar, _>(state_root_hash)
+        .bind::<BigInt, _>(tree_id)
         .bind::<BigInt, _>(tree_id)
         .bind::<BigInt, _>(tree_id)
         .bind::<VarChar, _>(format!("{}%", prefix.unwrap_or("")))
@@ -110,6 +112,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, PgConnecti
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p
                 WHERE c.hash = ANY(p.children)
+                AND c.tree_id = $1
             )
             SELECT l.address, l.data
             FROM tree_path t, merkle_radix_leaf l
