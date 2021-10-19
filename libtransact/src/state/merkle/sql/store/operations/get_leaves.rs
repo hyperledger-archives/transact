@@ -65,6 +65,7 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, SqliteConne
                           p.children,
                           '$[' || json_extract(?, '$[' || p.depth || ']') || ']'
                         )
+                        AND c.tree_id = ?
                     )
                     SELECT l.data
                     FROM tree_path t, merkle_radix_leaf l
@@ -77,6 +78,7 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, SqliteConne
                     serde_json::to_string(&address_bytes)
                         .map_err(|err| InternalError::from_source(Box::new(err)))?,
                 )
+                .bind::<BigInt, _>(tree_id)
                 .bind::<BigInt, _>(tree_id)
                 .load::<LeafData>(self.conn)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
@@ -125,6 +127,7 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, PgConnectio
                         SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                         FROM merkle_radix_tree_node c, tree_path p
                         WHERE c.hash = p.children[$3[p.depth]]
+                        AND c.tree_id = $2
                     )
                     SELECT l.data
                     FROM tree_path t, merkle_radix_leaf l
