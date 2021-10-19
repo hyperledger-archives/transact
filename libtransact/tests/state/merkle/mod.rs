@@ -148,6 +148,57 @@ where
     assert_read_value_at_address(&merkle_state, &del_root, "1234", None);
 }
 
+/// Given a cloneable MerkleState and an initial root:
+/// 1. Set a value at an address
+/// 2. Spawn N threads and pass a clone of the state to each
+/// 3. In each thread, perform M reads and writes
+/// 4. In each thread, validate that you can still read the original value
+fn test_merkle_trie_multithread_read<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>
+        + Clone
+        + 'static,
+{
+    let state_change_set = StateChange::Set {
+        key: "1234".to_string(),
+        value: "value".as_bytes().to_vec(),
+    };
+
+    let new_root = merkle_state
+        .commit(&initial_state_root, &[state_change_set])
+        .unwrap();
+
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    let thread_count = 10;
+    for t in 0..thread_count {
+        let merkle_state_t1 = merkle_state.clone();
+        let signaller = tx.clone();
+        let mut root = new_root.clone();
+        std::thread::Builder::new()
+            .name(format!("merkle_trie_multithread_read-{}", t))
+            .spawn(move || {
+                for i in 0..10 {
+                    assert_read_value_at_address(&merkle_state_t1, &root, "1234", Some("value"));
+
+                    let state_change_set = StateChange::Set {
+                        key: format!("1234a{}", t),
+                        value: format!("{}::{}", t, i).as_bytes().to_vec(),
+                    };
+
+                    root = merkle_state_t1.commit(&root, &[state_change_set]).unwrap();
+                }
+
+                signaller.send(()).unwrap();
+            })
+            .unwrap();
+    }
+    drop(tx);
+
+    assert_eq!(rx.iter().count(), thread_count);
+}
+
 fn test_merkle_trie_update<M>(initial_state_root: String, merkle_state: M)
 where
     M: Read<StateId = String, Key = String, Value = Vec<u8>>
