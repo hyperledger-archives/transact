@@ -221,7 +221,7 @@ mod tests {
 
         insert_into(merkle_radix_leaf::table)
             .values(NewMerkleRadixLeaf {
-                id: 1,
+                id: Some(1),
                 tree_id: 1,
                 address: "000000",
                 data: b"hello",
@@ -278,7 +278,7 @@ mod tests {
             let leaf_id = 1;
             insert_into(merkle_radix_leaf::table)
                 .values(NewMerkleRadixLeaf {
-                    id: leaf_id,
+                    id: Some(leaf_id),
                     tree_id: 1,
                     address: "000000",
                     data: b"hello",
