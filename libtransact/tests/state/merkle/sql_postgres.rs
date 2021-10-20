@@ -43,6 +43,15 @@ fn merkle_trie_delete() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn merkle_trie_multithread_read() -> Result<(), Box<dyn Error>> {
+    run_postgres_test(|db_url| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_url)?;
+        test_merkle_trie_multithread_read(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
 fn merkle_trie_update() -> Result<(), Box<dyn Error>> {
     run_postgres_test(|db_url| {
         let (state, orig_root) = new_sql_merkle_state_and_root(db_url)?;

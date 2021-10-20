@@ -61,6 +61,14 @@ fn merkle_trie_delete() {
     })
 }
 
+#[test]
+fn merkle_trie_multithread_read() {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sqlite_state_and_root(db_path);
+        test_merkle_trie_multithread_read(orig_root, state);
+    })
+}
+
 /// Atomic Commit/Rollback is the default journal model.
 #[test]
 fn merkle_trie_update_atomic_commit_rollback() {
