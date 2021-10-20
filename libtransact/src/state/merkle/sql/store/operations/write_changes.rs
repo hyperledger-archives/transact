@@ -24,10 +24,10 @@ use diesel::prelude::*;
 
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-#[cfg(feature = "postgres")]
-use crate::state::merkle::sql::store::models::postgres;
 #[cfg(feature = "sqlite")]
 use crate::state::merkle::sql::store::models::sqlite;
+#[cfg(feature = "postgres")]
+use crate::state::merkle::sql::store::models::{postgres, MerkleRadixLeaf};
 use crate::state::merkle::sql::store::models::{
     NewMerkleRadixChangeLogAddition, NewMerkleRadixChangeLogDeletion, NewMerkleRadixLeaf,
 };
@@ -91,9 +91,9 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
                 .filter_map(|(i, insertable_node)| {
                     insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
-                            id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
+                            id: Some(initial_id.checked_add(1 + i as i64).ok_or_else(|| {
                                 InternalError::with_message("exceeded id space".into())
-                            })?,
+                            })?),
                             tree_id,
                             address: insertable_node.address,
                             data,
@@ -104,7 +104,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
 
             let leaf_ids: HashMap<&str, i64> = leaves
                 .iter()
-                .map(|new_leaf| (new_leaf.address, new_leaf.id))
+                .filter_map(|new_leaf| new_leaf.id.map(|id| (new_leaf.address, id)))
                 .collect();
 
             insert_into(merkle_radix_leaf::table)
@@ -194,13 +194,6 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
         update: &TreeUpdate,
     ) -> Result<(), InternalError> {
         self.conn.transaction::<_, InternalError, _>(|| {
-            // We manually increment the id, so we don't have to insert one at a time and fetch
-            // back the resulting id.
-            let initial_id: i64 = merkle_radix_leaf::table
-                .select(max(merkle_radix_leaf::id))
-                .first::<Option<i64>>(self.conn)?
-                .unwrap_or(0);
-
             let nodes = update
                 .node_changes
                 .iter()
@@ -213,13 +206,10 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
 
             let leaves = nodes
                 .iter()
-                .enumerate()
-                .filter_map(|(i, insertable_node)| {
+                .filter_map(|insertable_node| {
                     insertable_node.node.value.as_deref().map(|data| {
                         Ok(NewMerkleRadixLeaf {
-                            id: initial_id.checked_add(1 + i as i64).ok_or_else(|| {
-                                InternalError::with_message("exceeded id space".into())
-                            })?,
+                            id: None,
                             tree_id,
                             address: insertable_node.address,
                             data,
@@ -228,14 +218,14 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
                 })
                 .collect::<Result<Vec<NewMerkleRadixLeaf>, InternalError>>()?;
 
-            let leaf_ids: HashMap<&str, i64> = leaves
-                .iter()
-                .map(|new_leaf| (new_leaf.address, new_leaf.id))
-                .collect();
-
-            insert_into(merkle_radix_leaf::table)
+            let inserted: Vec<MerkleRadixLeaf> = insert_into(merkle_radix_leaf::table)
                 .values(leaves)
-                .execute(self.conn)?;
+                .get_results(self.conn)?;
+
+            let leaf_ids: HashMap<&str, i64> = inserted
+                .iter()
+                .map(|new_leaf| (&*new_leaf.address, new_leaf.id))
+                .collect();
 
             let node_models: Vec<postgres::MerkleRadixTreeNode> = nodes
                 .iter()
