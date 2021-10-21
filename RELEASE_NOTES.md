@@ -1,5 +1,24 @@
 # Release Notes
 
+## Changes in Transact 0.3.12
+
+### libtransact updates
+
+* Limit query recursion to single tree. This fixes an issue where queries in
+  a database with trees with identical structure would cause an infinite loop
+  in SQLite.
+
+* Use SQLite immediate transactions. This improves multi-threaded support.
+
+* Update SQLite PRAGMA for the WAL journal mode. This improves multi-threaded
+  support.
+
+* Remove manual ID sequences for Postgres. This improves multi-thread support.
+
+* Update defaults for SQLite "synchronous" PRAGMA. This changes the default
+  "synchronous" PRAGMA setting to explicitly be "Normal" or "Full", if the WAL
+  journal mode is enabled.
+
 ## Changes in Transact 0.3.11
 
 ### Highlights
