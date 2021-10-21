@@ -133,7 +133,7 @@ impl<'a> TransactionContext for SabreContext<'a> {
     /// # Arguments
     ///
     /// * `event_type` -  This is used to subscribe to events. It should be globally unique and
-    ///         describe what, in general, has occured.
+    ///         describe what, in general, has occurred.
     /// * `attributes` - Additional information about the event that is transparent to the
     ///          validator. Attributes can be used by subscribers to filter the type of events
     ///          they receive.
