@@ -1022,7 +1022,7 @@ fn parse_hex(hex: &str) -> Result<Vec<u8>, AddressingError> {
     Ok(res)
 }
 
-// Compute a state address for a given namespace registry.
+/// Compute a state address for a given namespace registry.
 ///
 /// # Arguments
 ///
