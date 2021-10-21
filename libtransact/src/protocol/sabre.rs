@@ -120,7 +120,7 @@ impl std::fmt::Display for ActionBuildError {
     }
 }
 
-/// Native implementation for CreateContractAction
+/// Creates a contract and updates the associated contract registry
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateContractAction {
     name: String,
@@ -264,7 +264,7 @@ impl CreateContractActionBuilder {
     }
 }
 
-/// Native implementation for ExecuteContractAction
+/// Executes the contract
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct ExecuteContractAction {
     name: String,
@@ -432,7 +432,7 @@ impl ExecuteContractActionBuilder {
     }
 }
 
-/// Native implementation for CreateContractRegistryAction
+/// Create a contract registry with no version
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateContractRegistryAction {
     name: String,
@@ -522,7 +522,7 @@ impl CreateContractRegistryActionBuilder {
     }
 }
 
-/// Native implementation for CreateNamespaceRegistryAction
+/// Creates a namespace registry with no permissions
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateNamespaceRegistryAction {
     namespace: String,
@@ -612,7 +612,7 @@ impl CreateNamespaceRegistryActionBuilder {
     }
 }
 
-/// Native implementation for CreateNamespaceRegistryPermissionAction
+/// Adds a permission entry into a namespace registry for the associated namespace
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct CreateNamespaceRegistryPermissionAction {
     namespace: String,
@@ -748,7 +748,7 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
     }
 }
 
-/// Native implementation for SabrePayload
+/// Contains the sabre action that should be executed
 #[derive(Debug, Clone, PartialEq)]
 pub struct SabrePayload {
     action: Action,
