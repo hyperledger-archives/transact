@@ -355,7 +355,7 @@ impl IntoBytes for ExecuteContractAction {
 impl IntoProto<protos::sabre::ExecuteContractAction> for ExecuteContractAction {}
 impl IntoNative<ExecuteContractAction> for protos::sabre::ExecuteContractAction {}
 
-/// Builder used to create a ExecuteContractAction
+/// Builder used to create an ExecuteContractAction
 #[derive(Default, Clone)]
 pub struct ExecuteContractActionBuilder {
     name: Option<String>,
@@ -682,7 +682,7 @@ impl IntoNative<CreateNamespaceRegistryPermissionAction>
 {
 }
 
-/// Builder used to create CreateNamespaceRegistryPermissionAction
+/// Builder used to create a CreateNamespaceRegistryPermissionAction
 #[derive(Default, Clone)]
 pub struct CreateNamespaceRegistryPermissionActionBuilder {
     namespace: Option<String>,
@@ -884,7 +884,7 @@ impl From<AddressingError> for SabrePayloadBuildError {
     }
 }
 
-/// Builder used to create SabrePayload
+/// Builder used to create a SabrePayload
 #[derive(Default, Clone)]
 pub struct SabrePayloadBuilder {
     action: Option<Action>,
