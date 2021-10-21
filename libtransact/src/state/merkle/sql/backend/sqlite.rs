@@ -234,12 +234,18 @@ impl SqliteBackendBuilder {
 
     /// Modify the "journal mode" setting for the SQLite connection.
     ///
+    /// Note, if the journal mode is set to WALL, the default Synchronous mode is upgraded to Full.
+    /// This provides complete durability for this mode.
+    ///
     /// See the [pragma journal_mode
     /// documentation](https://sqlite.org/pragma.html#pragma_journal_mode) for more information.
     ///
     /// If unchanged, the default value is left to underlying SQLite installation.
     pub fn with_journal_mode(mut self, journal_mode: JournalMode) -> Self {
         self.journal_mode = Some(journal_mode);
+        if matches!(&self.journal_mode, &Some(JournalMode::Wal)) {
+            self.synchronous = Some(Synchronous::Full);
+        }
         self
     }
 
@@ -272,7 +278,7 @@ impl SqliteBackendBuilder {
 
         let mmap_size = self.memory_map_size;
         let journal_mode_opt = self.journal_mode;
-        let synchronous_opt = self.synchronous;
+        let synchronous_opt = self.synchronous.or(Some(Synchronous::Normal));
 
         if !self.create && (path != ":memory:") && !std::path::Path::new(&path).exists() {
             return Err(InvalidStateError::with_message(format!(
@@ -328,6 +334,12 @@ impl SqliteCustomizer {
 
         if let Some(journal_mode) = journal_mode {
             on_connect_sql += &format!("PRAGMA journal_mode={};", journal_mode);
+            if matches!(journal_mode, JournalMode::Wal) {
+                on_connect_sql += r#"
+                    PRAGMA wal_checkpoint(truncate);
+                    PRAGMA busy_timeout = 2000;
+                    "#;
+            }
         }
 
         if let Some(synchronous) = synchronous {

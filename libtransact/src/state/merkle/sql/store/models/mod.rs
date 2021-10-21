@@ -53,7 +53,7 @@ pub struct MerkleRadixLeaf {
 #[cfg_attr(test, derive(Debug, PartialEq))]
 #[table_name = "merkle_radix_leaf"]
 pub struct NewMerkleRadixLeaf<'a> {
-    pub id: i64,
+    pub id: Option<i64>,
     pub tree_id: i64,
     pub address: &'a str,
     pub data: &'a [u8],
