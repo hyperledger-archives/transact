@@ -122,7 +122,7 @@ impl<'a> TransactionContext for SabreContext<'a> {
     ///
     /// * `data` - the data to add
     ///
-    /// This is not currently supported `sabre_sdk::TransactionContext` so it is
+    /// This is not currently supported by `sabre_sdk::TransactionContext` so it is
     /// left unimplemented.
     fn add_receipt_data(&self, _data: Vec<u8>) -> Result<(), ContextError> {
         unimplemented!()
