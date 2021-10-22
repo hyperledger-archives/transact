@@ -19,6 +19,7 @@ use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 use crate::state::merkle::sql::backend::{self, Backend, Connection};
 
+use super::operations::delete_tree::MerkleRadixDeleteTreeOperation as _;
 use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
 use super::operations::get_or_create_tree::MerkleRadixGetOrCreateTreeOperation as _;
 use super::operations::get_path::MerkleRadixGetPathOperation as _;
@@ -46,6 +47,14 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         let operations = MerkleRadixOperations::new(conn.as_inner());
         operations.get_tree_id_by_name(tree_name)
     }
+
+    fn delete_tree(&self, tree_id: i64) -> Result<(), InternalError> {
+        let conn = self.backend.connection()?;
+
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.delete_tree(tree_id)
+    }
+
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         let conn = self.backend.connection()?;
 
