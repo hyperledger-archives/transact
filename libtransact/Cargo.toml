@@ -119,7 +119,7 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
-    "protocol-sabre-exec",
+    "protocol-sabre",
     "workload",
     "workload-batch-gen",
     "workload-runner"
@@ -157,14 +157,14 @@ family-command = ["handler"]
 family-command-workload = [
     "cylinder",
     "family-command",
-    "protocol-sabre-exec",
+    "protocol-sabre",
     "protocol-transaction-builder",
     "workload",
 ]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
     "family-smallbank",
-    "protocol-sabre-exec",
+    "protocol-sabre",
     "yaml-rust",
     "workload",
     "workload-runner"
@@ -177,7 +177,7 @@ protocol-batch = ["protocol-transaction"]
 protocol-batch-builder = ["cylinder", "protocol-batch"]
 protocol-transaction = []
 protocol-transaction-builder = ["cylinder", "protocol-transaction", "protocol-batch-builder"]
-protocol-sabre-exec = []
+protocol-sabre = []
 sabre-compat = ["sabre-sdk"]
 sawtooth-compat = ["sawtooth-sdk"]
 scheduler = ["context", "log", "protocol-batch"]

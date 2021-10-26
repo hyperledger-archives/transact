@@ -748,7 +748,7 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
     }
 }
 
-/// Contains the sabre action that should be executed
+/// Contains the sabre action that will be executed
 #[derive(Debug, Clone, PartialEq)]
 pub struct SabrePayload {
     action: Action,
