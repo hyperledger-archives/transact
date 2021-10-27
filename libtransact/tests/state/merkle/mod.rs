@@ -15,8 +15,6 @@
 mod btree;
 #[cfg(feature = "database-lmdb")]
 mod lmdb;
-#[cfg(feature = "state-merkle-redis-db-tests")]
-mod redisdb;
 #[cfg(feature = "state-merkle-sql-postgres-tests")]
 mod sql_postgres;
 #[cfg(all(feature = "state-merkle-sql", feature = "sqlite"))]
