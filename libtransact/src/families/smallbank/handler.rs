@@ -45,7 +45,7 @@ impl SmallbankTransactionHandler {
     pub fn new() -> SmallbankTransactionHandler {
         SmallbankTransactionHandler {
             family_name: SMALLBANK_FAMILY_NAME.to_string(),
-            family_versions: vec!["1.0".to_string()],
+            family_versions: vec!["1".to_string(), "1.0".to_string()],
             namespaces: vec![get_smallbank_prefix()],
         }
     }
