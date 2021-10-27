@@ -29,7 +29,7 @@ flexi_logger = "0.14"
 log = "0.4"
 protobuf = { version = "2.19" }
 sawtooth-sabre = "0.7"
-transact = { path = "../../libtransact", features=["execution", "family-command-workload", "sawtooth-compat", "workload", "protocol-sabre-exec"]}
+transact = { path = "../../libtransact", features=["execution", "family-command-workload", "sawtooth-compat", "workload", "protocol-sabre"]}
 
 
 [features]

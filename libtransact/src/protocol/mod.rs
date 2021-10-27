@@ -26,7 +26,7 @@ pub mod command;
 #[cfg(feature = "key-value-state")]
 pub mod key_value_state;
 pub mod receipt;
-#[cfg(feature = "protocol-sabre-exec")]
+#[cfg(feature = "protocol-sabre")]
 pub mod sabre;
 #[cfg(feature = "protocol-transaction")]
 pub mod transaction;
