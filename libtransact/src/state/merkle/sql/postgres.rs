@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 
-use crate::error::InvalidStateError;
+use crate::error::{InternalError, InvalidStateError};
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{
     Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, Write,
@@ -63,6 +63,18 @@ impl SqlMerkleStateBuilder<backend::PostgresBackend> {
         };
 
         Ok(SqlMerkleState { backend, tree_id })
+    }
+}
+
+impl SqlMerkleState<backend::PostgresBackend> {
+    /// Deletes the complete tree
+    ///
+    /// After calling this method, no data associated with the tree name will remain in the
+    /// database.
+    pub fn delete_tree(self) -> Result<(), InternalError> {
+        let store = SqlMerkleRadixStore::new(&self.backend);
+        store.delete_tree(self.tree_id)?;
+        Ok(())
     }
 }
 
@@ -241,6 +253,56 @@ mod test {
                 .with_tree("test-1")
                 .build()
                 .is_err());
+
+            Ok(())
+        })
+    }
+
+    /// This test creates state on a given  tree, adds some state, verifies that it can be read
+    /// back with a new state instance on that same tree.  It then deletes the tree, and verifies
+    /// that the tree no longer exists.
+    #[test]
+    fn test_delete_tree() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|db_url| {
+            let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
+            let state = SqlMerkleStateBuilder::new()
+                .with_backend(backend.clone())
+                .with_tree("test-1")
+                .create_tree_if_necessary()
+                .build()?;
+
+            let initial_state_root_hash = state.initial_state_root_hash()?;
+
+            let state_change_set = StateChange::Set {
+                key: "1234".to_string(),
+                value: "state_value".as_bytes().to_vec(),
+            };
+
+            let new_root = state.commit(&initial_state_root_hash, &[state_change_set])?;
+
+            assert_read_value_at_address(&state, &new_root, "1234", Some("state_value"));
+            drop(state);
+
+            // re-use the same tree, but fail if it doesn't exist.
+            let state = SqlMerkleStateBuilder::new()
+                .with_backend(backend.clone())
+                .with_tree("test-1")
+                .build()?;
+
+            assert_read_value_at_address(&state, &new_root, "1234", Some("state_value"));
+
+            state.delete_tree()?;
+
+            // verify it doesn't exist bu not creating the tree if it doesn't exist. That is, the
+            // build will fail in this case.
+            assert!(
+                SqlMerkleStateBuilder::new()
+                    .with_backend(backend)
+                    .with_tree("test-1")
+                    .build()
+                    .is_err(),
+                "The tree should no longer exist"
+            );
 
             Ok(())
         })
