@@ -208,7 +208,7 @@ fn run() -> Result<(), SabreCommandExecutorError> {
     // transactions have been submitted
     while submitted_transactions < num_transactions {
         // Get a batch from the command workload
-        let next_batch = command_workload.next_batch().map_err(|err| {
+        let (next_batch, _) = command_workload.next_batch().map_err(|err| {
             SabreCommandExecutorError::Internal(format!(
                 "Unable to get command transaction batch: {}",
                 err

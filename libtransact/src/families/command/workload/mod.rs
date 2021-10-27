@@ -26,7 +26,9 @@ use crate::protocol::{
     transaction::{HashMethod, TransactionBuilder, TransactionPair},
 };
 use crate::protos::{FromProto, IntoBytes};
-use crate::workload::{error::WorkloadError, BatchWorkload, TransactionWorkload};
+use crate::workload::{
+    error::WorkloadError, BatchWorkload, ExpectedBatchResult, TransactionWorkload,
+};
 
 use self::playlist::CommandGeneratingIter;
 
@@ -42,7 +44,9 @@ impl CommandTransactionWorkload {
 }
 
 impl TransactionWorkload for CommandTransactionWorkload {
-    fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError> {
+    fn next_transaction(
+        &mut self,
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
         let (command_proto, address) = self
             .generator
             .next()
@@ -57,6 +61,11 @@ impl TransactionWorkload for CommandTransactionWorkload {
         let payload_bytes = command_payload
             .into_bytes()
             .expect("Unable to get bytes from Command Payload");
+
+        let expected_batch_result = match &command {
+            Command::ReturnInvalid(_) => Some(ExpectedBatchResult::Invalid),
+            _ => Some(ExpectedBatchResult::Valid),
+        };
 
         let addresses = match command {
             Command::SetState(set_state) => set_state
@@ -91,7 +100,7 @@ impl TransactionWorkload for CommandTransactionWorkload {
             })?
             .build_pair(&*self.signer)?;
 
-        Ok(txn)
+        Ok((txn, expected_batch_result))
     }
 }
 
@@ -110,10 +119,14 @@ impl CommandBatchWorkload {
 }
 
 impl BatchWorkload for CommandBatchWorkload {
-    fn next_batch(&mut self) -> Result<BatchPair, WorkloadError> {
-        Ok(BatchBuilder::new()
-            .with_transactions(vec![self.transaction_workload.next_transaction()?.take().0])
-            .build_pair(&*self.signer)?)
+    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+        let (txn, result) = self.transaction_workload.next_transaction()?;
+        Ok((
+            BatchBuilder::new()
+                .with_transactions(vec![txn.take().0])
+                .build_pair(&*self.signer)?,
+            result,
+        ))
     }
 }
 

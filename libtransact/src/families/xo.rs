@@ -5,6 +5,7 @@ use crate::protocol::transaction::TransactionBuilder;
 use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 use crate::workload::BatchWorkload;
+use crate::workload::ExpectedBatchResult;
 use crate::workload::TransactionWorkload;
 
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
@@ -41,7 +42,9 @@ impl XoTransactionWorkload {
 }
 
 impl TransactionWorkload for XoTransactionWorkload {
-    fn next_transaction(&mut self) -> Result<TransactionPair, WorkloadError> {
+    fn next_transaction(
+        &mut self,
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
         let nonce = self
             .rng
             .sample_iter(&Alphanumeric)
@@ -51,15 +54,18 @@ impl TransactionWorkload for XoTransactionWorkload {
 
         let payload = Payload::new_as_create_with_random_name(&mut self.rng);
 
-        Ok(TransactionBuilder::new()
-            .with_family_name(FAMILY_NAME.to_string())
-            .with_family_version(FAMILY_VERSION.to_string())
-            .with_inputs(payload.inputs())
-            .with_outputs(payload.outputs())
-            .with_nonce(nonce)
-            .with_payload(payload.bytes())
-            .with_payload_hash_method(HashMethod::Sha512)
-            .build_pair(&*self.signer)?)
+        Ok((
+            TransactionBuilder::new()
+                .with_family_name(FAMILY_NAME.to_string())
+                .with_family_version(FAMILY_VERSION.to_string())
+                .with_inputs(payload.inputs())
+                .with_outputs(payload.outputs())
+                .with_nonce(nonce)
+                .with_payload(payload.bytes())
+                .with_payload_hash_method(HashMethod::Sha512)
+                .build_pair(&*self.signer)?,
+            None,
+        ))
     }
 }
 
@@ -85,10 +91,14 @@ impl XoBatchWorkload {
 }
 
 impl BatchWorkload for XoBatchWorkload {
-    fn next_batch(&mut self) -> Result<BatchPair, WorkloadError> {
-        Ok(BatchBuilder::new()
-            .with_transactions(vec![self.transaction_workload.next_transaction()?.take().0])
-            .build_pair(&*self.signer)?)
+    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+        let (txn, result) = self.transaction_workload.next_transaction()?;
+        Ok((
+            BatchBuilder::new()
+                .with_transactions(vec![txn.take().0])
+                .build_pair(&*self.signer)?,
+            result,
+        ))
     }
 }
 
