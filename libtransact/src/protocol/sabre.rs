@@ -28,16 +28,9 @@ use crate::protos::{
 
 pub const SABRE_PROTOCOL_VERSION: &str = "1";
 
-pub const ADMINISTRATORS_SETTING_KEY: &str = "sawtooth.swa.administrators";
-
-pub const ADMINISTRATORS_SETTING_ADDRESS: &str =
-    "000000a87cb5eafdcca6a814e4add97c4b517d3c530c2f44b31d18e3b0c44298fc1c14";
 pub const NAMESPACE_REGISTRY_ADDRESS_PREFIX: &str = "00ec00";
 pub const CONTRACT_REGISTRY_ADDRESS_PREFIX: &str = "00ec01";
 pub const CONTRACT_ADDRESS_PREFIX: &str = "00ec02";
-pub const SMART_PERMISSION_ADDRESS_PREFIX: &str = "00ec03";
-pub const AGENT_ADDRESS_PREFIX: &str = "cad11d00";
-pub const ORG_ADDRESS_PREFIX: &str = "cad11d01";
 
 pub const ADMINISTRATORS_SETTING_ADDRESS_BYTES: &[u8] = &[
     0, 0, 0, 168, 124, 181, 234, 253, 204, 166, 168, 20, 228, 173, 217, 124, 75, 81, 125, 60, 83,
@@ -47,9 +40,6 @@ pub const ADMINISTRATORS_SETTING_ADDRESS_BYTES: &[u8] = &[
 pub const NAMESPACE_REGISTRY_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 0];
 pub const CONTRACT_REGISTRY_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 1];
 pub const CONTRACT_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 2];
-pub const SMART_PERMISSION_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 3];
-pub const AGENT_ADDRESS_PREFIX_BYTES: &[u8] = &[202, 209, 29, 0];
-pub const ORG_ADDRESS_PREFIX_BYTES: &[u8] = &[202, 209, 29, 1];
 
 /// Native implementation for SabrePayload_Action
 #[derive(Debug, Clone, PartialEq)]
@@ -1061,46 +1051,6 @@ pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, Ad
     let s = String::from(name) + "," + version;
     let hash = sha512_hash(s.as_bytes());
     Ok([CONTRACT_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
-}
-
-/// Compute a state address for a given smart permission.
-///
-/// # Arguments
-///
-/// * `org_id` - the organization's id
-/// * `name` - smart permission name
-pub fn compute_smart_permission_address(
-    org_id: &str,
-    name: &str,
-) -> Result<Vec<u8>, AddressingError> {
-    let org_id_hash = sha512_hash(org_id.as_bytes());
-    let name_hash = sha512_hash(name.as_bytes());
-    Ok([
-        SMART_PERMISSION_ADDRESS_PREFIX_BYTES,
-        &org_id_hash[..3],
-        &name_hash[..29],
-    ]
-    .concat())
-}
-
-/// Compute a state address for a given agent name.
-///
-/// # Arguments
-///
-/// * `name` - the agent's name
-pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
-    let hash = sha512_hash(name);
-    Ok([AGENT_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
-}
-
-/// Compute a state address for a given organization id.
-///
-/// # Arguments
-///
-/// * `id` - the organization's id
-pub fn compute_org_address(id: &str) -> Result<Vec<u8>, AddressingError> {
-    let hash = sha512_hash(id.as_bytes());
-    Ok([ORG_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
 }
 
 fn sha512_hash(bytes: &[u8]) -> Vec<u8> {
