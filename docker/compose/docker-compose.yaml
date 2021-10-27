@@ -13,14 +13,8 @@ services:
     volumes:
       - ../..:/project/transact
     environment:
-        REDIS_URL: redis://redis:6379
         TEST_MODE: --verbose --release
         STATE_MERKLE_SQL_POSTGRES_TEST_URL: postgres://postgres:test@postgres-db:5432/transact
-
-  redis:
-    image: redis
-    expose:
-      - 6379
 
   postgres-db:
     image: postgres

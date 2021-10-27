@@ -33,8 +33,6 @@ pub mod btree;
 pub mod error;
 #[cfg(feature = "database-lmdb")]
 pub mod lmdb;
-#[cfg(feature = "database-redis")]
-pub mod redis;
 #[cfg(feature = "database-sqlite")]
 pub mod sqlite;
 

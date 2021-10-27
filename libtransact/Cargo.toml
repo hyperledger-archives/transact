@@ -45,7 +45,6 @@ r2d2 = { version = "0.8", optional = true }
 r2d2_sqlite = { version = "0.18", optional = true }
 rand = "0.6"
 rand_hc = { version = "0.1", optional = true }
-redis = { version = "0.20", default-features = false, optional = true }
 reqwest = { version = "0.11", features = ["blocking", "json"], optional = true}
 sabre-sdk = { version ="0.7.1", optional = true }
 sawtooth-sdk = { version = "0.5", optional = true }
@@ -111,7 +110,6 @@ experimental = [
     "contract-context",
     "contract-context-key-value",
     "database-lmdb",
-    "database-redis",
     "database-sqlite",
     "family-command",
     "family-command-workload",
@@ -149,7 +147,6 @@ contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_deriv
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 database-lmdb = ["lmdb-zero"]
-database-redis = ["redis"]
 database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
@@ -187,9 +184,6 @@ state-merkle-sql = ["diesel", "diesel_migrations"]
 # enabled by default, due to its requirement of an external postgres db
 # instance.
 state-merkle-sql-postgres-tests = ["postgres", "lazy_static"]
-# This feature must be enabled to run the merkle tests using a redis db.  It is
-# not enabled by default, due to its requirement of an external redis instance.
-state-merkle-redis-db-tests = ["database-redis", "state-merkle"]
 workload = []
 workload-batch-gen = ["workload"]
 workload-runner = [
