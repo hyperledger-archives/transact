@@ -34,7 +34,7 @@ use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 use super::ExpectedBatchResult;
 
-pub const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
+const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// This type maps the status link used to check the result of the batch after it has been submitted
 /// to the target URL that a batch was submitted to and the result that was expected of the batch
