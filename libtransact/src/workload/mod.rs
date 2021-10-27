@@ -19,7 +19,7 @@
 pub mod batch_gen;
 pub mod error;
 #[cfg(feature = "workload-runner")]
-pub mod runner;
+mod runner;
 pub mod source;
 
 use crate::protocol::batch::BatchPair;
