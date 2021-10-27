@@ -64,7 +64,9 @@ impl TransactionHandler for CommandTransactionHandler {
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
         let command_payload = CommandPayload::from_bytes(transaction_pair.transaction().payload())
-            .expect("Unable to parse CommandPayload");
+            .map_err(|_| {
+                ApplyError::InvalidTransaction("Unable to parse CommandPayload".to_string())
+            })?;
 
         for command in command_payload.commands().iter() {
             match command {
