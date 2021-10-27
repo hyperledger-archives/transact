@@ -128,14 +128,13 @@ experimental = [
 # stable features in support of wasm
 wasm = [
     # The following features are stable:
+    "sabre-compat",
 ]
 
 wasm-experimental = [
     # The experimental feature extends stable:
     "wasm",
     # The following features are experimental:
-    "sabre-compat",
-
 ]
 
 nightly = []
