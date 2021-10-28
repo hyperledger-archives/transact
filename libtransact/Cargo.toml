@@ -94,6 +94,7 @@ stable = [
     # The following features are stable:
     "contract-archive",
     "postgres",
+    "protocol-sabre",
     "sqlite",
     "state-merkle-sql",
 ]
@@ -117,7 +118,6 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
-    "protocol-sabre",
     "workload",
     "workload-batch-gen",
     "workload-runner"
