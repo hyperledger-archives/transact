@@ -15,6 +15,9 @@
  * limitations under the License.
  * -----------------------------------------------------------------------------
  */
+
+//! Traits for generating transactions and batches.
+
 #[cfg(feature = "workload-batch-gen")]
 pub mod batch_gen;
 pub mod error;
@@ -28,13 +31,18 @@ use crate::workload::error::WorkloadError;
 #[cfg(feature = "workload-runner")]
 pub use crate::workload::runner::{submit_batches_from_source, WorkloadRunner};
 
+/// `TransactionWorkload` provides an API for generating transactions
 pub trait TransactionWorkload: Send {
+    /// Get a `TransactionPair` and the result that is expected when that transaction is executed
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError>;
 }
 
+/// `BatchWorkload` provides an API for generating batches
 pub trait BatchWorkload: Send {
+    /// Get a `BatchPair` and the result that is expected when that batch is processed and its
+    /// transactions are executed
     fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError>;
 }
 
