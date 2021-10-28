@@ -22,6 +22,7 @@ pub(super) mod get_path;
 pub(super) mod get_tree_by_name;
 pub(super) mod has_root;
 pub(super) mod list_leaves;
+pub(super) mod list_trees;
 pub(super) mod prune_entries;
 pub(super) mod write_changes;
 
