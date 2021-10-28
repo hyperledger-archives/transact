@@ -19,16 +19,14 @@
 pub mod batch_gen;
 pub mod error;
 #[cfg(feature = "workload-runner")]
-pub mod runner;
+mod runner;
 pub mod source;
 
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
 use crate::workload::error::WorkloadError;
 #[cfg(feature = "workload-runner")]
-pub use crate::workload::runner::{
-    submit_batches_from_source, WorkloadRunner, DEFAULT_LOG_TIME_SECS,
-};
+pub use crate::workload::runner::{submit_batches_from_source, WorkloadRunner};
 
 pub trait TransactionWorkload: Send {
     fn next_transaction(
