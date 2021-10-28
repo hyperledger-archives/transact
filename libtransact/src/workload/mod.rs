@@ -23,7 +23,8 @@ pub mod batch_gen;
 pub mod error;
 #[cfg(feature = "workload-runner")]
 mod runner;
-pub mod source;
+#[cfg(feature = "workload-batch-gen")]
+mod source;
 
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
