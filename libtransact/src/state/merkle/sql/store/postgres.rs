@@ -26,6 +26,7 @@ use super::operations::get_path::MerkleRadixGetPathOperation as _;
 use super::operations::get_tree_by_name::MerkleRadixGetTreeByNameOperation as _;
 use super::operations::has_root::MerkleRadixHasRootOperation as _;
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
+use super::operations::list_trees::MerkleRadixListTreesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
 use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
@@ -53,6 +54,15 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
         operations.delete_tree(tree_id)
+    }
+
+    fn list_trees(
+        &self,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Result<String, InternalError>>>, InternalError>
+    {
+        let conn = self.backend.connection()?;
+        let operations = MerkleRadixOperations::new(conn.as_inner());
+        operations.list_trees()
     }
 
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
