@@ -19,6 +19,7 @@ pub mod playlist;
 
 use cylinder::Signer;
 
+use crate::error::InvalidStateError;
 use crate::protocol::{
     batch::{BatchBuilder, BatchPair},
     command::{Command, CommandPayload},
@@ -26,9 +27,7 @@ use crate::protocol::{
     transaction::{HashMethod, TransactionBuilder, TransactionPair},
 };
 use crate::protos::{FromProto, IntoBytes};
-use crate::workload::{
-    error::WorkloadError, BatchWorkload, ExpectedBatchResult, TransactionWorkload,
-};
+use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 use self::playlist::CommandGeneratingIter;
 
@@ -46,14 +45,14 @@ impl CommandTransactionWorkload {
 impl TransactionWorkload for CommandTransactionWorkload {
     fn next_transaction(
         &mut self,
-    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let (command_proto, address) = self
             .generator
             .next()
-            .ok_or_else(|| WorkloadError::InvalidState("No command available".to_string()))?;
+            .ok_or_else(|| InvalidStateError::with_message("No command available".to_string()))?;
 
         let command = Command::from_proto(command_proto).map_err(|_| {
-            WorkloadError::InvalidState("Unable to convert from command proto".to_string())
+            InvalidStateError::with_message("Unable to convert from command proto".to_string())
         })?;
 
         let command_payload = CommandPayload::new(vec![command.clone()]);
@@ -86,19 +85,25 @@ impl TransactionWorkload for CommandTransactionWorkload {
             .with_payload(payload_bytes)
             .into_payload_builder()
             .map_err(|err| {
-                WorkloadError::InvalidState(format!(
+                InvalidStateError::with_message(format!(
                     "Unable to convert execute action into sabre payload: {}",
                     err
                 ))
             })?
             .into_transaction_builder()
             .map_err(|err| {
-                WorkloadError::InvalidState(format!(
+                InvalidStateError::with_message(format!(
                     "Unable to convert execute payload into transaction: {}",
                     err
                 ))
             })?
-            .build_pair(&*self.signer)?;
+            .build_pair(&*self.signer)
+            .map_err(|err| {
+                InvalidStateError::with_message(format!(
+                    "Failed to build transaction pair: {}",
+                    err
+                ))
+            })?;
 
         Ok((txn, expected_batch_result))
     }
@@ -119,12 +124,17 @@ impl CommandBatchWorkload {
 }
 
 impl BatchWorkload for CommandBatchWorkload {
-    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+    fn next_batch(
+        &mut self,
+    ) -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let (txn, result) = self.transaction_workload.next_transaction()?;
         Ok((
             BatchBuilder::new()
                 .with_transactions(vec![txn.take().0])
-                .build_pair(&*self.signer)?,
+                .build_pair(&*self.signer)
+                .map_err(|err| {
+                    InvalidStateError::with_message(format!("Failed to build batch pair: {}", err))
+                })?,
             result,
         ))
     }

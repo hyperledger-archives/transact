@@ -26,6 +26,7 @@ use std::hash::Hash;
 use cylinder::Signer;
 use protobuf::Message;
 
+use crate::error::InvalidStateError;
 use crate::protocol::{
     batch::{BatchBuilder, BatchPair},
     sabre::ExecuteContractActionBuilder,
@@ -34,9 +35,7 @@ use crate::protocol::{
 use crate::protos::smallbank::{
     SmallbankTransactionPayload, SmallbankTransactionPayload_PayloadType,
 };
-use crate::workload::{
-    error::WorkloadError, BatchWorkload, ExpectedBatchResult, TransactionWorkload,
-};
+use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 use self::playlist::make_addresses;
 use self::playlist::SmallbankGeneratingIter;
@@ -105,16 +104,16 @@ impl SmallbankTransactionWorkload {
 impl TransactionWorkload for SmallbankTransactionWorkload {
     fn next_transaction(
         &mut self,
-    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let payload = self
             .generator
             .next()
-            .ok_or_else(|| WorkloadError::InvalidState("No payload available".to_string()))?;
+            .ok_or_else(|| InvalidStateError::with_message("No payload available".to_string()))?;
         let addresses = make_addresses(&payload);
         let dependencies = self.get_dependencies(&payload);
 
         let payload_bytes = payload.write_to_bytes().map_err(|_| {
-            WorkloadError::InvalidState("Unable to convert payload to bytes".to_string())
+            InvalidStateError::with_message("Unable to convert payload to bytes".to_string())
         })?;
 
         let txn_pair = ExecuteContractActionBuilder::new()
@@ -125,20 +124,26 @@ impl TransactionWorkload for SmallbankTransactionWorkload {
             .with_payload(payload_bytes)
             .into_payload_builder()
             .map_err(|err| {
-                WorkloadError::InvalidState(format!(
+                InvalidStateError::with_message(format!(
                     "Unable to convert execute action into sabre payload: {}",
                     err
                 ))
             })?
             .into_transaction_builder()
             .map_err(|err| {
-                WorkloadError::InvalidState(format!(
+                InvalidStateError::with_message(format!(
                     "Unable to convert execute payload into transaction: {}",
                     err
                 ))
             })?
             .with_dependencies(dependencies)
-            .build_pair(&*self.signer)?;
+            .build_pair(&*self.signer)
+            .map_err(|err| {
+                InvalidStateError::with_message(format!(
+                    "Failed to build transaction pair: {}",
+                    err
+                ))
+            })?;
 
         self.add_signature_if_create_account(
             &payload,
@@ -167,12 +172,17 @@ impl SmallbankBatchWorkload {
 }
 
 impl BatchWorkload for SmallbankBatchWorkload {
-    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+    fn next_batch(
+        &mut self,
+    ) -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let (txn, result) = self.transaction_workload.next_transaction()?;
         Ok((
             BatchBuilder::new()
                 .with_transactions(vec![txn.take().0])
-                .build_pair(&*self.signer)?,
+                .build_pair(&*self.signer)
+                .map_err(|err| {
+                    InvalidStateError::with_message(format!("Failed to build batch pair: {}", err))
+                })?,
             result,
         ))
     }

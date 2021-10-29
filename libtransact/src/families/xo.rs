@@ -1,9 +1,9 @@
+use crate::error::InvalidStateError;
 use crate::protocol::batch::BatchBuilder;
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::HashMethod;
 use crate::protocol::transaction::TransactionBuilder;
 use crate::protocol::transaction::TransactionPair;
-use crate::workload::error::WorkloadError;
 use crate::workload::BatchWorkload;
 use crate::workload::ExpectedBatchResult;
 use crate::workload::TransactionWorkload;
@@ -44,7 +44,7 @@ impl XoTransactionWorkload {
 impl TransactionWorkload for XoTransactionWorkload {
     fn next_transaction(
         &mut self,
-    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError> {
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let nonce = self
             .rng
             .sample_iter(&Alphanumeric)
@@ -63,7 +63,13 @@ impl TransactionWorkload for XoTransactionWorkload {
                 .with_nonce(nonce)
                 .with_payload(payload.bytes())
                 .with_payload_hash_method(HashMethod::Sha512)
-                .build_pair(&*self.signer)?,
+                .build_pair(&*self.signer)
+                .map_err(|err| {
+                    InvalidStateError::with_message(format!(
+                        "Failed to build transaction pair: {}",
+                        err
+                    ))
+                })?,
             None,
         ))
     }
@@ -91,12 +97,17 @@ impl XoBatchWorkload {
 }
 
 impl BatchWorkload for XoBatchWorkload {
-    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError> {
+    fn next_batch(
+        &mut self,
+    ) -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError> {
         let (txn, result) = self.transaction_workload.next_transaction()?;
         Ok((
             BatchBuilder::new()
                 .with_transactions(vec![txn.take().0])
-                .build_pair(&*self.signer)?,
+                .build_pair(&*self.signer)
+                .map_err(|err| {
+                    InvalidStateError::with_message(format!("Failed to build batch pair: {}", err))
+                })?,
             result,
         ))
     }
