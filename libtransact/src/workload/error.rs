@@ -97,29 +97,29 @@ impl std::error::Error for BatchingError {
 /// Errors that may occur during the reading of batches.
 #[derive(Debug)]
 pub enum BatchReadingError {
-    MessageError(protobuf::ProtobufError),
-    BatchingError(BatchingError),
-    UnknownError,
-    ProtoConversionError(ProtoConversionError),
+    Message(protobuf::ProtobufError),
+    Batching(BatchingError),
+    Unknown,
+    ProtoConversion(ProtoConversionError),
 }
 
 impl From<protobuf::ProtobufError> for BatchReadingError {
     fn from(err: protobuf::ProtobufError) -> Self {
-        BatchReadingError::MessageError(err)
+        BatchReadingError::Message(err)
     }
 }
 
 impl std::fmt::Display for BatchReadingError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
-            BatchReadingError::MessageError(ref err) => {
+            BatchReadingError::Message(ref err) => {
                 write!(f, "Error occurred reading messages: {}", err)
             }
-            BatchReadingError::BatchingError(ref err) => {
+            BatchReadingError::Batching(ref err) => {
                 write!(f, "Error creating the batch: {}", err)
             }
-            BatchReadingError::UnknownError => write!(f, "There was an unknown batching error."),
-            BatchReadingError::ProtoConversionError(ref err) => {
+            BatchReadingError::Unknown => write!(f, "There was an unknown batching error."),
+            BatchReadingError::ProtoConversion(ref err) => {
                 write!(f, "Error converting batch from proto: {}", err)
             }
         }
@@ -129,10 +129,10 @@ impl std::fmt::Display for BatchReadingError {
 impl std::error::Error for BatchReadingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
-            BatchReadingError::MessageError(ref err) => Some(err),
-            BatchReadingError::BatchingError(ref err) => Some(err),
-            BatchReadingError::UnknownError => Some(&BatchReadingError::UnknownError),
-            BatchReadingError::ProtoConversionError(ref err) => Some(err),
+            BatchReadingError::Message(ref err) => Some(err),
+            BatchReadingError::Batching(ref err) => Some(err),
+            BatchReadingError::Unknown => Some(&BatchReadingError::Unknown),
+            BatchReadingError::ProtoConversion(ref err) => Some(err),
         }
     }
 }
