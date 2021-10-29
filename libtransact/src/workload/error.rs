@@ -18,6 +18,7 @@
 
 use cylinder::SigningError;
 
+#[cfg(feature = "workload-batch-gen")]
 use crate::protos::ProtoConversionError;
 
 #[cfg(feature = "workload-runner")]
@@ -95,6 +96,7 @@ impl std::error::Error for BatchingError {
 }
 
 /// Errors that may occur during the reading of batches.
+#[cfg(feature = "workload-batch-gen")]
 #[derive(Debug)]
 pub enum BatchReadingError {
     Message(protobuf::ProtobufError),
@@ -103,12 +105,14 @@ pub enum BatchReadingError {
     ProtoConversion(ProtoConversionError),
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl From<protobuf::ProtobufError> for BatchReadingError {
     fn from(err: protobuf::ProtobufError) -> Self {
         BatchReadingError::Message(err)
     }
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl std::fmt::Display for BatchReadingError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -126,6 +130,7 @@ impl std::fmt::Display for BatchReadingError {
     }
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl std::error::Error for BatchReadingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
