@@ -20,7 +20,7 @@
 
 #[cfg(feature = "workload-batch-gen")]
 pub mod batch_gen;
-pub mod error;
+mod error;
 #[cfg(feature = "workload-runner")]
 mod runner;
 #[cfg(feature = "workload-batch-gen")]
