@@ -51,6 +51,11 @@ pub(in crate::state::merkle::sql) trait MerkleRadixStore {
 
     fn delete_tree(&self, tree_id: i64) -> Result<(), InternalError>;
 
+    /// Lists the names of available trees.
+    fn list_trees(
+        &self,
+    ) -> Result<Box<dyn ExactSizeIterator<Item = Result<String, InternalError>>>, InternalError>;
+
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
     fn get_path(
