@@ -32,6 +32,8 @@ use crate::protos::smallbank::{
     SmallbankTransactionPayload_WriteCheckTransactionData,
 };
 
+const SMALLBANK_FAMILY_NAME: &str = "smallbank";
+
 pub struct SmallbankTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
@@ -42,8 +44,8 @@ impl SmallbankTransactionHandler {
     #[allow(clippy::new_without_default)]
     pub fn new() -> SmallbankTransactionHandler {
         SmallbankTransactionHandler {
-            family_name: "smallbank".to_string(),
-            family_versions: vec!["1.0".to_string()],
+            family_name: SMALLBANK_FAMILY_NAME.to_string(),
+            family_versions: vec!["1".to_string(), "1.0".to_string()],
             namespaces: vec![get_smallbank_prefix()],
         }
     }
