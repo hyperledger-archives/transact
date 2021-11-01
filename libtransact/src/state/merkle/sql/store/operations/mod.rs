@@ -15,6 +15,7 @@
  * -----------------------------------------------------------------------------
  */
 
+pub(super) mod delete_tree;
 pub(super) mod get_leaves;
 pub(super) mod get_or_create_tree;
 pub(super) mod get_path;
