@@ -56,7 +56,7 @@ pub mod migration;
 mod postgres;
 #[cfg(feature = "sqlite")]
 mod sqlite;
-mod store;
+pub mod store;
 
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};

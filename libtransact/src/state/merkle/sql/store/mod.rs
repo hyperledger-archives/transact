@@ -35,12 +35,12 @@ use crate::state::merkle::{node::Node, sql::backend::Backend};
 type NodeChanges = Vec<(String, Node, String)>;
 
 #[derive(Default)]
-pub(in crate::state::merkle::sql) struct TreeUpdate {
+pub struct TreeUpdate {
     pub node_changes: NodeChanges,
     pub deletions: HashSet<String>,
 }
 
-pub(in crate::state::merkle::sql) trait MerkleRadixStore {
+pub trait MerkleRadixStore {
     fn get_or_create_tree(
         &self,
         tree_name: &str,
@@ -90,12 +90,12 @@ pub(in crate::state::merkle::sql) trait MerkleRadixStore {
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
 }
 
-pub(in crate::state::merkle::sql) struct SqlMerkleRadixStore<'b, B: Backend> {
+pub struct SqlMerkleRadixStore<'b, B: Backend> {
     pub backend: &'b B,
 }
 
 impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
-    pub(in crate::state::merkle::sql) fn new(backend: &'b B) -> Self {
+    pub fn new(backend: &'b B) -> Self {
         Self { backend }
     }
 }
