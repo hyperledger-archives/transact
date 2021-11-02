@@ -22,6 +22,8 @@ mod error;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use sha2::{Digest, Sha512};
+
 use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
 use crate::error::{InternalError, InvalidStateError};
@@ -794,8 +796,9 @@ fn get_node_by_hash(db: &dyn Database, hash: &str) -> Result<Node, StateDatabase
 
 /// Creates a hash of the given bytes
 fn hash(input: &[u8]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = Vec::new();
-    bytes.extend(openssl::sha::sha512(input).iter());
+    let mut hasher = Sha512::new();
+    hasher.update(input);
+    let bytes = hasher.finalize().to_vec();
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
 }

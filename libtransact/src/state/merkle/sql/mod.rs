@@ -61,6 +61,8 @@ mod store;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 
+use sha2::{Digest, Sha512};
+
 use crate::error::InternalError;
 use crate::state::error::StateWriteError;
 use crate::state::StateChange;
@@ -374,8 +376,9 @@ fn encode_and_hash(node: Node) -> Result<(Vec<u8>, Vec<u8>), InternalError> {
 
 /// Creates a hash of the given bytes
 fn hash(input: &[u8]) -> Vec<u8> {
-    let mut bytes: Vec<u8> = Vec::new();
-    bytes.extend(openssl::sha::sha512(input).iter());
+    let mut hasher = Sha512::new();
+    hasher.update(input);
+    let bytes = hasher.finalize().to_vec();
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hash.to_vec()
 }
