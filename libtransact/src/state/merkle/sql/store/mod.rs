@@ -49,6 +49,8 @@ pub(in crate::state::merkle::sql) trait MerkleRadixStore {
 
     fn get_tree_id_by_name(&self, tree_name: &str) -> Result<Option<i64>, InternalError>;
 
+    fn delete_tree(&self, tree_id: i64) -> Result<(), InternalError>;
+
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError>;
 
     fn get_path(
