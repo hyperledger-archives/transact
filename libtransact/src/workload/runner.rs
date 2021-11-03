@@ -152,6 +152,51 @@ impl WorkloadRunner {
             }
         }
     }
+
+    /// Return a WorkerShutdownSignaler, used to send a shutdown signal to the `Worker` threads.
+    pub fn shutdown_signaler(&self) -> WorkerShutdownSignaler {
+        WorkerShutdownSignaler {
+            senders: self
+                .workloads
+                .iter()
+                .map(|(_, worker)| (worker.id.clone(), worker.sender.clone()))
+                .collect(),
+        }
+    }
+
+    /// Block until for the thread has shutdown.
+    pub fn wait_for_shutdown(self) -> Result<(), WorkloadRunnerError> {
+        for (_, mut worker) in &mut self.workloads.into_iter() {
+            if let Some(thread) = worker.thread.take() {
+                thread.join().map_err(|_| {
+                    WorkloadRunnerError::WorkloadAddError(
+                        "Failed to join worker thread".to_string(),
+                    )
+                })?
+            }
+        }
+        Ok(())
+    }
+}
+
+/// The senders for all running `Worker`s in a `WorkloadRunner`.
+pub struct WorkerShutdownSignaler {
+    senders: Vec<(String, Sender<ShutdownMessage>)>,
+}
+
+impl WorkerShutdownSignaler {
+    /// Send a shutdown message to each `Worker` to signal it should stop
+    pub fn signal_shutdown(&self) -> Result<(), WorkloadRunnerError> {
+        for (id, sender) in &self.senders {
+            debug!("Shutting down worker {}", id);
+            sender.send(ShutdownMessage).map_err(|_| {
+                WorkloadRunnerError::WorkloadRemoveError(
+                    "Failed to send shutdown message".to_string(),
+                )
+            })?
+        }
+        Ok(())
+    }
 }
 
 /// Sent to a workload to signal it should stop
