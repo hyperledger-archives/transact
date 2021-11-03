@@ -1,5 +1,13 @@
 # Release Notes
 
+## Changes in Transact 0.3.13
+
+### libtransact updates
+
+* Add `delete_tree` to `SqlMerkleState`. This allows the entire tree to be
+  deleted, include all state root hashes and leaf data associated with that
+  tree.
+
 ## Changes in Transact 0.3.12
 
 ### libtransact updates
