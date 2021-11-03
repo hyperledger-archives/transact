@@ -93,6 +93,7 @@ impl WorkloadRunner {
             .with_auth(auth)
             .with_update_time(update_time)
             .get_batch_status(get_batch_status)
+            .with_duration(duration)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -201,6 +202,7 @@ struct WorkerBuilder {
     auth: Option<String>,
     update_time: Option<u32>,
     get_batch_status: Option<bool>,
+    duration: Option<Duration>,
 }
 
 impl WorkerBuilder {
@@ -262,6 +264,16 @@ impl WorkerBuilder {
     ///  * `update_time` - How often to provide an update about the workload
     pub fn with_update_time(mut self, update_time: u32) -> WorkerBuilder {
         self.update_time = Some(update_time);
+        self
+    }
+
+    /// Sets the total duration that the worker will run for
+    ///
+    /// # Arguments
+    ///
+    ///  * `duration` - How long the worker should run for
+    pub fn with_duration(mut self, duration: Option<Duration>) -> WorkerBuilder {
+        self.duration = duration;
         self
     }
 
