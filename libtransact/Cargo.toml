@@ -109,7 +109,6 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
-    "database-lmdb",
     "database-sqlite",
     "family-command",
     "family-command-workload",
