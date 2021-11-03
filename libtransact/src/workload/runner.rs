@@ -442,7 +442,7 @@ impl WorkerBuilder {
                                         Ok(status_links) => batch_status_links = status_links,
                                         Err(err) => {
                                             error!("{}", err);
-                                            std::process::exit(1);
+                                            break;
                                         }
                                     }
                                 }
