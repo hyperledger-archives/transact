@@ -135,24 +135,6 @@ impl WorkloadRunner {
         Ok(())
     }
 
-    /// Shutsdown all running workloads
-    pub fn shutdown(self) {
-        for (_, worker) in self.workloads.iter() {
-            if worker.sender.send(ShutdownMessage).is_err() {
-                warn!("Failed to send shutdown messages to {}", worker.id);
-            }
-        }
-
-        for (_, mut worker) in &mut self.workloads.into_iter() {
-            debug!("Shutting down worker {}", worker.id);
-            if let Some(thread) = worker.thread.take() {
-                if let Err(_err) = thread.join() {
-                    warn!("Failed to cleanly join worker thread {}", worker.id);
-                }
-            }
-        }
-    }
-
     /// Return a WorkerShutdownSignaler, used to send a shutdown signal to the `Worker` threads.
     pub fn shutdown_signaler(&self) -> WorkerShutdownSignaler {
         WorkerShutdownSignaler {
