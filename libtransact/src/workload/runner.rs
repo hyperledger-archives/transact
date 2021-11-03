@@ -317,6 +317,9 @@ impl WorkerBuilder {
 
         let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
 
+        // calculate the end time based on the duration given
+        let end_time = self.duration.map(|d| time::Instant::now() + d);
+
         let (sender, receiver) = channel();
 
         let thread_id = id.to_string();
@@ -338,6 +341,11 @@ impl WorkerBuilder {
                     let mut submission_start = time::Instant::now();
                     let mut submission_avg: Option<time::Duration> = None;
                     loop {
+                        if let Some(end_time) = end_time {
+                            if time::Instant::now() > end_time {
+                                break;
+                            }
+                        }
                         match receiver.try_recv() {
                             // recieved shutdown
                             Ok(_) => {
@@ -389,6 +397,7 @@ impl WorkerBuilder {
                                                 start_time,
                                                 submitted_batches,
                                                 &receiver,
+                                                end_time,
                                             ) {
                                                 Ok((true, _)) => break,
                                                 Ok((false, Some(link))) => {
@@ -478,6 +487,7 @@ fn slow_rate(
     start_time: time::Instant,
     submitted_batches: u32,
     receiver: &Receiver<ShutdownMessage>,
+    end_time: Option<time::Instant>,
 ) -> Result<(bool, Option<String>), WorkloadRunnerError> {
     debug!("Received TooManyRequests message from target, attempting to resubmit batch");
     let mut shutdown = false;
@@ -497,6 +507,11 @@ fn slow_rate(
     // sleep
     thread::sleep(wait);
     loop {
+        if let Some(end_time) = end_time {
+            if time::Instant::now() > end_time {
+                break;
+            }
+        }
         match receiver.try_recv() {
             // recieved shutdown
             Ok(_) => {
