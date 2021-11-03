@@ -27,6 +27,7 @@ use std::str::from_utf8;
 
 use rand::seq::IteratorRandom;
 use rand::thread_rng;
+use sha2::{Digest, Sha512};
 
 use transact::{
     database::{error::DatabaseError, Database},
@@ -1352,8 +1353,9 @@ fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]])
 }
 
 fn hex_hash(input: &[u8]) -> String {
-    let mut bytes: Vec<u8> = Vec::new();
-    bytes.extend(openssl::sha::sha512(input).iter());
+    let mut hasher = Sha512::new();
+    hasher.update(input);
+    let bytes = hasher.finalize().to_vec();
     let (hash, _rest) = bytes.split_at(bytes.len() / 2);
     hex::encode(hash.to_vec())
 }
