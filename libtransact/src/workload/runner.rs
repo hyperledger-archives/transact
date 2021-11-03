@@ -277,11 +277,18 @@ impl WorkerBuilder {
         self
     }
 
+    /// Sets a boolean value indicating if the status of submitted batches should be checked
+    ///
+    /// # Arguments
+    ///
+    ///  * `get_batch_status` - Whether or not the status of submitted batches should be checked
     pub fn get_batch_status(mut self, get_batch_status: bool) -> WorkerBuilder {
         self.get_batch_status = Some(get_batch_status);
         self
     }
 
+    /// Starts a thread that generates batches and submits them to the set targets, returns a
+    /// `Worker` containing the thread, an ID and a sender.
     pub fn build(self) -> Result<Worker, WorkloadRunnerError> {
         let id = self.id.ok_or_else(|| {
             WorkloadRunnerError::WorkloadAddError(
