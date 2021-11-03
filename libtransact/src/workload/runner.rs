@@ -76,6 +76,7 @@ impl WorkloadRunner {
         auth: String,
         update_time: u32,
         get_batch_status: bool,
+        duration: Option<Duration>,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
