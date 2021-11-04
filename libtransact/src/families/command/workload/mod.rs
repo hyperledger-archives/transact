@@ -15,6 +15,8 @@
  * ------------------------------------------------------------------------------
  */
 
+//! Implementations of the `BatchWorkload` and `TransactionWorkload` traits for the command family.
+
 pub mod playlist;
 
 use cylinder::Signer;
