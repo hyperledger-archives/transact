@@ -15,7 +15,7 @@
  * ------------------------------------------------------------------------------
  */
 
-pub mod handler;
+mod handler;
 #[cfg(feature = "family-command-workload")]
 pub mod workload;
 
