@@ -196,7 +196,7 @@ impl<'a> Iterator for BatchListFeeder<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let batches = match self.batch_source.next(1) {
             Ok(batches) => batches,
-            Err(err) => return Some(Err(BatchReadingError::MessageError(err))),
+            Err(err) => return Some(Err(BatchReadingError::Message(err))),
         };
 
         let batch_proto = match batches.get(0) {
@@ -206,7 +206,7 @@ impl<'a> Iterator for BatchListFeeder<'a> {
 
         match BatchPair::from_proto(batch_proto.clone()) {
             Ok(batch) => Some(Ok(batch)),
-            Err(err) => Some(Err(BatchReadingError::ProtoConversionError(err))),
+            Err(err) => Some(Err(BatchReadingError::ProtoConversion(err))),
         }
     }
 }

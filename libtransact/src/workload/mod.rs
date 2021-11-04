@@ -20,15 +20,15 @@
 
 #[cfg(feature = "workload-batch-gen")]
 pub mod batch_gen;
-pub mod error;
+mod error;
 #[cfg(feature = "workload-runner")]
 mod runner;
 #[cfg(feature = "workload-batch-gen")]
 mod source;
 
+use crate::error::InvalidStateError;
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
-use crate::workload::error::WorkloadError;
 #[cfg(feature = "workload-runner")]
 pub use crate::workload::runner::{submit_batches_from_source, WorkloadRunner};
 
@@ -37,14 +37,15 @@ pub trait TransactionWorkload: Send {
     /// Get a `TransactionPair` and the result that is expected when that transaction is executed
     fn next_transaction(
         &mut self,
-    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), WorkloadError>;
+    ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError>;
 }
 
 /// `BatchWorkload` provides an API for generating batches
 pub trait BatchWorkload: Send {
     /// Get a `BatchPair` and the result that is expected when that batch is processed and its
     /// transactions are executed
-    fn next_batch(&mut self) -> Result<(BatchPair, Option<ExpectedBatchResult>), WorkloadError>;
+    fn next_batch(&mut self)
+        -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError>;
 }
 
 #[derive(Clone)]
