@@ -76,6 +76,7 @@ impl WorkloadRunner {
         auth: String,
         update_time: u32,
         get_batch_status: bool,
+        duration: Option<Duration>,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
@@ -92,6 +93,7 @@ impl WorkloadRunner {
             .with_auth(auth)
             .with_update_time(update_time)
             .get_batch_status(get_batch_status)
+            .with_duration(duration)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -135,22 +137,49 @@ impl WorkloadRunner {
         Ok(())
     }
 
-    /// Shutsdown all running workloads
-    pub fn shutdown(self) {
-        for (_, worker) in self.workloads.iter() {
-            if worker.sender.send(ShutdownMessage).is_err() {
-                warn!("Failed to send shutdown messages to {}", worker.id);
-            }
+    /// Return a WorkerShutdownSignaler, used to send a shutdown signal to the `Worker` threads.
+    pub fn shutdown_signaler(&self) -> WorkerShutdownSignaler {
+        WorkerShutdownSignaler {
+            senders: self
+                .workloads
+                .iter()
+                .map(|(_, worker)| (worker.id.clone(), worker.sender.clone()))
+                .collect(),
         }
+    }
 
+    /// Block until for the thread has shutdown.
+    pub fn wait_for_shutdown(self) -> Result<(), WorkloadRunnerError> {
         for (_, mut worker) in &mut self.workloads.into_iter() {
-            debug!("Shutting down worker {}", worker.id);
             if let Some(thread) = worker.thread.take() {
-                if let Err(_err) = thread.join() {
-                    warn!("Failed to cleanly join worker thread {}", worker.id);
-                }
+                thread.join().map_err(|_| {
+                    WorkloadRunnerError::WorkloadAddError(
+                        "Failed to join worker thread".to_string(),
+                    )
+                })?
             }
         }
+        Ok(())
+    }
+}
+
+/// The senders for all running `Worker`s in a `WorkloadRunner`.
+pub struct WorkerShutdownSignaler {
+    senders: Vec<(String, Sender<ShutdownMessage>)>,
+}
+
+impl WorkerShutdownSignaler {
+    /// Send a shutdown message to each `Worker` to signal it should stop
+    pub fn signal_shutdown(&self) -> Result<(), WorkloadRunnerError> {
+        for (id, sender) in &self.senders {
+            debug!("Shutting down worker {}", id);
+            sender.send(ShutdownMessage).map_err(|_| {
+                WorkloadRunnerError::WorkloadRemoveError(
+                    "Failed to send shutdown message".to_string(),
+                )
+            })?
+        }
+        Ok(())
     }
 }
 
@@ -173,6 +202,7 @@ struct WorkerBuilder {
     auth: Option<String>,
     update_time: Option<u32>,
     get_batch_status: Option<bool>,
+    duration: Option<Duration>,
 }
 
 impl WorkerBuilder {
@@ -237,11 +267,28 @@ impl WorkerBuilder {
         self
     }
 
+    /// Sets the total duration that the worker will run for
+    ///
+    /// # Arguments
+    ///
+    ///  * `duration` - How long the worker should run for
+    pub fn with_duration(mut self, duration: Option<Duration>) -> WorkerBuilder {
+        self.duration = duration;
+        self
+    }
+
+    /// Sets a boolean value indicating if the status of submitted batches should be checked
+    ///
+    /// # Arguments
+    ///
+    ///  * `get_batch_status` - Whether or not the status of submitted batches should be checked
     pub fn get_batch_status(mut self, get_batch_status: bool) -> WorkerBuilder {
         self.get_batch_status = Some(get_batch_status);
         self
     }
 
+    /// Starts a thread that generates batches and submits them to the set targets, returns a
+    /// `Worker` containing the thread, an ID and a sender.
     pub fn build(self) -> Result<Worker, WorkloadRunnerError> {
         let id = self.id.ok_or_else(|| {
             WorkloadRunnerError::WorkloadAddError(
@@ -277,6 +324,9 @@ impl WorkerBuilder {
 
         let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
 
+        // calculate the end time based on the duration given
+        let end_time = self.duration.map(|d| time::Instant::now() + d);
+
         let (sender, receiver) = channel();
 
         let thread_id = id.to_string();
@@ -298,6 +348,11 @@ impl WorkerBuilder {
                     let mut submission_start = time::Instant::now();
                     let mut submission_avg: Option<time::Duration> = None;
                     loop {
+                        if let Some(end_time) = end_time {
+                            if time::Instant::now() > end_time {
+                                break;
+                            }
+                        }
                         match receiver.try_recv() {
                             // recieved shutdown
                             Ok(_) => {
@@ -315,8 +370,13 @@ impl WorkerBuilder {
                                 };
 
                                 // get next batch
-                                let (batch, expected_result) =
-                                    workload.next_batch().expect("Unable to get batch");
+                                let (batch, expected_result) = match workload.next_batch() {
+                                    Ok((batch, expected_result)) => (batch, expected_result),
+                                    Err(_) => {
+                                        error!("Failed to get next batch");
+                                        break;
+                                    }
+                                };
                                 let batch_bytes = match vec![batch.batch().clone()].into_bytes() {
                                     Ok(bytes) => bytes,
                                     Err(err) => {
@@ -349,6 +409,7 @@ impl WorkerBuilder {
                                                 start_time,
                                                 submitted_batches,
                                                 &receiver,
+                                                end_time,
                                             ) {
                                                 Ok((true, _)) => break,
                                                 Ok((false, Some(link))) => {
@@ -388,7 +449,7 @@ impl WorkerBuilder {
                                         Ok(status_links) => batch_status_links = status_links,
                                         Err(err) => {
                                             error!("{}", err);
-                                            std::process::exit(1);
+                                            break;
                                         }
                                     }
                                 }
@@ -438,6 +499,7 @@ fn slow_rate(
     start_time: time::Instant,
     submitted_batches: u32,
     receiver: &Receiver<ShutdownMessage>,
+    end_time: Option<time::Instant>,
 ) -> Result<(bool, Option<String>), WorkloadRunnerError> {
     debug!("Received TooManyRequests message from target, attempting to resubmit batch");
     let mut shutdown = false;
@@ -457,6 +519,11 @@ fn slow_rate(
     // sleep
     thread::sleep(wait);
     loop {
+        if let Some(end_time) = end_time {
+            if time::Instant::now() > end_time {
+                break;
+            }
+        }
         match receiver.try_recv() {
             // recieved shutdown
             Ok(_) => {
