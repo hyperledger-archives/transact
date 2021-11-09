@@ -4,7 +4,6 @@
 | Name | GitHub | RocketChat |
 | --- | --- | --- |
 | Andi Gunderson | agunde406 | agunde |
-| Eloá Franca Verona | eloaverona | eloafran |
 | Isabel Tomb | isabeltomb | isabeltomb |
 | James Mitchell | jsmitchell | jsmitchell |
 | Logan Seeley | ltseeley | ltseeley |
@@ -14,3 +13,8 @@
 | Ryan Banks | ryanlassigbanks | robinbanks |
 | Shannyn Telander | shannynalayna | shannynalayna |
 | Shawn Amundson | vaporos | amundson |
+
+### Retired Maintainers
+| Name | GitHub | RocketChat |
+| --- | --- | --- |
+| Eloá Franca Verona | eloaverona | eloafran |
