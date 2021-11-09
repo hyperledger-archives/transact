@@ -96,6 +96,7 @@ stable = [
     "protocol-sabre",
     "sqlite",
     "state-merkle-sql",
+    "workload",
 ]
 
 experimental = [
@@ -116,7 +117,6 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
-    "workload",
     "workload-batch-gen",
     "workload-runner"
 ]
