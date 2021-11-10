@@ -192,6 +192,7 @@ struct Worker {
     id: String,
     thread: Option<thread::JoinHandle<()>>,
     sender: Sender<ShutdownMessage>,
+    batch_status_checker: Option<BatchStatusChecker>,
 }
 
 #[derive(Default)]
@@ -330,7 +331,26 @@ impl WorkerBuilder {
 
         let (sender, receiver) = channel();
 
+        // create a channel for the batch status checker so that the sender can be used by the
+        // worker thread to send a shutdown message to the batch status checker when the worker
+        // shuts down
+        let (batch_status_checker_sender, batch_status_checker_receiver) = channel();
+
         let batch_status_links: ExpectedBatchResults = Arc::new(Mutex::new(HashMap::new()));
+        // start the batch status checker, this is a separate thread that checks the status links
+        // of submitted batches and compares the returned result to the expected result
+        let batch_status_checker = if get_batch_status {
+            Some(BatchStatusChecker::new(
+                batch_status_links.clone(),
+                auth.clone(),
+                id.clone(),
+                sender.clone(),
+                batch_status_checker_sender,
+                batch_status_checker_receiver,
+            )?)
+        } else {
+            None
+        };
 
         let thread_id = id.to_string();
         let thread = Some(
@@ -456,17 +476,6 @@ impl WorkerBuilder {
                                 // log http submission stats if its been longer then update time
                                 log(&http_counter, &mut last_log_time, update_time);
 
-                                if get_batch_status {
-                                    match check_batch_status(batch_status_links, &auth) {
-                                        // set `batch_status_links` to be the updated list of links
-                                        // returned by `check_batch_status`
-                                        Ok(status_links) => batch_status_links = status_links,
-                                        Err(err) => {
-                                            error!("{}", err);
-                                            break;
-                                        }
-                                    }
-                                }
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
                                 let diff = time::Instant::now() - submission_start;
@@ -496,8 +505,12 @@ impl WorkerBuilder {
                     ))
                 })?,
         );
-
-        Ok(Worker { id, thread, sender })
+        Ok(Worker {
+            id,
+            thread,
+            sender,
+            batch_status_checker,
+        })
     }
 }
 
