@@ -22,6 +22,7 @@ use std::fmt;
 use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime};
 use std::{thread, time};
 
@@ -38,7 +39,7 @@ const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// This type maps the status link used to check the result of the batch after it has been submitted
 /// to the target URL that a batch was submitted to and the result that was expected of the batch
-type ExpectedBatchResults = HashMap<String, (String, Option<ExpectedBatchResult>)>;
+type ExpectedBatchResults = Arc<Mutex<HashMap<String, (String, Option<ExpectedBatchResult>)>>>;
 
 /// Keeps track of the currenlty running workloads.
 ///
@@ -329,12 +330,13 @@ impl WorkerBuilder {
 
         let (sender, receiver) = channel();
 
+        let batch_status_links: ExpectedBatchResults = Arc::new(Mutex::new(HashMap::new()));
+
         let thread_id = id.to_string();
         let thread = Some(
             thread::Builder::new()
                 .name(id.to_string())
                 .spawn(move || {
-                    let mut batch_status_links: ExpectedBatchResults = HashMap::new();
                     // set first target
                     let mut next_target = 0;
                     let mut workload = workload;
@@ -389,10 +391,16 @@ impl WorkerBuilder {
                                 match submit_batch(target, &auth, batch_bytes.clone()) {
                                     Ok(link) => {
                                         if get_batch_status {
-                                            batch_status_links.insert(
-                                                link,
-                                                (target.to_string(), expected_result),
-                                            );
+                                            match batch_status_links.lock() {
+                                                Ok(mut l) => l.insert(
+                                                    link,
+                                                    (target.to_string(), expected_result),
+                                                ),
+                                                Err(_) => {
+                                                    error!("ExpectedBatchResults lock poisoned");
+                                                    break;
+                                                }
+                                            };
                                         }
                                         submitted_batches += 1;
                                         http_counter.increment_sent()
@@ -414,10 +422,16 @@ impl WorkerBuilder {
                                                 Ok((true, _)) => break,
                                                 Ok((false, Some(link))) => {
                                                     if get_batch_status {
-                                                        batch_status_links.insert(
-                                                            link,
-                                                            (target.to_string(), expected_result),
-                                                        );
+                                                        match batch_status_links.lock() {
+                                                            Ok(mut l) => l.insert(
+                                                                link,
+                                                                (target.to_string(), expected_result),
+                                                            ),
+                                                            Err(_) => {
+                                                                error!("ExpectedBatchResults lock poisoned");
+                                                                break;
+                                                            }
+                                                        };
                                                     }
                                                     submitted_batches = 1;
                                                     start_time = time::Instant::now();
