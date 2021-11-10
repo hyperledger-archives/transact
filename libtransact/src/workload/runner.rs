@@ -153,7 +153,7 @@ impl WorkloadRunner {
         }
     }
 
-    /// Block until for the thread has shutdown.
+    /// Block until the threads have shutdown.
     pub fn wait_for_shutdown(self) -> Result<(), WorkloadRunnerError> {
         for (_, mut worker) in &mut self.workloads.into_iter() {
             if let Some(mut batch_status_checker) = worker.batch_status_checker {
