@@ -128,6 +128,10 @@ impl WorkloadRunner {
                     )));
                 }
             }
+
+            if let Some(mut batch_status_checker) = worker.batch_status_checker {
+                batch_status_checker.remove_batch_status_checker()?;
+            }
         } else {
             return Err(WorkloadRunnerError::WorkloadRemoveError(format!(
                 "Workload with ID {} does not exist",
