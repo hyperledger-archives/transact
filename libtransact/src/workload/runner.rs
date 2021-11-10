@@ -615,106 +615,200 @@ fn submit_batch(
         })
 }
 
-/// Takes a mutable hashmap of batch status links and checks each link once to get the status of
-/// the associated batch. If the returned status of the batch matches the result that was
-/// expected for that batch, the status link is removed from the hashmap. If the returned status is
-/// "pending", the link is left in the map to be checked again in a future call. The updated hash
-/// map of status links is returned after all links have been checked.
-///
-/// # Arguments
-///
-/// `status_links` - A hashmap of batch status links mapped to the target URL that the associated
-///  batch was originally submitted to and the expected result of the batch
-/// `auth` - The string used in the authorization header of the request
-///
-/// # Errors
-///
-/// Returns a `WorkloadRunnerError` if the status of a batch does not match the expected result
-fn check_batch_status(
-    mut status_links: ExpectedBatchResults,
-    auth: &str,
-) -> Result<ExpectedBatchResults, WorkloadRunnerError> {
-    for (status_link, (target, expected_result)) in status_links.clone() {
-        let url = get_batch_status_url(target, &status_link);
-        Client::new()
-            .get(url)
-            .header("Authorization", auth)
-            .send()
-            .map_err(|err| {
-                WorkloadRunnerError::SubmitError(format!(
-                    "Failed to get status of submitted batch: {}",
-                    err
-                ))
-            })
-            .and_then(|res| {
-                let status = res.status();
-                if status.is_success() {
-                    let batch_info: Vec<BatchInfo> = res.json().map_err(|_| {
-                        WorkloadRunnerError::SubmitError(
-                            "Failed to deserialize response body".to_string(),
-                        )
-                    })?;
-                    for info in batch_info {
-                        match info.status {
-                            BatchStatus::Invalid(invalid_txns) => match expected_result {
-                                Some(ExpectedBatchResult::Valid) => {
-                                    return Err(WorkloadRunnerError::SubmitError(format!(
-                                        "Expected valid result, received invalid {:?}",
-                                        invalid_txns
-                                    )));
-                                }
-                                Some(ExpectedBatchResult::Invalid) => {
-                                    status_links.remove(&status_link);
-                                }
-                                // If the expected result is not set there is nothing to be done
-                                // for the batch
-                                None => (),
-                            },
-                            // If the transactions have been successfully applied and returned
-                            // a `BatchStatus::Valid` or `BatchStatus::Committed` response, remove
-                            // the status link from the list
-                            BatchStatus::Valid(valid_txns) | BatchStatus::Committed(valid_txns) => {
-                                match expected_result {
-                                    Some(ExpectedBatchResult::Valid) => {
-                                        status_links.remove(&status_link);
+struct BatchStatusChecker {
+    id: String,
+    sender: Sender<ShutdownMessage>,
+    thread: Option<thread::JoinHandle<()>>,
+}
+
+impl BatchStatusChecker {
+    /// Takes a mutable hashmap of batch status links and starts a thread that continuously loops
+    /// through the links, checking each link to get the status of the associated batch. If the
+    /// returned status of the batch matches the result that was expected for that batch, the
+    /// status link is removed from the hashmap. If the returned status is "pending", the link is
+    /// left in the map to be checked again.
+    ///
+    /// # Arguments
+    ///
+    /// `status_links` - A hashmap of batch status links mapped to the target URL that the
+    ///  associated  batc was originally submitted to and the expected result of the
+    ///  batch
+    /// `auth` - The string used in the authorization header of the request
+    /// `id` - The id of the `Worker` this `BatchStatusChecker` is associated with
+    /// `worker_sender` - The sender for with the `Worker` this `BatchStatusChecker` is associated
+    ///  with. It is used to send a shutdown signal to the worker thread if a batch result does not
+    ///  match the expected result
+    /// `sender` - The sender that will be used to send a shutdown message when the
+    ///  `BatchStatusChecker` needs to be shutdown
+    /// `reciever` - The reciever used to check if the `BatchStatusChecker` has recieved a shutdown
+    ///  message
+    ///
+    /// # Errors
+    ///
+    /// * Returns a `WorkloadRunnerError` if the thread cannot be created
+    /// * Exits with 1 if the status of a batch does not match the expected result
+    fn new(
+        status_links: ExpectedBatchResults,
+        auth: String,
+        id: String,
+        worker_sender: Sender<ShutdownMessage>,
+        sender: Sender<ShutdownMessage>,
+        reciever: Receiver<ShutdownMessage>,
+    ) -> Result<Self, WorkloadRunnerError> {
+        let id = format!("BatchStatusChecker-{}", id);
+        let thread = Some(
+            thread::Builder::new()
+                .name(id.clone())
+                .spawn(move || {
+                    'outer: loop {
+                        match reciever.try_recv() {
+                            // Recieved shutdown.
+                            Ok(_) => {
+                                info!("Batch status checker received shutdown");
+                                break;
+                            }
+                            Err(TryRecvError::Empty) => {
+                                // Check if the list of batch status links is empty
+                                let is_empty = match status_links.lock() {
+                                    Ok(l) => l.is_empty(),
+                                    Err(_) => {
+                                        error!("ExpectedBatchResults lock poisoned");
+                                        break;
                                     }
-                                    Some(ExpectedBatchResult::Invalid) => {
-                                        return Err(WorkloadRunnerError::SubmitError(format!(
-                                            "expected invalid result, received valid {:?}",
-                                            valid_txns
-                                        )));
+                                };
+                                // Sleep for two seconds if the list of batch status links is
+                                // empty
+                                if is_empty {
+                                    thread::sleep(Duration::new(2, 0))
+                                } else {
+                                    let (status_link, (target, expected_result)) =
+                                        match status_links.lock() {
+                                            Ok(l) => match l.iter().next() {
+                                                Some((s, (t, e))) => {
+                                                    (s.clone(), (t.clone(), e.clone()))
+                                                }
+                                                None => {
+                                                    error!("Status links empty");
+                                                    break;
+                                                }
+                                            },
+                                            Err(_) => {
+                                                error!("ExpectedBatchResults lock poisoned");
+                                                break;
+                                            }
+                                        };
+
+                                    // Get the full batch status URL
+                                    let url =
+                                        get_batch_status_url(target.to_string(), &status_link);
+                                    match Client::new()
+                                        .get(url)
+                                        .header("Authorization", &auth)
+                                        .send()
+                                    {
+                                        Ok(res) => {
+                                            let status = res.status();
+                                            if status.is_success() {
+                                                let batch_info: Vec<BatchInfo> = match res.json() {
+                                                    Ok(b) => b,
+                                                    Err(_) => {
+                                                        error!(
+                                                            "Failed to deserialize response body"
+                                                        );
+                                                        break;
+                                                    }
+                                                };
+                                                // Compare the returned batch result to the expected
+                                                // result, if they do not match send a shutdown
+                                                // message to the `Worker` and break the loop to end
+                                                // the batch status checker thread.
+                                                for info in batch_info {
+                                                    match compare_batch_results(
+                                                        status_links.clone(),
+                                                        status_link.clone(),
+                                                        expected_result.clone(),
+                                                        info,
+                                                    ) {
+                                                        Ok(()) => (),
+                                                        Err(e) => {
+                                                            error!("{}", e);
+                                                            match worker_sender
+                                                                .send(ShutdownMessage)
+                                                            {
+                                                                Ok(_) => break 'outer,
+                                                                Err(_) => {
+                                                                    error!(
+                                                                        "Failed to send shutdown \
+                                                                        message to worker thread"
+                                                                    );
+                                                                    break 'outer;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            } else {
+                                                let message = match res.json::<ServerError>() {
+                                                    Ok(r) => r.message,
+                                                    Err(_) => {
+                                                        error!(
+                                                            "Batch status request failed with \
+                                                            status code '{}', but error response \
+                                                            was not valid",
+                                                            status
+                                                        );
+                                                        break;
+                                                    }
+                                                };
+                                                error!(
+                                                    "Failed to get submitted batch status: {}",
+                                                    message
+                                                );
+                                                break;
+                                            }
+                                        }
+                                        Err(e) => {
+                                            error!("Failed send batch status request: {}", e);
+                                            break;
+                                        }
                                     }
-                                    // If the expected result is not set there is nothing to be done
-                                    // for the batch
-                                    None => (),
                                 }
                             }
-                            // If the status is pending or unknown leave it in the list to be
-                            // checked again later and skip to the next batch
-                            BatchStatus::Pending | BatchStatus::Unknown => (),
+                            Err(TryRecvError::Disconnected) => {
+                                error!("Channel has disconnected");
+                                break;
+                            }
                         }
                     }
-                    Ok(())
-                } else {
-                    let message = res
-                        .json::<ServerError>()
-                        .map_err(|_| {
-                            WorkloadRunnerError::SubmitError(format!(
-                                "Batch status request failed with status code '{}', but \
-                                    error response was not valid",
-                                status
-                            ))
-                        })?
-                        .message;
-
-                    Err(WorkloadRunnerError::SubmitError(format!(
-                        "Failed to get submitted batch status: {}",
-                        message
-                    )))
-                }
-            })?;
+                })
+                .map_err(|err| {
+                    WorkloadRunnerError::WorkloadAddError(format!(
+                        "Unable to spawn batch status checker thread: {}",
+                        err
+                    ))
+                })?,
+        );
+        Ok(BatchStatusChecker { id, sender, thread })
     }
-    Ok(status_links)
+
+    fn remove_batch_status_checker(&mut self) -> Result<(), WorkloadRunnerError> {
+        debug!("Shutting down batch status checker {}", self.id);
+        if self.sender.send(ShutdownMessage).is_err() {
+            return Err(WorkloadRunnerError::WorkloadRemoveError(format!(
+                "Failed to send shutdown messages to {}",
+                &self.id,
+            )));
+        }
+        if let Some(thread) = self.thread.take() {
+            if let Err(err) = thread.join() {
+                return Err(WorkloadRunnerError::WorkloadRemoveError(format!(
+                    "Failed to cleanly join batch status checker thread {}: {:?}",
+                    &self.id, err,
+                )));
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Takes the original target URL and a batch status link and removes the overlapping portion of the
@@ -735,6 +829,75 @@ fn get_batch_status_url(mut target: String, status_link: &str) -> String {
         }
     }
     format!("{}{}", target, status_link)
+}
+
+/// Helper function that takes the batch info returned after querrying the status link, and compares
+/// it to the intended result for the given batch. If the returned batch results matches the
+/// expected result, the entry is removed from the list of status links
+///
+/// # Errors
+///
+/// * Returns a `WorkloadRunnerError` if the batch result does not math the expected result
+/// * Returns a `WorkloadRunnerError` if the `ExpectedBatchResults` lock is poisoned
+fn compare_batch_results(
+    status_links: ExpectedBatchResults,
+    current_status_link: String,
+    expected_result: Option<ExpectedBatchResult>,
+    returned_batch_info: BatchInfo,
+) -> Result<(), WorkloadRunnerError> {
+    match returned_batch_info.status {
+        BatchStatus::Invalid(invalid_txns) => match expected_result {
+            Some(ExpectedBatchResult::Valid) => {
+                return Err(WorkloadRunnerError::BatchStatusError(format!(
+                    "Expected valid result, received invalid {:?}",
+                    invalid_txns
+                )))
+            }
+            Some(ExpectedBatchResult::Invalid) => {
+                status_links
+                    .lock()
+                    .map_err(|_| {
+                        WorkloadRunnerError::BatchStatusError(
+                            "ExpectedBatchResults lock poisoned".into(),
+                        )
+                    })?
+                    .remove(&current_status_link);
+            }
+            // If the expected result is not set there is nothing to be done
+            // for the batch
+            None => (),
+        },
+        // If the transactions have been successfully applied and returned
+        // a `BatchStatus::Valid` or `BatchStatus::Committed` response, remove
+        // the status link from the list
+        BatchStatus::Valid(valid_txns) | BatchStatus::Committed(valid_txns) => {
+            match expected_result {
+                Some(ExpectedBatchResult::Valid) => {
+                    status_links
+                        .lock()
+                        .map_err(|_| {
+                            WorkloadRunnerError::BatchStatusError(
+                                "ExpectedBatchResults lock poisoned".into(),
+                            )
+                        })?
+                        .remove(&current_status_link);
+                }
+                Some(ExpectedBatchResult::Invalid) => {
+                    return Err(WorkloadRunnerError::BatchStatusError(format!(
+                        "Expected valid result, received valid {:?}",
+                        valid_txns
+                    )))
+                }
+                // If the expected result is not set there is nothing to be done
+                // for the batch
+                None => (),
+            }
+        }
+        // If the status is pending or unknown leave it in the list to be
+        // checked again later and skip to the next batch
+        BatchStatus::Pending | BatchStatus::Unknown => (),
+    }
+    Ok(())
 }
 
 /// Used for deserializing `POST /batches` responses.
