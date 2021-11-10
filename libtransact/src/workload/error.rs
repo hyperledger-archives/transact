@@ -31,6 +31,8 @@ pub enum WorkloadRunnerError {
     WorkloadAddError(String),
     /// Error raised when removing workload from the runner
     WorkloadRemoveError(String),
+    /// Error raised when retrieving a batch status
+    BatchStatusError(String),
 }
 
 #[cfg(feature = "workload-runner")]
@@ -51,6 +53,9 @@ impl std::fmt::Display for WorkloadRunnerError {
             }
             WorkloadRunnerError::WorkloadRemoveError(ref err) => {
                 write!(f, "Unable to remove workload: {}", err)
+            }
+            WorkloadRunnerError::BatchStatusError(ref err) => {
+                write!(f, "Error occurred while retrieving batch status: {}", err)
             }
         }
     }
