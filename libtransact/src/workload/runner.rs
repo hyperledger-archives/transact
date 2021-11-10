@@ -609,6 +609,7 @@ fn slow_rate(
     loop {
         if let Some(end_time) = end_time {
             if time::Instant::now() > end_time {
+                shutdown = true;
                 break;
             }
         }
