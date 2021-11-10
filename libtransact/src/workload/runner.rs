@@ -156,6 +156,15 @@ impl WorkloadRunner {
     /// Block until for the thread has shutdown.
     pub fn wait_for_shutdown(self) -> Result<(), WorkloadRunnerError> {
         for (_, mut worker) in &mut self.workloads.into_iter() {
+            if let Some(mut batch_status_checker) = worker.batch_status_checker {
+                if let Some(thread) = batch_status_checker.thread.take() {
+                    thread.join().map_err(|_| {
+                        WorkloadRunnerError::WorkloadAddError(
+                            "Failed to join batch status checker thread".to_string(),
+                        )
+                    })?
+                }
+            }
             if let Some(thread) = worker.thread.take() {
                 thread.join().map_err(|_| {
                     WorkloadRunnerError::WorkloadAddError(
