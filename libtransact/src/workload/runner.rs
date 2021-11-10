@@ -335,6 +335,7 @@ impl WorkerBuilder {
         // worker thread to send a shutdown message to the batch status checker when the worker
         // shuts down
         let (batch_status_checker_sender, batch_status_checker_receiver) = channel();
+        let batch_status_checker_shutdown = batch_status_checker_sender.clone();
 
         let batch_status_links: ExpectedBatchResults = Arc::new(Mutex::new(HashMap::new()));
         // start the batch status checker, this is a separate thread that checks the status links
@@ -372,6 +373,11 @@ impl WorkerBuilder {
                     loop {
                         if let Some(end_time) = end_time {
                             if time::Instant::now() > end_time {
+                                signal_batch_status_checker_shutdown(
+                                    batch_status_checker_shutdown,
+                                    thread_id,
+                                    get_batch_status,
+                                );
                                 break;
                             }
                         }
@@ -379,6 +385,11 @@ impl WorkerBuilder {
                             // recieved shutdown
                             Ok(_) => {
                                 info!("Worker received shutdown");
+                                signal_batch_status_checker_shutdown(
+                                    batch_status_checker_shutdown,
+                                    thread_id,
+                                    get_batch_status,
+                                );
                                 break;
                             }
                             Err(TryRecvError::Empty) => {
@@ -387,6 +398,11 @@ impl WorkerBuilder {
                                     Some(target) => target,
                                     None => {
                                         error!("No targets provided");
+                                        signal_batch_status_checker_shutdown(
+                                            batch_status_checker_shutdown,
+                                            thread_id,
+                                            get_batch_status,
+                                        );
                                         break;
                                     }
                                 };
@@ -396,6 +412,11 @@ impl WorkerBuilder {
                                     Ok((batch, expected_result)) => (batch, expected_result),
                                     Err(_) => {
                                         error!("Failed to get next batch");
+                                        signal_batch_status_checker_shutdown(
+                                            batch_status_checker_shutdown,
+                                            thread_id,
+                                            get_batch_status,
+                                        );
                                         break;
                                     }
                                 };
@@ -403,6 +424,11 @@ impl WorkerBuilder {
                                     Ok(bytes) => bytes,
                                     Err(err) => {
                                         error!("Unable to get batch bytes {}", err);
+                                        signal_batch_status_checker_shutdown(
+                                            batch_status_checker_shutdown,
+                                            thread_id,
+                                            get_batch_status,
+                                        );
                                         break;
                                     }
                                 };
@@ -418,6 +444,11 @@ impl WorkerBuilder {
                                                 ),
                                                 Err(_) => {
                                                     error!("ExpectedBatchResults lock poisoned");
+                                                    signal_batch_status_checker_shutdown(
+                                                        batch_status_checker_shutdown,
+                                                        thread_id,
+                                                        get_batch_status,
+                                                    );
                                                     break;
                                                 }
                                             };
@@ -439,7 +470,14 @@ impl WorkerBuilder {
                                                 &receiver,
                                                 end_time,
                                             ) {
-                                                Ok((true, _)) => break,
+                                                Ok((true, _)) => {
+                                                    signal_batch_status_checker_shutdown(
+                                                        batch_status_checker_shutdown,
+                                                        thread_id,
+                                                        get_batch_status,
+                                                    );
+                                                    break;
+                                                }
                                                 Ok((false, Some(link))) => {
                                                     if get_batch_status {
                                                         match batch_status_links.lock() {
@@ -449,6 +487,11 @@ impl WorkerBuilder {
                                                             ),
                                                             Err(_) => {
                                                                 error!("ExpectedBatchResults lock poisoned");
+                                                                signal_batch_status_checker_shutdown(
+                                                                    batch_status_checker_shutdown,
+                                                                    thread_id,
+                                                                    get_batch_status,
+                                                                );
                                                                 break;
                                                             }
                                                         };
@@ -493,6 +536,11 @@ impl WorkerBuilder {
 
                             Err(TryRecvError::Disconnected) => {
                                 error!("Channel has disconnected");
+                                signal_batch_status_checker_shutdown(
+                                    batch_status_checker_shutdown,
+                                    thread_id,
+                                    get_batch_status,
+                                );
                                 break;
                             }
                         }
@@ -626,6 +674,27 @@ fn submit_batch(
                 )))
             }
         })
+}
+
+/// Helper function that will send a shutdown message to the batch status checker thread if a batch
+/// status checker is running
+fn signal_batch_status_checker_shutdown(
+    batch_status_checker_sender: Sender<ShutdownMessage>,
+    id: String,
+    check_batch_status: bool,
+) {
+    if check_batch_status {
+        debug!(
+            "Shutting down batch status checker BatchStatusChecker-{}",
+            id
+        );
+        if batch_status_checker_sender.send(ShutdownMessage).is_err() {
+            error!(
+                "Failed to send shutdown message to BatchStatusChecker-{}",
+                id,
+            );
+        }
+    }
 }
 
 struct BatchStatusChecker {
