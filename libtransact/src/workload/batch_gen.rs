@@ -34,32 +34,6 @@ use crate::protos::{
 use super::error::{BatchReadingError, BatchingError};
 use super::source::LengthDelimitedMessageSource;
 
-/// Generates signed batches from a stream of length-delimited transactions.
-/// Constrains the batches to `max_batch_size` number of transactions per
-/// batch.  The resulting batches are written in a length-delimited fashion to
-/// the given writer.
-pub fn generate_signed_batches<'a>(
-    reader: &'a mut dyn Read,
-    writer: &'a mut dyn Write,
-    max_batch_size: usize,
-    signer: &dyn Signer,
-) -> Result<(), BatchingError> {
-    let mut producer = SignedBatchProducer::new(reader, max_batch_size, signer);
-    loop {
-        match producer.next() {
-            Some(Ok(batch)) => {
-                if let Err(err) = batch.write_length_delimited_to_writer(writer) {
-                    return Err(BatchingError::MessageError(err));
-                }
-            }
-            None => break,
-            Some(Err(err)) => return Err(err),
-        }
-    }
-
-    Ok(())
-}
-
 type TransactionSource<'a> = LengthDelimitedMessageSource<'a, Transaction>;
 
 /// Produces signed batches from a length-delimited source of Transactions.
@@ -82,6 +56,22 @@ impl<'a> SignedBatchProducer<'a> {
             max_batch_size,
             signer,
         }
+    }
+
+    /// Writes signed batches in a length-delimited fashion to the given writer.
+    pub fn write_to(&mut self, writer: &'a mut dyn Write) -> Result<(), BatchingError> {
+        loop {
+            match self.next() {
+                Some(Ok(batch)) => {
+                    if let Err(err) = batch.write_length_delimited_to_writer(writer) {
+                        return Err(BatchingError::MessageError(err));
+                    }
+                }
+                None => break,
+                Some(Err(err)) => return Err(err),
+            }
+        }
+        Ok(())
     }
 }
 
