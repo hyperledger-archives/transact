@@ -25,12 +25,11 @@ use cylinder::Signer;
 use protobuf::Message;
 
 use crate::error::{InternalError, InvalidStateError};
-use crate::protocol::batch::BatchPair;
+use crate::protocol::batch::{BatchBuilder, BatchPair};
+use crate::protocol::transaction::Transaction as ProtocolTransaction;
+use crate::protos::FromNative;
 use crate::protos::FromProto;
-use crate::protos::{
-    batch::{Batch, BatchHeader},
-    transaction::Transaction,
-};
+use crate::protos::{batch::Batch, transaction::Transaction};
 
 use super::error::{BatchReadingError, BatchingError};
 use super::source::LengthDelimitedMessageSource;
@@ -107,37 +106,29 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
 }
 
 fn batch_transactions(txns: Vec<Transaction>, signer: &dyn Signer) -> BatchResult {
-    let mut batch_header = BatchHeader::new();
-
-    // set signer_public_key
-    let pk = match signer.public_key() {
-        Ok(pk) => pk,
-        Err(err) => return Err(BatchingError::SigningError(err)),
-    };
-    let public_key = pk.as_hex();
-
-    let txn_ids = txns
-        .iter()
-        .map(|txn| String::from(txn.get_header_signature()))
-        .collect();
-    batch_header.set_transaction_ids(protobuf::RepeatedField::from_vec(txn_ids));
-    batch_header.set_signer_public_key(public_key);
-
-    let header_bytes = batch_header.write_to_bytes()?;
-    let signature = signer
-        .sign(&header_bytes)
-        .map_err(BatchingError::SigningError);
-    match signature {
-        Ok(signature) => {
-            let mut batch = Batch::new();
-            batch.set_header_signature(signature.as_hex());
-            batch.set_header(header_bytes);
-            batch.set_transactions(protobuf::RepeatedField::from_vec(txns));
-
-            Ok(batch)
-        }
-        Err(err) => Err(err),
-    }
+    let transaction = txns
+        .into_iter()
+        .map(ProtocolTransaction::from_proto)
+        .into_iter()
+        .collect::<Result<Vec<ProtocolTransaction>, _>>()
+        .map_err(|_| {
+            BatchingError::InvalidStateError(InvalidStateError::with_message(
+                "Failed to convert transactions from protobuf".into(),
+            ))
+        })?;
+    let protocol_batch = BatchBuilder::new()
+        .with_transactions(transaction)
+        .build(signer)
+        .map_err(|_| {
+            BatchingError::InvalidStateError(InvalidStateError::with_message(
+                "Failed to build batch".into(),
+            ))
+        })?;
+    Batch::from_native(protocol_batch).map_err(|_| {
+        BatchingError::InvalidStateError(InvalidStateError::with_message(
+            "Failed to convert batch to protobuf".into(),
+        ))
+    })
 }
 
 type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
