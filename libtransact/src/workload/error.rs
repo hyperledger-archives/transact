@@ -105,8 +105,6 @@ impl std::error::Error for BatchingError {
 #[derive(Debug)]
 pub enum BatchReadingError {
     Message(protobuf::ProtobufError),
-    Batching(BatchingError),
-    Unknown,
     ProtoConversion(ProtoConversionError),
 }
 
@@ -124,10 +122,6 @@ impl std::fmt::Display for BatchReadingError {
             BatchReadingError::Message(ref err) => {
                 write!(f, "Error occurred reading messages: {}", err)
             }
-            BatchReadingError::Batching(ref err) => {
-                write!(f, "Error creating the batch: {}", err)
-            }
-            BatchReadingError::Unknown => write!(f, "There was an unknown batching error."),
             BatchReadingError::ProtoConversion(ref err) => {
                 write!(f, "Error converting batch from proto: {}", err)
             }
@@ -140,8 +134,6 @@ impl std::error::Error for BatchReadingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             BatchReadingError::Message(ref err) => Some(err),
-            BatchReadingError::Batching(ref err) => Some(err),
-            BatchReadingError::Unknown => Some(&BatchReadingError::Unknown),
             BatchReadingError::ProtoConversion(ref err) => Some(err),
         }
     }
