@@ -44,7 +44,7 @@ pub struct SignedBatchProducer<'a> {
 }
 
 /// Resulting batch or error.
-pub type BatchResult = Result<Batch, BatchingError>;
+type BatchResult = Result<Batch, BatchingError>;
 
 impl<'a> SignedBatchProducer<'a> {
     /// Creates a new `SignedBatchProducer` with a given Transaction source and
