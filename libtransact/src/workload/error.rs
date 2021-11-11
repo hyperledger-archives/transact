@@ -63,12 +63,14 @@ impl std::fmt::Display for WorkloadRunnerError {
 }
 
 // Errors that may occur during the generation of batches from a source.
+#[cfg(feature = "workload-batch-gen")]
 #[derive(Debug)]
 pub enum BatchingError {
     InternalError(InternalError),
     InvalidStateError(InvalidStateError),
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl std::fmt::Display for BatchingError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -78,6 +80,7 @@ impl std::fmt::Display for BatchingError {
     }
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl std::error::Error for BatchingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
