@@ -178,8 +178,9 @@ mod tests {
 
     use std::io::{Cursor, Write};
 
-    use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
+    use cylinder::{secp256k1::Secp256k1Context, Context, Signature, Signer};
 
+    use crate::protos::batch::BatchHeader;
     use crate::protos::transaction::TransactionHeader;
 
     type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
@@ -198,9 +199,11 @@ mod tests {
     fn next_transactions() {
         let mut encoded_bytes: Vec<u8> = Vec::new();
 
-        write_txn_with_sig("sig1", &mut encoded_bytes);
-        write_txn_with_sig("sig2", &mut encoded_bytes);
-        write_txn_with_sig("sig3", &mut encoded_bytes);
+        let signer = new_signer();
+
+        write_txn_with_signer(&*signer, &mut encoded_bytes);
+        write_txn_with_signer(&*signer, &mut encoded_bytes);
+        write_txn_with_signer(&*signer, &mut encoded_bytes);
 
         let mut source = Cursor::new(encoded_bytes);
 
@@ -229,8 +232,9 @@ mod tests {
 
     #[test]
     fn signed_batches_single_transaction() {
+        let signer1 = new_signer();
         let mut encoded_bytes: Vec<u8> = Vec::new();
-        write_txn_with_sig("sig1", &mut encoded_bytes);
+        let sig1 = write_txn_with_signer(&*signer1, &mut encoded_bytes);
 
         let mut source = Cursor::new(encoded_bytes);
 
@@ -244,7 +248,7 @@ mod tests {
 
         let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
         assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], String::from("sig1"));
+        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
 
         // test exhaustion
         batch_result = producer.next();
@@ -255,9 +259,14 @@ mod tests {
     fn signed_batches_multiple_batches() {
         let mut encoded_bytes: Vec<u8> = Vec::new();
 
-        write_txn_with_sig("sig1", &mut encoded_bytes);
-        write_txn_with_sig("sig2", &mut encoded_bytes);
-        write_txn_with_sig("sig3", &mut encoded_bytes);
+        let signer1 = new_signer();
+        let sig1 = write_txn_with_signer(&*signer1, &mut encoded_bytes);
+
+        let signer2 = new_signer();
+        let sig2 = write_txn_with_signer(&*signer2, &mut encoded_bytes);
+
+        let signer3 = new_signer();
+        let sig3 = write_txn_with_signer(&*signer3, &mut encoded_bytes);
 
         let mut source = Cursor::new(encoded_bytes);
 
@@ -275,8 +284,8 @@ mod tests {
 
         let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
         assert_eq!(batch_header.transaction_ids.len(), 2);
-        assert_eq!(batch_header.transaction_ids[0], String::from("sig1"));
-        assert_eq!(batch_header.transaction_ids[1], String::from("sig2"));
+        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
+        assert_eq!(batch_header.transaction_ids[1], sig2.as_hex());
         assert_eq!(batch.header_signature, signature.as_hex());
 
         // pull the next batch
@@ -287,7 +296,7 @@ mod tests {
 
         let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
         assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], String::from("sig3"));
+        assert_eq!(batch_header.transaction_ids[0], sig3.as_hex());
 
         // test exhaustion
         batch_result = producer.next();
@@ -298,9 +307,14 @@ mod tests {
     fn generate_signed_batches() {
         let mut encoded_bytes: Vec<u8> = Vec::new();
 
-        write_txn_with_sig("sig1", &mut encoded_bytes);
-        write_txn_with_sig("sig2", &mut encoded_bytes);
-        write_txn_with_sig("sig3", &mut encoded_bytes);
+        let signer1 = new_signer();
+        let sig1 = write_txn_with_signer(&*signer1, &mut encoded_bytes);
+
+        let signer2 = new_signer();
+        let sig2 = write_txn_with_signer(&*signer2, &mut encoded_bytes);
+
+        let signer3 = new_signer();
+        let sig3 = write_txn_with_signer(&*signer3, &mut encoded_bytes);
 
         let mut source = Cursor::new(encoded_bytes);
         let output_bytes: Vec<u8> = Vec::new();
@@ -308,7 +322,8 @@ mod tests {
 
         let signer = new_signer();
 
-        super::generate_signed_batches(&mut source, &mut output, 2, &*signer)
+        super::SignedBatchProducer::new(&mut source, 2, &*signer)
+            .write_to(&mut output)
             .expect("Should have generated batches!");
 
         // reset for reading
@@ -318,41 +333,50 @@ mod tests {
         let batch = &(batch_source.next(1).unwrap())[0];
         let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
         assert_eq!(batch_header.transaction_ids.len(), 2);
-        assert_eq!(batch_header.transaction_ids[0], String::from("sig1"));
-        assert_eq!(batch_header.transaction_ids[1], String::from("sig2"));
+        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
+        assert_eq!(batch_header.transaction_ids[1], sig2.as_hex());
 
         let batch = &(batch_source.next(1).unwrap())[0];
         let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
         assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], String::from("sig3"));
+        assert_eq!(batch_header.transaction_ids[0], sig3.as_hex());
     }
 
-    fn make_txn(sig: &str) -> Transaction {
+    fn make_txn(signer: &dyn Signer) -> (Transaction, Signature) {
         let mut txn_header = TransactionHeader::new();
 
-        txn_header.set_batcher_public_key(String::from("some_public_key"));
+        let public_key = signer.public_key().expect("failed to get pub key").as_hex();
+
+        txn_header.set_batcher_public_key(public_key.clone());
         txn_header.set_family_name(String::from("test_family"));
         txn_header.set_family_version(String::from("1.0"));
-        txn_header.set_signer_public_key(String::from("some_public_key"));
-        txn_header.set_payload_sha512(String::from("some_sha512_hash"));
+        txn_header.set_signer_public_key(public_key);
+        txn_header.set_payload_sha512(String::from("hash"));
+
+        let header_bytes = txn_header.write_to_bytes().unwrap();
+
+        let signature = signer
+            .sign(&header_bytes)
+            .expect("Failed to sign header bytes");
 
         let mut txn = Transaction::new();
-        txn.set_header(txn_header.write_to_bytes().unwrap());
-        txn.set_header_signature(String::from(sig));
-        txn.set_payload(sig.as_bytes().to_vec());
+        txn.set_header(header_bytes);
+        txn.set_header_signature(signature.as_hex());
+        txn.set_payload("sig".as_bytes().to_vec());
 
-        txn
+        (txn, signature)
     }
 
-    fn write_txn_with_sig(sig: &str, out: &mut dyn Write) {
-        let txn = make_txn(sig);
+    fn write_txn_with_signer(signer: &dyn Signer, out: &mut dyn Write) -> Signature {
+        let (txn, signature) = make_txn(signer);
         txn.write_length_delimited_to_writer(out)
             .expect("Unable to write delimiter");
+        signature
     }
 
     fn new_signer() -> Box<dyn Signer> {
         let context = Secp256k1Context::new();
         let key = context.new_random_private_key();
-        context.new_signer(key)
+        context.new_signer(key.clone())
     }
 }
