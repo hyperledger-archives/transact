@@ -145,7 +145,7 @@ pub struct BatchListFeeder<'a> {
 }
 
 /// Resulting BatchList or error.
-pub type BatchListResult = Result<BatchPair, BatchReadingError>;
+pub(super) type BatchListResult = Result<BatchPair, BatchReadingError>;
 
 impl<'a> BatchListFeeder<'a> {
     /// Creates a new `BatchListFeeder` with a given Batch source
