@@ -137,39 +137,6 @@ fn batch_transactions(txns: Vec<Transaction>, signer: &dyn Signer) -> BatchResul
     }
 }
 
-pub struct SignedBatchIterator<'a> {
-    transaction_iterator: &'a mut dyn Iterator<Item = Transaction>,
-    max_batch_size: usize,
-    signer: &'a dyn Signer,
-}
-
-impl<'a> SignedBatchIterator<'a> {
-    pub fn new(
-        iterator: &'a mut dyn Iterator<Item = Transaction>,
-        max_batch_size: usize,
-        signer: &'a dyn Signer,
-    ) -> Self {
-        SignedBatchIterator {
-            transaction_iterator: iterator,
-            max_batch_size,
-            signer,
-        }
-    }
-}
-
-impl<'a> Iterator for SignedBatchIterator<'a> {
-    type Item = BatchResult;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let txns = self
-            .transaction_iterator
-            .take(self.max_batch_size)
-            .collect();
-
-        Some(batch_transactions(txns, self.signer))
-    }
-}
-
 type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
 
 /// Produces batches from length-delimited source of Batches.
