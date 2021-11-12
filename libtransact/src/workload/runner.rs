@@ -78,6 +78,7 @@ impl WorkloadRunner {
         update_time: u32,
         get_batch_status: bool,
         duration: Option<Duration>,
+        request_counter: Arc<HttpRequestCounter>,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
@@ -95,6 +96,7 @@ impl WorkloadRunner {
             .with_update_time(update_time)
             .get_batch_status(get_batch_status)
             .with_duration(duration)
+            .with_request_counter(request_counter)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -218,6 +220,7 @@ struct WorkerBuilder {
     update_time: Option<u32>,
     get_batch_status: Option<bool>,
     duration: Option<Duration>,
+    request_counter: Option<Arc<HttpRequestCounter>>,
 }
 
 impl WorkerBuilder {
@@ -299,6 +302,19 @@ impl WorkerBuilder {
     ///  * `get_batch_status` - Whether or not the status of submitted batches should be checked
     pub fn get_batch_status(mut self, get_batch_status: bool) -> WorkerBuilder {
         self.get_batch_status = Some(get_batch_status);
+        self
+    }
+
+    /// Sets the [`HttpRequestCounter`] that will track the submitted requests
+    ///
+    /// # Arguments
+    ///
+    ///  * `request_counter` - The [`HttpRequestCounter`] for the worker
+    pub fn with_request_counter(
+        mut self,
+        request_counter: Arc<HttpRequestCounter>,
+    ) -> WorkerBuilder {
+        self.request_counter = Some(request_counter);
         self
     }
 
