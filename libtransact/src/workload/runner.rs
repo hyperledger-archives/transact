@@ -1070,6 +1070,18 @@ impl HttpRequestCounter {
         self.sent_count.store(0, Ordering::Relaxed);
         self.queue_full_count.store(0, Ordering::Relaxed);
     }
+
+    pub fn reset_sent_count(&self) {
+        self.sent_count.store(0, Ordering::Relaxed);
+    }
+
+    pub fn reset_queue_full_count(&self) {
+        self.queue_full_count.store(0, Ordering::Relaxed);
+    }
+
+    pub fn get_batches_per_second(&self, update: f64) -> f64 {
+        self.sent_count.load(Ordering::Relaxed) as f64 / update
+    }
 }
 
 impl fmt::Display for HttpRequestCounter {
