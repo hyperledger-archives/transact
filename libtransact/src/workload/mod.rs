@@ -30,7 +30,7 @@ use crate::error::InvalidStateError;
 use crate::protocol::batch::BatchPair;
 use crate::protocol::transaction::TransactionPair;
 #[cfg(feature = "workload-runner")]
-pub use crate::workload::runner::{submit_batches_from_source, WorkloadRunner};
+pub use crate::workload::runner::{submit_batches_from_source, HttpRequestCounter, WorkloadRunner};
 
 /// `TransactionWorkload` provides an API for generating transactions
 pub trait TransactionWorkload: Send {
