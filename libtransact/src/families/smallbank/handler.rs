@@ -34,6 +34,7 @@ use crate::protos::smallbank::{
 
 const SMALLBANK_FAMILY_NAME: &str = "smallbank";
 
+/// A transaction handler for the smallbank family.
 pub struct SmallbankTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
@@ -50,20 +51,31 @@ impl SmallbankTransactionHandler {
         }
     }
 
+    /// Returns the smallbank transaction family namespace.
     pub fn namespaces(&self) -> Vec<String> {
         self.namespaces.clone()
     }
 }
 
 impl TransactionHandler for SmallbankTransactionHandler {
+    /// Returns the name of the smallbank transaction family.
     fn family_name(&self) -> &str {
         &self.family_name
     }
 
+    /// Returns the list of versions that the `SmallbankTransactionHandler` can process.
     fn family_versions(&self) -> &[String] {
         &self.family_versions
     }
 
+    /// Defines the business logic for the smallbank transaction family. This function is called by
+    /// the transaction processor when a `TpProcessRequest` is received.
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction_pair` - The smallbank `TransactionPair` to be processed
+    /// * `context` - The transaction context which provides access to reading and writing from
+    ///               state, as well as well as appending data to the receipt.
     fn apply(
         &self,
         transaction_pair: &TransactionPair,
