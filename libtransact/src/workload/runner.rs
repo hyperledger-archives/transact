@@ -351,6 +351,12 @@ impl WorkerBuilder {
             )
         })?;
 
+        let http_counter = self.request_counter.ok_or_else(|| {
+            WorkloadRunnerError::WorkloadAddError(
+                "unable to build, missing field: `request_counter`".to_string(),
+            )
+        })?;
+
         let get_batch_status = self.get_batch_status.unwrap_or(false);
 
         let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
@@ -390,8 +396,6 @@ impl WorkerBuilder {
                     // set first target
                     let mut next_target = 0;
                     let mut workload = workload;
-                    // keep track of status of http requests for logging
-                    let http_counter = HttpRequestCounter::new(thread_id.to_string());
                     // the last time http request information was logged
                     let mut last_log_time = time::Instant::now();
                     let mut start_time = time::Instant::now();
@@ -544,9 +548,6 @@ impl WorkerBuilder {
                                         }
                                     }
                                 }
-
-                                // log http submission stats if its been longer then update time
-                                log(&http_counter, &mut last_log_time, update_time);
 
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
