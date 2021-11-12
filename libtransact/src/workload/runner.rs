@@ -35,8 +35,6 @@ use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 use super::ExpectedBatchResult;
 
-const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
-
 /// This type maps the status link used to check the result of the batch after it has been submitted
 /// to the target URL that a batch was submitted to and the result that was expected of the batch
 type ExpectedBatchResults = Arc<Mutex<HashMap<String, (String, Option<ExpectedBatchResult>)>>>;
@@ -61,7 +59,6 @@ impl WorkloadRunner {
     ///              URL before adding `/batches` for submission
     /// * `time_to_wait`- The amount of time to wait between batch submissions
     /// * `auth` - The string to be set in the Authorization header for the request
-    /// * `update_time` - The time between updates on the workload
     /// * `get_batch_status` - Determines if the workload should compare the result of a batch after
     ///                      it is submitted to the expected result
     ///
@@ -75,7 +72,6 @@ impl WorkloadRunner {
         targets: Vec<String>,
         time_to_wait: Duration,
         auth: String,
-        update_time: u32,
         get_batch_status: bool,
         duration: Option<Duration>,
         request_counter: Arc<HttpRequestCounter>,
@@ -93,7 +89,6 @@ impl WorkloadRunner {
             .with_targets(targets)
             .with_time_to_wait(time_to_wait)
             .with_auth(auth)
-            .with_update_time(update_time)
             .get_batch_status(get_batch_status)
             .with_duration(duration)
             .with_request_counter(request_counter)
@@ -217,7 +212,6 @@ struct WorkerBuilder {
     targets: Option<Vec<String>>,
     time_to_wait: Option<Duration>,
     auth: Option<String>,
-    update_time: Option<u32>,
     get_batch_status: Option<bool>,
     duration: Option<Duration>,
     request_counter: Option<Arc<HttpRequestCounter>>,
@@ -272,16 +266,6 @@ impl WorkerBuilder {
     ///  * `auth` - The auth string to set against the Authorization header for the http request
     pub fn with_auth(mut self, auth: String) -> WorkerBuilder {
         self.auth = Some(auth);
-        self
-    }
-
-    /// Sets the update time of the worker
-    ///
-    /// # Arguments
-    ///
-    ///  * `update_time` - How often to provide an update about the workload
-    pub fn with_update_time(mut self, update_time: u32) -> WorkerBuilder {
-        self.update_time = Some(update_time);
         self
     }
 
@@ -359,8 +343,6 @@ impl WorkerBuilder {
 
         let get_batch_status = self.get_batch_status.unwrap_or(false);
 
-        let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
-
         // calculate the end time based on the duration given
         let end_time = self.duration.map(|d| time::Instant::now() + d);
 
@@ -396,8 +378,6 @@ impl WorkerBuilder {
                     // set first target
                     let mut next_target = 0;
                     let mut workload = workload;
-                    // the last time http request information was logged
-                    let mut last_log_time = time::Instant::now();
                     let mut start_time = time::Instant::now();
                     // total number of batches that have been submitted
                     let mut submitted_batches = 0;
