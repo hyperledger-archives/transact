@@ -15,7 +15,19 @@
  * -----------------------------------------------------------------------------
  */
 
-//! A basic Command Transaction Family
+//! Defines a command family implementation of `TransactionHandler`.
+//!
+//! The following are the commands that can be sent to the [`CommandTransactionHandler`], with a
+//! brief explanation of what they do:
+//!
+//! GetState - Read state entries
+//! SetState - Write state entries
+//! DeleteState - Delete state entries
+//! AddEvent - Add an event to the transaction receipt
+//! AddReceiptData - Add an event to the receipt
+//! Sleep - Sleep for a specified duration
+//! ReturnInvalid - "Return" InvalidTransaction
+//! ReturnInternalError - "Return" InternalError
 
 use std::{thread, time};
 
@@ -28,6 +40,7 @@ const COMMAND_FAMILY_NAME: &str = "command";
 const COMMAND_NAMESPACE: &str = "06abbc";
 const COMMAND_VERSION: &str = "1";
 
+/// A transaction handler for the command family.
 #[derive(Default)]
 pub struct CommandTransactionHandler {
     family_name: String,
@@ -44,20 +57,31 @@ impl CommandTransactionHandler {
         }
     }
 
+    /// Returns the command transaction family namespace.
     pub fn namespaces(&self) -> Vec<String> {
         self.namespaces.clone()
     }
 }
 
 impl TransactionHandler for CommandTransactionHandler {
+    /// Returns the name of the command transaction family.
     fn family_name(&self) -> &str {
         &self.family_name
     }
 
+    /// Returns the list of versions that the `CommandTransactionHandler` can process.
     fn family_versions(&self) -> &[String] {
         &self.versions
     }
 
+    /// Defines the business logic for the command transaction family. This function is called by
+    /// the transaction processor when a `TpProcessRequest` is received.
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction_pair` - The command `TransactionPair` to be processed
+    /// * `context` - The transaction context which provides access to reading and writing from
+    ///               state, as well as well as appending data to the receipt.
     fn apply(
         &self,
         transaction_pair: &TransactionPair,
