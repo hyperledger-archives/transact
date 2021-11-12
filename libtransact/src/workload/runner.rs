@@ -1076,18 +1076,6 @@ impl HttpRequestCounter {
         self.queue_full_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn log(&self, seconds: u64, nanoseconds: u32) {
-        let update = seconds as f64 + f64::from(nanoseconds) * 1e-9;
-        println!(
-            "{}, Batches/s {:.3}",
-            self,
-            self.sent_count.load(Ordering::Relaxed) as f64 / update
-        );
-
-        self.sent_count.store(0, Ordering::Relaxed);
-        self.queue_full_count.store(0, Ordering::Relaxed);
-    }
-
     pub fn reset_sent_count(&self) {
         self.sent_count.store(0, Ordering::Relaxed);
     }
@@ -1112,15 +1100,6 @@ impl fmt::Display for HttpRequestCounter {
             self.sent_count.load(Ordering::Relaxed),
             self.queue_full_count.load(Ordering::Relaxed)
         )
-    }
-}
-
-/// Log if time since last log is greater than update time.
-pub fn log(counter: &HttpRequestCounter, last_log_time: &mut time::Instant, update_time: u32) {
-    let log_time = time::Instant::now() - *last_log_time;
-    if log_time.as_secs() as u32 >= update_time {
-        counter.log(log_time.as_secs(), log_time.subsec_nanos());
-        *last_log_time = time::Instant::now();
     }
 }
 
