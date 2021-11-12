@@ -1110,22 +1110,18 @@ pub fn log(counter: &HttpRequestCounter, last_log_time: &mut time::Instant, upda
 /// Helper function to submit a list of batches from a source
 pub fn submit_batches_from_source(
     source: &mut dyn Read,
-    input_file: String,
     targets: Vec<String>,
     time_to_wait: Duration,
     auth: String,
-    update: u32,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
 ) {
     let mut workload = BatchListFeeder::new(source);
     // set first target
     let mut next_target = 0;
-    // keep track of status of http requests for logging
-    let http_counter = HttpRequestCounter::new(format!("File: {}", input_file));
-    // the last time http request information was logged
-    let mut last_log_time = time::Instant::now();
     let mut submission_start = time::Instant::now();
     let mut submission_avg: Option<time::Duration> = None;
     loop {
+        let http_counter = request_counters[next_target].clone();
         let target = match targets.get(next_target) {
             Some(target) => target,
             None => {
@@ -1167,9 +1163,6 @@ pub fn submit_batches_from_source(
             }
         }
 
-        // log http submission stats if its been longer then update time
-        log(&http_counter, &mut last_log_time, update);
-
         // get next target, round robin
         next_target = (next_target + 1) % targets.len();
         let diff = time::Instant::now() - submission_start;
@@ -1184,7 +1177,4 @@ pub fn submit_batches_from_source(
         thread::sleep(wait_time);
         submission_start = time::Instant::now();
     }
-
-    // log http submission stats for remaning workload
-    log(&http_counter, &mut last_log_time, 0);
 }
