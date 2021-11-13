@@ -304,7 +304,9 @@ mod test {
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
     use crate::context::ContextLifecycle;
-    use crate::families::command::{workload::make_command_transaction, CommandTransactionHandler};
+    use crate::families::command::{
+        workload::CommandTransactionBuilder, CommandTransactionHandler,
+    };
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
@@ -339,12 +341,14 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a simple transaction.
-        let txn_pair = make_command_transaction(
-            &[Command::SetState(SetState::new(create_bytes_entry(vec![
-                ("abc".into(), b"abc".to_vec()),
-            ])))],
-            &*new_signer(),
-        );
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![Command::SetState(SetState::new(create_bytes_entry(
+                vec![("abc".into(), b"abc".to_vec())],
+            )))])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
         let txn_id = txn_pair.transaction().header_signature().into();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -393,13 +397,15 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a failing transaction, resulting in an invalid error.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::GetState(GetState::new(vec!["abc".into()])),
                 Command::ReturnInvalid(ReturnInvalid::new("Test Fail Succeeded".into())),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
@@ -450,15 +456,17 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a failing transaction, resulting in an internal error.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::GetState(GetState::new(vec!["abc".into()])),
                 Command::ReturnInternalError(ReturnInternalError::new(
                     "Test Internal Fail Succeeded".into(),
                 )),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
 
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -498,17 +506,19 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a valid delete transaction.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::SetState(SetState::new(create_bytes_entry(vec![(
                     "abc".into(),
                     b"abc".to_vec(),
                 )]))),
                 Command::GetState(GetState::new(vec!["abc".into()])),
                 Command::DeleteState(DeleteState::new(vec!["abc".into()])),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -557,10 +567,12 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a busy wait transaction.
-        let txn_pair = make_command_transaction(
-            &[Command::Sleep(Sleep::new(100, SleepType::BusyWait))],
-            &*new_signer(),
-        );
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![Command::Sleep(Sleep::new(100, SleepType::BusyWait))])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -608,10 +620,12 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute a sleep transaction.
-        let txn_pair = make_command_transaction(
-            &[Command::Sleep(Sleep::new(100, SleepType::Wait))],
-            &*new_signer(),
-        );
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![Command::Sleep(Sleep::new(100, SleepType::Wait))])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -661,8 +675,8 @@ mod test {
 
         // Create and execute a Set transaction, followed by an Internal error. This will cause
         // the rest of the commands to be short-circuited.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::SetState(SetState::new(create_bytes_entry(vec![(
                     "abc".into(),
                     b"abc".to_vec(),
@@ -674,9 +688,11 @@ mod test {
                     "def".into(),
                     b"def".to_vec(),
                 )]))),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
 
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -728,8 +744,8 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute an Add Event transaction.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::AddEvent(AddEvent::new(
                     "First event".to_string(),
                     create_bytes_entry(vec![
@@ -746,9 +762,11 @@ mod test {
                     ]),
                     b"def".to_vec(),
                 )),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
 
@@ -820,13 +838,15 @@ mod test {
         assert!(static_adapter.start(Box::new(registry.clone())).is_ok());
 
         // Create and execute an Add Receipt Data transaction.
-        let txn_pair = make_command_transaction(
-            &[
+        let txn_pair = CommandTransactionBuilder::new()
+            .with_commands(vec![
                 Command::AddReceiptData(AddReceiptData::new(b"abc".to_vec())),
                 Command::AddReceiptData(AddReceiptData::new(b"def".to_vec())),
-            ],
-            &*new_signer(),
-        );
+            ])
+            .into_transaction_builder()
+            .expect("Failed to get transaction builder")
+            .build_pair(&*new_signer())
+            .expect("Failed to build transaction pair");
 
         let txn_id = txn_pair.transaction().header_signature().to_owned();
         let context_id = context_manager.create_context(&[], &state_id);
