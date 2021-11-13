@@ -193,7 +193,7 @@ fn make_command_workload_addresses() -> Vec<String> {
     addresses
 }
 
-pub fn bytes_to_hex_str(b: &[u8]) -> String {
+fn bytes_to_hex_str(b: &[u8]) -> String {
     b.iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
