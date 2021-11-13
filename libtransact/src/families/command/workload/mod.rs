@@ -142,68 +142,99 @@ impl BatchWorkload for CommandBatchWorkload {
     }
 }
 
-pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
-    let command_payload = CommandPayload::new(commands.to_vec());
-    TransactionBuilder::new()
-        .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
-        .with_family_name(String::from("command"))
-        .with_family_version(String::from("1"))
-        .with_inputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .flatten()
-                .collect(),
-        )
-        .with_outputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .flatten()
-                .collect(),
-        )
-        .with_payload_hash_method(HashMethod::Sha512)
-        .with_payload(
-            command_payload
-                .into_bytes()
-                .expect("Unable to get bytes from Command Payload"),
-        )
-        .build_pair(signer)
-        .unwrap()
+#[derive(Default)]
+pub struct CommandTransactionBuilder {
+    commands: Option<Vec<Command>>,
+}
+
+impl CommandTransactionBuilder {
+    pub fn new() -> Self {
+        CommandTransactionBuilder::default()
+    }
+
+    pub fn with_commands(mut self, commands: Vec<Command>) -> Self {
+        self.commands = Some(commands);
+        self
+    }
+
+    pub fn into_transaction_builder(self) -> Result<TransactionBuilder, InvalidStateError> {
+        let commands_vec = self.commands.ok_or_else(|| {
+            InvalidStateError::with_message("'commands' field is required".to_string())
+        })?;
+
+        let commands = commands_vec.as_slice();
+
+        let command_payload = CommandPayload::new(commands.to_vec())
+            .into_bytes()
+            .map_err(|_| {
+                InvalidStateError::with_message(
+                    "Failed to convert command payload to bytes".to_string(),
+                )
+            })?;
+
+        Ok(TransactionBuilder::new()
+            .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
+            .with_family_name(String::from("command"))
+            .with_family_version(String::from("1"))
+            .with_inputs(
+                commands
+                    .iter()
+                    .map(|cmd| match cmd {
+                        Command::SetState(set_state) => Some(
+                            set_state
+                                .state_writes()
+                                .iter()
+                                .flat_map(|b| b.key().as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        Command::DeleteState(delete_state) => Some(
+                            delete_state
+                                .state_keys()
+                                .to_vec()
+                                .iter()
+                                .flat_map(|k| k.as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .filter(Option::is_some)
+                    .flatten()
+                    .collect(),
+            )
+            .with_outputs(
+                commands
+                    .iter()
+                    .map(|cmd| match cmd {
+                        Command::SetState(set_state) => Some(
+                            set_state
+                                .state_writes()
+                                .iter()
+                                .flat_map(|b| b.key().as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        Command::DeleteState(delete_state) => Some(
+                            delete_state
+                                .state_keys()
+                                .to_vec()
+                                .iter()
+                                .flat_map(|k| k.as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .filter(Option::is_some)
+                    .flatten()
+                    .collect(),
+            )
+            .with_payload_hash_method(HashMethod::Sha512)
+            .with_payload(command_payload))
+    }
+
+    pub fn build_pair(self, signer: &dyn Signer) -> Result<TransactionPair, InvalidStateError> {
+        self.into_transaction_builder()?
+            .build_pair(signer)
+            .map_err(|_| {
+                InvalidStateError::with_message("Failed build transaction pair".to_string())
+            })
+    }
 }
