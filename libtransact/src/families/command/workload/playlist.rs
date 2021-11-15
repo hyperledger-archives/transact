@@ -17,6 +17,7 @@
 
 //! Tools for generating command family transactions
 use protobuf::RepeatedField;
+use rand::distributions::Standard;
 use rand::prelude::*;
 use sha2::{Digest, Sha512};
 
@@ -55,50 +56,45 @@ impl Iterator for CommandGeneratingIter {
     fn next(&mut self) -> Option<Self::Item> {
         let mut command = Command::new();
 
-        // If no addresses are currently set, generate a number between 2 and 6
-        // to ensure `delete_state` will not be chosen
-        let rand = if self.set_addresses.is_empty() {
-            self.rng.gen_range(2, 6)
-        } else {
-            self.rng.gen_range(2, 7)
-        };
-
-        let command_type = match rand {
-            2 => Command_CommandType::SET_STATE,
-            3 => Command_CommandType::GET_STATE,
-            4 => Command_CommandType::ADD_EVENT,
-            5 => Command_CommandType::RETURN_INVALID,
-            6 => Command_CommandType::DELETE_STATE,
-            _ => panic!("Should not have generated outside of [2, 7)"),
-        };
-
-        command.set_command_type(command_type);
+        let mut command_type: CommandType = self.rng.gen();
+        // Delete state must have an existing state to delete in order to be run. If no addresses
+        // are currently set and `CommandType::DeleteState` is generated, generate a new command
+        if self.set_addresses.is_empty() {
+            while command_type == CommandType::DeleteState {
+                command_type = self.rng.gen();
+            }
+        }
 
         match command_type {
-            Command_CommandType::SET_STATE => {
+            CommandType::SetState => {
+                command.set_command_type(Command_CommandType::SET_STATE);
                 let (set_state, address) = make_set_state_command(&mut self.rng, &self.addresses);
                 command.set_set_state(set_state);
                 // add address to list of set addresses
                 self.add_set_address(address.clone());
                 Some((command, address))
             }
-            Command_CommandType::GET_STATE => {
+            CommandType::GetState => {
+                command.set_command_type(Command_CommandType::GET_STATE);
                 let (get_state, address) = make_get_state_command(&mut self.rng, &self.addresses);
                 command.set_get_state(get_state);
                 Some((command, address))
             }
-            Command_CommandType::ADD_EVENT => {
+            CommandType::AddEvent => {
+                command.set_command_type(Command_CommandType::ADD_EVENT);
                 let (add_event, address) = make_add_event_command(&mut self.rng, &self.addresses);
                 command.set_add_event(add_event);
                 Some((command, address))
             }
-            Command_CommandType::RETURN_INVALID => {
+            CommandType::ReturnInvalid => {
+                command.set_command_type(Command_CommandType::RETURN_INVALID);
                 let (return_invalid, address) =
                     make_return_invalid_command(&mut self.rng, &self.addresses);
                 command.set_return_invalid(return_invalid);
                 Some((command, address))
             }
-            Command_CommandType::DELETE_STATE => {
+            CommandType::DeleteState => {
+                command.set_command_type(Command_CommandType::DELETE_STATE);
                 // get a state address that has been set
                 let address_index = self.rng.gen_range(0, self.set_addresses.len());
                 let address = String::from(&self.set_addresses[address_index]);
@@ -109,7 +105,6 @@ impl Iterator for CommandGeneratingIter {
                 command.set_delete_state(delete_state);
                 Some((command, address))
             }
-            _ => panic!("Should not have generated outside of [2, 7)"),
         }
     }
 }
@@ -198,4 +193,25 @@ fn bytes_to_hex_str(b: &[u8]) -> String {
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
         .join("")
+}
+
+#[derive(Debug, PartialEq)]
+enum CommandType {
+    SetState,
+    GetState,
+    AddEvent,
+    ReturnInvalid,
+    DeleteState,
+}
+
+impl Distribution<CommandType> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> CommandType {
+        match rng.gen_range(2, 7) {
+            2 => CommandType::SetState,
+            3 => CommandType::GetState,
+            4 => CommandType::AddEvent,
+            5 => CommandType::ReturnInvalid,
+            _ => CommandType::DeleteState,
+        }
+    }
 }
