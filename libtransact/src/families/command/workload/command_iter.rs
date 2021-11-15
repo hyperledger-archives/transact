@@ -16,13 +16,11 @@
  */
 
 //! Tools for generating command family transactions
-use protobuf::RepeatedField;
 use rand::distributions::Standard;
 use rand::prelude::*;
 use sha2::{Digest, Sha512};
 
-use crate::protos::command;
-use crate::protos::command::{Command, Command_CommandType};
+use crate::protocol::command;
 
 pub struct CommandGeneratingIter {
     rng: StdRng,
@@ -51,11 +49,9 @@ impl CommandGeneratingIter {
 }
 
 impl Iterator for CommandGeneratingIter {
-    type Item = (Command, String);
+    type Item = (command::Command, String);
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut command = Command::new();
-
         let mut command_type: CommandType = self.rng.gen();
         // Delete state must have an existing state to delete in order to be run. If no addresses
         // are currently set and `CommandType::DeleteState` is generated, generate a new command
@@ -67,34 +63,29 @@ impl Iterator for CommandGeneratingIter {
 
         match command_type {
             CommandType::SetState => {
-                command.set_command_type(Command_CommandType::SET_STATE);
                 let (set_state, address) = make_set_state_command(&mut self.rng, &self.addresses);
-                command.set_set_state(set_state);
+                let command = command::Command::SetState(set_state);
                 // add address to list of set addresses
                 self.add_set_address(address.clone());
                 Some((command, address))
             }
             CommandType::GetState => {
-                command.set_command_type(Command_CommandType::GET_STATE);
                 let (get_state, address) = make_get_state_command(&mut self.rng, &self.addresses);
-                command.set_get_state(get_state);
+                let command = command::Command::GetState(get_state);
                 Some((command, address))
             }
             CommandType::AddEvent => {
-                command.set_command_type(Command_CommandType::ADD_EVENT);
                 let (add_event, address) = make_add_event_command(&mut self.rng, &self.addresses);
-                command.set_add_event(add_event);
+                let command = command::Command::AddEvent(add_event);
                 Some((command, address))
             }
             CommandType::ReturnInvalid => {
-                command.set_command_type(Command_CommandType::RETURN_INVALID);
                 let (return_invalid, address) =
                     make_return_invalid_command(&mut self.rng, &self.addresses);
-                command.set_return_invalid(return_invalid);
+                let command = command::Command::ReturnInvalid(return_invalid);
                 Some((command, address))
             }
             CommandType::DeleteState => {
-                command.set_command_type(Command_CommandType::DELETE_STATE);
                 // get a state address that has been set
                 let address_index = self.rng.gen_range(0, self.set_addresses.len());
                 let address = String::from(&self.set_addresses[address_index]);
@@ -102,7 +93,7 @@ impl Iterator for CommandGeneratingIter {
                 self.remove_set_address(address_index);
 
                 let delete_state = make_delete_state_command(address.clone());
-                command.set_delete_state(delete_state);
+                let command = command::Command::DeleteState(delete_state);
                 Some((command, address))
             }
         }
@@ -110,44 +101,44 @@ impl Iterator for CommandGeneratingIter {
 }
 
 fn make_set_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::SetState, String) {
-    let mut bytes_entry = command::BytesEntry::new();
-
     let address = &addresses[rng.gen_range(0, addresses.len())];
 
-    bytes_entry.set_key(address.to_string());
-    bytes_entry.set_value(rng.gen_range(0, 1000).to_string().as_bytes().to_vec());
+    let bytes_entry = command::BytesEntry::new(
+        address.to_string(),
+        rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+    );
 
-    let mut set_state = command::SetState::new();
-    set_state.set_state_writes(RepeatedField::from_vec(vec![bytes_entry]));
-
-    (set_state, address.to_string())
+    (
+        command::SetState::new(vec![bytes_entry]),
+        address.to_string(),
+    )
 }
 
 fn make_get_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::GetState, String) {
     let address = &addresses[rng.gen_range(0, addresses.len())];
 
-    let state_keys = vec![address.to_string()];
-
-    let mut get_state = command::GetState::new();
-    get_state.set_state_keys(RepeatedField::from_vec(state_keys));
-
-    (get_state, address.to_string())
+    (
+        command::GetState::new(vec![address.to_string()]),
+        address.to_string(),
+    )
 }
 
 fn make_add_event_command(rng: &mut StdRng, addresses: &[String]) -> (command::AddEvent, String) {
     let address = &addresses[rng.gen_range(0, addresses.len())];
-    let mut bytes_entry = command::BytesEntry::new();
 
-    bytes_entry.set_key("key".to_string());
-    bytes_entry.set_value(rng.gen_range(0, 1000).to_string().as_bytes().to_vec());
+    let bytes_entry = command::BytesEntry::new(
+        "key".to_string(),
+        rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+    );
 
-    let mut add_event = command::AddEvent::new();
-
-    add_event.set_event_type("event_type".to_string());
-    add_event.set_attributes(RepeatedField::from_vec(vec![bytes_entry]));
-    add_event.set_data(rng.gen_range(0, 1000).to_string().as_bytes().to_vec());
-
-    (add_event, address.to_string())
+    (
+        command::AddEvent::new(
+            "event_type".to_string(),
+            vec![bytes_entry],
+            rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+        ),
+        address.to_string(),
+    )
 }
 
 fn make_return_invalid_command(
@@ -156,19 +147,14 @@ fn make_return_invalid_command(
 ) -> (command::ReturnInvalid, String) {
     let address = &addresses[rng.gen_range(0, addresses.len())];
 
-    let mut return_invalid = command::ReturnInvalid::new();
-    return_invalid.set_error_message("'return_invalid' command mock error message".to_string());
-
-    (return_invalid, address.to_string())
+    (
+        command::ReturnInvalid::new("'return_invalid' command mock error message".to_string()),
+        address.to_string(),
+    )
 }
 
 fn make_delete_state_command(address: String) -> command::DeleteState {
-    let state_keys = vec![address];
-
-    let mut delete_state = command::DeleteState::new();
-    delete_state.set_state_keys(RepeatedField::from_vec(state_keys));
-
-    delete_state
+    command::DeleteState::new(vec![address])
 }
 
 fn make_command_workload_addresses() -> Vec<String> {

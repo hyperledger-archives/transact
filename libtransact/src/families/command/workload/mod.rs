@@ -28,7 +28,7 @@ use crate::protocol::{
     sabre::ExecuteContractActionBuilder,
     transaction::{HashMethod, TransactionBuilder, TransactionPair},
 };
-use crate::protos::{FromProto, IntoBytes};
+use crate::protos::IntoBytes;
 use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
@@ -48,14 +48,10 @@ impl TransactionWorkload for CommandTransactionWorkload {
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
-        let (command_proto, address) = self
+        let (command, address) = self
             .generator
             .next()
             .ok_or_else(|| InvalidStateError::with_message("No command available".to_string()))?;
-
-        let command = Command::from_proto(command_proto).map_err(|_| {
-            InvalidStateError::with_message("Unable to convert from command proto".to_string())
-        })?;
 
         let command_payload = CommandPayload::new(vec![command.clone()]);
 
