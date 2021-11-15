@@ -16,7 +16,8 @@
  * -----------------------------------------------------------------------------
  */
 
-use cylinder::SigningError;
+#[cfg(feature = "workload-batch-gen")]
+use crate::error::{InternalError, InvalidStateError};
 
 #[cfg(feature = "workload-batch-gen")]
 use crate::protos::ProtoConversionError;
@@ -64,38 +65,24 @@ impl std::fmt::Display for WorkloadRunnerError {
 // Errors that may occur during the generation of batches from a source.
 #[derive(Debug)]
 pub enum BatchingError {
-    MessageError(protobuf::ProtobufError),
-    SigningError(SigningError),
-}
-
-impl From<SigningError> for BatchingError {
-    fn from(err: SigningError) -> Self {
-        BatchingError::SigningError(err)
-    }
-}
-
-impl From<protobuf::ProtobufError> for BatchingError {
-    fn from(err: protobuf::ProtobufError) -> Self {
-        BatchingError::MessageError(err)
-    }
+    InternalError(InternalError),
+    InvalidStateError(InvalidStateError),
 }
 
 impl std::fmt::Display for BatchingError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BatchingError::MessageError(ref err) => {
-                write!(f, "Error occurred reading messages: {}", err)
-            }
-            BatchingError::SigningError(ref err) => write!(f, "Unable to sign batch: {}", err),
+        match self {
+            BatchingError::InternalError(err) => f.write_str(&err.to_string()),
+            BatchingError::InvalidStateError(err) => f.write_str(&err.to_string()),
         }
     }
 }
 
 impl std::error::Error for BatchingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
-            BatchingError::MessageError(ref err) => Some(err),
-            BatchingError::SigningError(ref err) => Some(err),
+        match self {
+            BatchingError::InternalError(ref err) => Some(err),
+            BatchingError::InvalidStateError(ref err) => Some(err),
         }
     }
 }

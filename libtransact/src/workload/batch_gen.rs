@@ -24,6 +24,7 @@ use std::io::Write;
 use cylinder::Signer;
 use protobuf::Message;
 
+use crate::error::{InternalError, InvalidStateError};
 use crate::protocol::batch::BatchPair;
 use crate::protos::FromProto;
 use crate::protos::{
@@ -64,7 +65,12 @@ impl<'a> SignedBatchProducer<'a> {
             match self.next() {
                 Some(Ok(batch)) => {
                     if let Err(err) = batch.write_length_delimited_to_writer(writer) {
-                        return Err(BatchingError::MessageError(err));
+                        return Err(BatchingError::InternalError(
+                            InternalError::from_source_with_message(
+                                Box::new(err),
+                                "Error occurred reading messages".into(),
+                            ),
+                        ));
                     }
                 }
                 None => break,
@@ -83,7 +89,14 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
     fn next(&mut self) -> Option<BatchResult> {
         let txns = match self.transaction_source.next(self.max_batch_size) {
             Ok(txns) => txns,
-            Err(err) => return Some(Err(BatchingError::MessageError(err))),
+            Err(err) => {
+                return Some(Err(BatchingError::InternalError(
+                    InternalError::from_source_with_message(
+                        Box::new(err),
+                        "Error occurred reading messages".into(),
+                    ),
+                )))
+            }
         };
         if txns.is_empty() {
             None
