@@ -17,7 +17,7 @@
 
 //! Implementations of the `BatchWorkload` and `TransactionWorkload` traits for the command family.
 
-pub mod playlist;
+mod command_iter;
 
 use cylinder::Signer;
 
@@ -31,7 +31,7 @@ use crate::protocol::{
 use crate::protos::{FromProto, IntoBytes};
 use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
-use self::playlist::CommandGeneratingIter;
+pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
 
 pub struct CommandTransactionWorkload {
     generator: CommandGeneratingIter,
