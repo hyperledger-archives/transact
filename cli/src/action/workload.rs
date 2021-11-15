@@ -13,6 +13,7 @@
 // limitations under the License
 
 use crate::action::time::{Time, TimeType, TimeUnit};
+use std::sync::Arc;
 use std::time::Duration;
 
 use clap::ArgMatches;
@@ -26,9 +27,10 @@ use transact::families::{
         playlist::SmallbankGeneratingIter, SmallbankBatchWorkload, SmallbankTransactionWorkload,
     },
 };
-use transact::workload::WorkloadRunner;
+use transact::workload::{HttpRequestCounter, WorkloadRunner};
 
 use crate::error::CliError;
+use crate::request_logger::RequestLogger;
 
 use super::{create_cylinder_jwt_auth_signer_key, Action, DEFAULT_LOG_TIME_SECS};
 
@@ -122,6 +124,30 @@ impl Action for WorkloadAction {
             })
             .transpose()?;
 
+        // Create request counters for each of the targets given
+        let mut request_counters = Vec::new();
+        for i in 0..targets.len() {
+            let id = match workload {
+                "smallbank" => format!("Smallbank-Workload-{}", i),
+                "command" => format!("Command-Workload-{}", i),
+                _ => {
+                    return Err(CliError::ActionError(format!(
+                        "Unsupported workload type: {}",
+                        workload
+                    )))
+                }
+            };
+            request_counters.push(Arc::new(HttpRequestCounter::new(id)));
+        }
+
+        // Start the request logger
+        let request_logger = RequestLogger::new(
+            request_counters.clone(),
+            Duration::new(update.into(), 0),
+            duration,
+        )
+        .map_err(|err| CliError::ActionError(format!("Unable to start request logger: {}", err)))?;
+
         let mut workload_runner = WorkloadRunner::default();
 
         match workload {
@@ -141,10 +167,10 @@ impl Action for WorkloadAction {
                     max,
                     auth,
                     signer,
-                    update,
                     seed,
                     num_accounts,
                     duration,
+                    request_counters,
                 )?;
             }
             "command" => {
@@ -155,9 +181,9 @@ impl Action for WorkloadAction {
                     max,
                     auth,
                     signer,
-                    update,
                     seed,
                     duration,
+                    request_counters,
                 )?;
             }
             _ => {
@@ -170,10 +196,14 @@ impl Action for WorkloadAction {
 
         // setup control-c handling
         let workload_runner_shutdown_signaler = workload_runner.shutdown_signaler();
+        let request_logger_shutdown_signaler = request_logger.shutdown_signaler();
 
         ctrlc::set_handler(move || {
             if let Err(err) = workload_runner_shutdown_signaler.signal_shutdown() {
                 error!("Unable to cleanly shutdown workload: {}", err);
+            }
+            if let Err(err) = request_logger_shutdown_signaler.signal_shutdown() {
+                error!("Unable to cleanly shutdown request logger: {}", err);
             }
         })
         .map_err(|_| {
@@ -182,6 +212,9 @@ impl Action for WorkloadAction {
 
         if let Err(err) = workload_runner.wait_for_shutdown() {
             error!("Unable to cleanly shutdown workload runner: {}", err);
+        }
+        if let Err(err) = request_logger.wait_for_shutdown() {
+            error!("Unable to cleanly shutdown request logger: {}", err);
         }
 
         Ok(())
@@ -196,10 +229,10 @@ fn start_smallbank_workloads(
     target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
-    update: u32,
     seed: u64,
     num_accounts: usize,
     total_duration: Option<Time>,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -241,9 +274,9 @@ fn start_smallbank_workloads(
                 target,
                 rate.into(),
                 auth.to_string(),
-                update,
                 false,
                 duration,
+                request_counters[i].clone(),
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }
@@ -259,9 +292,9 @@ fn start_command_workloads(
     target_rate_max: Time,
     auth: String,
     signer: Box<dyn Signer>,
-    update: u32,
     seed: u64,
     total_duration: Option<Time>,
+    request_counters: Vec<Arc<HttpRequestCounter>>,
 ) -> Result<(), CliError> {
     let mut rng = rand::thread_rng();
 
@@ -303,9 +336,9 @@ fn start_command_workloads(
                 target,
                 rate.into(),
                 auth.to_string(),
-                update,
                 true,
                 duration,
+                request_counters[i].clone(),
             )
             .map_err(|err| CliError::ActionError(format!("Unable to start workload: {}", err)))?
     }

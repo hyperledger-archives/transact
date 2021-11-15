@@ -19,7 +19,6 @@
 
 use std::collections::HashMap;
 use std::fmt;
-use std::io::Read;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
@@ -30,12 +29,9 @@ use reqwest::{blocking::Client, header, StatusCode};
 
 use crate::protos::IntoBytes;
 
-use super::batch_gen::BatchListFeeder;
 use super::error::WorkloadRunnerError;
 use super::BatchWorkload;
 use super::ExpectedBatchResult;
-
-const DEFAULT_LOG_TIME_SECS: u32 = 30; // time in seconds
 
 /// This type maps the status link used to check the result of the batch after it has been submitted
 /// to the target URL that a batch was submitted to and the result that was expected of the batch
@@ -61,7 +57,6 @@ impl WorkloadRunner {
     ///              URL before adding `/batches` for submission
     /// * `time_to_wait`- The amount of time to wait between batch submissions
     /// * `auth` - The string to be set in the Authorization header for the request
-    /// * `update_time` - The time between updates on the workload
     /// * `get_batch_status` - Determines if the workload should compare the result of a batch after
     ///                      it is submitted to the expected result
     ///
@@ -75,9 +70,9 @@ impl WorkloadRunner {
         targets: Vec<String>,
         time_to_wait: Duration,
         auth: String,
-        update_time: u32,
         get_batch_status: bool,
         duration: Option<Duration>,
+        request_counter: Arc<HttpRequestCounter>,
     ) -> Result<(), WorkloadRunnerError> {
         if self.workloads.contains_key(&id) {
             return Err(WorkloadRunnerError::WorkloadAddError(format!(
@@ -92,9 +87,9 @@ impl WorkloadRunner {
             .with_targets(targets)
             .with_time_to_wait(time_to_wait)
             .with_auth(auth)
-            .with_update_time(update_time)
             .get_batch_status(get_batch_status)
             .with_duration(duration)
+            .with_request_counter(request_counter)
             .build()?;
 
         self.workloads.insert(id, worker);
@@ -215,9 +210,9 @@ struct WorkerBuilder {
     targets: Option<Vec<String>>,
     time_to_wait: Option<Duration>,
     auth: Option<String>,
-    update_time: Option<u32>,
     get_batch_status: Option<bool>,
     duration: Option<Duration>,
+    request_counter: Option<Arc<HttpRequestCounter>>,
 }
 
 impl WorkerBuilder {
@@ -272,16 +267,6 @@ impl WorkerBuilder {
         self
     }
 
-    /// Sets the update time of the worker
-    ///
-    /// # Arguments
-    ///
-    ///  * `update_time` - How often to provide an update about the workload
-    pub fn with_update_time(mut self, update_time: u32) -> WorkerBuilder {
-        self.update_time = Some(update_time);
-        self
-    }
-
     /// Sets the total duration that the worker will run for
     ///
     /// # Arguments
@@ -299,6 +284,19 @@ impl WorkerBuilder {
     ///  * `get_batch_status` - Whether or not the status of submitted batches should be checked
     pub fn get_batch_status(mut self, get_batch_status: bool) -> WorkerBuilder {
         self.get_batch_status = Some(get_batch_status);
+        self
+    }
+
+    /// Sets the [`HttpRequestCounter`] that will track the submitted requests
+    ///
+    /// # Arguments
+    ///
+    ///  * `request_counter` - The [`HttpRequestCounter`] for the worker
+    pub fn with_request_counter(
+        mut self,
+        request_counter: Arc<HttpRequestCounter>,
+    ) -> WorkerBuilder {
+        self.request_counter = Some(request_counter);
         self
     }
 
@@ -335,9 +333,13 @@ impl WorkerBuilder {
             )
         })?;
 
-        let get_batch_status = self.get_batch_status.unwrap_or(false);
+        let http_counter = self.request_counter.ok_or_else(|| {
+            WorkloadRunnerError::WorkloadAddError(
+                "unable to build, missing field: `request_counter`".to_string(),
+            )
+        })?;
 
-        let update_time = self.update_time.unwrap_or(DEFAULT_LOG_TIME_SECS);
+        let get_batch_status = self.get_batch_status.unwrap_or(false);
 
         // calculate the end time based on the duration given
         let end_time = self.duration.map(|d| time::Instant::now() + d);
@@ -374,10 +376,6 @@ impl WorkerBuilder {
                     // set first target
                     let mut next_target = 0;
                     let mut workload = workload;
-                    // keep track of status of http requests for logging
-                    let http_counter = HttpRequestCounter::new(thread_id.to_string());
-                    // the last time http request information was logged
-                    let mut last_log_time = time::Instant::now();
                     let mut start_time = time::Instant::now();
                     // total number of batches that have been submitted
                     let mut submitted_batches = 0;
@@ -528,9 +526,6 @@ impl WorkerBuilder {
                                         }
                                     }
                                 }
-
-                                // log http submission stats if its been longer then update time
-                                log(&http_counter, &mut last_log_time, update_time);
 
                                 // get next target, round robin
                                 next_target = (next_target + 1) % targets.len();
@@ -1059,16 +1054,16 @@ impl HttpRequestCounter {
         self.queue_full_count.fetch_add(1, Ordering::Relaxed);
     }
 
-    pub fn log(&self, seconds: u64, nanoseconds: u32) {
-        let update = seconds as f64 + f64::from(nanoseconds) * 1e-9;
-        println!(
-            "{}, Batches/s {:.3}",
-            self,
-            self.sent_count.load(Ordering::Relaxed) as f64 / update
-        );
-
+    pub fn reset_sent_count(&self) {
         self.sent_count.store(0, Ordering::Relaxed);
+    }
+
+    pub fn reset_queue_full_count(&self) {
         self.queue_full_count.store(0, Ordering::Relaxed);
+    }
+
+    pub fn get_batches_per_second(&self, update: f64) -> f64 {
+        self.sent_count.load(Ordering::Relaxed) as f64 / update
     }
 }
 
@@ -1084,95 +1079,4 @@ impl fmt::Display for HttpRequestCounter {
             self.queue_full_count.load(Ordering::Relaxed)
         )
     }
-}
-
-/// Log if time since last log is greater than update time.
-pub fn log(counter: &HttpRequestCounter, last_log_time: &mut time::Instant, update_time: u32) {
-    let log_time = time::Instant::now() - *last_log_time;
-    if log_time.as_secs() as u32 >= update_time {
-        counter.log(log_time.as_secs(), log_time.subsec_nanos());
-        *last_log_time = time::Instant::now();
-    }
-}
-
-/// Helper function to submit a list of batches from a source
-pub fn submit_batches_from_source(
-    source: &mut dyn Read,
-    input_file: String,
-    targets: Vec<String>,
-    time_to_wait: Duration,
-    auth: String,
-    update: u32,
-) {
-    let mut workload = BatchListFeeder::new(source);
-    // set first target
-    let mut next_target = 0;
-    // keep track of status of http requests for logging
-    let http_counter = HttpRequestCounter::new(format!("File: {}", input_file));
-    // the last time http request information was logged
-    let mut last_log_time = time::Instant::now();
-    let mut submission_start = time::Instant::now();
-    let mut submission_avg: Option<time::Duration> = None;
-    loop {
-        let target = match targets.get(next_target) {
-            Some(target) => target,
-            None => {
-                error!("No targets provided");
-                break;
-            }
-        };
-
-        // get next batch
-        let batch = match workload.next() {
-            Some(Ok(batch)) => batch,
-            Some(Err(err)) => {
-                error!("Unable to get batch: {}", err);
-                break;
-            }
-            None => {
-                info!("All batches submitted");
-                break;
-            }
-        };
-
-        let batch_bytes = match vec![batch.batch().clone()].into_bytes() {
-            Ok(bytes) => bytes,
-            Err(err) => {
-                error!("Unable to get batch bytes {}", err);
-                break;
-            }
-        };
-
-        // submit batch to the target
-        match submit_batch(target, &auth, batch_bytes) {
-            Ok(_) => http_counter.increment_sent(),
-            Err(err) => {
-                if err == WorkloadRunnerError::TooManyRequests {
-                    http_counter.increment_queue_full()
-                } else {
-                    error!("{}", err);
-                }
-            }
-        }
-
-        // log http submission stats if its been longer then update time
-        log(&http_counter, &mut last_log_time, update);
-
-        // get next target, round robin
-        next_target = (next_target + 1) % targets.len();
-        let diff = time::Instant::now() - submission_start;
-        let submission_time = match submission_avg {
-            Some(val) => (diff + val) / 2,
-            None => diff,
-        };
-        submission_avg = Some(submission_time);
-
-        let wait_time = time_to_wait.saturating_sub(submission_time);
-
-        thread::sleep(wait_time);
-        submission_start = time::Instant::now();
-    }
-
-    // log http submission stats for remaning workload
-    log(&http_counter, &mut last_log_time, 0);
 }
