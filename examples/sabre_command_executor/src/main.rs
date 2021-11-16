@@ -37,7 +37,7 @@ use transact::execution::{
     executor::{ExecutionTaskSubmitter, Executor},
 };
 use transact::families::command::workload::{
-    playlist::CommandGeneratingIter, CommandBatchWorkload, CommandTransactionWorkload,
+    CommandBatchWorkload, CommandGeneratingIter, CommandTransactionWorkload,
 };
 use transact::protocol::{
     batch::{BatchBuilder, BatchPair},

@@ -17,7 +17,7 @@
 
 //! Implementations of the `BatchWorkload` and `TransactionWorkload` traits for the command family.
 
-pub mod playlist;
+mod command_iter;
 
 use cylinder::Signer;
 
@@ -28,10 +28,10 @@ use crate::protocol::{
     sabre::ExecuteContractActionBuilder,
     transaction::{HashMethod, TransactionBuilder, TransactionPair},
 };
-use crate::protos::{FromProto, IntoBytes};
+use crate::protos::IntoBytes;
 use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
-use self::playlist::CommandGeneratingIter;
+pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
 
 pub struct CommandTransactionWorkload {
     generator: CommandGeneratingIter,
@@ -48,14 +48,10 @@ impl TransactionWorkload for CommandTransactionWorkload {
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
-        let (command_proto, address) = self
+        let (command, address) = self
             .generator
             .next()
             .ok_or_else(|| InvalidStateError::with_message("No command available".to_string()))?;
-
-        let command = Command::from_proto(command_proto).map_err(|_| {
-            InvalidStateError::with_message("Unable to convert from command proto".to_string())
-        })?;
 
         let command_payload = CommandPayload::new(vec![command.clone()]);
 
@@ -142,68 +138,99 @@ impl BatchWorkload for CommandBatchWorkload {
     }
 }
 
-pub fn make_command_transaction(commands: &[Command], signer: &dyn Signer) -> TransactionPair {
-    let command_payload = CommandPayload::new(commands.to_vec());
-    TransactionBuilder::new()
-        .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
-        .with_family_name(String::from("command"))
-        .with_family_version(String::from("1"))
-        .with_inputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .flatten()
-                .collect(),
-        )
-        .with_outputs(
-            commands
-                .iter()
-                .map(|cmd| match cmd {
-                    Command::SetState(set_state) => Some(
-                        set_state
-                            .state_writes()
-                            .iter()
-                            .flat_map(|b| b.key().as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    Command::DeleteState(delete_state) => Some(
-                        delete_state
-                            .state_keys()
-                            .to_vec()
-                            .iter()
-                            .flat_map(|k| k.as_bytes().to_vec())
-                            .collect(),
-                    ),
-                    _ => None,
-                })
-                .filter(Option::is_some)
-                .flatten()
-                .collect(),
-        )
-        .with_payload_hash_method(HashMethod::Sha512)
-        .with_payload(
-            command_payload
-                .into_bytes()
-                .expect("Unable to get bytes from Command Payload"),
-        )
-        .build_pair(signer)
-        .unwrap()
+#[derive(Default)]
+pub struct CommandTransactionBuilder {
+    commands: Option<Vec<Command>>,
+}
+
+impl CommandTransactionBuilder {
+    pub fn new() -> Self {
+        CommandTransactionBuilder::default()
+    }
+
+    pub fn with_commands(mut self, commands: Vec<Command>) -> Self {
+        self.commands = Some(commands);
+        self
+    }
+
+    pub fn into_transaction_builder(self) -> Result<TransactionBuilder, InvalidStateError> {
+        let commands_vec = self.commands.ok_or_else(|| {
+            InvalidStateError::with_message("'commands' field is required".to_string())
+        })?;
+
+        let commands = commands_vec.as_slice();
+
+        let command_payload = CommandPayload::new(commands.to_vec())
+            .into_bytes()
+            .map_err(|_| {
+                InvalidStateError::with_message(
+                    "Failed to convert command payload to bytes".to_string(),
+                )
+            })?;
+
+        Ok(TransactionBuilder::new()
+            .with_batcher_public_key(vec![0u8, 0u8, 0u8, 0u8])
+            .with_family_name(String::from("command"))
+            .with_family_version(String::from("1"))
+            .with_inputs(
+                commands
+                    .iter()
+                    .map(|cmd| match cmd {
+                        Command::SetState(set_state) => Some(
+                            set_state
+                                .state_writes()
+                                .iter()
+                                .flat_map(|b| b.key().as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        Command::DeleteState(delete_state) => Some(
+                            delete_state
+                                .state_keys()
+                                .to_vec()
+                                .iter()
+                                .flat_map(|k| k.as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .filter(Option::is_some)
+                    .flatten()
+                    .collect(),
+            )
+            .with_outputs(
+                commands
+                    .iter()
+                    .map(|cmd| match cmd {
+                        Command::SetState(set_state) => Some(
+                            set_state
+                                .state_writes()
+                                .iter()
+                                .flat_map(|b| b.key().as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        Command::DeleteState(delete_state) => Some(
+                            delete_state
+                                .state_keys()
+                                .to_vec()
+                                .iter()
+                                .flat_map(|k| k.as_bytes().to_vec())
+                                .collect(),
+                        ),
+                        _ => None,
+                    })
+                    .filter(Option::is_some)
+                    .flatten()
+                    .collect(),
+            )
+            .with_payload_hash_method(HashMethod::Sha512)
+            .with_payload(command_payload))
+    }
+
+    pub fn build_pair(self, signer: &dyn Signer) -> Result<TransactionPair, InvalidStateError> {
+        self.into_transaction_builder()?
+            .build_pair(signer)
+            .map_err(|_| {
+                InvalidStateError::with_message("Failed build transaction pair".to_string())
+            })
+    }
 }
