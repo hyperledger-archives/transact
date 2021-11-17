@@ -92,6 +92,7 @@ stable = [
     "default",
     # The following features are stable:
     "contract-archive",
+    "family-command",
     "family-smallbank",
     "postgres",
     "protocol-sabre",
@@ -112,7 +113,6 @@ experimental = [
     "contract-context",
     "contract-context-key-value",
     "database-sqlite",
-    "family-command",
     "family-command-workload",
     "family-smallbank-workload",
     "family-xo",
