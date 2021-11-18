@@ -22,6 +22,8 @@ use std::io::Error as StdIoError;
 use cylinder::SigningError;
 use yaml_rust::EmitError;
 
+use crate::protos::ProtoConversionError;
+
 #[derive(Debug)]
 pub enum PlaylistError {
     IoError(StdIoError),
@@ -30,6 +32,7 @@ pub enum PlaylistError {
     MessageError(protobuf::ProtobufError),
     SigningError(SigningError),
     BuildError(String),
+    ProtoConversionError(ProtoConversionError),
 }
 
 impl fmt::Display for PlaylistError {
@@ -49,6 +52,9 @@ impl fmt::Display for PlaylistError {
             PlaylistError::BuildError(ref err) => {
                 write!(f, "Error occurred building transactions: {}", err)
             }
+            PlaylistError::ProtoConversionError(ref err) => {
+                write!(f, "Error occurred during protobuf conversion: {}", err)
+            }
         }
     }
 }
@@ -62,6 +68,7 @@ impl Error for PlaylistError {
             PlaylistError::MessageError(ref err) => Some(err),
             PlaylistError::SigningError(ref err) => Some(err),
             PlaylistError::BuildError(_) => None,
+            PlaylistError::ProtoConversionError(ref err) => Some(err),
         }
     }
 }
