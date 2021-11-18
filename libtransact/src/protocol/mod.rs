@@ -28,5 +28,6 @@ pub mod key_value_state;
 pub mod receipt;
 #[cfg(feature = "protocol-sabre")]
 pub mod sabre;
+pub mod smallbank;
 #[cfg(feature = "protocol-transaction")]
 pub mod transaction;
