@@ -59,6 +59,8 @@ impl WorkloadRunner {
     /// * `auth` - The string to be set in the Authorization header for the request
     /// * `get_batch_status` - Determines if the workload should compare the result of a batch after
     ///                      it is submitted to the expected result
+    /// * `duration` - The amount of time the workload should run for
+    /// * `request_counter` - Tracks the submitted requests for logging
     ///
     /// Returns an error if a workload with that ID is already running or if the workload thread
     /// could not be started
