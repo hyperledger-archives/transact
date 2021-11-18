@@ -16,7 +16,8 @@
  * -----------------------------------------------------------------------------
  */
 
-use cylinder::SigningError;
+#[cfg(feature = "workload-batch-gen")]
+use crate::error::{InternalError, InvalidStateError};
 
 #[cfg(feature = "workload-batch-gen")]
 use crate::protos::ProtoConversionError;
@@ -62,40 +63,29 @@ impl std::fmt::Display for WorkloadRunnerError {
 }
 
 // Errors that may occur during the generation of batches from a source.
+#[cfg(feature = "workload-batch-gen")]
 #[derive(Debug)]
 pub enum BatchingError {
-    MessageError(protobuf::ProtobufError),
-    SigningError(SigningError),
+    InternalError(InternalError),
+    InvalidStateError(InvalidStateError),
 }
 
-impl From<SigningError> for BatchingError {
-    fn from(err: SigningError) -> Self {
-        BatchingError::SigningError(err)
-    }
-}
-
-impl From<protobuf::ProtobufError> for BatchingError {
-    fn from(err: protobuf::ProtobufError) -> Self {
-        BatchingError::MessageError(err)
-    }
-}
-
+#[cfg(feature = "workload-batch-gen")]
 impl std::fmt::Display for BatchingError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BatchingError::MessageError(ref err) => {
-                write!(f, "Error occurred reading messages: {}", err)
-            }
-            BatchingError::SigningError(ref err) => write!(f, "Unable to sign batch: {}", err),
+        match self {
+            BatchingError::InternalError(err) => f.write_str(&err.to_string()),
+            BatchingError::InvalidStateError(err) => f.write_str(&err.to_string()),
         }
     }
 }
 
+#[cfg(feature = "workload-batch-gen")]
 impl std::error::Error for BatchingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
-            BatchingError::MessageError(ref err) => Some(err),
-            BatchingError::SigningError(ref err) => Some(err),
+        match self {
+            BatchingError::InternalError(ref err) => Some(err),
+            BatchingError::InvalidStateError(ref err) => Some(err),
         }
     }
 }
@@ -105,8 +95,6 @@ impl std::error::Error for BatchingError {
 #[derive(Debug)]
 pub enum BatchReadingError {
     Message(protobuf::ProtobufError),
-    Batching(BatchingError),
-    Unknown,
     ProtoConversion(ProtoConversionError),
 }
 
@@ -124,10 +112,6 @@ impl std::fmt::Display for BatchReadingError {
             BatchReadingError::Message(ref err) => {
                 write!(f, "Error occurred reading messages: {}", err)
             }
-            BatchReadingError::Batching(ref err) => {
-                write!(f, "Error creating the batch: {}", err)
-            }
-            BatchReadingError::Unknown => write!(f, "There was an unknown batching error."),
             BatchReadingError::ProtoConversion(ref err) => {
                 write!(f, "Error converting batch from proto: {}", err)
             }
@@ -140,8 +124,6 @@ impl std::error::Error for BatchReadingError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match *self {
             BatchReadingError::Message(ref err) => Some(err),
-            BatchReadingError::Batching(ref err) => Some(err),
-            BatchReadingError::Unknown => Some(&BatchReadingError::Unknown),
             BatchReadingError::ProtoConversion(ref err) => Some(err),
         }
     }
