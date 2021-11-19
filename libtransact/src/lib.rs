@@ -123,6 +123,8 @@ extern crate diesel;
 extern crate diesel_migrations;
 
 #[cfg(feature = "context")]
+mod collections;
+#[cfg(feature = "context")]
 pub mod context;
 #[cfg(feature = "contract")]
 pub mod contract;
