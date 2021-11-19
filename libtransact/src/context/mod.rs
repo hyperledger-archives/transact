@@ -21,10 +21,6 @@
 //! previous contexts. The context manager implements the context lifecycle and services the calls
 //! that read, write, and delete data from state.
 
-/// Unique id that references a "Context" from which a `Transaction` can query state and
-/// modify events, data, and state.
-pub type ContextId = [u8; 16];
-
 mod error;
 pub mod manager;
 
@@ -32,6 +28,10 @@ use crate::context::manager::ContextManagerError;
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt};
 use std::mem;
 use uuid::Uuid;
+
+/// Unique id that references a "Context" from which a `Transaction` can query state and
+/// modify events, data, and state.
+pub type ContextId = [u8; 16];
 
 /// ContextManager functionality used by the Scheduler.
 pub trait ContextLifecycle: Send {
