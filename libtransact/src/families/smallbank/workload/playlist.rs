@@ -561,7 +561,7 @@ impl<'a> fmt::Write for FmtWriter<'a> {
     }
 }
 
-pub fn bytes_to_hex_str(b: &[u8]) -> String {
+fn bytes_to_hex_str(b: &[u8]) -> String {
     b.iter()
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
