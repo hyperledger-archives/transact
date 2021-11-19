@@ -14,18 +14,21 @@
 
 FROM ubuntu:bionic as builder
 
+ENV TRANSACT_FORCE_PANDOC=true
+
 RUN apt-get update && \
     apt-get install -y \
     curl \
-    unzip \
     gcc \
     git \
+    libsqlite3-dev \
     libssl-dev \
+    libzmq3-dev \
+    pandoc \
     pkg-config \
     protobuf-compiler \
-    libzmq3-dev \
-    libsqlite3-dev \
-    sqlite3
+    sqlite3 \
+    unzip
 
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
     chmod +x /usr/bin/rustup-init && \
