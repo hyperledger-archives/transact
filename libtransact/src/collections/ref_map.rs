@@ -22,7 +22,7 @@ use std::borrow::Borrow;
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use super::error::RefMapRemoveError;
+use crate::error::InvalidStateError;
 
 /// A map that will keep track of the number of times an ID has been added, and only remove the ID
 /// once the reference count is 0.
@@ -56,7 +56,7 @@ impl<K: Hash + Eq> RefMap<K> {
     /// Decrements the referece count for `ref_id`
     ///
     /// If the internal reference count reaches zero, then `ref_id` will be removed.
-    pub fn remove_ref<Q: ?Sized>(&mut self, ref_id: &Q) -> Result<Option<K>, RefMapRemoveError>
+    pub fn remove_ref<Q: ?Sized>(&mut self, ref_id: &Q) -> Result<Option<K>, InvalidStateError>
     where
         K: Borrow<Q>,
         Q: Hash + Eq,
@@ -64,7 +64,7 @@ impl<K: Hash + Eq> RefMap<K> {
         let (key, ref_count) = match self.references.remove_entry(ref_id) {
             Some((key, ref_count)) => (key, ref_count),
             None => {
-                return Err(RefMapRemoveError(
+                return Err(InvalidStateError::with_message(
                     "Trying to remove a reference that does not exist".into(),
                 ))
             }
@@ -114,12 +114,12 @@ pub mod tests {
         assert_eq!(ref_count, 2);
 
         let id = ref_map.remove_ref("test_id");
-        assert_eq!(id, Ok(None));
+        assert!(matches!(id, Ok(None)));
 
         assert_eq!(ref_map.references.get("test_id").cloned(), Some(1 as u64));
 
         let id = ref_map.remove_ref("test_id");
-        assert_eq!(id, Ok(Some("test_id".to_string())));
+        assert_eq!(&id.unwrap().unwrap(), "test_id");
         assert_eq!(ref_map.references.get("test_id"), None);
     }
 
