@@ -34,9 +34,9 @@ use yaml_rust::YamlEmitter;
 use yaml_rust::YamlLoader;
 
 use crate::protocol::sabre::ExecuteContractActionBuilder;
-use crate::protos::smallbank;
-use crate::protos::smallbank::SmallbankTransactionPayload;
-use crate::protos::smallbank::SmallbankTransactionPayload_PayloadType as SBPayloadType;
+use crate::protocol::smallbank;
+use crate::protocol::smallbank::SmallbankTransactionPayload;
+use crate::protos::IntoBytes;
 use crate::protos::IntoProto;
 
 use super::error::PlaylistError;
@@ -98,8 +98,8 @@ pub fn process_smallbank_playlist(
         let addresses = make_addresses(&payload);
 
         let payload_bytes = payload
-            .write_to_bytes()
-            .map_err(PlaylistError::MessageError)?;
+            .into_bytes()
+            .map_err(PlaylistError::ProtoConversionError)?;
 
         let txn = ExecuteContractActionBuilder::new()
             .with_name(String::from("smallbank"))
@@ -147,28 +147,27 @@ pub fn process_smallbank_playlist(
 }
 
 pub fn make_addresses(payload: &SmallbankTransactionPayload) -> Vec<String> {
-    match payload.get_payload_type() {
-        SBPayloadType::CREATE_ACCOUNT => vec![customer_id_address(
-            payload.get_create_account().get_customer_id(),
-        )],
-        SBPayloadType::DEPOSIT_CHECKING => vec![customer_id_address(
-            payload.get_deposit_checking().get_customer_id(),
-        )],
-        SBPayloadType::WRITE_CHECK => vec![customer_id_address(
-            payload.get_write_check().get_customer_id(),
-        )],
-        SBPayloadType::TRANSACT_SAVINGS => vec![customer_id_address(
-            payload.get_transact_savings().get_customer_id(),
-        )],
-        SBPayloadType::SEND_PAYMENT => vec![
-            customer_id_address(payload.get_send_payment().get_source_customer_id()),
-            customer_id_address(payload.get_send_payment().get_dest_customer_id()),
+    match payload {
+        SmallbankTransactionPayload::CreateAccountTransactionData(payload) => {
+            vec![customer_id_address(*payload.customer_id())]
+        }
+        SmallbankTransactionPayload::DepositCheckingTransactionData(payload) => {
+            vec![customer_id_address(*payload.customer_id())]
+        }
+        SmallbankTransactionPayload::WriteCheckTransactionData(payload) => {
+            vec![customer_id_address(*payload.customer_id())]
+        }
+        SmallbankTransactionPayload::TransactSavingsTransactionData(payload) => {
+            vec![customer_id_address(*payload.customer_id())]
+        }
+        SmallbankTransactionPayload::SendPaymentTransactionData(payload) => vec![
+            customer_id_address(*payload.source_customer_id()),
+            customer_id_address(*payload.dest_customer_id()),
         ],
-        SBPayloadType::AMALGAMATE => vec![
-            customer_id_address(payload.get_amalgamate().get_source_customer_id()),
-            customer_id_address(payload.get_amalgamate().get_dest_customer_id()),
+        SmallbankTransactionPayload::AmalgamateTransactionData(payload) => vec![
+            customer_id_address(*payload.source_customer_id()),
+            customer_id_address(*payload.dest_customer_id()),
         ],
-        SBPayloadType::PAYLOAD_TYPE_UNSET => panic!("Payload type was not set: {:?}", payload),
     }
 }
 
@@ -254,126 +253,128 @@ impl Iterator for SmallbankGeneratingIter {
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.current_account < self.num_accounts {
-            payload.set_payload_type(SBPayloadType::CREATE_ACCOUNT);
-
-            let mut create_account =
-                smallbank::SmallbankTransactionPayload_CreateAccountTransactionData::new();
             let customer_id: u32 = self.rng.gen_range(0, u32::MAX);
             self.accounts.push(customer_id);
-            create_account.set_customer_id(customer_id);
-            create_account.set_customer_name(
+
+            let create_account = smallbank::CreateAccount::new(
+                customer_id,
                 self.rng
                     .sample_iter(&rand::distributions::Alphanumeric)
                     .take(20)
                     .collect(),
+                1_000_000,
+                1_000_000,
             );
 
-            create_account.set_initial_savings_balance(1_000_000);
-            create_account.set_initial_checking_balance(1_000_000);
-            payload.set_create_account(create_account);
-
             self.current_account += 1;
+            Some(SmallbankTransactionPayload::CreateAccountTransactionData(
+                create_account,
+            ))
         } else {
             let payload_type: PayloadType = self.rng.gen();
 
             match payload_type {
                 PayloadType::DepositChecking => {
-                    let data = make_smallbank_deposit_checking_txn(
-                        &mut self.rng,
-                        self.num_accounts,
-                        &self.accounts,
-                    );
-                    payload.set_deposit_checking(data);
+                    let deposit_checking: smallbank::DepositChecking =
+                        make_smallbank_deposit_checking_txn(
+                            &mut self.rng,
+                            self.num_accounts,
+                            &self.accounts,
+                        );
+                    Some(SmallbankTransactionPayload::DepositCheckingTransactionData(
+                        deposit_checking,
+                    ))
                 }
                 PayloadType::WriteCheck => {
-                    let data = make_smallbank_write_check_txn(
+                    let write_check: smallbank::WriteCheck = make_smallbank_write_check_txn(
                         &mut self.rng,
                         self.num_accounts,
                         &self.accounts,
                     );
-                    payload.set_write_check(data);
+                    Some(SmallbankTransactionPayload::WriteCheckTransactionData(
+                        write_check,
+                    ))
                 }
                 PayloadType::TransactSavings => {
-                    let data = make_smallbank_transact_savings_txn(
-                        &mut self.rng,
-                        self.num_accounts,
-                        &self.accounts,
-                    );
-                    payload.set_transact_savings(data);
+                    let transact_savings: smallbank::TransactSavings =
+                        make_smallbank_transact_savings_txn(
+                            &mut self.rng,
+                            self.num_accounts,
+                            &self.accounts,
+                        );
+                    Some(SmallbankTransactionPayload::TransactSavingsTransactionData(
+                        transact_savings,
+                    ))
                 }
                 PayloadType::SendPayment => {
-                    let data = make_smallbank_send_payment_txn(
+                    let send_payment: smallbank::SendPayment = make_smallbank_send_payment_txn(
                         &mut self.rng,
                         self.num_accounts,
                         &self.accounts,
                     );
-                    payload.set_send_payment(data);
+                    Some(SmallbankTransactionPayload::SendPaymentTransactionData(
+                        send_payment,
+                    ))
                 }
                 PayloadType::Amalgamate => {
-                    let data = make_smallbank_amalgamate_txn(
+                    let amalgamate: smallbank::Amalgamate = make_smallbank_amalgamate_txn(
                         &mut self.rng,
                         self.num_accounts,
                         &self.accounts,
                     );
-                    payload.set_amalgamate(data);
+                    Some(SmallbankTransactionPayload::AmalgamateTransactionData(
+                        amalgamate,
+                    ))
                 }
-            };
+            }
         }
-        Some(payload)
     }
 }
 
 impl From<SmallbankTransactionPayload> for Yaml {
     fn from(payload: SmallbankTransactionPayload) -> Self {
-        match payload.payload_type {
-            SBPayloadType::CREATE_ACCOUNT => {
-                let data = payload.get_create_account();
+        match payload {
+            SmallbankTransactionPayload::CreateAccountTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("create_account"),
-                "customer_id" => Yaml::Integer(i64::from(data.customer_id)),
-                "customer_name" => Yaml::String(data.customer_name.clone()),
+                "customer_id" => Yaml::Integer(*data.customer_id() as i64),
+                "customer_name" => Yaml::String(String::from(data.customer_name())),
                 "initial_savings_balance" =>
-                    Yaml::Integer(i64::from(data.initial_savings_balance)),
+                    Yaml::Integer(*data.initial_savings_balance() as i64),
                 "initial_checking_balance" =>
-                    Yaml::Integer(i64::from(data.initial_checking_balance))}
+                    Yaml::Integer(*data.initial_checking_balance() as i64)}
             }
-            SBPayloadType::DEPOSIT_CHECKING => {
-                let data = payload.get_deposit_checking();
+            SmallbankTransactionPayload::DepositCheckingTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("deposit_checking"),
-                "customer_id" => Yaml::Integer(i64::from(data.customer_id)),
-                "amount" => Yaml::Integer(i64::from(data.amount))}
+                "customer_id" => Yaml::Integer(*data.customer_id() as i64),
+                "amount" => Yaml::Integer(*data.amount() as i64)}
             }
-            SBPayloadType::WRITE_CHECK => {
-                let data = payload.get_write_check();
+            SmallbankTransactionPayload::WriteCheckTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("write_check"),
-                "customer_id" => Yaml::Integer(i64::from(data.customer_id)),
-                "amount" => Yaml::Integer(i64::from(data.amount))}
+                "customer_id" => Yaml::Integer(*data.customer_id() as i64),
+                "amount" => Yaml::Integer(*data.amount() as i64)}
             }
-            SBPayloadType::TRANSACT_SAVINGS => {
-                let data = payload.get_transact_savings();
+            SmallbankTransactionPayload::TransactSavingsTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("transact_savings"),
-                "customer_id" => Yaml::Integer(i64::from(data.customer_id)),
-                "amount" => Yaml::Integer(i64::from(data.amount))}
+                "customer_id" => Yaml::Integer(*data.customer_id() as i64),
+                "amount" => Yaml::Integer(*data.amount() as i64)}
             }
-            SBPayloadType::SEND_PAYMENT => {
-                let data = payload.get_send_payment();
+            SmallbankTransactionPayload::SendPaymentTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("send_payment"),
-                "source_customer_id" => Yaml::Integer(i64::from(data.source_customer_id)),
-                "dest_customer_id" => Yaml::Integer(i64::from(data.dest_customer_id)),
-                "amount" => Yaml::Integer(i64::from(data.amount))}
+                "source_customer_id" => Yaml::Integer(*data.source_customer_id() as i64),
+                "dest_customer_id" => Yaml::Integer(*data.dest_customer_id() as i64),
+                "amount" => Yaml::Integer(*data.amount() as i64)}
             }
-            SBPayloadType::AMALGAMATE => {
-                let data = payload.get_amalgamate();
+            SmallbankTransactionPayload::AmalgamateTransactionData(data) => {
                 yaml_map! {
                 "transaction_type" => Yaml::from_str("amalgamate"),
-                "source_customer_id" => Yaml::Integer(i64::from(data.source_customer_id)),
-                "dest_customer_id" => Yaml::Integer(i64::from(data.dest_customer_id))}
+                "source_customer_id" => Yaml::Integer(*data.source_customer_id() as i64),
+                "dest_customer_id" => Yaml::Integer(*data.dest_customer_id() as i64)}
             }
-            SBPayloadType::PAYLOAD_TYPE_UNSET => panic!("Unset payload type: {:?}", payload),
         }
     }
 }
@@ -381,107 +382,94 @@ impl From<SmallbankTransactionPayload> for Yaml {
 impl<'a> From<&'a Yaml> for SmallbankTransactionPayload {
     fn from(yaml: &Yaml) -> Self {
         if let Some(txn_hash) = yaml.as_hash() {
-            let mut payload = SmallbankTransactionPayload::new();
             match txn_hash[&Yaml::from_str("transaction_type")].as_str() {
                 Some("create_account") => {
-                    payload.set_payload_type(SBPayloadType::CREATE_ACCOUNT);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_CreateAccountTransactionData::new();
-                    data.set_customer_id(
-                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32,
+                    let customer_id =
+                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32;
+                    let customer_name = txn_hash[&Yaml::from_str("customer_name")]
+                        .as_str()
+                        .unwrap()
+                        .to_string();
+                    let initial_savings_balance = txn_hash
+                        [&Yaml::from_str("initial_savings_balance")]
+                        .as_i64()
+                        .unwrap() as u32;
+                    let initial_checking_balance = txn_hash
+                        [&Yaml::from_str("initial_checking_balance")]
+                        .as_i64()
+                        .unwrap() as u32;
+
+                    let create_account = smallbank::CreateAccount::new(
+                        customer_id,
+                        customer_name,
+                        initial_savings_balance,
+                        initial_checking_balance,
                     );
-                    data.set_customer_name(
-                        txn_hash[&Yaml::from_str("customer_name")]
-                            .as_str()
-                            .unwrap()
-                            .to_string(),
-                    );
-                    data.set_initial_savings_balance(
-                        txn_hash[&Yaml::from_str("initial_savings_balance")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    data.set_initial_checking_balance(
-                        txn_hash[&Yaml::from_str("initial_checking_balance")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    payload.set_create_account(data);
+
+                    SmallbankTransactionPayload::CreateAccountTransactionData(create_account)
                 }
 
                 Some("deposit_checking") => {
-                    payload.set_payload_type(SBPayloadType::DEPOSIT_CHECKING);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData::new(
-                        );
-                    data.set_customer_id(
-                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32,
-                    );
-                    data.set_amount(txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32);
-                    payload.set_deposit_checking(data);
+                    let customer_id =
+                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32;
+                    let amount = txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32;
+
+                    let deposit_checking = smallbank::DepositChecking::new(customer_id, amount);
+
+                    SmallbankTransactionPayload::DepositCheckingTransactionData(deposit_checking)
                 }
 
                 Some("write_check") => {
-                    payload.set_payload_type(SBPayloadType::WRITE_CHECK);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_WriteCheckTransactionData::new();
-                    data.set_customer_id(
-                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32,
-                    );
-                    data.set_amount(txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32);
-                    payload.set_write_check(data);
+                    let customer_id =
+                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32;
+                    let amount = txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32;
+
+                    let write_check = smallbank::WriteCheck::new(customer_id, amount);
+
+                    SmallbankTransactionPayload::WriteCheckTransactionData(write_check)
                 }
 
                 Some("transact_savings") => {
-                    payload.set_payload_type(SBPayloadType::TRANSACT_SAVINGS);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData::new(
-                        );
-                    data.set_customer_id(
-                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32,
-                    );
-                    data.set_amount(txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as i32);
-                    payload.set_transact_savings(data);
+                    let customer_id =
+                        txn_hash[&Yaml::from_str("customer_id")].as_i64().unwrap() as u32;
+                    let amount = txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as i32;
+
+                    let transact_savings = smallbank::TransactSavings::new(customer_id, amount);
+
+                    SmallbankTransactionPayload::TransactSavingsTransactionData(transact_savings)
                 }
 
                 Some("send_payment") => {
-                    payload.set_payload_type(SBPayloadType::SEND_PAYMENT);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_SendPaymentTransactionData::new();
-                    data.set_source_customer_id(
-                        txn_hash[&Yaml::from_str("source_customer_id")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    data.set_dest_customer_id(
-                        txn_hash[&Yaml::from_str("dest_customer_id")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    data.set_amount(txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32);
-                    payload.set_send_payment(data);
+                    let source_customer_id = txn_hash[&Yaml::from_str("source_customer_id")]
+                        .as_i64()
+                        .unwrap() as u32;
+                    let dest_customer_id = txn_hash[&Yaml::from_str("dest_customer_id")]
+                        .as_i64()
+                        .unwrap() as u32;
+                    let amount = txn_hash[&Yaml::from_str("amount")].as_i64().unwrap() as u32;
+
+                    let send_payment =
+                        smallbank::SendPayment::new(source_customer_id, dest_customer_id, amount);
+
+                    SmallbankTransactionPayload::SendPaymentTransactionData(send_payment)
                 }
 
                 Some("amalgamate") => {
-                    payload.set_payload_type(SBPayloadType::AMALGAMATE);
-                    let mut data =
-                        smallbank::SmallbankTransactionPayload_AmalgamateTransactionData::new();
-                    data.set_source_customer_id(
-                        txn_hash[&Yaml::from_str("source_customer_id")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    data.set_dest_customer_id(
-                        txn_hash[&Yaml::from_str("dest_customer_id")]
-                            .as_i64()
-                            .unwrap() as u32,
-                    );
-                    payload.set_amalgamate(data);
+                    let source_customer_id = txn_hash[&Yaml::from_str("source_customer_id")]
+                        .as_i64()
+                        .unwrap() as u32;
+                    let dest_customer_id = txn_hash[&Yaml::from_str("dest_customer_id")]
+                        .as_i64()
+                        .unwrap() as u32;
+
+                    let amalgamate =
+                        smallbank::Amalgamate::new(source_customer_id, dest_customer_id);
+
+                    SmallbankTransactionPayload::AmalgamateTransactionData(amalgamate)
                 }
                 Some(txn_type) => panic!("unknown transaction_type: {}", txn_type),
                 None => panic!("No transaction_type specified"),
             }
-            payload
         } else {
             panic!("should be a hash map!")
         }
@@ -492,73 +480,60 @@ fn make_smallbank_deposit_checking_txn(
     rng: &mut StdRng,
     num_accounts: usize,
     accounts: &[u32],
-) -> smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData {
-    let mut payload = smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData::new();
+) -> smallbank::DepositChecking {
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
-    payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
-
-    payload
+    smallbank::DepositChecking::new(
+        accounts[rng.gen_range(0, num_accounts)],
+        rng.gen_range(10, 200),
+    )
 }
 
 fn make_smallbank_write_check_txn(
     rng: &mut StdRng,
     num_accounts: usize,
     accounts: &[u32],
-) -> smallbank::SmallbankTransactionPayload_WriteCheckTransactionData {
-    let mut payload = smallbank::SmallbankTransactionPayload_WriteCheckTransactionData::new();
+) -> smallbank::WriteCheck {
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
-    payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
-
-    payload
+    smallbank::WriteCheck::new(
+        accounts[rng.gen_range(0, num_accounts)],
+        rng.gen_range(10, 200),
+    )
 }
 
 fn make_smallbank_transact_savings_txn(
     rng: &mut StdRng,
     num_accounts: usize,
     accounts: &[u32],
-) -> smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData {
-    let mut payload = smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData::new();
+) -> smallbank::TransactSavings {
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
-    payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
-
-    payload
+    smallbank::TransactSavings::new(
+        accounts[rng.gen_range(0, num_accounts)],
+        rng.gen_range(10, 200),
+    )
 }
 
 fn make_smallbank_send_payment_txn(
     rng: &mut StdRng,
     num_accounts: usize,
     accounts: &[u32],
-) -> smallbank::SmallbankTransactionPayload_SendPaymentTransactionData {
-    let mut payload = smallbank::SmallbankTransactionPayload_SendPaymentTransactionData::new();
+) -> smallbank::SendPayment {
     // value in range should always exist
     let source = rng.gen_range(0, num_accounts);
     let dest = next_non_matching_in_range(rng, num_accounts, source);
-    payload.set_source_customer_id(accounts[source]);
-    payload.set_dest_customer_id(accounts[dest]);
-    payload.set_amount(rng.gen_range(10, 200));
 
-    payload
+    smallbank::SendPayment::new(accounts[source], accounts[dest], rng.gen_range(10, 200))
 }
 
 fn make_smallbank_amalgamate_txn(
     rng: &mut StdRng,
     num_accounts: usize,
     accounts: &[u32],
-) -> smallbank::SmallbankTransactionPayload_AmalgamateTransactionData {
-    let mut payload = smallbank::SmallbankTransactionPayload_AmalgamateTransactionData::new();
+) -> smallbank::Amalgamate {
     // value in range should always exist
     let source = rng.gen_range(0, num_accounts);
     let dest = next_non_matching_in_range(rng, num_accounts, source);
-    payload.set_source_customer_id(accounts[source]);
-    payload.set_dest_customer_id(accounts[dest]);
 
-    payload
+    smallbank::Amalgamate::new(accounts[source], accounts[dest])
 }
 
 fn next_non_matching_in_range(rng: &mut StdRng, max: usize, exclude: usize) -> usize {

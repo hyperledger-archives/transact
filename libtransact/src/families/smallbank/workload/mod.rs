@@ -24,17 +24,15 @@ use std::collections::HashMap;
 use std::hash::Hash;
 
 use cylinder::Signer;
-use protobuf::Message;
 
 use crate::error::InvalidStateError;
 use crate::protocol::{
     batch::{BatchBuilder, BatchPair},
     sabre::ExecuteContractActionBuilder,
+    smallbank::SmallbankTransactionPayload,
     transaction::TransactionPair,
 };
-use crate::protos::smallbank::{
-    SmallbankTransactionPayload, SmallbankTransactionPayload_PayloadType,
-};
+use crate::protos::IntoBytes;
 use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 use self::playlist::make_addresses;
@@ -60,9 +58,9 @@ impl SmallbankTransactionWorkload {
         payload: &SmallbankTransactionPayload,
         signature: String,
     ) {
-        if payload.get_payload_type() == SmallbankTransactionPayload_PayloadType::CREATE_ACCOUNT {
+        if let SmallbankTransactionPayload::CreateAccountTransactionData(data) = payload {
             self.dependencies
-                .add_signature(payload.get_create_account().get_customer_id(), signature);
+                .add_signature(*data.customer_id(), signature);
         }
     }
 
@@ -75,26 +73,25 @@ impl SmallbankTransactionWorkload {
     }
 
     fn get_dependencies(&self, payload: &SmallbankTransactionPayload) -> Vec<String> {
-        match payload.get_payload_type() {
-            SmallbankTransactionPayload_PayloadType::DEPOSIT_CHECKING => self
-                .get_dependencies_for_customer_ids(&[payload
-                    .get_deposit_checking()
-                    .get_customer_id()]),
-            SmallbankTransactionPayload_PayloadType::WRITE_CHECK => self
-                .get_dependencies_for_customer_ids(&[payload.get_write_check().get_customer_id()]),
-            SmallbankTransactionPayload_PayloadType::TRANSACT_SAVINGS => self
-                .get_dependencies_for_customer_ids(&[payload
-                    .get_transact_savings()
-                    .get_customer_id()]),
-            SmallbankTransactionPayload_PayloadType::SEND_PAYMENT => self
+        match payload {
+            SmallbankTransactionPayload::DepositCheckingTransactionData(payload) => {
+                self.get_dependencies_for_customer_ids(&[*payload.customer_id()])
+            }
+            SmallbankTransactionPayload::WriteCheckTransactionData(payload) => {
+                self.get_dependencies_for_customer_ids(&[*payload.customer_id()])
+            }
+            SmallbankTransactionPayload::TransactSavingsTransactionData(payload) => {
+                self.get_dependencies_for_customer_ids(&[*payload.customer_id()])
+            }
+            SmallbankTransactionPayload::SendPaymentTransactionData(payload) => self
                 .get_dependencies_for_customer_ids(&[
-                    payload.get_send_payment().get_source_customer_id(),
-                    payload.get_send_payment().get_dest_customer_id(),
+                    *payload.source_customer_id(),
+                    *payload.dest_customer_id(),
                 ]),
-            SmallbankTransactionPayload_PayloadType::AMALGAMATE => self
+            SmallbankTransactionPayload::AmalgamateTransactionData(payload) => self
                 .get_dependencies_for_customer_ids(&[
-                    payload.get_amalgamate().get_source_customer_id(),
-                    payload.get_amalgamate().get_dest_customer_id(),
+                    *payload.source_customer_id(),
+                    *payload.dest_customer_id(),
                 ]),
             _ => vec![],
         }
@@ -112,7 +109,7 @@ impl TransactionWorkload for SmallbankTransactionWorkload {
         let addresses = make_addresses(&payload);
         let dependencies = self.get_dependencies(&payload);
 
-        let payload_bytes = payload.write_to_bytes().map_err(|_| {
+        let payload_bytes = payload.clone().into_bytes().map_err(|_| {
             InvalidStateError::with_message("Unable to convert payload to bytes".to_string())
         })?;
 
