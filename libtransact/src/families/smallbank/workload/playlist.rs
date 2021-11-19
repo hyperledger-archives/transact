@@ -25,6 +25,7 @@ use std::time::Instant;
 
 use cylinder::Signer;
 use protobuf::Message;
+use rand::distributions::Standard;
 use rand::prelude::*;
 use sha2::{Digest, Sha512};
 use yaml_rust::yaml::Hash;
@@ -252,7 +253,6 @@ impl Iterator for SmallbankGeneratingIter {
     type Item = SmallbankTransactionPayload;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let mut payload = SmallbankTransactionPayload::new();
         if self.current_account < self.num_accounts {
             payload.set_payload_type(SBPayloadType::CREATE_ACCOUNT);
 
@@ -274,19 +274,10 @@ impl Iterator for SmallbankGeneratingIter {
 
             self.current_account += 1;
         } else {
-            let payload_type = match self.rng.gen_range(2, 7) {
-                2 => SBPayloadType::DEPOSIT_CHECKING,
-                3 => SBPayloadType::WRITE_CHECK,
-                4 => SBPayloadType::TRANSACT_SAVINGS,
-                5 => SBPayloadType::SEND_PAYMENT,
-                6 => SBPayloadType::AMALGAMATE,
-                _ => panic!("Should not have generated outside of [2, 7)"),
-            };
-
-            payload.set_payload_type(payload_type);
+            let payload_type: PayloadType = self.rng.gen();
 
             match payload_type {
-                SBPayloadType::DEPOSIT_CHECKING => {
+                PayloadType::DepositChecking => {
                     let data = make_smallbank_deposit_checking_txn(
                         &mut self.rng,
                         self.num_accounts,
@@ -294,7 +285,7 @@ impl Iterator for SmallbankGeneratingIter {
                     );
                     payload.set_deposit_checking(data);
                 }
-                SBPayloadType::WRITE_CHECK => {
+                PayloadType::WriteCheck => {
                     let data = make_smallbank_write_check_txn(
                         &mut self.rng,
                         self.num_accounts,
@@ -302,7 +293,7 @@ impl Iterator for SmallbankGeneratingIter {
                     );
                     payload.set_write_check(data);
                 }
-                SBPayloadType::TRANSACT_SAVINGS => {
+                PayloadType::TransactSavings => {
                     let data = make_smallbank_transact_savings_txn(
                         &mut self.rng,
                         self.num_accounts,
@@ -310,7 +301,7 @@ impl Iterator for SmallbankGeneratingIter {
                     );
                     payload.set_transact_savings(data);
                 }
-                SBPayloadType::SEND_PAYMENT => {
+                PayloadType::SendPayment => {
                     let data = make_smallbank_send_payment_txn(
                         &mut self.rng,
                         self.num_accounts,
@@ -318,7 +309,7 @@ impl Iterator for SmallbankGeneratingIter {
                     );
                     payload.set_send_payment(data);
                 }
-                SBPayloadType::AMALGAMATE => {
+                PayloadType::Amalgamate => {
                     let data = make_smallbank_amalgamate_txn(
                         &mut self.rng,
                         self.num_accounts,
@@ -326,7 +317,6 @@ impl Iterator for SmallbankGeneratingIter {
                     );
                     payload.set_amalgamate(data);
                 }
-                _ => panic!("Should not have generated outside of [2, 7)"),
             };
         }
         Some(payload)
@@ -601,4 +591,25 @@ pub fn bytes_to_hex_str(b: &[u8]) -> String {
         .map(|b| format!("{:02x}", b))
         .collect::<Vec<_>>()
         .join("")
+}
+
+#[derive(Debug, PartialEq)]
+enum PayloadType {
+    DepositChecking,
+    WriteCheck,
+    TransactSavings,
+    SendPayment,
+    Amalgamate,
+}
+
+impl Distribution<PayloadType> for Standard {
+    fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> PayloadType {
+        match rng.gen_range(2, 7) {
+            3 => PayloadType::DepositChecking,
+            4 => PayloadType::WriteCheck,
+            5 => PayloadType::TransactSavings,
+            6 => PayloadType::SendPayment,
+            _ => PayloadType::Amalgamate,
+        }
+    }
 }
