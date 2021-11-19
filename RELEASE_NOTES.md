@@ -1,5 +1,16 @@
 # Release Notes
 
+## Changes in Transact 0.3.14
+
+### libtransact updates
+
+* Make `MerkleRadixStore` and the SQL implementation public.  This allows
+  library consumers access to the lower-level APIs for interacting with the
+  merkle-radix tree storage layer.
+
+* Add `list_trees` to `MerkleRadixStore`.  This allows the user to list the
+  available trees stored in the underlying store.
+
 ## Changes in Transact 0.3.13
 
 ### libtransact updates
