@@ -31,6 +31,14 @@ pub struct RefMap<K: Hash + Eq> {
     references: HashMap<K, u64>,
 }
 
+impl<K: Hash + Eq + Clone> Clone for RefMap<K> {
+    fn clone(&self) -> Self {
+        Self {
+            references: self.references.clone(),
+        }
+    }
+}
+
 impl<K: Hash + Eq> RefMap<K> {
     /// Create a new `RefMap`
     pub fn new() -> Self {
