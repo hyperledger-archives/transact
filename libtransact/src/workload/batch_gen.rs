@@ -25,11 +25,11 @@ use cylinder::Signer;
 use protobuf::Message;
 
 use crate::error::{InternalError, InvalidStateError};
-use crate::protocol::batch::{BatchBuilder, BatchPair};
-use crate::protocol::transaction::Transaction as ProtocolTransaction;
+use crate::protocol::batch::{Batch, BatchBuilder, BatchPair};
+use crate::protocol::transaction::Transaction;
 use crate::protos::FromNative;
 use crate::protos::FromProto;
-use crate::protos::{batch::Batch, transaction::Transaction};
+use crate::protos::batch::Batch as ProtobufBatch;
 
 use super::error::{BatchReadingError, BatchingError};
 use super::source::LengthDelimitedMessageSource;
@@ -63,7 +63,10 @@ impl<'a> SignedBatchProducer<'a> {
         loop {
             match self.next() {
                 Some(Ok(batch)) => {
-                    if let Err(err) = batch.write_length_delimited_to_writer(writer) {
+                    let proto_batch = ProtobufBatch::from_native(batch).map_err(|err| {
+                        BatchingError::InternalError(InternalError::from_source(Box::new(err)))
+                    })?;
+                    if let Err(err) = proto_batch.write_length_delimited_to_writer(writer) {
                         return Err(BatchingError::InternalError(
                             InternalError::from_source_with_message(
                                 Box::new(err),
@@ -86,8 +89,13 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
     /// Gets the next BatchResult.
     /// `Ok(None)` indicates that the underlying source has been consumed.
     fn next(&mut self) -> Option<BatchResult> {
-        let txns = match self.transaction_source.next(self.max_batch_size) {
-            Ok(txns) => txns,
+        let txns: Vec<Transaction> = match self.transaction_source.next(self.max_batch_size)
+        {
+            Ok(txns) => txns
+                .into_iter()
+                .map(Transaction::from_proto)
+                .collect::<Result<Vec<Transaction>, _>>()
+                .ok()?,
             Err(err) => {
                 return Some(Err(BatchingError::InternalError(
                     InternalError::from_source_with_message(
@@ -106,29 +114,14 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
 }
 
 fn batch_transactions(txns: Vec<Transaction>, signer: &dyn Signer) -> BatchResult {
-    let transaction = txns
-        .into_iter()
-        .map(ProtocolTransaction::from_proto)
-        .into_iter()
-        .collect::<Result<Vec<ProtocolTransaction>, _>>()
-        .map_err(|_| {
-            BatchingError::InvalidStateError(InvalidStateError::with_message(
-                "Failed to convert transactions from protobuf".into(),
-            ))
-        })?;
-    let protocol_batch = BatchBuilder::new()
-        .with_transactions(transaction)
+    BatchBuilder::new()
+        .with_transactions(txns)
         .build(signer)
         .map_err(|_| {
             BatchingError::InvalidStateError(InvalidStateError::with_message(
                 "Failed to build batch".into(),
             ))
-        })?;
-    Batch::from_native(protocol_batch).map_err(|_| {
-        BatchingError::InvalidStateError(InvalidStateError::with_message(
-            "Failed to convert batch to protobuf".into(),
-        ))
-    })
+        })
 }
 
 type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
