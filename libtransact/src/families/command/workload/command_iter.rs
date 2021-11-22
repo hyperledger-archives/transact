@@ -22,6 +22,7 @@ use sha2::{Digest, Sha512};
 
 use crate::protocol::command;
 
+/// An iterator that generates `command`s
 pub struct CommandGeneratingIter {
     rng: StdRng,
     addresses: Vec<String>,
@@ -29,6 +30,11 @@ pub struct CommandGeneratingIter {
 }
 
 impl CommandGeneratingIter {
+    /// Create a new [CommandGeneratingIter]
+    ///
+    /// # Arguments
+    ///
+    /// * `seed` - Used to create a new `SeedableRng`
     pub fn new(seed: u64) -> Self {
         CommandGeneratingIter {
             rng: SeedableRng::seed_from_u64(seed),
@@ -37,12 +43,22 @@ impl CommandGeneratingIter {
         }
     }
 
+    /// Add an address to `set_addresses`, this is a list of all addresses currently set
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address to add to the `set_addresses` list
     pub fn add_set_address(&mut self, address: String) {
         if !self.set_addresses.contains(&address) {
             self.set_addresses.push(address);
         }
     }
 
+    /// Remove an address from `set_addresses`, this is a list of all addresses currently set
+    ///
+    /// # Arguments
+    ///
+    /// * `address` - The address to remove from the `set_addresses` list
     pub fn remove_set_address(&mut self, index: usize) {
         self.set_addresses.remove(index);
     }

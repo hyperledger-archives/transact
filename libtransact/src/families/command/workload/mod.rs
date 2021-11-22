@@ -33,18 +33,28 @@ use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
 
+/// A transaction workload that generates signed `command` transactions.
 pub struct CommandTransactionWorkload {
     generator: CommandGeneratingIter,
     signer: Box<dyn Signer>,
 }
 
 impl CommandTransactionWorkload {
+    /// Create a new [CommandTransactionWorkload]
+    ///
+    /// # Arguments
+    ///
+    /// * `generator` - An iterator that generates `command`s from the command family
+    /// * `signer` - Used to sign the generated transactions
     pub fn new(generator: CommandGeneratingIter, signer: Box<dyn Signer>) -> Self {
         Self { generator, signer }
     }
 }
 
+/// An implementation of the `TransactionWorkload` trait for command family.
 impl TransactionWorkload for CommandTransactionWorkload {
+    /// Create a new signed `command` transaction. Returns the `TransactionPair` and the expected
+    /// result after the transaction is executed.
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
@@ -107,12 +117,20 @@ impl TransactionWorkload for CommandTransactionWorkload {
     }
 }
 
+/// A batch workload that generates signed batches that contain `command` transactions.
 pub struct CommandBatchWorkload {
     transaction_workload: CommandTransactionWorkload,
     signer: Box<dyn Signer>,
 }
 
 impl CommandBatchWorkload {
+    /// Create a new [CommandBatchWorkload]
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction_workload` - A [CommandTransactionWorkload] that generates command
+    ///   transactions
+    /// * `signer` - Used to sign the generated batches
     pub fn new(transaction_workload: CommandTransactionWorkload, signer: Box<dyn Signer>) -> Self {
         Self {
             transaction_workload,
@@ -121,7 +139,10 @@ impl CommandBatchWorkload {
     }
 }
 
+/// An implementation of the `BatchWorkload` trait for command family.
 impl BatchWorkload for CommandBatchWorkload {
+    /// Create a new signed `command` batch. Returns the `BatchPair` and the expected result after
+    /// the batch is submitted.
     fn next_batch(
         &mut self,
     ) -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError> {
@@ -138,21 +159,29 @@ impl BatchWorkload for CommandBatchWorkload {
     }
 }
 
+/// Builds a `command` tansaction with the list of commands stored in `commands`
 #[derive(Default)]
 pub struct CommandTransactionBuilder {
     commands: Option<Vec<Command>>,
 }
 
 impl CommandTransactionBuilder {
+    /// Create a new [CommandTransactionBuilder]
     pub fn new() -> Self {
         CommandTransactionBuilder::default()
     }
 
+    /// Set the `commands` field of the [CommandTransactionBuilder]
+    ///
+    /// # Arguments
+    ///
+    /// * `commands` - The list of commands that will in the final transaction
     pub fn with_commands(mut self, commands: Vec<Command>) -> Self {
         self.commands = Some(commands);
         self
     }
 
+    /// Create a `TransactionBuilder` with the list of commands stored in the `commands` field
     pub fn into_transaction_builder(self) -> Result<TransactionBuilder, InvalidStateError> {
         let commands_vec = self.commands.ok_or_else(|| {
             InvalidStateError::with_message("'commands' field is required".to_string())
@@ -226,6 +255,7 @@ impl CommandTransactionBuilder {
             .with_payload(command_payload))
     }
 
+    /// Create a `TransactionPair` signed by the given signer
     pub fn build_pair(self, signer: &dyn Signer) -> Result<TransactionPair, InvalidStateError> {
         self.into_transaction_builder()?
             .build_pair(signer)
