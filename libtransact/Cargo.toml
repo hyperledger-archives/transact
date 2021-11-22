@@ -32,6 +32,7 @@ bzip2 = { version = "0.4", optional = true }
 cbor-codec = { version = "0.7", optional = true }
 chrono = { version = "0.4", optional = true }
 cylinder = { version = "0.2", optional = true }
+diesel = { version = "~1.4.7", features = ["r2d2"], optional = true }
 diesel_migrations = { version = "1.4", optional = true }
 glob = { version = "0.3", optional = true }
 hex = "0.4"
@@ -40,8 +41,6 @@ libc = ">=0.2.35"
 lmdb-zero = { version = ">=0.4.1", optional = true }
 log = { version = "0.4", optional = true, features = ["std"] }
 protobuf = "2.23"
-r2d2 = { version = "0.8", optional = true }
-r2d2_sqlite = { version = "0.18", optional = true }
 rand = "0.6"
 rand_hc = { version = "0.1", optional = true }
 reqwest = { version = "0.11", features = ["blocking", "json"], optional = true}
@@ -56,13 +55,6 @@ sha2 = "0.9"
 tar = { version = "0.4", optional = true }
 uuid = { version = "0.8", optional = true, features = ["v4"] }
 yaml-rust =  { version = "0.4", optional = true }
-
-# The following dependencies are interdependent.
-#
-# diesel 1.4.7 is the minimum version that does not conflict with rusqlite in
-# that they both require a transient dependency of libsqlite-sys.
-diesel = { version = "~1.4.7", features = ["r2d2"], optional = true }
-rusqlite = { version = "0.25", optional = true }
 
 [dev-dependencies]
 rusty-fork = "0.3"
@@ -112,7 +104,6 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
-    "database-sqlite",
     "family-command-workload",
     "family-smallbank-workload",
     "family-xo",
@@ -145,7 +136,6 @@ contract-archive = ["bzip2", "contract", "glob", "semver", "serde", "serde_deriv
 contract-context = ["contract", "contract-address"]
 contract-context-key-value = ["contract-context", "key-value-state"]
 database-lmdb = ["lmdb-zero"]
-database-sqlite = ["rusqlite", "r2d2", "r2d2_sqlite"]
 execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
 family-command-workload = [
