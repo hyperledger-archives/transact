@@ -25,7 +25,7 @@ path = "src/main.rs"
 [dependencies]
 clap = "2"
 cylinder = "0.2"
-flexi_logger = "0.19"
+flexi_logger = { version = "0.20", features = ["use_chrono_for_offset"] }
 log = "0.4"
 protobuf = { version = "2.19" }
 sawtooth-sabre = "0.7"
