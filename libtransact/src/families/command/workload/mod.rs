@@ -117,12 +117,20 @@ impl TransactionWorkload for CommandTransactionWorkload {
     }
 }
 
+/// A batch workload that generates signed batches that contain `command` transactions.
 pub struct CommandBatchWorkload {
     transaction_workload: CommandTransactionWorkload,
     signer: Box<dyn Signer>,
 }
 
 impl CommandBatchWorkload {
+    /// Create a new [CommandBatchWorkload]
+    ///
+    /// # Arguments
+    ///
+    /// * `transaction_workload` - A [CommandTransactionWorkload] that generates command
+    ///   transactions
+    /// * `signer` - Used to sign the generated batches
     pub fn new(transaction_workload: CommandTransactionWorkload, signer: Box<dyn Signer>) -> Self {
         Self {
             transaction_workload,
@@ -131,7 +139,10 @@ impl CommandBatchWorkload {
     }
 }
 
+/// An implementation of the `BatchWorkload` trait for command family.
 impl BatchWorkload for CommandBatchWorkload {
+    /// Create a new signed `command` batch. Returns the `BatchPair` and the expected result after
+    /// the batch is submitted.
     fn next_batch(
         &mut self,
     ) -> Result<(BatchPair, Option<ExpectedBatchResult>), InvalidStateError> {
