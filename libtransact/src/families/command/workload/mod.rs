@@ -159,21 +159,29 @@ impl BatchWorkload for CommandBatchWorkload {
     }
 }
 
+/// Builds a `command` tansaction with the list of commands stored in `commands`
 #[derive(Default)]
 pub struct CommandTransactionBuilder {
     commands: Option<Vec<Command>>,
 }
 
 impl CommandTransactionBuilder {
+    /// Create a new [CommandTransactionBuilder]
     pub fn new() -> Self {
         CommandTransactionBuilder::default()
     }
 
+    /// Set the `commands` field of the [CommandTransactionBuilder]
+    ///
+    /// # Arguments
+    ///
+    /// * `commands` - The list of commands that will in the final transaction
     pub fn with_commands(mut self, commands: Vec<Command>) -> Self {
         self.commands = Some(commands);
         self
     }
 
+    /// Create a `TransactionBuilder` with the list of commands stored in the `commands` field
     pub fn into_transaction_builder(self) -> Result<TransactionBuilder, InvalidStateError> {
         let commands_vec = self.commands.ok_or_else(|| {
             InvalidStateError::with_message("'commands' field is required".to_string())
@@ -247,6 +255,7 @@ impl CommandTransactionBuilder {
             .with_payload(command_payload))
     }
 
+    /// Create a `TransactionPair` signed by the given signer
     pub fn build_pair(self, signer: &dyn Signer) -> Result<TransactionPair, InvalidStateError> {
         self.into_transaction_builder()?
             .build_pair(signer)
