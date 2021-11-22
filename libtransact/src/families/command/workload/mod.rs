@@ -33,18 +33,28 @@ use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
 pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
 
+/// A transaction workload that generates signed `command` transactions.
 pub struct CommandTransactionWorkload {
     generator: CommandGeneratingIter,
     signer: Box<dyn Signer>,
 }
 
 impl CommandTransactionWorkload {
+    /// Create a new [CommandTransactionWorkload]
+    ///
+    /// # Arguments
+    ///
+    /// * `generator` - An iterator that generates `command`s from the command family
+    /// * `signer` - Used to sign the generated transactions
     pub fn new(generator: CommandGeneratingIter, signer: Box<dyn Signer>) -> Self {
         Self { generator, signer }
     }
 }
 
+/// An implementation of the `TransactionWorkload` trait for command family.
 impl TransactionWorkload for CommandTransactionWorkload {
+    /// Create a new signed `command` transaction. Returns the `TransactionPair` and the expected
+    /// result after the transaction is executed.
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
