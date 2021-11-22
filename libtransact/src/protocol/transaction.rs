@@ -506,6 +506,7 @@ impl TransactionBuilder {
         let nonce = self.nonce.unwrap_or_else(|| {
             rand::thread_rng()
                 .sample_iter(&Alphanumeric)
+                .map(char::from)
                 .take(DEFAULT_NONCE_SIZE)
                 .collect::<String>()
                 .as_bytes()

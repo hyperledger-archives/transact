@@ -258,12 +258,13 @@ impl Iterator for SmallbankGeneratingIter {
 
             let mut create_account =
                 smallbank::SmallbankTransactionPayload_CreateAccountTransactionData::new();
-            let customer_id: u32 = self.rng.gen_range(0, u32::MAX);
+            let customer_id: u32 = self.rng.gen_range(0..u32::MAX);
             self.accounts.push(customer_id);
             create_account.set_customer_id(customer_id);
             create_account.set_customer_name(
-                self.rng
-                    .sample_iter(&rand::distributions::Alphanumeric)
+                std::iter::repeat(())
+                    .map(|()| self.rng.sample(rand::distributions::Alphanumeric))
+                    .map(char::from)
                     .take(20)
                     .collect(),
             );
@@ -274,7 +275,7 @@ impl Iterator for SmallbankGeneratingIter {
 
             self.current_account += 1;
         } else {
-            let payload_type = match self.rng.gen_range(2, 7) {
+            let payload_type = match self.rng.gen_range(2..7) {
                 2 => SBPayloadType::DEPOSIT_CHECKING,
                 3 => SBPayloadType::WRITE_CHECK,
                 4 => SBPayloadType::TRANSACT_SAVINGS,
@@ -505,9 +506,9 @@ fn make_smallbank_deposit_checking_txn(
 ) -> smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_DepositCheckingTransactionData::new();
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    let customer_id = accounts[rng.gen_range(0..num_accounts)];
     payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
+    payload.set_amount(rng.gen_range(10..200));
 
     payload
 }
@@ -519,9 +520,9 @@ fn make_smallbank_write_check_txn(
 ) -> smallbank::SmallbankTransactionPayload_WriteCheckTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_WriteCheckTransactionData::new();
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    let customer_id = accounts[rng.gen_range(0..num_accounts)];
     payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
+    payload.set_amount(rng.gen_range(10..200));
 
     payload
 }
@@ -533,9 +534,9 @@ fn make_smallbank_transact_savings_txn(
 ) -> smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_TransactSavingsTransactionData::new();
     // value in range should always exist
-    let customer_id = accounts[rng.gen_range(0, num_accounts)];
+    let customer_id = accounts[rng.gen_range(0..num_accounts)];
     payload.set_customer_id(customer_id);
-    payload.set_amount(rng.gen_range(10, 200));
+    payload.set_amount(rng.gen_range(10..200));
 
     payload
 }
@@ -547,11 +548,11 @@ fn make_smallbank_send_payment_txn(
 ) -> smallbank::SmallbankTransactionPayload_SendPaymentTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_SendPaymentTransactionData::new();
     // value in range should always exist
-    let source = rng.gen_range(0, num_accounts);
+    let source = rng.gen_range(0..num_accounts);
     let dest = next_non_matching_in_range(rng, num_accounts, source);
     payload.set_source_customer_id(accounts[source]);
     payload.set_dest_customer_id(accounts[dest]);
-    payload.set_amount(rng.gen_range(10, 200));
+    payload.set_amount(rng.gen_range(10..200));
 
     payload
 }
@@ -563,7 +564,7 @@ fn make_smallbank_amalgamate_txn(
 ) -> smallbank::SmallbankTransactionPayload_AmalgamateTransactionData {
     let mut payload = smallbank::SmallbankTransactionPayload_AmalgamateTransactionData::new();
     // value in range should always exist
-    let source = rng.gen_range(0, num_accounts);
+    let source = rng.gen_range(0..num_accounts);
     let dest = next_non_matching_in_range(rng, num_accounts, source);
     payload.set_source_customer_id(accounts[source]);
     payload.set_dest_customer_id(accounts[dest]);
@@ -574,7 +575,7 @@ fn make_smallbank_amalgamate_txn(
 fn next_non_matching_in_range(rng: &mut StdRng, max: usize, exclude: usize) -> usize {
     let mut selected = exclude;
     while selected == exclude {
-        selected = rng.gen_range(0, max)
+        selected = rng.gen_range(0..max)
     }
     selected
 }

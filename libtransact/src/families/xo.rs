@@ -43,9 +43,9 @@ impl TransactionWorkload for XoTransactionWorkload {
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
-        let nonce = self
-            .rng
-            .sample_iter(&Alphanumeric)
+        let nonce = std::iter::repeat(())
+            .map(|()| self.rng.sample(Alphanumeric))
+            .map(char::from)
             .take(NONCE_SIZE)
             .collect::<String>()
             .into_bytes();
@@ -124,10 +124,11 @@ impl Payload {
     /// Creates a Payload initialized with Action::Create and a randomly
     /// generated name.
     pub fn new_as_create_with_random_name(rnd: &mut StdRng) -> Self {
-        let length = rnd.gen_range(5, 20);
+        let length = rnd.gen_range(5..20);
 
         Payload::new_as_create(
             rnd.sample_iter(&Alphanumeric)
+                .map(char::from)
                 .take(length)
                 .collect::<String>()
                 .as_str(),
