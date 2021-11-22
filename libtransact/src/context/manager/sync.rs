@@ -126,7 +126,7 @@ impl ContextLifecycle for ContextManager {
     fn drop_context(&mut self, context_id: ContextId) -> Result<(), InternalError> {
         self.internal_manager
             .lock()
-            .expect("Lock in drop_context was poisoned")
+            .map_err(|_| InternalError::with_message("ContextManager lock was poisoned".into()))?
             .drop_context(context_id)
     }
 

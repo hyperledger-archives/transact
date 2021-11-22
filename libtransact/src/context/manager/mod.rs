@@ -511,7 +511,7 @@ mod tests {
         let context_id = manager.create_context(&[], &state_id);
         manager.set_state(&context_id, KEY2.to_string(), BYTES2.to_vec())?;
 
-        manager.drop_context(context_id.clone());
+        manager.drop_context(context_id.clone())?;
 
         assert!(matches!(
             manager.set_state(&context_id, KEY3.to_string(), BYTES3.to_vec()),
@@ -542,11 +542,11 @@ mod tests {
         let context_id = manager.create_context(&[ancestor_context], &state_id);
         manager.set_state(&context_id, KEY3.to_string(), BYTES3.to_vec())?;
 
-        manager.drop_context(ancestor_context.clone());
+        manager.drop_context(ancestor_context.clone())?;
 
         assert!(manager.get_context(&ancestor_context).is_ok());
 
-        manager.drop_context(context_id.clone());
+        manager.drop_context(context_id.clone())?;
 
         assert!(
             matches!(
