@@ -25,6 +25,7 @@ mod error;
 pub mod manager;
 
 use crate::context::manager::ContextManagerError;
+use crate::error::InternalError;
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt};
 use std::mem;
 use uuid::Uuid;
@@ -71,7 +72,7 @@ pub trait ContextLifecycle: Send {
     /// Create a new Context, returning a unique ContextId.
     fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId;
 
-    fn drop_context(&mut self, context_id: ContextId);
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), InternalError>;
 
     fn get_transaction_receipt(
         &self,

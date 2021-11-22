@@ -248,6 +248,7 @@ mod tests {
     use super::*;
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
+    use crate::error::InternalError;
     use crate::protocol::batch::BatchBuilder;
     use crate::protocol::receipt::TransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
@@ -374,7 +375,9 @@ mod tests {
                 .map_err(|err| ContextManagerError::from(err))
         }
 
-        fn drop_context(&mut self, _context_id: ContextId) {}
+        fn drop_context(&mut self, _context_id: ContextId) -> Result<(), InternalError> {
+            Ok(())
+        }
 
         fn clone_box(&self) -> Box<dyn ContextLifecycle> {
             Box::new(self.clone())
