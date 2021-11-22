@@ -457,6 +457,7 @@ mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
+    use crate::context::ContextId;
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
     use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTaskCompletionNotification;
@@ -707,7 +708,7 @@ mod tests {
     }
 
     fn create_iterator() -> impl Iterator<Item = ExecutionTask> {
-        let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let context_id = ContextId::default();
         let signer = new_signer();
 
         (0..NUMBER_OF_TRANSACTIONS)

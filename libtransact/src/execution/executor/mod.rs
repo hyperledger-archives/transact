@@ -125,6 +125,7 @@ mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
+    use crate::context::ContextId;
     use crate::execution::adapter::test_adapter::TestExecutionAdapter;
     use crate::protocol::transaction::{HashMethod, TransactionBuilder, TransactionPair};
     use crate::scheduler::ExecutionTask;
@@ -225,7 +226,7 @@ mod tests {
 
     impl MockTaskExecutionIterator {
         fn new() -> Self {
-            let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+            let context_id = ContextId::default();
 
             let family_name = |i| {
                 if i % 2 == 0 {

@@ -80,24 +80,16 @@ impl ContextManager {
         &mut self,
         context_id: &ContextId,
     ) -> Result<&mut Context, ContextManagerError> {
-        self.contexts.get_mut(context_id).ok_or_else(|| {
-            ContextManagerError::MissingContextError(
-                str::from_utf8(context_id)
-                    .expect("Unable to generate string from ContextId")
-                    .to_string(),
-            )
-        })
+        self.contexts
+            .get_mut(context_id)
+            .ok_or_else(|| ContextManagerError::MissingContextError(context_id.to_string()))
     }
 
     /// Returns a Context within the ContextManager's Context list specified by the ContextId
     fn get_context(&self, context_id: &ContextId) -> Result<&Context, ContextManagerError> {
-        self.contexts.get(context_id).ok_or_else(|| {
-            ContextManagerError::MissingContextError(
-                str::from_utf8(context_id)
-                    .expect("Unable to generate string from ContextId")
-                    .to_string(),
-            )
-        })
+        self.contexts
+            .get(context_id)
+            .ok_or_else(|| ContextManagerError::MissingContextError(context_id.to_string()))
     }
 
     /// Get the values associated with list of keys, from a specific Context.
