@@ -9,9 +9,7 @@ use crate::workload::ExpectedBatchResult;
 use crate::workload::TransactionWorkload;
 
 use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
-use rand::distributions::Alphanumeric;
-use rand::prelude::*;
-use rand_hc::Hc128Rng;
+use rand::{distributions::Alphanumeric, prelude::*};
 use sha2::{Digest, Sha512};
 
 static FAMILY_NAME: &str = "xo";
@@ -19,7 +17,7 @@ static FAMILY_VERSION: &str = "0.1";
 static NONCE_SIZE: usize = 32;
 
 pub struct XoTransactionWorkload {
-    rng: Hc128Rng,
+    rng: StdRng,
     signer: Box<dyn Signer>,
 }
 
@@ -32,8 +30,8 @@ impl Default for XoTransactionWorkload {
 impl XoTransactionWorkload {
     pub fn new(seed: Option<u64>, signer: Option<Box<dyn Signer>>) -> Self {
         let rng = match seed {
-            Some(seed) => Hc128Rng::seed_from_u64(seed),
-            None => Hc128Rng::from_entropy(),
+            Some(seed) => StdRng::seed_from_u64(seed),
+            None => StdRng::from_entropy(),
         };
         let signer = signer.unwrap_or_else(new_signer);
 
@@ -45,9 +43,9 @@ impl TransactionWorkload for XoTransactionWorkload {
     fn next_transaction(
         &mut self,
     ) -> Result<(TransactionPair, Option<ExpectedBatchResult>), InvalidStateError> {
-        let nonce = self
-            .rng
-            .sample_iter(&Alphanumeric)
+        let nonce = std::iter::repeat(())
+            .map(|()| self.rng.sample(Alphanumeric))
+            .map(char::from)
             .take(NONCE_SIZE)
             .collect::<String>()
             .into_bytes();
@@ -125,11 +123,12 @@ struct Payload {
 impl Payload {
     /// Creates a Payload initialized with Action::Create and a randomly
     /// generated name.
-    pub fn new_as_create_with_random_name(rnd: &mut Hc128Rng) -> Self {
-        let length = rnd.gen_range(5, 20);
+    pub fn new_as_create_with_random_name(rnd: &mut StdRng) -> Self {
+        let length = rnd.gen_range(5..20);
 
         Payload::new_as_create(
             rnd.sample_iter(&Alphanumeric)
+                .map(char::from)
                 .take(length)
                 .collect::<String>()
                 .as_str(),

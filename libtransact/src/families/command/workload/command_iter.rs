@@ -103,7 +103,7 @@ impl Iterator for CommandGeneratingIter {
             }
             CommandType::DeleteState => {
                 // get a state address that has been set
-                let address_index = self.rng.gen_range(0, self.set_addresses.len());
+                let address_index = self.rng.gen_range(0..self.set_addresses.len());
                 let address = String::from(&self.set_addresses[address_index]);
                 // remove the address from the list of set addresses
                 self.remove_set_address(address_index);
@@ -117,11 +117,11 @@ impl Iterator for CommandGeneratingIter {
 }
 
 fn make_set_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::SetState, String) {
-    let address = &addresses[rng.gen_range(0, addresses.len())];
+    let address = &addresses[rng.gen_range(0..addresses.len())];
 
     let bytes_entry = command::BytesEntry::new(
         address.to_string(),
-        rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+        rng.gen_range(0..1000).to_string().as_bytes().to_vec(),
     );
 
     (
@@ -131,7 +131,7 @@ fn make_set_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::S
 }
 
 fn make_get_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::GetState, String) {
-    let address = &addresses[rng.gen_range(0, addresses.len())];
+    let address = &addresses[rng.gen_range(0..addresses.len())];
 
     (
         command::GetState::new(vec![address.to_string()]),
@@ -140,18 +140,18 @@ fn make_get_state_command(rng: &mut StdRng, addresses: &[String]) -> (command::G
 }
 
 fn make_add_event_command(rng: &mut StdRng, addresses: &[String]) -> (command::AddEvent, String) {
-    let address = &addresses[rng.gen_range(0, addresses.len())];
+    let address = &addresses[rng.gen_range(0..addresses.len())];
 
     let bytes_entry = command::BytesEntry::new(
         "key".to_string(),
-        rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+        rng.gen_range(0..1000).to_string().as_bytes().to_vec(),
     );
 
     (
         command::AddEvent::new(
             "event_type".to_string(),
             vec![bytes_entry],
-            rng.gen_range(0, 1000).to_string().as_bytes().to_vec(),
+            rng.gen_range(0..1000).to_string().as_bytes().to_vec(),
         ),
         address.to_string(),
     )
@@ -161,7 +161,7 @@ fn make_return_invalid_command(
     rng: &mut StdRng,
     addresses: &[String],
 ) -> (command::ReturnInvalid, String) {
-    let address = &addresses[rng.gen_range(0, addresses.len())];
+    let address = &addresses[rng.gen_range(0..addresses.len())];
 
     (
         command::ReturnInvalid::new("'return_invalid' command mock error message".to_string()),
@@ -208,7 +208,7 @@ enum CommandType {
 
 impl Distribution<CommandType> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> CommandType {
-        match rng.gen_range(2, 7) {
+        match rng.gen_range(2..7) {
             2 => CommandType::SetState,
             3 => CommandType::GetState,
             4 => CommandType::AddEvent,
