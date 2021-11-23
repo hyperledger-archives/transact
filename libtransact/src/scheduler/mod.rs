@@ -248,6 +248,7 @@ mod tests {
     use super::*;
     use crate::context::manager::ContextManagerError;
     use crate::context::ContextLifecycle;
+    use crate::error::InternalError;
     use crate::protocol::batch::BatchBuilder;
     use crate::protocol::receipt::TransactionReceiptBuilder;
     use crate::protocol::transaction::{HashMethod, Transaction, TransactionBuilder};
@@ -337,6 +338,7 @@ mod tests {
             0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e,
             0x0f, 0x10,
         ]
+        .into()
     }
 
     #[derive(Clone)]
@@ -358,6 +360,7 @@ mod tests {
                 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 0x00, 0x01,
             ]
+            .into()
         }
 
         fn get_transaction_receipt(
@@ -372,7 +375,9 @@ mod tests {
                 .map_err(|err| ContextManagerError::from(err))
         }
 
-        fn drop_context(&mut self, _context_id: ContextId) {}
+        fn drop_context(&mut self, _context_id: ContextId) -> Result<(), InternalError> {
+            Ok(())
+        }
 
         fn clone_box(&self) -> Box<dyn ContextLifecycle> {
             Box::new(self.clone())

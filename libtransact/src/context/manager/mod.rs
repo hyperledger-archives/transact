@@ -21,27 +21,51 @@ use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::str;
 
+use crate::collections::RefMap;
 pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
+use crate::error::InternalError;
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
 use crate::state::Read;
 
 #[derive(Clone)]
 pub struct ContextManager {
     contexts: HashMap<ContextId, Context>,
+    context_refs: RefMap<ContextId>,
     database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
 }
 
 impl ContextLifecycle for ContextManager {
     /// Creates a Context, and returns the resulting ContextId.
     fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId {
+        for ctx_id in dependent_contexts {
+            self.context_refs.add_ref(*ctx_id);
+        }
+
         let new_context = Context::new(state_id, dependent_contexts.to_vec());
         self.contexts.insert(*new_context.id(), new_context.clone());
+        self.context_refs.add_ref(*new_context.id());
         *new_context.id()
     }
 
-    fn drop_context(&mut self, _context_id: ContextId) {
-        unimplemented!();
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), InternalError> {
+        let mut contexts = VecDeque::new();
+        contexts.push_back(context_id);
+
+        while let Some(context_id) = contexts.pop_front() {
+            if let Ok(Some(_)) = self.context_refs.remove_ref(&context_id) {
+                if let Some(context) = self.contexts.remove(&context_id) {
+                    contexts.extend(context.base_contexts.into_iter());
+                } else {
+                    return Err(InternalError::with_message(
+                        "Failed to remove a context whose ref count was 0 \
+                         but was not in the context collection"
+                            .into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
     }
 
     /// Generates a valid `TransactionReceipt` based on the information available within the
@@ -71,6 +95,7 @@ impl ContextManager {
     pub fn new(database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>) -> Self {
         ContextManager {
             contexts: HashMap::new(),
+            context_refs: RefMap::new(),
             database,
         }
     }
@@ -80,24 +105,16 @@ impl ContextManager {
         &mut self,
         context_id: &ContextId,
     ) -> Result<&mut Context, ContextManagerError> {
-        self.contexts.get_mut(context_id).ok_or_else(|| {
-            ContextManagerError::MissingContextError(
-                str::from_utf8(context_id)
-                    .expect("Unable to generate string from ContextId")
-                    .to_string(),
-            )
-        })
+        self.contexts
+            .get_mut(context_id)
+            .ok_or_else(|| ContextManagerError::MissingContextError(context_id.to_string()))
     }
 
     /// Returns a Context within the ContextManager's Context list specified by the ContextId
     fn get_context(&self, context_id: &ContextId) -> Result<&Context, ContextManagerError> {
-        self.contexts.get(context_id).ok_or_else(|| {
-            ContextManagerError::MissingContextError(
-                str::from_utf8(context_id)
-                    .expect("Unable to generate string from ContextId")
-                    .to_string(),
-            )
-        })
+        self.contexts
+            .get(context_id)
+            .ok_or_else(|| ContextManagerError::MissingContextError(context_id.to_string()))
     }
 
     /// Get the values associated with list of keys, from a specific Context.
@@ -477,5 +494,76 @@ mod tests {
             key_values.pop().unwrap(),
             (KEY2.to_string(), BYTES2.to_vec())
         );
+    }
+
+    /// Test that a context with no base contexts may be dropped.
+    /// 1) Create a context
+    /// 2) Add some state to it
+    /// 3) Drop the context
+    /// 4) Validate that the context can no longer be used.
+    #[test]
+    fn drop_context_with_no_dependencies() -> Result<(), Box<dyn std::error::Error>> {
+        let state_changes = vec![state::StateChange::Set {
+            key: KEY1.to_string(),
+            value: BYTES1.to_vec(),
+        }];
+        let (mut manager, state_id) = make_manager(Some(state_changes));
+        let context_id = manager.create_context(&[], &state_id);
+        manager.set_state(&context_id, KEY2.to_string(), BYTES2.to_vec())?;
+
+        manager.drop_context(context_id.clone())?;
+
+        assert!(matches!(
+            manager.set_state(&context_id, KEY3.to_string(), BYTES3.to_vec()),
+            Err(ContextManagerError::MissingContextError { .. })
+        ));
+
+        Ok(())
+    }
+
+    /// Test that a context with base contexts may be dropped
+    /// 1) Create a parent context
+    /// 2) Create a context with the parent as its base context
+    /// 3) Add some state to it
+    /// 4) Drop the ancestor context
+    /// 5) Validate that the ancestor is still available
+    /// 6) Drop the context
+    /// 7) Validate that both the ancestor context and the context are no longer available
+    #[test]
+    fn drop_context_with_dependencies() -> Result<(), Box<dyn std::error::Error>> {
+        let state_changes = vec![state::StateChange::Set {
+            key: KEY1.to_string(),
+            value: BYTES1.to_vec(),
+        }];
+        let (mut manager, state_id) = make_manager(Some(state_changes));
+        let ancestor_context = manager.create_context(&[], &state_id);
+        manager.set_state(&ancestor_context, KEY2.to_string(), BYTES2.to_vec())?;
+
+        let context_id = manager.create_context(&[ancestor_context], &state_id);
+        manager.set_state(&context_id, KEY3.to_string(), BYTES3.to_vec())?;
+
+        manager.drop_context(ancestor_context.clone())?;
+
+        assert!(manager.get_context(&ancestor_context).is_ok());
+
+        manager.drop_context(context_id.clone())?;
+
+        assert!(
+            matches!(
+                manager.get_context(&context_id),
+                Err(ContextManagerError::MissingContextError { .. })
+            ),
+            "Did not drop context"
+        );
+
+        assert!(
+            matches!(
+                manager.get_context(&ancestor_context),
+                Err(ContextManagerError::MissingContextError { .. })
+            ),
+            "Did not drop ancestor context"
+        );
+
+        Ok(())
     }
 }

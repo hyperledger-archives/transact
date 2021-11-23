@@ -24,6 +24,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::context::error::ContextManagerError;
 use crate::context::{manager, ContextId, ContextLifecycle};
+use crate::error::InternalError;
 use crate::protocol::receipt::{Event, TransactionReceipt};
 use crate::state::Read;
 
@@ -122,10 +123,10 @@ impl ContextLifecycle for ContextManager {
             .create_context(dependent_contexts, state_id)
     }
 
-    fn drop_context(&mut self, context_id: ContextId) {
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), InternalError> {
         self.internal_manager
             .lock()
-            .expect("Lock in drop_context was poisoned")
+            .map_err(|_| InternalError::with_message("ContextManager lock was poisoned".into()))?
             .drop_context(context_id)
     }
 

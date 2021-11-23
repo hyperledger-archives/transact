@@ -21,24 +21,58 @@
 //! previous contexts. The context manager implements the context lifecycle and services the calls
 //! that read, write, and delete data from state.
 
-/// Unique id that references a "Context" from which a `Transaction` can query state and
-/// modify events, data, and state.
-pub type ContextId = [u8; 16];
-
 mod error;
 pub mod manager;
 
 use crate::context::manager::ContextManagerError;
+use crate::error::InternalError;
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt};
 use std::mem;
 use uuid::Uuid;
+
+/// Unique id that references a "Context" from which a `Transaction` can query state and
+/// modify events, data, and state.
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
+pub struct ContextId([u8; 16]);
+
+impl ContextId {
+    fn new_random() -> ContextId {
+        ContextId(*Uuid::new_v4().as_bytes())
+    }
+}
+
+impl From<[u8; 16]> for ContextId {
+    fn from(bytes: [u8; 16]) -> Self {
+        ContextId(bytes)
+    }
+}
+
+impl Default for ContextId {
+    fn default() -> Self {
+        ContextId(*Uuid::nil().as_bytes())
+    }
+}
+
+impl std::fmt::Debug for ContextId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.debug_tuple("ContextId")
+            .field(&Uuid::from_bytes(self.0).to_simple_ref())
+            .finish()
+    }
+}
+
+impl std::fmt::Display for ContextId {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_str(&Uuid::from_bytes(self.0).to_simple_ref().to_string())
+    }
+}
 
 /// ContextManager functionality used by the Scheduler.
 pub trait ContextLifecycle: Send {
     /// Create a new Context, returning a unique ContextId.
     fn create_context(&mut self, dependent_contexts: &[ContextId], state_id: &str) -> ContextId;
 
-    fn drop_context(&mut self, context_id: ContextId);
+    fn drop_context(&mut self, context_id: ContextId) -> Result<(), InternalError>;
 
     fn get_transaction_receipt(
         &self,
@@ -71,17 +105,18 @@ impl Context {
     pub fn new(state_id: &str, base_contexts: Vec<ContextId>) -> Self {
         Context {
             base_contexts,
-            state_id: state_id.to_string(),
             state_changes: Vec::new(),
-            id: *Uuid::new_v4().as_bytes(),
+            id: ContextId::new_random(),
             data: Vec::new(),
             events: Vec::new(),
+            state_id: state_id.to_string(),
         }
     }
 
     pub fn base_contexts(&self) -> &[ContextId] {
         &self.base_contexts
     }
+
     pub fn events(&self) -> &Vec<Event> {
         &self.events
     }

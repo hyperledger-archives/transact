@@ -157,6 +157,7 @@ mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
+    use crate::context::ContextId;
     use crate::protocol::transaction::{HashMethod, TransactionBuilder};
 
     static FAMILY_VERSION: &str = "1.0";
@@ -181,7 +182,7 @@ mod tests {
             "The noop adapter is registered",
         );
 
-        let context_id = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        let context_id = ContextId::default();
 
         let on_done = Box::new(
             move |notification: Result<
