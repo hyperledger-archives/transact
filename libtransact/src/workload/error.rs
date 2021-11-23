@@ -19,9 +19,6 @@
 #[cfg(feature = "workload-batch-gen")]
 use crate::error::{InternalError, InvalidStateError};
 
-#[cfg(feature = "workload-batch-gen")]
-use crate::protos::ProtoConversionError;
-
 #[cfg(feature = "workload-runner")]
 #[derive(Debug, PartialEq)]
 pub enum WorkloadRunnerError {
@@ -86,45 +83,6 @@ impl std::error::Error for BatchingError {
         match self {
             BatchingError::InternalError(ref err) => Some(err),
             BatchingError::InvalidStateError(ref err) => Some(err),
-        }
-    }
-}
-
-/// Errors that may occur during the reading of batches.
-#[cfg(feature = "workload-batch-gen")]
-#[derive(Debug)]
-pub enum BatchReadingError {
-    Message(protobuf::ProtobufError),
-    ProtoConversion(ProtoConversionError),
-}
-
-#[cfg(feature = "workload-batch-gen")]
-impl From<protobuf::ProtobufError> for BatchReadingError {
-    fn from(err: protobuf::ProtobufError) -> Self {
-        BatchReadingError::Message(err)
-    }
-}
-
-#[cfg(feature = "workload-batch-gen")]
-impl std::fmt::Display for BatchReadingError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match *self {
-            BatchReadingError::Message(ref err) => {
-                write!(f, "Error occurred reading messages: {}", err)
-            }
-            BatchReadingError::ProtoConversion(ref err) => {
-                write!(f, "Error converting batch from proto: {}", err)
-            }
-        }
-    }
-}
-
-#[cfg(feature = "workload-batch-gen")]
-impl std::error::Error for BatchReadingError {
-    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
-        match *self {
-            BatchReadingError::Message(ref err) => Some(err),
-            BatchReadingError::ProtoConversion(ref err) => Some(err),
         }
     }
 }

@@ -31,7 +31,7 @@ use crate::protos::FromNative;
 use crate::protos::FromProto;
 use crate::protos::batch::Batch as ProtobufBatch;
 
-use super::error::{BatchReadingError, BatchingError};
+use super::error::BatchingError;
 use super::source::LengthDelimitedMessageSource;
 
 type TransactionSource<'a> = LengthDelimitedMessageSource<'a, Transaction>;
@@ -132,7 +132,7 @@ pub struct BatchListFeeder<'a> {
 }
 
 /// Resulting BatchList or error.
-pub(super) type BatchListResult = Result<BatchPair, BatchReadingError>;
+pub(super) type BatchListResult = Result<BatchPair, BatchingError>;
 
 impl<'a> BatchListFeeder<'a> {
     /// Creates a new `BatchListFeeder` with a given Batch source
@@ -150,7 +150,7 @@ impl<'a> Iterator for BatchListFeeder<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let batches = match self.batch_source.next(1) {
             Ok(batches) => batches,
-            Err(err) => return Some(Err(BatchReadingError::Message(err))),
+            Err(err) => return Some(Err(BatchingError::InternalError(err))),
         };
 
         let batch_proto = match batches.get(0) {
