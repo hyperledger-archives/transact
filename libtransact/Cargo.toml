@@ -85,6 +85,7 @@ stable = [
     # The following features are stable:
     "contract-archive",
     "family-command",
+    "family-command-workload",
     "family-smallbank",
     "postgres",
     "protocol-sabre",
@@ -104,7 +105,6 @@ experimental = [
     "contract-address-triple-key-hash",
     "contract-context",
     "contract-context-key-value",
-    "family-command-workload",
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
