@@ -27,18 +27,16 @@ use protobuf::Message;
 use crate::error::{InternalError, InvalidStateError};
 use crate::protocol::batch::{Batch, BatchBuilder, BatchPair};
 use crate::protocol::transaction::Transaction;
-use crate::protos::FromNative;
-use crate::protos::FromProto;
 use crate::protos::batch::Batch as ProtobufBatch;
+use crate::protos::FromNative;
 use crate::workload::{
     batch_reader::{protobuf::ProtobufBatchReader, BatchReader},
     transaction_reader::{protobuf::ProtobufTransactionReader, TransactionReader},
 };
 
 use super::error::BatchingError;
-use super::source::LengthDelimitedMessageSource;
 
-type TransactionSource<'a> = LengthDelimitedMessageSource<'a, Transaction>;
+type TransactionSource<'a> = ProtobufTransactionReader<'a>;
 
 /// Produces signed batches from a length-delimited source of Transactions.
 pub struct SignedBatchProducer<'a> {
@@ -54,7 +52,7 @@ impl<'a> SignedBatchProducer<'a> {
     /// Creates a new `SignedBatchProducer` with a given Transaction source and
     /// a max number of transactions per batch.
     pub fn new(source: &'a mut dyn Read, max_batch_size: usize, signer: &'a dyn Signer) -> Self {
-        let transaction_source = LengthDelimitedMessageSource::new(source);
+        let transaction_source = ProtobufTransactionReader::new(source);
         SignedBatchProducer {
             transaction_source,
             max_batch_size,
@@ -93,13 +91,8 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
     /// Gets the next BatchResult.
     /// `Ok(None)` indicates that the underlying source has been consumed.
     fn next(&mut self) -> Option<BatchResult> {
-        let txns: Vec<Transaction> = match self.transaction_source.next(self.max_batch_size)
-        {
-            Ok(txns) => txns
-                .into_iter()
-                .map(Transaction::from_proto)
-                .collect::<Result<Vec<Transaction>, _>>()
-                .ok()?,
+        let txns: Vec<Transaction> = match self.transaction_source.next(self.max_batch_size) {
+            Ok(txns) => txns,
             Err(err) => {
                 return Some(Err(BatchingError::InternalError(
                     InternalError::from_source_with_message(
@@ -128,7 +121,7 @@ fn batch_transactions(txns: Vec<Transaction>, signer: &dyn Signer) -> BatchResul
         })
 }
 
-type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
+type BatchSource<'a> = ProtobufBatchReader<'a>;
 
 /// Produces batches from length-delimited source of Batches.
 pub struct BatchListFeeder<'a> {
@@ -141,7 +134,7 @@ pub(super) type BatchListResult = Result<BatchPair, BatchingError>;
 impl<'a> BatchListFeeder<'a> {
     /// Creates a new `BatchListFeeder` with a given Batch source
     pub fn new(source: &'a mut dyn Read) -> Self {
-        let batch_source = LengthDelimitedMessageSource::new(source);
+        let batch_source = ProtobufBatchReader::new(source);
         BatchListFeeder { batch_source }
     }
 }
@@ -157,15 +150,7 @@ impl<'a> Iterator for BatchListFeeder<'a> {
             Err(err) => return Some(Err(BatchingError::InternalError(err))),
         };
 
-        let batch_proto = match batches.get(0) {
-            Some(batch_proto) => batch_proto,
-            None => return None,
-        };
-
-        match BatchPair::from_proto(batch_proto.clone()) {
-            Ok(batch) => Some(Ok(batch)),
-            Err(err) => Some(Err(BatchReadingError::ProtoConversion(err))),
-        }
+        batches.get(0).map(|b| Ok(b.clone()))
     }
 }
 
