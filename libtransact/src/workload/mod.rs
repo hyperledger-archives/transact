@@ -20,11 +20,13 @@
 
 #[cfg(feature = "workload-batch-gen")]
 pub mod batch_gen;
+#[cfg(feature = "workload-batch-gen")]
+mod batch_reader;
 mod error;
 #[cfg(feature = "workload-runner")]
 mod runner;
 #[cfg(feature = "workload-batch-gen")]
-mod source;
+mod transaction_reader;
 
 use crate::error::InvalidStateError;
 use crate::protocol::batch::BatchPair;

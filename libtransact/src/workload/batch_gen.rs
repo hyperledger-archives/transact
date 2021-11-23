@@ -30,6 +30,10 @@ use crate::protocol::transaction::Transaction;
 use crate::protos::FromNative;
 use crate::protos::FromProto;
 use crate::protos::batch::Batch as ProtobufBatch;
+use crate::workload::{
+    batch_reader::{protobuf::ProtobufBatchReader, BatchReader},
+    transaction_reader::{protobuf::ProtobufTransactionReader, TransactionReader},
+};
 
 use super::error::BatchingError;
 use super::source::LengthDelimitedMessageSource;
