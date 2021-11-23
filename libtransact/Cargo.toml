@@ -178,8 +178,7 @@ workload-runner = [
     "chrono",
     "reqwest",
     "serde",
-    "serde_derive",
-    "workload-batch-gen"
+    "serde_derive"
 ]
 
 [package.metadata.docs.rs]
