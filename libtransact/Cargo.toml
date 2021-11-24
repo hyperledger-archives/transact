@@ -91,6 +91,7 @@ stable = [
     "sqlite",
     "state-merkle-sql",
     "workload",
+    "workload-batch-gen",
     "workload-runner"
 ]
 
@@ -107,8 +108,7 @@ experimental = [
     "contract-context-key-value",
     "family-smallbank-workload",
     "family-xo",
-    "key-value-state",
-    "workload-batch-gen"
+    "key-value-state"
 ]
 
 # stable features in support of wasm
