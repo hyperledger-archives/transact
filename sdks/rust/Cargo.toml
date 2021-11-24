@@ -27,7 +27,7 @@ edition = "2018"
 
 [dependencies]
 protobuf = "2.19"
-sha2 = "0.8"
+sha2 = "0.9"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 transact = "0.3"
