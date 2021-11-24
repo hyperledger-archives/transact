@@ -58,7 +58,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
             )));
         }
     };
-    let hash = sha512_hash(prefix.as_bytes());
+    let hash = Sha512::digest(prefix.as_bytes());
     Ok([NAMESPACE_REGISTRY_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
@@ -68,7 +68,7 @@ pub fn compute_namespace_registry_address(namespace: &str) -> Result<Vec<u8>, Ad
 ///
 /// * `name` - the name of the contract registry
 pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, AddressingError> {
-    let hash = sha512_hash(name.as_bytes());
+    let hash = Sha512::digest(name.as_bytes());
     Ok([CONTRACT_REGISTRY_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
@@ -80,7 +80,7 @@ pub fn compute_contract_registry_address(name: &str) -> Result<Vec<u8>, Addressi
 /// * `version` - the version of the contract
 pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, AddressingError> {
     let s = String::from(name) + "," + version;
-    let hash = sha512_hash(s.as_bytes());
+    let hash = Sha512::digest(s.as_bytes());
     Ok([CONTRACT_ADDRESS_PREFIX_BYTES, &hash[..32]].concat())
 }
 
@@ -90,7 +90,7 @@ pub fn compute_contract_address(name: &str, version: &str) -> Result<Vec<u8>, Ad
 ///
 /// * `name` - the agent's name
 pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
-    let hash = sha512_hash(name);
+    let hash = Sha512::digest(name);
     Ok([AGENT_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
 }
 
@@ -100,14 +100,8 @@ pub fn compute_agent_address(name: &[u8]) -> Result<Vec<u8>, AddressingError> {
 ///
 /// * `id` - the organization's id
 pub fn compute_org_address(id: &str) -> Result<Vec<u8>, AddressingError> {
-    let hash = sha512_hash(id.as_bytes());
+    let hash = Sha512::digest(id.as_bytes());
     Ok([ORG_ADDRESS_PREFIX_BYTES, &hash[..31]].concat())
-}
-
-fn sha512_hash(bytes: &[u8]) -> Vec<u8> {
-    let mut hasher = Sha512::new();
-    hasher.input(bytes);
-    hasher.result().to_vec()
 }
 
 #[derive(Debug)]
