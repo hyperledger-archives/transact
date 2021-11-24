@@ -111,6 +111,12 @@ impl From<std::sync::PoisonError<std::sync::MutexGuard<'_, Shared>>> for CoreErr
     }
 }
 
+impl From<crate::error::InternalError> for CoreError {
+    fn from(error: crate::error::InternalError) -> Self {
+        CoreError::Internal(error.to_string())
+    }
+}
+
 pub struct SchedulerCore {
     /// The data shared between this core thread and the thread which owns
     /// `SerialScheduler`.
@@ -131,7 +137,7 @@ pub struct SchedulerCore {
     current_batch: Option<BatchPair>,
 
     /// The ID of the current transaction which is being executed (from the current batch).
-    current_txn: Option<String>,
+    current_txn: Option<(String, ContextId)>,
 
     /// A queue of the current batch's transactions that have not been exeucted yet.
     txn_queue: VecDeque<Transaction>,
@@ -198,6 +204,10 @@ impl SchedulerCore {
             // Send a `None` execution task to indicate that there are no more tasks to execute
             self.execution_tx.send(None)?;
 
+            if let Some(previous_context_id) = self.previous_context {
+                self.context_lifecycle.drop_context(previous_context_id)?;
+            }
+
             Ok(true)
         } else {
             Ok(false)
@@ -254,7 +264,10 @@ impl SchedulerCore {
             None => self.context_lifecycle.create_context(&[], &self.state_id),
         };
 
-        self.current_txn = Some(transaction_pair.transaction().header_signature().into());
+        self.current_txn = Some((
+            transaction_pair.transaction().header_signature().into(),
+            context_id,
+        ));
         self.execution_tx
             .send(Some(ExecutionTask::new(transaction_pair, context_id)))?;
         self.next_ready = false;
@@ -358,7 +371,12 @@ impl SchedulerCore {
                     self.try_schedule_next()?;
                 }
                 Ok(CoreMessage::ExecutionResult(task_notification)) => {
-                    let current_txn_id = self.current_txn.clone().unwrap_or_else(|| "".into());
+                    let current_txn_id = self
+                        .current_txn
+                        .as_ref()
+                        .map(|(txn_id, _)| txn_id.as_str())
+                        .unwrap_or("");
+
                     match task_notification {
                         ExecutionTaskCompletionNotification::Valid(context_id, transaction_id) => {
                             if transaction_id != current_txn_id {
@@ -368,13 +386,16 @@ impl SchedulerCore {
                                 continue;
                             }
                             self.current_txn = None;
+                            if let Some(previous_context_id) = self.previous_context.take() {
+                                self.context_lifecycle.drop_context(previous_context_id)?;
+                            }
                             self.previous_context = Some(context_id);
                             self.txn_receipts.push(
                                 self.context_lifecycle
                                     .get_transaction_receipt(&context_id, &transaction_id)?,
                             );
                         }
-                        ExecutionTaskCompletionNotification::Invalid(_context_id, result) => {
+                        ExecutionTaskCompletionNotification::Invalid(context_id, result) => {
                             if result.transaction_id != current_txn_id {
                                 self.send_scheduler_error(SchedulerError::UnexpectedNotification(
                                     result.transaction_id,
@@ -382,6 +403,7 @@ impl SchedulerCore {
                                 continue;
                             }
                             self.current_txn = None;
+                            self.context_lifecycle.drop_context(context_id)?;
                             self.invalidate_current_batch(result)?;
                         }
                     };
@@ -407,8 +429,11 @@ impl SchedulerCore {
                     sender.send(self.current_batch.take()).map_err(|_| {
                         CoreError::Internal("aborted batch receiver dropped".into())
                     })?;
-                    // Also remove the current transaction
-                    self.current_txn.take();
+
+                    // Also drop the current transaction's context, if it exists
+                    if let Some((_, context_id)) = self.current_txn.take() {
+                        self.context_lifecycle.drop_context(context_id)?;
+                    }
 
                     // No batches are executing or in the queue now, so the scheduler may be ready
                     // to shutdown
