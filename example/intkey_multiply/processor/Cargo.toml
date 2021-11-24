@@ -21,7 +21,7 @@ edition = "2018"
 clap = "2"
 protobuf = "2.19"
 cfg-if = "1"
-hex = "0.3.1"
+hex = "0.4"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 rust-crypto-wasm = "0.3"
