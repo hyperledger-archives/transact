@@ -38,7 +38,7 @@ use super::transaction::Transaction;
 #[derive(Clone, Eq, Hash, PartialEq)]
 pub struct BatchHeader {
     signer_public_key: Vec<u8>,
-    transaction_ids: Vec<Vec<u8>>,
+    transaction_ids: Vec<String>,
 }
 
 impl BatchHeader {
@@ -46,7 +46,7 @@ impl BatchHeader {
         &self.signer_public_key
     }
 
-    pub fn transaction_ids(&self) -> &[Vec<u8>] {
+    pub fn transaction_ids(&self) -> &[String] {
         &self.transaction_ids
     }
 }
@@ -74,15 +74,10 @@ impl fmt::Debug for BatchHeader {
 }
 
 impl FromProto<protos::batch::BatchHeader> for BatchHeader {
-    fn from_proto(header: protos::batch::BatchHeader) -> Result<Self, ProtoConversionError> {
+    fn from_proto(mut header: protos::batch::BatchHeader) -> Result<Self, ProtoConversionError> {
         Ok(BatchHeader {
             signer_public_key: hex::decode(header.get_signer_public_key())?,
-            transaction_ids: header
-                .get_transaction_ids()
-                .to_vec()
-                .into_iter()
-                .map(|t| hex::decode(t).map_err(ProtoConversionError::from))
-                .collect::<Result<_, _>>()?,
+            transaction_ids: header.take_transaction_ids().to_vec(),
         })
     }
 }
@@ -91,13 +86,7 @@ impl FromNative<BatchHeader> for protos::batch::BatchHeader {
     fn from_native(header: BatchHeader) -> Result<Self, ProtoConversionError> {
         let mut proto_header = protos::batch::BatchHeader::new();
         proto_header.set_signer_public_key(hex::encode(header.signer_public_key));
-        proto_header.set_transaction_ids(
-            header
-                .transaction_ids
-                .iter()
-                .map(hex::encode)
-                .collect::<protobuf::RepeatedField<String>>(),
-        );
+        proto_header.set_transaction_ids(header.transaction_ids.into());
         Ok(proto_header)
     }
 }
@@ -439,11 +428,8 @@ impl BatchBuilder {
         let trace = self.trace.unwrap_or(false);
         let transaction_ids = transactions
             .iter()
-            .flat_map(|t| {
-                vec![hex::decode(t.header_signature())
-                    .map_err(|e| BatchBuildError::SerializationError(format!("{}", e)))]
-            })
-            .collect::<Result<_, _>>()?;
+            .map(|t| t.header_signature().to_string())
+            .collect();
 
         let signer_public_key = signer.public_key()?.as_slice().to_vec();
 
@@ -510,25 +496,14 @@ mod tests {
             .public_key()
             .expect("Failed to get signer public key");
         assert_eq!(
-            vec![
-                SIGNATURE2.as_bytes().to_vec(),
-                SIGNATURE3.as_bytes().to_vec()
-            ],
+            vec![SIGNATURE2.to_string(), SIGNATURE3.to_string()],
             pair.header().transaction_ids()
         );
         assert_eq!(signer_pub_key.as_slice(), pair.header().signer_public_key());
         assert_eq!(
             vec![
-                Transaction::new(
-                    BYTES2.to_vec(),
-                    hex::encode(SIGNATURE2.to_string()),
-                    BYTES3.to_vec()
-                ),
-                Transaction::new(
-                    BYTES4.to_vec(),
-                    hex::encode(SIGNATURE3.to_string()),
-                    BYTES5.to_vec()
-                ),
+                Transaction::new(BYTES2.to_vec(), SIGNATURE2.to_string(), BYTES3.to_vec()),
+                Transaction::new(BYTES4.to_vec(), SIGNATURE3.to_string(), BYTES5.to_vec()),
             ],
             pair.batch().transactions()
         );
@@ -542,16 +517,8 @@ mod tests {
 
         let pair = BatchBuilder::new()
             .with_transactions(vec![
-                Transaction::new(
-                    BYTES2.to_vec(),
-                    hex::encode(SIGNATURE2.to_string()),
-                    BYTES3.to_vec(),
-                ),
-                Transaction::new(
-                    BYTES4.to_vec(),
-                    hex::encode(SIGNATURE3.to_string()),
-                    BYTES5.to_vec(),
-                ),
+                Transaction::new(BYTES2.to_vec(), SIGNATURE2.to_string(), BYTES3.to_vec()),
+                Transaction::new(BYTES4.to_vec(), SIGNATURE3.to_string(), BYTES5.to_vec()),
             ])
             .with_trace(true)
             .build_pair(&*signer)
@@ -567,16 +534,8 @@ mod tests {
 
         let mut builder = BatchBuilder::new();
         builder = builder.with_transactions(vec![
-            Transaction::new(
-                BYTES2.to_vec(),
-                hex::encode(SIGNATURE2.to_string()),
-                BYTES3.to_vec(),
-            ),
-            Transaction::new(
-                BYTES4.to_vec(),
-                hex::encode(SIGNATURE3.to_string()),
-                BYTES5.to_vec(),
-            ),
+            Transaction::new(BYTES2.to_vec(), SIGNATURE2.to_string(), BYTES3.to_vec()),
+            Transaction::new(BYTES4.to_vec(), SIGNATURE3.to_string(), BYTES5.to_vec()),
         ]);
         builder = builder.with_trace(true);
         let pair = builder.build_pair(&*signer).unwrap();
@@ -588,12 +547,12 @@ mod tests {
     fn batch_header_fields() {
         let header = BatchHeader {
             signer_public_key: hex::decode(KEY1).unwrap(),
-            transaction_ids: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            transaction_ids: vec![KEY2.to_string(), KEY3.to_string()],
         };
 
         assert_eq!(KEY1, hex::encode(header.signer_public_key()));
         assert_eq!(
-            vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap(),],
+            vec![KEY2.to_string(), KEY3.to_string(),],
             header.transaction_ids()
         );
     }
@@ -603,7 +562,7 @@ mod tests {
     fn batch_header_bytes() {
         let original = BatchHeader {
             signer_public_key: hex::decode(KEY1).unwrap(),
-            transaction_ids: vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap()],
+            transaction_ids: vec![KEY2.to_string(), KEY3.to_string()],
         };
 
         let header_bytes = original.clone().into_bytes().unwrap();
@@ -637,7 +596,7 @@ mod tests {
 
         assert_eq!(KEY1, hex::encode(header.signer_public_key()));
         assert_eq!(
-            vec![hex::decode(KEY2).unwrap(), hex::decode(KEY3).unwrap(),],
+            vec![KEY2.to_string(), KEY3.to_string()],
             header.transaction_ids(),
         );
     }
