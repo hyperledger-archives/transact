@@ -1,5 +1,62 @@
 # Release Notes
 
+
+## Changes in Transact 0.4.1
+
+### Highlights
+
+* Add workload CLI tool.  This CLI tool currently supports submitting `command`
+  and `smallbank` (experimentally) transactions at configurable rates and
+  durations.
+* Add finer-grained features to allow for more flexible library usage.  With
+  these new features, library consumers don't necessarily need to pull in all
+  the modules when using Transact in their applications.
+* Add smallbank smart contract example.  This contract has been ported from the
+  sawtooth-rust-sdk.
+* Add command smart contract.
+
+### libtransact
+
+* Implement `ContextManager::drop_context`, where contexts are reference
+  counted.
+* Update serial scheduler to drop contexts where appropriate.
+* Change `BatchHeader::transaction_ids` from `Vec<Vec<u8>>` to `Vec<String>` to
+  make all header signature fields consistently typed.
+* Change `TransactionHeader::dependencies` from `Vec<Vec<u8>>` to `Vec<String>`
+  to make all header signature fields consistently typed.
+* Change `HashMethod:SHA512` to HashMethod::Sha512, following the recommended
+  naming conventions.
+* Drop experimental feature `"sqlite-db"`, in favor of `"state-merkle-sql"` and
+  `"sqlite"`.
+* Drop experimental feature `"redis-db"`, as Redis does not meet the
+  transactional requirements of the Merkle State.
+* Add `transact::state::merkle::kv::StateDatabaseError::InternalError` variant,
+  wrapping `transact::error::InternalError`.
+* Add `"sabre-compat"` feature for writing wasm-compatible smart contracts.
+* Add the smallbank transaction handler.
+* Add `xo`, `smallbank` and `command` implementations of the
+  `TransactionWorkload` and `BatchWorkload` traits.
+* Remove dependency on openssl.
+
+### CLI
+
+* Add a CLI command named `command` that has three subcommands `set-state`,
+  `get-state`, and `show-state` which can be used to interact with the command
+  smart contract.
+* Add a `playlist` CLI command that has four subcommands `create`, `process`,
+  `batch`, and `submit` which can be used to generate files of pregenerated
+  payloads, transactions, and batches. The file containing the batches can then
+  be submitted against a distributed ledger.
+* Add a `workload` CLI command which can be used to submit a workload against a
+  distributed ledger.
+
+### Examples
+
+* Add a sabre-compatible smallbank smart contract.
+* Add a sabre-compatible command smart contract.
+* Add an example application that submits command transactions directly to
+  sabre.
+
 # Changes in Transact 0.3.14
 
 ### libtransact updates
