@@ -1,5 +1,198 @@
 # Release Notes
 
+
+## Changes in Transact 0.4.1
+
+### Highlights
+
+* Add workload CLI tool.  This CLI tool currently supports submitting `command`
+  and `smallbank` (experimentally) transactions at configurable rates and
+  durations.
+* Add finer-grained features to allow for more flexible library usage.  With
+  these new features, library consumers don't necessarily need to pull in all
+  the modules when using Transact in their applications.
+* Add smallbank smart contract example.  This contract has been ported from the
+  sawtooth-rust-sdk.
+* Add command smart contract.
+
+### libtransact
+
+* Implement `ContextManager::drop_context`, where contexts are reference
+  counted.
+* Update serial scheduler to drop contexts where appropriate.
+* Change `BatchHeader::transaction_ids` from `Vec<Vec<u8>>` to `Vec<String>` to
+  make all header signature fields consistently typed.
+* Change `TransactionHeader::dependencies` from `Vec<Vec<u8>>` to `Vec<String>`
+  to make all header signature fields consistently typed.
+* Change `HashMethod:SHA512` to HashMethod::Sha512, following the recommended
+  naming conventions.
+* Drop experimental feature `"sqlite-db"`, in favor of `"state-merkle-sql"` and
+  `"sqlite"`.
+* Drop experimental feature `"redis-db"`, as Redis does not meet the
+  transactional requirements of the Merkle State.
+* Add `transact::state::merkle::kv::StateDatabaseError::InternalError` variant,
+  wrapping `transact::error::InternalError`.
+* Add `"sabre-compat"` feature for writing wasm-compatible smart contracts.
+* Add the smallbank transaction handler.
+* Add `xo`, `smallbank` and `command` implementations of the
+  `TransactionWorkload` and `BatchWorkload` traits.
+* Remove dependency on openssl.
+
+### CLI
+
+* Add a CLI command named `command` that has three subcommands `set-state`,
+  `get-state`, and `show-state` which can be used to interact with the command
+  smart contract.
+* Add a `playlist` CLI command that has four subcommands `create`, `process`,
+  `batch`, and `submit` which can be used to generate files of pregenerated
+  payloads, transactions, and batches. The file containing the batches can then
+  be submitted against a distributed ledger.
+* Add a `workload` CLI command which can be used to submit a workload against a
+  distributed ledger.
+
+### Examples
+
+* Add a sabre-compatible smallbank smart contract.
+* Add a sabre-compatible command smart contract.
+* Add an example application that submits command transactions directly to
+  sabre.
+
+# Changes in Transact 0.3.14
+
+### libtransact updates
+
+* Make `MerkleRadixStore` and the SQL implementation public.  This allows
+  library consumers access to the lower-level APIs for interacting with the
+  merkle-radix tree storage layer.
+
+* Add `list_trees` to `MerkleRadixStore`.  This allows the user to list the
+  available trees stored in the underlying store.
+
+## Changes in Transact 0.3.13
+
+### libtransact updates
+
+* Add `delete_tree` to `SqlMerkleState`. This allows the entire tree to be
+  deleted, include all state root hashes and leaf data associated with that
+  tree.
+
+## Changes in Transact 0.3.12
+
+### libtransact updates
+
+* Limit query recursion to single tree. This fixes an issue where queries in
+  a database with trees with identical structure would cause an infinite loop
+  in SQLite.
+
+* Use SQLite immediate transactions. This improves multi-threaded support.
+
+* Update SQLite PRAGMA for the WAL journal mode. This improves multi-threaded
+  support.
+
+* Remove manual ID sequences for Postgres. This improves multi-thread support.
+
+* Update defaults for SQLite "synchronous" PRAGMA. This changes the default
+  "synchronous" PRAGMA setting to explicitly be "Normal" or "Full", if the WAL
+  journal mode is enabled.
+
+## Changes in Transact 0.3.11
+
+### Highlights
+
+* The `"state-merkle-sql"` feature has been stabilized, along with the
+  `"postgres"` and `"sqlite"` features.
+
+### libtransact updates
+
+* Stabilize `"state-merkle-sql"` by moving it to the `"stable"` feature group.
+
+* Stabilize `"postgres"` by moving it to the `"stable"` feature group.
+
+* Stabilize `"sqlite"` by moving it to the `"stable"` feature group.
+
+* Replace `OverlayReader` and `-Writer` with `MerkleRadixStore`.
+
+* Move operations, schema, and models to `store` module.
+
+* Merge `insert_node` and `update_change_log` operations into single
+  `write_changes` operation.
+
+* Separate all Postgres- and SQLite-specific code into respective `postgres` and
+  `sqlite` submodules, relative to the parent module.
+
+* Allow migrations to be run against a single connection.  This allows
+  migrations to be run in an instance where the caller does not have access to a
+  connection pool or the connection string and, therefore, cannot use a
+  `Backend` instance via the `MigrationManager` trait.
+
+## Changes in Transact 0.3.10
+
+### Highlights
+
+* The `"state-merkle-leaf-reader"` feature has been stabilized by being removed.
+  This makes the `MerkleLeafReader` trait part of the standard, stable API.
+
+### libtransact updates
+
+* Generalize the feature guard over `serde_derive`.  This change removes the
+  possibility of the macros being unavailable if a specific libtransact feature
+  is not enabled.  Now any feature that depends on `serde_derive` will have the
+  macros available.
+
+* Re-export `transact::state::merkle::kv::MerkelLeafIterator` in the parent
+  module for backwards-compatibility.  This type was previously part of the
+  public API.
+
+* Soft-deprecate the type `transact::state::merkle::kv::MerkelLeafIterator`, as
+  this type should not be part of the public API, and may be removed in a future
+  release.
+
+* Return `InvalidStateError` when a `StateDatabaseError::NotFound` variant is
+  encountered during leaf iteration when implemented on `kv::MerkleState`.
+
+* Stabilize `"state-merkle-leaf-reader"` feature by removing it. This makes the
+  `MerkleLeafReader` trait part of the standard, stable API.
+
+## Changes in Transact 0.3.9
+
+### libtransact updates
+
+* Remove `StateDatabaseError::InternalError` variant.  This change was not
+  backwards compatible.
+
+## Changes in Transact 0.3.8 (yanked)
+
+### Highlights
+
+* Experimental support for merkle state stored in Postgres and SQLite databases.
+  This is available via new struct `SqlMerkleState` and activated by the
+  features `"state-merkle-sql"` with `"postgres"` and/or `"sqlite"` enabled for
+  either database.
+
+### libtransact updates
+
+* Move existing key-value `MerkleState` implementation to
+  `transact::state::merkle::kv`.  This implementation is backed by the key-value
+  `Database` abstraction.  It is re-exported in the `transact::state::merkle`
+  module for backwards compatibility.
+
+* Add experimental `SqlMerkelState` available in the module
+  `transact::state::merkle::sql`. This is activated by the features
+  `"state-merkle-sql"` with `"postgres"` and/or `"sqlite"` enabled for either
+  database.
+
+* Add `transact::error::InternalError`, copied from the splinter library.
+
+* Add `transact::error::InvalidStateError`, copied from the splinter library.
+
+* Expand SQLite journal configuration in experimental `SqliteDatabase`
+
+## Changes in Transact 0.3.7
+
+* Update `semver` dependency from `0.9` to `1.0`.
+* Fix various clippy errors that were introduced with the release of Rust 1.50.
+* Update `protobuf` dependency from `2.0` to `2.19`.
+
 ## Changes in Transact 0.3.6
 
 * Update the `cylinder` dependency of libtransact and the `simple_xo` example to
