@@ -25,16 +25,18 @@ use cylinder::Signer;
 use protobuf::Message;
 
 use crate::error::{InternalError, InvalidStateError};
-use crate::protocol::batch::{BatchBuilder, BatchPair};
-use crate::protocol::transaction::Transaction as ProtocolTransaction;
+use crate::protocol::batch::{Batch, BatchBuilder, BatchPair};
+use crate::protocol::transaction::Transaction;
+use crate::protos::batch::Batch as ProtobufBatch;
 use crate::protos::FromNative;
-use crate::protos::FromProto;
-use crate::protos::{batch::Batch, transaction::Transaction};
+use crate::workload::{
+    batch_reader::{protobuf::ProtobufBatchReader, BatchReader},
+    transaction_reader::{protobuf::ProtobufTransactionReader, TransactionReader},
+};
 
-use super::error::{BatchReadingError, BatchingError};
-use super::source::LengthDelimitedMessageSource;
+use super::error::BatchingError;
 
-type TransactionSource<'a> = LengthDelimitedMessageSource<'a, Transaction>;
+type TransactionSource<'a> = ProtobufTransactionReader<'a>;
 
 /// Produces signed batches from a length-delimited source of Transactions.
 pub struct SignedBatchProducer<'a> {
@@ -50,7 +52,7 @@ impl<'a> SignedBatchProducer<'a> {
     /// Creates a new `SignedBatchProducer` with a given Transaction source and
     /// a max number of transactions per batch.
     pub fn new(source: &'a mut dyn Read, max_batch_size: usize, signer: &'a dyn Signer) -> Self {
-        let transaction_source = LengthDelimitedMessageSource::new(source);
+        let transaction_source = ProtobufTransactionReader::new(source);
         SignedBatchProducer {
             transaction_source,
             max_batch_size,
@@ -63,7 +65,10 @@ impl<'a> SignedBatchProducer<'a> {
         loop {
             match self.next() {
                 Some(Ok(batch)) => {
-                    if let Err(err) = batch.write_length_delimited_to_writer(writer) {
+                    let proto_batch = ProtobufBatch::from_native(batch).map_err(|err| {
+                        BatchingError::InternalError(InternalError::from_source(Box::new(err)))
+                    })?;
+                    if let Err(err) = proto_batch.write_length_delimited_to_writer(writer) {
                         return Err(BatchingError::InternalError(
                             InternalError::from_source_with_message(
                                 Box::new(err),
@@ -86,7 +91,7 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
     /// Gets the next BatchResult.
     /// `Ok(None)` indicates that the underlying source has been consumed.
     fn next(&mut self) -> Option<BatchResult> {
-        let txns = match self.transaction_source.next(self.max_batch_size) {
+        let txns: Vec<Transaction> = match self.transaction_source.next(self.max_batch_size) {
             Ok(txns) => txns,
             Err(err) => {
                 return Some(Err(BatchingError::InternalError(
@@ -106,32 +111,17 @@ impl<'a> Iterator for SignedBatchProducer<'a> {
 }
 
 fn batch_transactions(txns: Vec<Transaction>, signer: &dyn Signer) -> BatchResult {
-    let transaction = txns
-        .into_iter()
-        .map(ProtocolTransaction::from_proto)
-        .into_iter()
-        .collect::<Result<Vec<ProtocolTransaction>, _>>()
-        .map_err(|_| {
-            BatchingError::InvalidStateError(InvalidStateError::with_message(
-                "Failed to convert transactions from protobuf".into(),
-            ))
-        })?;
-    let protocol_batch = BatchBuilder::new()
-        .with_transactions(transaction)
+    BatchBuilder::new()
+        .with_transactions(txns)
         .build(signer)
         .map_err(|_| {
             BatchingError::InvalidStateError(InvalidStateError::with_message(
                 "Failed to build batch".into(),
             ))
-        })?;
-    Batch::from_native(protocol_batch).map_err(|_| {
-        BatchingError::InvalidStateError(InvalidStateError::with_message(
-            "Failed to convert batch to protobuf".into(),
-        ))
-    })
+        })
 }
 
-type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
+type BatchSource<'a> = ProtobufBatchReader<'a>;
 
 /// Produces batches from length-delimited source of Batches.
 pub struct BatchListFeeder<'a> {
@@ -139,12 +129,12 @@ pub struct BatchListFeeder<'a> {
 }
 
 /// Resulting BatchList or error.
-pub(super) type BatchListResult = Result<BatchPair, BatchReadingError>;
+pub(super) type BatchListResult = Result<BatchPair, BatchingError>;
 
 impl<'a> BatchListFeeder<'a> {
     /// Creates a new `BatchListFeeder` with a given Batch source
     pub fn new(source: &'a mut dyn Read) -> Self {
-        let batch_source = LengthDelimitedMessageSource::new(source);
+        let batch_source = ProtobufBatchReader::new(source);
         BatchListFeeder { batch_source }
     }
 }
@@ -157,18 +147,10 @@ impl<'a> Iterator for BatchListFeeder<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         let batches = match self.batch_source.next(1) {
             Ok(batches) => batches,
-            Err(err) => return Some(Err(BatchReadingError::Message(err))),
+            Err(err) => return Some(Err(BatchingError::InternalError(err))),
         };
 
-        let batch_proto = match batches.get(0) {
-            Some(batch_proto) => batch_proto,
-            None => return None,
-        };
-
-        match BatchPair::from_proto(batch_proto.clone()) {
-            Ok(batch) => Some(Ok(batch)),
-            Err(err) => Some(Err(BatchReadingError::ProtoConversion(err))),
-        }
+        batches.get(0).map(|b| Ok(b.clone()))
     }
 }
 
@@ -180,17 +162,19 @@ mod tests {
 
     use cylinder::{secp256k1::Secp256k1Context, Context, Signature, Signer};
 
-    use crate::protos::batch::BatchHeader;
-    use crate::protos::transaction::TransactionHeader;
+    use crate::protocol::batch::BatchHeader;
+    use crate::protocol::transaction::{HashMethod, TransactionBuilder};
+    use crate::protos::transaction::Transaction as ProtobufTransaction;
+    use crate::protos::FromBytes;
 
-    type BatchSource<'a> = LengthDelimitedMessageSource<'a, Batch>;
+    type BatchSource<'a> = ProtobufBatchReader<'a>;
 
     #[test]
     fn empty_transaction_source() {
         let encoded_bytes: Vec<u8> = Vec::new();
         let mut source = Cursor::new(encoded_bytes);
 
-        let mut txn_stream: TransactionSource = LengthDelimitedMessageSource::new(&mut source);
+        let mut txn_stream: TransactionSource = ProtobufTransactionReader::new(&mut source);
         let txns = txn_stream.next(2).unwrap();
         assert_eq!(txns.len(), 0);
     }
@@ -207,7 +191,7 @@ mod tests {
 
         let mut source = Cursor::new(encoded_bytes);
 
-        let mut txn_stream: TransactionSource = LengthDelimitedMessageSource::new(&mut source);
+        let mut txn_stream: TransactionSource = ProtobufTransactionReader::new(&mut source);
 
         let mut txns = txn_stream.next(2).unwrap();
         assert_eq!(txns.len(), 2);
@@ -246,9 +230,9 @@ mod tests {
 
         let batch = batch_result.unwrap().unwrap();
 
-        let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
-        assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
+        let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
+        assert_eq!(batch_header.transaction_ids().len(), 1);
+        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
 
         // test exhaustion
         batch_result = producer.next();
@@ -279,14 +263,14 @@ mod tests {
         let batch = batch_result.unwrap().unwrap();
 
         let signature = signer
-            .sign(&batch.header)
+            .sign(&batch.header())
             .expect("Unable to sign batch header");
 
-        let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
-        assert_eq!(batch_header.transaction_ids.len(), 2);
-        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
-        assert_eq!(batch_header.transaction_ids[1], sig2.as_hex());
-        assert_eq!(batch.header_signature, signature.as_hex());
+        let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
+        assert_eq!(batch_header.transaction_ids().len(), 2);
+        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[1], sig2.take_bytes());
+        assert_eq!(batch.header_signature(), signature.as_hex());
 
         // pull the next batch
         batch_result = producer.next();
@@ -294,9 +278,9 @@ mod tests {
 
         let batch = batch_result.unwrap().unwrap();
 
-        let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
-        assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], sig3.as_hex());
+        let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
+        assert_eq!(batch_header.transaction_ids().len(), 1);
+        assert_eq!(batch_header.transaction_ids()[0], sig3.take_bytes());
 
         // test exhaustion
         batch_result = producer.next();
@@ -328,48 +312,48 @@ mod tests {
 
         // reset for reading
         output.set_position(0);
-        let mut batch_source: BatchSource = LengthDelimitedMessageSource::new(&mut output);
+        let mut batch_source: BatchSource = ProtobufBatchReader::new(&mut output);
 
         let batch = &(batch_source.next(1).unwrap())[0];
-        let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
-        assert_eq!(batch_header.transaction_ids.len(), 2);
-        assert_eq!(batch_header.transaction_ids[0], sig1.as_hex());
-        assert_eq!(batch_header.transaction_ids[1], sig2.as_hex());
+        let batch_header: BatchHeader = batch.header().clone();
+        assert_eq!(batch_header.transaction_ids().len(), 2);
+        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[1], sig2.take_bytes());
 
         let batch = &(batch_source.next(1).unwrap())[0];
-        let batch_header: BatchHeader = Message::parse_from_bytes(&batch.header).unwrap();
-        assert_eq!(batch_header.transaction_ids.len(), 1);
-        assert_eq!(batch_header.transaction_ids[0], sig3.as_hex());
+        let batch_header: BatchHeader = batch.header().clone();
+        assert_eq!(batch_header.transaction_ids().len(), 1);
+        assert_eq!(batch_header.transaction_ids()[0], sig3.take_bytes());
     }
 
     fn make_txn(signer: &dyn Signer) -> (Transaction, Signature) {
-        let mut txn_header = TransactionHeader::new();
+        let public_key = signer
+            .public_key()
+            .expect("failed to get pub key")
+            .into_bytes();
 
-        let public_key = signer.public_key().expect("failed to get pub key").as_hex();
+        let txn = TransactionBuilder::new()
+            .with_batcher_public_key(public_key)
+            .with_family_name(String::from("test_family"))
+            .with_family_version(String::from("1.0"))
+            .with_inputs(vec!["inputs".as_bytes().to_vec()])
+            .with_outputs(vec!["outputs".as_bytes().to_vec()])
+            .with_payload_hash_method(HashMethod::Sha512)
+            .with_payload("sig".as_bytes().to_vec())
+            .build(signer)
+            .expect("Failed to build transaction");
 
-        txn_header.set_batcher_public_key(public_key.clone());
-        txn_header.set_family_name(String::from("test_family"));
-        txn_header.set_family_version(String::from("1.0"));
-        txn_header.set_signer_public_key(public_key);
-        txn_header.set_payload_sha512(String::from("hash"));
-
-        let header_bytes = txn_header.write_to_bytes().unwrap();
-
-        let signature = signer
-            .sign(&header_bytes)
-            .expect("Failed to sign header bytes");
-
-        let mut txn = Transaction::new();
-        txn.set_header(header_bytes);
-        txn.set_header_signature(signature.as_hex());
-        txn.set_payload("sig".as_bytes().to_vec());
+        let signature =
+            Signature::from_hex(txn.header_signature()).expect("Failed to get signature");
 
         (txn, signature)
     }
 
     fn write_txn_with_signer(signer: &dyn Signer, out: &mut dyn Write) -> Signature {
         let (txn, signature) = make_txn(signer);
-        txn.write_length_delimited_to_writer(out)
+        let txn_proto = ProtobufTransaction::from_native(txn).unwrap();
+        txn_proto
+            .write_length_delimited_to_writer(out)
             .expect("Unable to write delimiter");
         signature
     }
