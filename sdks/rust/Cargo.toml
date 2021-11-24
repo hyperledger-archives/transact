@@ -30,7 +30,7 @@ protobuf = "2.19"
 sha2 = "0.8"
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-transact = "0.3"
+transact = "0.4"
 cylinder = "0.2"
 
 [build-dependencies]
