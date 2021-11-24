@@ -232,7 +232,7 @@ mod tests {
 
         let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
         assert_eq!(batch_header.transaction_ids().len(), 1);
-        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[0], sig1.as_hex());
 
         // test exhaustion
         batch_result = producer.next();
@@ -268,8 +268,8 @@ mod tests {
 
         let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
         assert_eq!(batch_header.transaction_ids().len(), 2);
-        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
-        assert_eq!(batch_header.transaction_ids()[1], sig2.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[0], sig1.as_hex());
+        assert_eq!(batch_header.transaction_ids()[1], sig2.as_hex());
         assert_eq!(batch.header_signature(), signature.as_hex());
 
         // pull the next batch
@@ -280,7 +280,7 @@ mod tests {
 
         let batch_header = BatchHeader::from_bytes(batch.header()).unwrap();
         assert_eq!(batch_header.transaction_ids().len(), 1);
-        assert_eq!(batch_header.transaction_ids()[0], sig3.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[0], sig3.as_hex());
 
         // test exhaustion
         batch_result = producer.next();
@@ -317,13 +317,13 @@ mod tests {
         let batch = &(batch_source.next(1).unwrap())[0];
         let batch_header: BatchHeader = batch.header().clone();
         assert_eq!(batch_header.transaction_ids().len(), 2);
-        assert_eq!(batch_header.transaction_ids()[0], sig1.take_bytes());
-        assert_eq!(batch_header.transaction_ids()[1], sig2.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[0], sig1.as_hex());
+        assert_eq!(batch_header.transaction_ids()[1], sig2.as_hex());
 
         let batch = &(batch_source.next(1).unwrap())[0];
         let batch_header: BatchHeader = batch.header().clone();
         assert_eq!(batch_header.transaction_ids().len(), 1);
-        assert_eq!(batch_header.transaction_ids()[0], sig3.take_bytes());
+        assert_eq!(batch_header.transaction_ids()[0], sig3.as_hex());
     }
 
     fn make_txn(signer: &dyn Signer) -> (Transaction, Signature) {
