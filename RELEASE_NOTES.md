@@ -1,8 +1,35 @@
 # Release Notes
 
+## Changes in Sawtooth Sabre 0.8.1
+
+* Remove smart permissions support. Smart permissions are currently not used
+  anywhere but did rely heavily on Pike.
+* Remove Pike. Pike has been moved to Grid and had a major update.
+* Add contract show/list subcommands to the `sabre` CLI.
+* Support custom keyfile in Sabre CLIs. Adds support for keyfile
+  (relative/absolute) path read from the CLI.
+* Break out checking if a signer is an admin into trait. The `AdminPermission`
+  trait will be used to decouple the Sabre Transaction Handler from Sawtooth
+  Settings when checking if a signer is an admin. Two implementation are
+  provided. One to still check Settings and one no-op implementation that always
+  returns true. When starting up the transaction processor provide the flag
+  `--admin-no-op` to treat all signers as admins.
+
 ## Changes in Sawtooth Sabre 0.8.0
 
 * Unreleased version
+
+## Changes in Sawtooth Sabre 0.7.2
+
+* Update the version of protobuf used to 2.19.
+* Change occurrences of `protobuf::parse_from_bytes` to
+  `Message::parse_from_bytes` because `protobuf::parse_from_bytes` is
+  depreciated.
+* Update the `ptr_to_vec` function to check the return type of
+  `externs::get_ptr_len` and handle errors appropriately.
+* Update examples that were pulling sawtooth-sdk from github to use the
+  published crate instead.
+* Update the version of wasmi used to 0.9.
 
 ## Changes in Sawtooth Sabre 0.7.1
 
