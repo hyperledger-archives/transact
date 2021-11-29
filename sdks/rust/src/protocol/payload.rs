@@ -1902,7 +1902,7 @@ impl SabrePayloadBuilder {
             .with_family_version(SABRE_PROTOCOL_VERSION.into())
             .with_inputs(input_addresses)
             .with_outputs(output_addresses)
-            .with_payload_hash_method(HashMethod::SHA512)
+            .with_payload_hash_method(HashMethod::Sha512)
             .with_payload(payload_bytes))
     }
 }
@@ -2347,7 +2347,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2373,7 +2373,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2402,7 +2402,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2428,7 +2428,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2453,7 +2453,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2479,7 +2479,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2505,7 +2505,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2530,7 +2530,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2556,7 +2556,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2584,7 +2584,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     #[test]
@@ -2610,7 +2610,7 @@ mod tests {
             txn_header.family_version(),
             SABRE_PROTOCOL_VERSION.to_string()
         );
-        assert_eq!(txn_header.payload_hash_method(), &HashMethod::SHA512);
+        assert_eq!(txn_header.payload_hash_method(), &HashMethod::Sha512);
     }
 
     fn new_signer() -> Box<dyn Signer> {
