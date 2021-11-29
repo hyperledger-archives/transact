@@ -4,6 +4,18 @@
 
 * Unreleased version
 
+## Changes in Sawtooth Sabre 0.7.2
+
+* Update the version of protobuf used to 2.19.
+* Change occurrences of `protobuf::parse_from_bytes` to
+  `Message::parse_from_bytes` because `protobuf::parse_from_bytes` is
+  depreciated.
+* Update the `ptr_to_vec` function to check the return type of
+  `externs::get_ptr_len` and handle errors appropriately.
+* Update examples that were pulling sawtooth-sdk from github to use the
+  published crate instead.
+* Update the version of wasmi used to 0.9.
+
 ## Changes in Sawtooth Sabre 0.7.1
 
 * Update the allowed family version to include 0.5, 0.6 and update the current
