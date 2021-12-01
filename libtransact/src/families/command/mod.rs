@@ -16,7 +16,11 @@
  */
 
 mod handler;
+#[cfg(feature = "family-command-transaction-builder")]
+mod transaction_builder;
 #[cfg(feature = "family-command-workload")]
 pub mod workload;
 
 pub use self::handler::CommandTransactionHandler;
+#[cfg(feature = "family-command-transaction-builder")]
+pub use self::transaction_builder::CommandTransactionBuilder;
