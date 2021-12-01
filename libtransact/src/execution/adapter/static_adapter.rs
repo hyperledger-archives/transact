@@ -290,7 +290,7 @@ impl From<ContextManagerError> for ContextError {
     }
 }
 
-#[cfg(all(test, feature = "family-command-workload"))]
+#[cfg(all(test, feature = "family-command-transaction-builder"))]
 mod test {
     use super::*;
 
@@ -304,9 +304,7 @@ mod test {
     use cylinder::{secp256k1::Secp256k1Context, Context, Signer};
 
     use crate::context::ContextLifecycle;
-    use crate::families::command::{
-        workload::CommandTransactionBuilder, CommandTransactionHandler,
-    };
+    use crate::families::command::{CommandTransactionBuilder, CommandTransactionHandler};
     use crate::protocol::command::{
         AddEvent, AddReceiptData, BytesEntry, Command, DeleteState, GetState, ReturnInternalError,
         ReturnInvalid, SetState, Sleep, SleepType,
