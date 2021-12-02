@@ -999,12 +999,19 @@ pub struct Link {
     link: String,
 }
 
-/// Used for deserializing `GET /batch_status` responses.
+/// This struct is a subset of the `GET /batch_status` response.  The complete response looks like
+/// [BatchInfo {
+///     id: "<id string>",
+///     status: BatchStatus,
+///     timestamp:
+///         SystemTime {
+///             tv_sec: <tv_sec>,
+///             tv_nsec: <tv_nsec>
+///         }
+/// }]
 #[derive(Debug, Deserialize)]
 struct BatchInfo {
-    pub id: String,
     pub status: BatchStatus,
-    pub timestamp: SystemTime,
 }
 
 /// Used by `BatchInfo` for deserializing `GET /batch_status` responses.
