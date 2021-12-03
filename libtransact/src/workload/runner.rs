@@ -1025,18 +1025,22 @@ enum BatchStatus {
     Committed(Vec<ValidTransaction>),
 }
 
-/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+/// Allow dead code because this struct is deserialized as part of the batch status response and
+/// available for debugging.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ValidTransaction {
-    pub transaction_id: String,
+    transaction_id: String,
 }
 
-/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+/// Allow dead code because this struct is deserialized as part of the batch status response and
+/// available for debugging.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct InvalidTransaction {
-    pub transaction_id: String,
-    pub error_message: String,
-    pub error_data: Vec<u8>,
+    transaction_id: String,
+    error_message: String,
+    error_data: Vec<u8>,
 }
 
 /// Counts sent and queue full for Batches submmissions from the target REST Api.
