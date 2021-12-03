@@ -59,6 +59,36 @@ pub struct SqliteBackend {
     connection_pool: Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>,
 }
 
+impl SqliteBackend {
+    /// Execute write operations against the database.
+    ///
+    /// This function will execute the provided closure with an exclusive write connection.  Via
+    /// this function, only a single writer is allowed at a time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    pub(in crate::state::merkle::sql) fn execute_write<F, T>(
+        &self,
+        f: F,
+    ) -> Result<T, InternalError>
+    where
+        F: Fn(SqliteConnection) -> Result<T, InternalError>,
+    {
+        let write_pool = self.connection_pool.write().map_err(|_| {
+            InternalError::with_message("SqliteBackend connection pool lock was poisoned".into())
+        })?;
+
+        let conn = write_pool
+            .get()
+            .map(SqliteConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        f(conn)
+    }
+}
+
 impl Backend for SqliteBackend {
     type Connection = SqliteConnection;
 
