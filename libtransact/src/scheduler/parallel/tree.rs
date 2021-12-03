@@ -58,7 +58,7 @@ impl<T: Clone> RadixTree<T> {
             .children
             .values()
             .find(|child| address.starts_with(&child.borrow().address))
-            .map(|child| Rc::clone(child))
+            .map(Rc::clone)
             .ok_or_else(|| RadixTreeError::AddressNotInTree("Address Not In Tree".to_string()))
     }
 
@@ -147,7 +147,7 @@ impl<T: Clone> RadixTree<T> {
                     address.chars().skip(prefix_len).take(1).collect::<String>();
                 child_address_prefix.starts_with(&address_prefix)
             })
-            .map(|child| Rc::clone(child));
+            .map(Rc::clone);
 
         // Checks if the next child with a matching prefix was found, else just adds the new
         // address as a child.

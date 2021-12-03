@@ -22,7 +22,7 @@ use std::fmt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::mpsc::{channel, Receiver, Sender, TryRecvError};
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use std::{thread, time};
 
 use reqwest::{blocking::Client, header, StatusCode};
@@ -999,12 +999,19 @@ pub struct Link {
     link: String,
 }
 
-/// Used for deserializing `GET /batch_status` responses.
+/// This struct is a subset of the `GET /batch_status` response.  The complete response looks like
+/// [BatchInfo {
+///     id: "<id string>",
+///     status: BatchStatus,
+///     timestamp:
+///         SystemTime {
+///             tv_sec: <tv_sec>,
+///             tv_nsec: <tv_nsec>
+///         }
+/// }]
 #[derive(Debug, Deserialize)]
 struct BatchInfo {
-    pub id: String,
     pub status: BatchStatus,
-    pub timestamp: SystemTime,
 }
 
 /// Used by `BatchInfo` for deserializing `GET /batch_status` responses.
@@ -1018,18 +1025,22 @@ enum BatchStatus {
     Committed(Vec<ValidTransaction>),
 }
 
-/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+/// Allow dead code because this struct is deserialized as part of the batch status response and
+/// available for debugging.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct ValidTransaction {
-    pub transaction_id: String,
+    transaction_id: String,
 }
 
-/// Used by `BatchStatus` for deserializing `GET /batch_status` responses.
+/// Allow dead code because this struct is deserialized as part of the batch status response and
+/// available for debugging.
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct InvalidTransaction {
-    pub transaction_id: String,
-    pub error_message: String,
-    pub error_data: Vec<u8>,
+    transaction_id: String,
+    error_message: String,
+    error_data: Vec<u8>,
 }
 
 /// Counts sent and queue full for Batches submmissions from the target REST Api.
