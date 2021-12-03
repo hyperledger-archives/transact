@@ -22,6 +22,7 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::num::NonZeroU32;
+use std::sync::{Arc, RwLock};
 
 use diesel::{
     connection::SimpleConnection,
@@ -55,7 +56,7 @@ impl Connection for SqliteConnection {
 /// Available if the feature "sqlite" is enabled.
 #[derive(Clone)]
 pub struct SqliteBackend {
-    connection_pool: Pool<ConnectionManager<sqlite::SqliteConnection>>,
+    connection_pool: Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>,
 }
 
 impl Backend for SqliteBackend {
@@ -63,6 +64,12 @@ impl Backend for SqliteBackend {
 
     fn connection(&self) -> Result<Self::Connection, InternalError> {
         self.connection_pool
+            .read()
+            .map_err(|_| {
+                InternalError::with_message(
+                    "SqliteBackend connection pool lock was poisoned".into(),
+                )
+            })?
             .get()
             .map(SqliteConnection)
             .map_err(|err| InternalError::from_source(Box::new(err)))
@@ -72,7 +79,7 @@ impl Backend for SqliteBackend {
 impl From<Pool<ConnectionManager<sqlite::SqliteConnection>>> for SqliteBackend {
     fn from(pool: Pool<ConnectionManager<sqlite::SqliteConnection>>) -> Self {
         Self {
-            connection_pool: pool,
+            connection_pool: Arc::new(RwLock::new(pool)),
         }
     }
 }
@@ -307,9 +314,7 @@ impl SqliteBackendBuilder {
             .get()
             .map_err(|err| InvalidStateError::with_message(err.to_string()))?;
 
-        Ok(SqliteBackend {
-            connection_pool: pool,
-        })
+        Ok(SqliteBackend::from(pool))
     }
 }
 
