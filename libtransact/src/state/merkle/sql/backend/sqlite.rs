@@ -87,6 +87,31 @@ impl SqliteBackend {
 
         f(conn)
     }
+
+    /// Execute read operation against the database.
+    ///
+    /// This function will execute the provided closure with an read connection.  Via
+    /// this function, multiple readers are allowed, unless there is a write in progress.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    pub(in crate::state::merkle::sql) fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(SqliteConnection) -> Result<T, InternalError>,
+    {
+        let read_pool = self.connection_pool.read().map_err(|_| {
+            InternalError::with_message("SqliteBackend connection pool lock was poisoned".into())
+        })?;
+
+        let conn = read_pool
+            .get()
+            .map(SqliteConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        f(conn)
+    }
 }
 
 impl Backend for SqliteBackend {
