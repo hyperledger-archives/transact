@@ -18,7 +18,7 @@ use std::error::Error;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use transact::state::merkle::sql::{
-    backend::{JournalMode, SqliteBackend, SqliteBackendBuilder},
+    backend::{SqliteBackend, SqliteBackendBuilder},
     migration::MigrationManager,
     SqlMerkleState, SqlMerkleStateBuilder,
 };
@@ -151,7 +151,6 @@ fn new_sql_merkle_state_and_root(
 ) -> Result<(SqlMerkleState<SqliteBackend>, String), Box<dyn Error>> {
     let backend = SqliteBackendBuilder::new()
         .with_connection_path(dbpath)
-        .with_journal_mode(JournalMode::Wal)
         .with_create()
         .build()?;
     backend.run_migrations()?;

@@ -22,6 +22,7 @@
 use std::convert::TryFrom;
 use std::fmt;
 use std::num::NonZeroU32;
+use std::sync::{Arc, RwLock};
 
 use diesel::{
     connection::SimpleConnection,
@@ -55,7 +56,62 @@ impl Connection for SqliteConnection {
 /// Available if the feature "sqlite" is enabled.
 #[derive(Clone)]
 pub struct SqliteBackend {
-    connection_pool: Pool<ConnectionManager<sqlite::SqliteConnection>>,
+    connection_pool: Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>,
+}
+
+impl SqliteBackend {
+    /// Execute write operations against the database.
+    ///
+    /// This function will execute the provided closure with an exclusive write connection.  Via
+    /// this function, only a single writer is allowed at a time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    pub(in crate::state::merkle::sql) fn execute_write<F, T>(
+        &self,
+        f: F,
+    ) -> Result<T, InternalError>
+    where
+        F: Fn(SqliteConnection) -> Result<T, InternalError>,
+    {
+        let write_pool = self.connection_pool.write().map_err(|_| {
+            InternalError::with_message("SqliteBackend connection pool lock was poisoned".into())
+        })?;
+
+        let conn = write_pool
+            .get()
+            .map(SqliteConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        f(conn)
+    }
+
+    /// Execute read operation against the database.
+    ///
+    /// This function will execute the provided closure with an read connection.  Via
+    /// this function, multiple readers are allowed, unless there is a write in progress.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    pub(in crate::state::merkle::sql) fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(SqliteConnection) -> Result<T, InternalError>,
+    {
+        let read_pool = self.connection_pool.read().map_err(|_| {
+            InternalError::with_message("SqliteBackend connection pool lock was poisoned".into())
+        })?;
+
+        let conn = read_pool
+            .get()
+            .map(SqliteConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        f(conn)
+    }
 }
 
 impl Backend for SqliteBackend {
@@ -63,6 +119,12 @@ impl Backend for SqliteBackend {
 
     fn connection(&self) -> Result<Self::Connection, InternalError> {
         self.connection_pool
+            .read()
+            .map_err(|_| {
+                InternalError::with_message(
+                    "SqliteBackend connection pool lock was poisoned".into(),
+                )
+            })?
             .get()
             .map(SqliteConnection)
             .map_err(|err| InternalError::from_source(Box::new(err)))
@@ -71,6 +133,14 @@ impl Backend for SqliteBackend {
 
 impl From<Pool<ConnectionManager<sqlite::SqliteConnection>>> for SqliteBackend {
     fn from(pool: Pool<ConnectionManager<sqlite::SqliteConnection>>) -> Self {
+        Self {
+            connection_pool: Arc::new(RwLock::new(pool)),
+        }
+    }
+}
+
+impl From<Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>> for SqliteBackend {
+    fn from(pool: Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>) -> Self {
         Self {
             connection_pool: pool,
         }
@@ -307,9 +377,7 @@ impl SqliteBackendBuilder {
             .get()
             .map_err(|err| InvalidStateError::with_message(err.to_string()))?;
 
-        Ok(SqliteBackend {
-            connection_pool: pool,
-        })
+        Ok(SqliteBackend::from(pool))
     }
 }
 
