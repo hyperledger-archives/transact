@@ -1,5 +1,14 @@
 # Release Notes
 
+## Changes in Transact 0.4.2
+
+### libtransact
+
+* Update `SqliteMerkleRadixStore` with exclusive write.  This updates
+  `SqliteMerkleRadixStore` such that that all writes are exclusive, but multiple
+  readers will be possible. This mitigates bugs that may occur when concurrent
+  writes are allowed.
+* Add `From<Arc<RwLock<Pool...>>>` implementation for `SqliteBackend`.
 
 ## Changes in Transact 0.4.1
 
