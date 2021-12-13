@@ -31,6 +31,9 @@ use crate::protocol::{
 use crate::protos::IntoBytes;
 use crate::workload::{BatchWorkload, ExpectedBatchResult, TransactionWorkload};
 
+#[cfg(feature = "family-command-transaction-builder")]
+use super::transaction_builder::CommandTransactionBuilder as CmdTransactionBuilder;
+
 pub use crate::families::command::workload::command_iter::CommandGeneratingIter;
 
 /// A transaction workload that generates signed `command` transactions.
@@ -158,3 +161,10 @@ impl BatchWorkload for CommandBatchWorkload {
         ))
     }
 }
+
+#[cfg(feature = "family-command-transaction-builder")]
+#[deprecated(
+    since = "0.4.1",
+    note = "Please use families::command::CommandTransactionBuilder"
+)]
+pub type CommandTransactionBuilder = CmdTransactionBuilder;
