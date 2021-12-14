@@ -32,7 +32,6 @@ cfg_if! {
     }
 }
 
-extern crate crypto;
 extern crate protobuf;
 pub mod handler;
 

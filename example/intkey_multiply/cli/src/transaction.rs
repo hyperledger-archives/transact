@@ -17,8 +17,6 @@
 
 use std::time::Instant;
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use protobuf::Message;
 use sawtooth_sdk::messages::batch::Batch;
 use sawtooth_sdk::messages::batch::BatchHeader;
@@ -26,6 +24,7 @@ use sawtooth_sdk::messages::batch::BatchList;
 use sawtooth_sdk::messages::transaction::Transaction;
 use sawtooth_sdk::messages::transaction::TransactionHeader;
 use sawtooth_sdk::signing::Signer;
+use sha2::{Digest, Sha512};
 
 use crate::error::CliError;
 
@@ -62,9 +61,11 @@ fn bytes_to_hex_str(b: &[u8]) -> String {
 ///
 /// * `namespace` - the address prefix for this namespace
 fn compute_intkey_address(name: &str) -> String {
-    let mut sha = Sha512::new();
-    sha.input(name.as_bytes());
-    String::from(INTKEY_PREFIX) + &sha.result_str()[64..].to_string()
+    let sha = Sha512::digest(name)
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
+    String::from(INTKEY_PREFIX) + &sha[64..].to_string()
 }
 
 /// Returns a Transaction for the given Payload and Signer
@@ -111,11 +112,8 @@ pub fn create_transaction(
     txn_header.set_inputs(protobuf::RepeatedField::from_vec(input_addresses));
     txn_header.set_outputs(protobuf::RepeatedField::from_vec(output_addresses));
 
-    let mut sha = Sha512::new();
-    sha.input(payload);
-    let hash: &mut [u8] = &mut [0; 64];
-    sha.result(hash);
-    txn_header.set_payload_sha512(bytes_to_hex_str(hash));
+    let hash = Sha512::digest(payload);
+    txn_header.set_payload_sha512(bytes_to_hex_str(&hash[0..64]));
     txn.set_payload(payload.to_vec());
 
     let txn_header_bytes = txn_header.write_to_bytes()?;

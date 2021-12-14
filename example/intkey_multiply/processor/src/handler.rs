@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use hex::{decode, encode_upper};
+use sha2::{Digest, Sha512};
 
 use std::collections::BTreeMap;
 use std::collections::HashMap;
@@ -38,9 +37,10 @@ const MAX_VALUE: u32 = 4_294_967_295;
 const MAX_NAME_LEN: usize = 20;
 
 fn get_intkey_prefix() -> String {
-    let mut sha = Sha512::new();
-    sha.input_str("intkey");
-    sha.result_str()[..6].to_string()
+    Sha512::digest("intkey")[..3]
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>()
 }
 
 fn decode_intkey(hex_string: String) -> Result<BTreeMap<String, u32>, ApplyError> {
@@ -310,9 +310,11 @@ impl<'a> IntkeyState<'a> {
     }
 
     fn calculate_address(name: &str) -> String {
-        let mut sha = Sha512::new();
-        sha.input(name.as_bytes());
-        get_intkey_prefix() + &sha.result_str()[64..].to_string()
+        let sha = Sha512::digest(name)
+            .iter()
+            .map(|b| format!("{:02x}", b))
+            .collect::<String>();
+        get_intkey_prefix() + &sha[64..].to_string()
     }
 
     pub fn get(&mut self, name: &str) -> Result<Option<u32>, ApplyError> {
