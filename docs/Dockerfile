@@ -49,6 +49,7 @@ RUN apt-get update && apt-get install -y -q \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
     && pip3 install \
+    mistune==0.8.4 \
     sphinx \
     sphinxcontrib-httpdomain \
     sphinxcontrib-openapi \

@@ -56,7 +56,7 @@ build:
 build-docs:
     #!/usr/bin/env sh
     set -e
-    docker-compose -f docs/docker-compose.yaml up
+    docker-compose -f docs/docker-compose.yaml up --exit-code-from sabre-docs
 
 ci:
     just ci-lint
