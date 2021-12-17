@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use sawtooth_sdk::processor::handler::ApplyError;
+use sha2::{Digest, Sha512};
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
@@ -26,9 +25,10 @@ const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
 const CONTRACT_PREFIX: &str = "00ec02";
 
 pub fn hash(to_hash: &str, num: usize) -> Result<String, ApplyError> {
-    let mut sha = Sha512::new();
-    sha.input_str(to_hash);
-    let temp = sha.result_str();
+    let temp = Sha512::digest(to_hash)
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
     let hash = match temp.get(..num) {
         Some(x) => x,
         None => {

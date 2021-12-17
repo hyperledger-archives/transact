@@ -14,8 +14,6 @@
 
 //! Provides a Sawtooth Transaction Handler for executing Sabre transactions.
 
-use crypto::digest::Digest;
-use crypto::sha2::Sha512;
 use sabre_sdk::protocol::state::{
     ContractBuilder, ContractRegistry, ContractRegistryBuilder, NamespaceRegistry,
     NamespaceRegistryBuilder, PermissionBuilder, VersionBuilder,
@@ -24,6 +22,7 @@ use sawtooth_sdk::messages::processor::TpProcessRequest;
 use sawtooth_sdk::processor::handler::ApplyError;
 use sawtooth_sdk::processor::handler::TransactionContext;
 use sawtooth_sdk::processor::handler::TransactionHandler;
+use sha2::{Digest, Sha512};
 
 use crate::admin::AdminPermission;
 use crate::payload::SabreRequestPayload;
@@ -261,12 +260,14 @@ fn create_contract(
 
     state.set_contract(name, version, contract)?;
 
-    let mut sha = Sha512::new();
-    sha.input(payload.contract());
+    let contract_sha512 = Sha512::digest(payload.contract())
+        .iter()
+        .map(|b| format!("{:02x}", b))
+        .collect::<String>();
 
     let contract_registry_version = VersionBuilder::new()
         .with_version(version.into())
-        .with_contract_sha512(sha.result_str())
+        .with_contract_sha512(contract_sha512)
         .with_creator(signer.into())
         .build()
         .map_err(|_| {

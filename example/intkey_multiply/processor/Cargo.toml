@@ -22,13 +22,12 @@ clap = "2"
 protobuf = "2.19"
 cfg-if = "1"
 hex = "0.4"
+sha2 = "0.10"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
-rust-crypto-wasm = "0.3"
 sabre-sdk = {path = "../../../sdks/rust"}
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-rust-crypto = "0.2.36"
 sawtooth-sdk = "0.5"
 rustc-serialize = "0.3.22"
 log = "0.3.0"
