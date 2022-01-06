@@ -120,7 +120,7 @@ pub trait Write: Sync + Send {
     ) -> Result<Self::StateId, StateWriteError>;
 }
 
-/// `state::Prune` provides a way to remove state ids from a particular state
+/// `state::Prune` provides a way to remove no-longer needed state data from a particular state
 /// storage system.
 ///
 /// Removing `StateIds` and the associated state makes it so the state storage
@@ -134,7 +134,7 @@ pub trait Prune: Sync + Send {
     /// The Value that is being stored in state.
     type Value;
 
-    /// Prune any State prior to the given StateId.
+    /// Prune keys from state for a given set of state IDs.
     ///
     /// In storage mechanisms that have a concept of `StateId` ordering, this
     /// function should provide the functionality to prune older state values.
