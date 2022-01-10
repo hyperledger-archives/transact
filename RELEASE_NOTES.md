@@ -1,5 +1,18 @@
 # Release Notes
 
+## Changes in Transact 0.4.3
+
+* Alter column type for `merkle_radix_leaf.address` in SQLite. This fixes a bug
+  where address that were valid numeric values would have their leading 0s
+  removed (as expressed in the hex string of the address).
+* Move `CommandTransactionBuilder` from `transact::families::command::workload`
+  to `transact::families::command`. The original version remains and is now
+  deprecated.
+* Update rustdoc for transact::state::merkle module with more detail
+* Update rustdoc for transact::state::Prune trait for clarity
+
+### libtransact
+
 ## Changes in Transact 0.4.2
 
 ### libtransact
