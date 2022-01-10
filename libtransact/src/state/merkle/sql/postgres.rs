@@ -308,6 +308,40 @@ mod test {
         })
     }
 
+    #[test]
+    fn test_list_leaves() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|db_url| {
+            let backend = PostgresBackendBuilder::new().with_url(db_url).build()?;
+
+            let tree_1 = SqlMerkleStateBuilder::new()
+                .with_backend(backend.clone())
+                .with_tree("test-1")
+                .create_tree_if_necessary()
+                .build()?;
+
+            let initial_state_root_hash = tree_1.initial_state_root_hash()?;
+
+            let state_change_set = StateChange::Set {
+                key: "012345".to_string(),
+                value: "state_value".as_bytes().to_vec(),
+            };
+
+            let new_root = tree_1
+                .commit(&initial_state_root_hash, &[state_change_set])
+                .unwrap();
+            assert_read_value_at_address(&tree_1, &new_root, "012345", Some("state_value"));
+
+            let entry = tree_1
+                .leaves(&new_root, None)?
+                .next()
+                .expect("A value should have been listed")?;
+
+            assert_eq!(("012345".to_string(), b"state_value".to_vec()), entry);
+
+            Ok(())
+        })
+    }
+
     fn assert_read_value_at_address<R>(
         merkle_read: &R,
         root_hash: &str,
