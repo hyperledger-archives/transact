@@ -1087,7 +1087,7 @@ impl fmt::Display for HttpRequestCounter {
             f,
             "{0}: {1}, Sent: {2}, Queue Full {3}",
             self.id,
-            time.format("%h-%d-%Y %H:%M:%S%.3f").to_string(),
+            time.format("%h-%d-%Y %H:%M:%S%.3f"),
             self.sent_count.load(Ordering::Relaxed),
             self.queue_full_count.load(Ordering::Relaxed)
         )

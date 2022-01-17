@@ -720,7 +720,7 @@ fn get_ref_count(db_reader: &dyn DatabaseReader, key: &[u8]) -> Result<u64, Stat
 }
 
 fn to_bytes(num: u64) -> [u8; 8] {
-    unsafe { ::std::mem::transmute(num.to_le()) }
+    num.to_le().to_ne_bytes()
 }
 
 fn from_bytes(bytes: &[u8]) -> u64 {
