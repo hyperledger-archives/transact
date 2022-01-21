@@ -1,4 +1,4 @@
-name: Lint Transact
+name: 0-4 Lint Transact
 
 on:
   pull_request:

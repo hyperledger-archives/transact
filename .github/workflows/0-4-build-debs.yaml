@@ -1,4 +1,4 @@
-name: Build Debs
+name: 0-4 Build Debs
 
 on:
   pull_request:

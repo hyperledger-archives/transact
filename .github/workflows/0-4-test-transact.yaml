@@ -1,4 +1,4 @@
-name: Test Transact
+name: 0-4 Test Transact
 
 on:
   pull_request:
