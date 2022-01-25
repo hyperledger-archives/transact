@@ -1,0 +1,45 @@
+// Copyright 2018 Cargill Incorporated
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+// A contract registry is stored using the name of the contract, with the
+// following address:
+//
+//   00ec01 + hash(name)
+//
+// The stored contents are a serialized ContractRegistryList message to handle
+// hash collisions.
+
+message ContractRegistry {
+  message Version {
+    string version = 1;
+
+    // used to verify a contract is same as the one the client intended to
+    // invoke
+    string contract_sha512 = 2;
+
+    // for client information purposes only - the key that created this
+    // contract on the chain
+    string creator = 3;
+  }
+
+  string name = 1;
+  repeated Version versions = 2;
+  repeated string owners = 3;
+}
+
+message ContractRegistryList {
+  repeated ContractRegistry registries = 1;
+}
