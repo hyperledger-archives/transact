@@ -42,13 +42,13 @@ use transact::families::command::workload::{
 use transact::protocol::{
     batch::{BatchBuilder, BatchPair},
     receipt::{StateChange, TransactionResult},
-    sabre::{
+    sabre::payload::{
         CreateContractActionBuilder, CreateContractRegistryActionBuilder,
         CreateNamespaceRegistryActionBuilder, CreateNamespaceRegistryPermissionActionBuilder,
     },
     transaction::Transaction,
 };
-use transact::protos::sabre::{Setting, Setting_Entry};
+use transact::protos::sabre_payload::{Setting, Setting_Entry};
 use transact::sawtooth::SawtoothToTransactHandlerAdapter;
 use transact::scheduler::{serial::SerialScheduler, BatchExecutionResult, Scheduler};
 use transact::state::{

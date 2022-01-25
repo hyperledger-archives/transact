@@ -45,7 +45,16 @@ fn main() {
                 .unwrap(),
             proto_path.join("merkle.proto").to_str().unwrap(),
             proto_path.join("command.proto").to_str().unwrap(),
-            proto_path.join("sabre.proto").to_str().unwrap(),
+            proto_path
+                .join("sabre_contract_registry.proto")
+                .to_str()
+                .unwrap(),
+            proto_path.join("sabre_contract.proto").to_str().unwrap(),
+            proto_path
+                .join("sabre_namespace_registry.proto")
+                .to_str()
+                .unwrap(),
+            proto_path.join("sabre_payload.proto").to_str().unwrap(),
             proto_path.join("smallbank.proto").to_str().unwrap(),
             #[cfg(feature = "key-value-state")]
             proto_path.join("key_value_state.proto").to_str().unwrap(),
@@ -62,7 +71,8 @@ fn main() {
             b"pub mod batch;\npub mod events;\n \
         #[cfg(feature = \"key-value-state\")]\npub mod key_value_state;\n \
         pub mod transaction;\npub mod transaction_receipt;\npub mod merkle;\n \
-        pub mod command;\npub mod sabre;\npub mod smallbank;\n",
+        pub mod command;\npub mod sabre_contract;\npub mod sabre_contract_registry;\n \n
+        \npub mod sabre_namespace_registry;\npub mod sabre_payload;pub mod smallbank;\n",
         )
         .unwrap();
 }

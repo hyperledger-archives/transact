@@ -51,9 +51,9 @@ impl Version {
     }
 }
 
-impl FromProto<protos::contract_registry::ContractRegistry_Version> for Version {
+impl FromProto<protos::sabre_contract_registry::ContractRegistry_Version> for Version {
     fn from_proto(
-        proto: protos::contract_registry::ContractRegistry_Version,
+        proto: protos::sabre_contract_registry::ContractRegistry_Version,
     ) -> Result<Self, ProtoConversionError> {
         Ok(Version {
             version: proto.get_version().to_string(),
@@ -63,9 +63,9 @@ impl FromProto<protos::contract_registry::ContractRegistry_Version> for Version 
     }
 }
 
-impl FromNative<Version> for protos::contract_registry::ContractRegistry_Version {
+impl FromNative<Version> for protos::sabre_contract_registry::ContractRegistry_Version {
     fn from_native(native: Version) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::contract_registry::ContractRegistry_Version::new();
+        let mut proto = protos::sabre_contract_registry::ContractRegistry_Version::new();
 
         proto.set_version(native.version().to_string());
         proto.set_contract_sha512(native.contract_sha512().to_string());
@@ -75,8 +75,8 @@ impl FromNative<Version> for protos::contract_registry::ContractRegistry_Version
     }
 }
 
-impl IntoProto<protos::contract_registry::ContractRegistry_Version> for Version {}
-impl IntoNative<Version> for protos::contract_registry::ContractRegistry_Version {}
+impl IntoProto<protos::sabre_contract_registry::ContractRegistry_Version> for Version {}
+impl IntoNative<Version> for protos::sabre_contract_registry::ContractRegistry_Version {}
 
 #[derive(Debug)]
 pub enum VersionBuildError {
@@ -177,9 +177,9 @@ impl ContractRegistry {
     }
 }
 
-impl FromProto<protos::contract_registry::ContractRegistry> for ContractRegistry {
+impl FromProto<protos::sabre_contract_registry::ContractRegistry> for ContractRegistry {
     fn from_proto(
-        proto: protos::contract_registry::ContractRegistry,
+        proto: protos::sabre_contract_registry::ContractRegistry,
     ) -> Result<Self, ProtoConversionError> {
         Ok(ContractRegistry {
             name: proto.get_name().to_string(),
@@ -194,9 +194,9 @@ impl FromProto<protos::contract_registry::ContractRegistry> for ContractRegistry
     }
 }
 
-impl FromNative<ContractRegistry> for protos::contract_registry::ContractRegistry {
+impl FromNative<ContractRegistry> for protos::sabre_contract_registry::ContractRegistry {
     fn from_native(contract_registry: ContractRegistry) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::contract_registry::ContractRegistry::new();
+        let mut proto = protos::sabre_contract_registry::ContractRegistry::new();
         proto.set_name(contract_registry.name().to_string());
         proto.set_versions(RepeatedField::from_vec(
             contract_registry
@@ -205,7 +205,7 @@ impl FromNative<ContractRegistry> for protos::contract_registry::ContractRegistr
                 .into_iter()
                 .map(Version::into_proto)
                 .collect::<Result<
-                    Vec<protos::contract_registry::ContractRegistry_Version>,
+                    Vec<protos::sabre_contract_registry::ContractRegistry_Version>,
                     ProtoConversionError,
                 >>()?,
         ));
@@ -217,12 +217,12 @@ impl FromNative<ContractRegistry> for protos::contract_registry::ContractRegistr
 
 impl FromBytes<ContractRegistry> for ContractRegistry {
     fn from_bytes(bytes: &[u8]) -> Result<ContractRegistry, ProtoConversionError> {
-        let proto: protos::contract_registry::ContractRegistry = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get ContractRegistry from bytes".to_string(),
-            )
-        })?;
+        let proto: protos::sabre_contract_registry::ContractRegistry =
+            Message::parse_from_bytes(bytes).map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get ContractRegistry from bytes".to_string(),
+                )
+            })?;
         proto.into_native()
     }
 }
@@ -239,8 +239,8 @@ impl IntoBytes for ContractRegistry {
     }
 }
 
-impl IntoProto<protos::contract_registry::ContractRegistry> for ContractRegistry {}
-impl IntoNative<ContractRegistry> for protos::contract_registry::ContractRegistry {}
+impl IntoProto<protos::sabre_contract_registry::ContractRegistry> for ContractRegistry {}
+impl IntoNative<ContractRegistry> for protos::sabre_contract_registry::ContractRegistry {}
 
 #[derive(Debug)]
 pub enum ContractRegistryBuildError {
@@ -328,9 +328,9 @@ impl ContractRegistryList {
     }
 }
 
-impl FromProto<protos::contract_registry::ContractRegistryList> for ContractRegistryList {
+impl FromProto<protos::sabre_contract_registry::ContractRegistryList> for ContractRegistryList {
     fn from_proto(
-        proto: protos::contract_registry::ContractRegistryList,
+        proto: protos::sabre_contract_registry::ContractRegistryList,
     ) -> Result<Self, ProtoConversionError> {
         Ok(ContractRegistryList {
             registries: proto
@@ -343,24 +343,22 @@ impl FromProto<protos::contract_registry::ContractRegistryList> for ContractRegi
     }
 }
 
-impl FromNative<ContractRegistryList> for protos::contract_registry::ContractRegistryList {
+impl FromNative<ContractRegistryList> for protos::sabre_contract_registry::ContractRegistryList {
     fn from_native(
         contract_registry_list: ContractRegistryList,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::contract_registry::ContractRegistryList::new();
-        proto.set_registries(
-            RepeatedField::from_vec(
-                contract_registry_list
-                    .registries()
-                    .to_vec()
-                    .into_iter()
-                    .map(ContractRegistry::into_proto)
-                    .collect::<Result<
-                        Vec<protos::contract_registry::ContractRegistry>,
-                        ProtoConversionError,
-                    >>()?,
-            ),
-        );
+        let mut proto = protos::sabre_contract_registry::ContractRegistryList::new();
+        proto.set_registries(RepeatedField::from_vec(
+            contract_registry_list
+                .registries()
+                .to_vec()
+                .into_iter()
+                .map(ContractRegistry::into_proto)
+                .collect::<Result<
+                    Vec<protos::sabre_contract_registry::ContractRegistry>,
+                    ProtoConversionError,
+                >>()?,
+        ));
 
         Ok(proto)
     }
@@ -368,7 +366,7 @@ impl FromNative<ContractRegistryList> for protos::contract_registry::ContractReg
 
 impl FromBytes<ContractRegistryList> for ContractRegistryList {
     fn from_bytes(bytes: &[u8]) -> Result<ContractRegistryList, ProtoConversionError> {
-        let proto: protos::contract_registry::ContractRegistryList =
+        let proto: protos::sabre_contract_registry::ContractRegistryList =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ContractRegistryList from bytes".to_string(),
@@ -390,8 +388,8 @@ impl IntoBytes for ContractRegistryList {
     }
 }
 
-impl IntoProto<protos::contract_registry::ContractRegistryList> for ContractRegistryList {}
-impl IntoNative<ContractRegistryList> for protos::contract_registry::ContractRegistryList {}
+impl IntoProto<protos::sabre_contract_registry::ContractRegistryList> for ContractRegistryList {}
+impl IntoNative<ContractRegistryList> for protos::sabre_contract_registry::ContractRegistryList {}
 
 #[derive(Debug)]
 pub enum ContractRegistryListBuildError {
@@ -469,9 +467,9 @@ impl Permission {
     }
 }
 
-impl FromProto<protos::namespace_registry::NamespaceRegistry_Permission> for Permission {
+impl FromProto<protos::sabre_namespace_registry::NamespaceRegistry_Permission> for Permission {
     fn from_proto(
-        proto: protos::namespace_registry::NamespaceRegistry_Permission,
+        proto: protos::sabre_namespace_registry::NamespaceRegistry_Permission,
     ) -> Result<Self, ProtoConversionError> {
         Ok(Permission {
             contract_name: proto.get_contract_name().to_string(),
@@ -481,9 +479,9 @@ impl FromProto<protos::namespace_registry::NamespaceRegistry_Permission> for Per
     }
 }
 
-impl FromNative<Permission> for protos::namespace_registry::NamespaceRegistry_Permission {
+impl FromNative<Permission> for protos::sabre_namespace_registry::NamespaceRegistry_Permission {
     fn from_native(native: Permission) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::namespace_registry::NamespaceRegistry_Permission::new();
+        let mut proto = protos::sabre_namespace_registry::NamespaceRegistry_Permission::new();
 
         proto.set_contract_name(native.contract_name().to_string());
         proto.set_read(native.read());
@@ -493,8 +491,8 @@ impl FromNative<Permission> for protos::namespace_registry::NamespaceRegistry_Pe
     }
 }
 
-impl IntoProto<protos::namespace_registry::NamespaceRegistry_Permission> for Permission {}
-impl IntoNative<Permission> for protos::namespace_registry::NamespaceRegistry_Permission {}
+impl IntoProto<protos::sabre_namespace_registry::NamespaceRegistry_Permission> for Permission {}
+impl IntoNative<Permission> for protos::sabre_namespace_registry::NamespaceRegistry_Permission {}
 
 #[derive(Debug)]
 pub enum PermissionBuildError {
@@ -591,9 +589,9 @@ impl NamespaceRegistry {
     }
 }
 
-impl FromProto<protos::namespace_registry::NamespaceRegistry> for NamespaceRegistry {
+impl FromProto<protos::sabre_namespace_registry::NamespaceRegistry> for NamespaceRegistry {
     fn from_proto(
-        proto: protos::namespace_registry::NamespaceRegistry,
+        proto: protos::sabre_namespace_registry::NamespaceRegistry,
     ) -> Result<Self, ProtoConversionError> {
         Ok(NamespaceRegistry {
             namespace: proto.get_namespace().to_string(),
@@ -608,9 +606,9 @@ impl FromProto<protos::namespace_registry::NamespaceRegistry> for NamespaceRegis
     }
 }
 
-impl FromNative<NamespaceRegistry> for protos::namespace_registry::NamespaceRegistry {
+impl FromNative<NamespaceRegistry> for protos::sabre_namespace_registry::NamespaceRegistry {
     fn from_native(native: NamespaceRegistry) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::namespace_registry::NamespaceRegistry::new();
+        let mut proto = protos::sabre_namespace_registry::NamespaceRegistry::new();
         proto.set_namespace(native.namespace().to_string());
         proto.set_owners(RepeatedField::from_vec(native.owners().to_vec()));
         proto.set_permissions(RepeatedField::from_vec(
@@ -620,7 +618,7 @@ impl FromNative<NamespaceRegistry> for protos::namespace_registry::NamespaceRegi
                 .into_iter()
                 .map(Permission::into_proto)
                 .collect::<Result<
-                    Vec<protos::namespace_registry::NamespaceRegistry_Permission>,
+                    Vec<protos::sabre_namespace_registry::NamespaceRegistry_Permission>,
                     ProtoConversionError,
                 >>()?,
         ));
@@ -631,8 +629,8 @@ impl FromNative<NamespaceRegistry> for protos::namespace_registry::NamespaceRegi
 
 impl FromBytes<NamespaceRegistry> for NamespaceRegistry {
     fn from_bytes(bytes: &[u8]) -> Result<NamespaceRegistry, ProtoConversionError> {
-        let proto: protos::namespace_registry::NamespaceRegistry = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
+        let proto: protos::sabre_namespace_registry::NamespaceRegistry =
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get NamespaceRegistry from bytes".to_string(),
                 )
@@ -653,8 +651,8 @@ impl IntoBytes for NamespaceRegistry {
     }
 }
 
-impl IntoProto<protos::namespace_registry::NamespaceRegistry> for NamespaceRegistry {}
-impl IntoNative<NamespaceRegistry> for protos::namespace_registry::NamespaceRegistry {}
+impl IntoProto<protos::sabre_namespace_registry::NamespaceRegistry> for NamespaceRegistry {}
+impl IntoNative<NamespaceRegistry> for protos::sabre_namespace_registry::NamespaceRegistry {}
 
 #[derive(Debug)]
 pub enum NamespaceRegistryBuildError {
@@ -742,9 +740,9 @@ impl NamespaceRegistryList {
     }
 }
 
-impl FromProto<protos::namespace_registry::NamespaceRegistryList> for NamespaceRegistryList {
+impl FromProto<protos::sabre_namespace_registry::NamespaceRegistryList> for NamespaceRegistryList {
     fn from_proto(
-        proto: protos::namespace_registry::NamespaceRegistryList,
+        proto: protos::sabre_namespace_registry::NamespaceRegistryList,
     ) -> Result<Self, ProtoConversionError> {
         Ok(NamespaceRegistryList {
             registries: proto
@@ -757,24 +755,22 @@ impl FromProto<protos::namespace_registry::NamespaceRegistryList> for NamespaceR
     }
 }
 
-impl FromNative<NamespaceRegistryList> for protos::namespace_registry::NamespaceRegistryList {
+impl FromNative<NamespaceRegistryList> for protos::sabre_namespace_registry::NamespaceRegistryList {
     fn from_native(
         namespace_registry_list: NamespaceRegistryList,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::namespace_registry::NamespaceRegistryList::new();
-        proto.set_registries(
-            RepeatedField::from_vec(
-                namespace_registry_list
-                    .registries()
-                    .to_vec()
-                    .into_iter()
-                    .map(NamespaceRegistry::into_proto)
-                    .collect::<Result<
-                        Vec<protos::namespace_registry::NamespaceRegistry>,
-                        ProtoConversionError,
-                    >>()?,
-            ),
-        );
+        let mut proto = protos::sabre_namespace_registry::NamespaceRegistryList::new();
+        proto.set_registries(RepeatedField::from_vec(
+            namespace_registry_list
+                .registries()
+                .to_vec()
+                .into_iter()
+                .map(NamespaceRegistry::into_proto)
+                .collect::<Result<
+                    Vec<protos::sabre_namespace_registry::NamespaceRegistry>,
+                    ProtoConversionError,
+                >>()?,
+        ));
 
         Ok(proto)
     }
@@ -782,7 +778,7 @@ impl FromNative<NamespaceRegistryList> for protos::namespace_registry::Namespace
 
 impl FromBytes<NamespaceRegistryList> for NamespaceRegistryList {
     fn from_bytes(bytes: &[u8]) -> Result<NamespaceRegistryList, ProtoConversionError> {
-        let proto: protos::namespace_registry::NamespaceRegistryList =
+        let proto: protos::sabre_namespace_registry::NamespaceRegistryList =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get NamespaceRegistryList from bytes".to_string(),
@@ -804,8 +800,8 @@ impl IntoBytes for NamespaceRegistryList {
     }
 }
 
-impl IntoProto<protos::namespace_registry::NamespaceRegistryList> for NamespaceRegistryList {}
-impl IntoNative<NamespaceRegistryList> for protos::namespace_registry::NamespaceRegistryList {}
+impl IntoProto<protos::sabre_namespace_registry::NamespaceRegistryList> for NamespaceRegistryList {}
+impl IntoNative<NamespaceRegistryList> for protos::sabre_namespace_registry::NamespaceRegistryList {}
 
 #[derive(Debug)]
 pub enum NamespaceRegistryListBuildError {
@@ -903,8 +899,8 @@ impl Contract {
     }
 }
 
-impl FromProto<protos::contract::Contract> for Contract {
-    fn from_proto(proto: protos::contract::Contract) -> Result<Self, ProtoConversionError> {
+impl FromProto<protos::sabre_contract::Contract> for Contract {
+    fn from_proto(proto: protos::sabre_contract::Contract) -> Result<Self, ProtoConversionError> {
         Ok(Contract {
             name: proto.get_name().to_string(),
             version: proto.get_version().to_string(),
@@ -916,9 +912,9 @@ impl FromProto<protos::contract::Contract> for Contract {
     }
 }
 
-impl FromNative<Contract> for protos::contract::Contract {
+impl FromNative<Contract> for protos::sabre_contract::Contract {
     fn from_native(contract: Contract) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::contract::Contract::new();
+        let mut proto = protos::sabre_contract::Contract::new();
 
         proto.set_name(contract.name().to_string());
         proto.set_version(contract.version().to_string());
@@ -933,11 +929,12 @@ impl FromNative<Contract> for protos::contract::Contract {
 
 impl FromBytes<Contract> for Contract {
     fn from_bytes(bytes: &[u8]) -> Result<Contract, ProtoConversionError> {
-        let proto: protos::contract::Contract = Message::parse_from_bytes(bytes).map_err(|_| {
-            ProtoConversionError::SerializationError(
-                "Unable to get Contract from bytes".to_string(),
-            )
-        })?;
+        let proto: protos::sabre_contract::Contract =
+            Message::parse_from_bytes(bytes).map_err(|_| {
+                ProtoConversionError::SerializationError(
+                    "Unable to get Contract from bytes".to_string(),
+                )
+            })?;
         proto.into_native()
     }
 }
@@ -954,8 +951,8 @@ impl IntoBytes for Contract {
     }
 }
 
-impl IntoProto<protos::contract::Contract> for Contract {}
-impl IntoNative<Contract> for protos::contract::Contract {}
+impl IntoProto<protos::sabre_contract::Contract> for Contract {}
+impl IntoNative<Contract> for protos::sabre_contract::Contract {}
 
 #[derive(Debug)]
 pub enum ContractBuildError {
@@ -1090,8 +1087,10 @@ impl ContractList {
     }
 }
 
-impl FromProto<protos::contract::ContractList> for ContractList {
-    fn from_proto(proto: protos::contract::ContractList) -> Result<Self, ProtoConversionError> {
+impl FromProto<protos::sabre_contract::ContractList> for ContractList {
+    fn from_proto(
+        proto: protos::sabre_contract::ContractList,
+    ) -> Result<Self, ProtoConversionError> {
         Ok(ContractList {
             contracts: proto
                 .get_contracts()
@@ -1103,16 +1102,16 @@ impl FromProto<protos::contract::ContractList> for ContractList {
     }
 }
 
-impl FromNative<ContractList> for protos::contract::ContractList {
+impl FromNative<ContractList> for protos::sabre_contract::ContractList {
     fn from_native(contract_list: ContractList) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::contract::ContractList::new();
+        let mut proto = protos::sabre_contract::ContractList::new();
         proto.set_contracts(RepeatedField::from_vec(
             contract_list
                 .contracts()
                 .to_vec()
                 .into_iter()
                 .map(Contract::into_proto)
-                .collect::<Result<Vec<protos::contract::Contract>, ProtoConversionError>>()?,
+                .collect::<Result<Vec<protos::sabre_contract::Contract>, ProtoConversionError>>()?,
         ));
 
         Ok(proto)
@@ -1121,8 +1120,8 @@ impl FromNative<ContractList> for protos::contract::ContractList {
 
 impl FromBytes<ContractList> for ContractList {
     fn from_bytes(bytes: &[u8]) -> Result<ContractList, ProtoConversionError> {
-        let proto: protos::contract::ContractList =
-            Message::parse_from_bytes(bytes).map_err(|_| {
+        let proto: protos::sabre_contract::ContractList = Message::parse_from_bytes(bytes)
+            .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ContractList from bytes".to_string(),
                 )
@@ -1143,8 +1142,8 @@ impl IntoBytes for ContractList {
     }
 }
 
-impl IntoProto<protos::contract::ContractList> for ContractList {}
-impl IntoNative<ContractList> for protos::contract::ContractList {}
+impl IntoProto<protos::sabre_contract::ContractList> for ContractList {}
+impl IntoNative<ContractList> for protos::sabre_contract::ContractList {}
 
 #[derive(Debug)]
 pub enum ContractListBuildError {

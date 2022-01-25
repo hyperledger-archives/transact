@@ -14,18 +14,16 @@
 
 use protobuf::Message;
 use protobuf::RepeatedField;
-#[cfg(not(target_arch = "wasm32"))]
-use transact::protocol::transaction::{HashMethod, TransactionBuilder};
 
 use std::error::Error as StdError;
 
+use crate::protocol::transaction::{HashMethod, TransactionBuilder};
 use crate::protos;
 use crate::protos::{
     FromBytes, FromNative, FromProto, IntoBytes, IntoNative, IntoProto, ProtoConversionError,
 };
 
 use super::AddressingError;
-#[cfg(not(target_arch = "wasm32"))]
 use super::{
     compute_contract_address, compute_contract_registry_address,
     compute_namespace_registry_address, ADMINISTRATORS_SETTING_ADDRESS_BYTES,
@@ -187,9 +185,9 @@ impl CreateContractAction {
     }
 }
 
-impl FromProto<protos::payload::CreateContractAction> for CreateContractAction {
+impl FromProto<protos::sabre_payload::CreateContractAction> for CreateContractAction {
     fn from_proto(
-        proto: protos::payload::CreateContractAction,
+        proto: protos::sabre_payload::CreateContractAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(CreateContractAction {
             name: proto.get_name().to_string(),
@@ -201,11 +199,11 @@ impl FromProto<protos::payload::CreateContractAction> for CreateContractAction {
     }
 }
 
-impl FromNative<CreateContractAction> for protos::payload::CreateContractAction {
+impl FromNative<CreateContractAction> for protos::sabre_payload::CreateContractAction {
     fn from_native(
         create_contract_action: CreateContractAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::CreateContractAction::new();
+        let mut proto = protos::sabre_payload::CreateContractAction::new();
         proto.set_name(create_contract_action.name().to_string());
         proto.set_version(create_contract_action.version().to_string());
         proto.set_inputs(RepeatedField::from_vec(
@@ -221,12 +219,12 @@ impl FromNative<CreateContractAction> for protos::payload::CreateContractAction 
 
 impl FromBytes<CreateContractAction> for CreateContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateContractAction, ProtoConversionError> {
-        let proto: protos::payload::CreateContractAction = Message::parse_from_bytes(bytes)
+        let proto: protos::sabre_payload::CreateContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get CreateContractAction from bytes".to_string(),
-                )
-            })?;
+            ProtoConversionError::SerializationError(
+                "Unable to get CreateContractAction from bytes".to_string(),
+            )
+        })?;
         proto.into_native()
     }
 }
@@ -243,8 +241,8 @@ impl IntoBytes for CreateContractAction {
     }
 }
 
-impl IntoProto<protos::payload::CreateContractAction> for CreateContractAction {}
-impl IntoNative<CreateContractAction> for protos::payload::CreateContractAction {}
+impl IntoProto<protos::sabre_payload::CreateContractAction> for CreateContractAction {}
+impl IntoNative<CreateContractAction> for protos::sabre_payload::CreateContractAction {}
 
 /// Builder used to create a CreateContractAction
 #[derive(Default, Clone)]
@@ -340,9 +338,9 @@ impl DeleteContractAction {
     }
 }
 
-impl FromProto<protos::payload::DeleteContractAction> for DeleteContractAction {
+impl FromProto<protos::sabre_payload::DeleteContractAction> for DeleteContractAction {
     fn from_proto(
-        proto: protos::payload::DeleteContractAction,
+        proto: protos::sabre_payload::DeleteContractAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(DeleteContractAction {
             name: proto.get_name().to_string(),
@@ -351,11 +349,11 @@ impl FromProto<protos::payload::DeleteContractAction> for DeleteContractAction {
     }
 }
 
-impl FromNative<DeleteContractAction> for protos::payload::DeleteContractAction {
+impl FromNative<DeleteContractAction> for protos::sabre_payload::DeleteContractAction {
     fn from_native(
         delete_contract_action: DeleteContractAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::DeleteContractAction::new();
+        let mut proto = protos::sabre_payload::DeleteContractAction::new();
         proto.set_name(delete_contract_action.name().to_string());
         proto.set_version(delete_contract_action.version().to_string());
         Ok(proto)
@@ -364,12 +362,12 @@ impl FromNative<DeleteContractAction> for protos::payload::DeleteContractAction 
 
 impl FromBytes<DeleteContractAction> for DeleteContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteContractAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteContractAction = Message::parse_from_bytes(bytes)
+        let proto: protos::sabre_payload::DeleteContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
-                ProtoConversionError::SerializationError(
-                    "Unable to get DeleteContractAction from bytes".to_string(),
-                )
-            })?;
+            ProtoConversionError::SerializationError(
+                "Unable to get DeleteContractAction from bytes".to_string(),
+            )
+        })?;
         proto.into_native()
     }
 }
@@ -386,8 +384,8 @@ impl IntoBytes for DeleteContractAction {
     }
 }
 
-impl IntoProto<protos::payload::DeleteContractAction> for DeleteContractAction {}
-impl IntoNative<DeleteContractAction> for protos::payload::DeleteContractAction {}
+impl IntoProto<protos::sabre_payload::DeleteContractAction> for DeleteContractAction {}
+impl IntoNative<DeleteContractAction> for protos::sabre_payload::DeleteContractAction {}
 
 /// Builder used to create a DeleteContractAction
 #[derive(Default, Clone)]
@@ -461,9 +459,9 @@ impl ExecuteContractAction {
     }
 }
 
-impl FromProto<protos::payload::ExecuteContractAction> for ExecuteContractAction {
+impl FromProto<protos::sabre_payload::ExecuteContractAction> for ExecuteContractAction {
     fn from_proto(
-        proto: protos::payload::ExecuteContractAction,
+        proto: protos::sabre_payload::ExecuteContractAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(ExecuteContractAction {
             name: proto.get_name().to_string(),
@@ -475,11 +473,11 @@ impl FromProto<protos::payload::ExecuteContractAction> for ExecuteContractAction
     }
 }
 
-impl FromNative<ExecuteContractAction> for protos::payload::ExecuteContractAction {
+impl FromNative<ExecuteContractAction> for protos::sabre_payload::ExecuteContractAction {
     fn from_native(
         execute_contract_action: ExecuteContractAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::ExecuteContractAction::new();
+        let mut proto = protos::sabre_payload::ExecuteContractAction::new();
         proto.set_name(execute_contract_action.name().to_string());
         proto.set_version(execute_contract_action.version().to_string());
         proto.set_inputs(RepeatedField::from_vec(
@@ -495,7 +493,7 @@ impl FromNative<ExecuteContractAction> for protos::payload::ExecuteContractActio
 
 impl FromBytes<ExecuteContractAction> for ExecuteContractAction {
     fn from_bytes(bytes: &[u8]) -> Result<ExecuteContractAction, ProtoConversionError> {
-        let proto: protos::payload::ExecuteContractAction = Message::parse_from_bytes(bytes)
+        let proto: protos::sabre_payload::ExecuteContractAction = Message::parse_from_bytes(bytes)
             .map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get ExecuteContractAction from bytes".to_string(),
@@ -517,8 +515,8 @@ impl IntoBytes for ExecuteContractAction {
     }
 }
 
-impl IntoProto<protos::payload::ExecuteContractAction> for ExecuteContractAction {}
-impl IntoNative<ExecuteContractAction> for protos::payload::ExecuteContractAction {}
+impl IntoProto<protos::sabre_payload::ExecuteContractAction> for ExecuteContractAction {}
+impl IntoNative<ExecuteContractAction> for protos::sabre_payload::ExecuteContractAction {}
 
 /// Builder used to create a ExecuteContractAction
 #[derive(Default, Clone)]
@@ -614,9 +612,11 @@ impl CreateContractRegistryAction {
     }
 }
 
-impl FromProto<protos::payload::CreateContractRegistryAction> for CreateContractRegistryAction {
+impl FromProto<protos::sabre_payload::CreateContractRegistryAction>
+    for CreateContractRegistryAction
+{
     fn from_proto(
-        proto: protos::payload::CreateContractRegistryAction,
+        proto: protos::sabre_payload::CreateContractRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(CreateContractRegistryAction {
             name: proto.get_name().to_string(),
@@ -625,11 +625,13 @@ impl FromProto<protos::payload::CreateContractRegistryAction> for CreateContract
     }
 }
 
-impl FromNative<CreateContractRegistryAction> for protos::payload::CreateContractRegistryAction {
+impl FromNative<CreateContractRegistryAction>
+    for protos::sabre_payload::CreateContractRegistryAction
+{
     fn from_native(
         create_contract_registry_action: CreateContractRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::CreateContractRegistryAction::new();
+        let mut proto = protos::sabre_payload::CreateContractRegistryAction::new();
         proto.set_name(create_contract_registry_action.name().to_string());
         proto.set_owners(RepeatedField::from_vec(
             create_contract_registry_action.owners().to_vec(),
@@ -640,8 +642,8 @@ impl FromNative<CreateContractRegistryAction> for protos::payload::CreateContrac
 
 impl FromBytes<CreateContractRegistryAction> for CreateContractRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateContractRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::CreateContractRegistryAction = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
+        let proto: protos::sabre_payload::CreateContractRegistryAction =
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateContractRegistryAction from bytes".to_string(),
                 )
@@ -662,8 +664,14 @@ impl IntoBytes for CreateContractRegistryAction {
     }
 }
 
-impl IntoProto<protos::payload::CreateContractRegistryAction> for CreateContractRegistryAction {}
-impl IntoNative<CreateContractRegistryAction> for protos::payload::CreateContractRegistryAction {}
+impl IntoProto<protos::sabre_payload::CreateContractRegistryAction>
+    for CreateContractRegistryAction
+{
+}
+impl IntoNative<CreateContractRegistryAction>
+    for protos::sabre_payload::CreateContractRegistryAction
+{
+}
 
 /// Builder used to create a CreateContractRegistryAction
 #[derive(Default, Clone)]
@@ -723,9 +731,11 @@ impl DeleteContractRegistryAction {
     }
 }
 
-impl FromProto<protos::payload::DeleteContractRegistryAction> for DeleteContractRegistryAction {
+impl FromProto<protos::sabre_payload::DeleteContractRegistryAction>
+    for DeleteContractRegistryAction
+{
     fn from_proto(
-        proto: protos::payload::DeleteContractRegistryAction,
+        proto: protos::sabre_payload::DeleteContractRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(DeleteContractRegistryAction {
             name: proto.get_name().to_string(),
@@ -733,11 +743,13 @@ impl FromProto<protos::payload::DeleteContractRegistryAction> for DeleteContract
     }
 }
 
-impl FromNative<DeleteContractRegistryAction> for protos::payload::DeleteContractRegistryAction {
+impl FromNative<DeleteContractRegistryAction>
+    for protos::sabre_payload::DeleteContractRegistryAction
+{
     fn from_native(
         delete_contract_registry_action: DeleteContractRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::DeleteContractRegistryAction::new();
+        let mut proto = protos::sabre_payload::DeleteContractRegistryAction::new();
         proto.set_name(delete_contract_registry_action.name().to_string());
         Ok(proto)
     }
@@ -745,8 +757,8 @@ impl FromNative<DeleteContractRegistryAction> for protos::payload::DeleteContrac
 
 impl FromBytes<DeleteContractRegistryAction> for DeleteContractRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteContractRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteContractRegistryAction = Message::parse_from_bytes(bytes)
-            .map_err(|_| {
+        let proto: protos::sabre_payload::DeleteContractRegistryAction =
+            Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteContractRegistryAction from bytes".to_string(),
                 )
@@ -767,8 +779,14 @@ impl IntoBytes for DeleteContractRegistryAction {
     }
 }
 
-impl IntoProto<protos::payload::DeleteContractRegistryAction> for DeleteContractRegistryAction {}
-impl IntoNative<DeleteContractRegistryAction> for protos::payload::DeleteContractRegistryAction {}
+impl IntoProto<protos::sabre_payload::DeleteContractRegistryAction>
+    for DeleteContractRegistryAction
+{
+}
+impl IntoNative<DeleteContractRegistryAction>
+    for protos::sabre_payload::DeleteContractRegistryAction
+{
+}
 
 /// Builder used to create a DeleteContractRegistryAction
 #[derive(Default, Clone)]
@@ -817,11 +835,11 @@ impl UpdateContractRegistryOwnersAction {
     }
 }
 
-impl FromProto<protos::payload::UpdateContractRegistryOwnersAction>
+impl FromProto<protos::sabre_payload::UpdateContractRegistryOwnersAction>
     for UpdateContractRegistryOwnersAction
 {
     fn from_proto(
-        proto: protos::payload::UpdateContractRegistryOwnersAction,
+        proto: protos::sabre_payload::UpdateContractRegistryOwnersAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(UpdateContractRegistryOwnersAction {
             name: proto.get_name().to_string(),
@@ -831,12 +849,12 @@ impl FromProto<protos::payload::UpdateContractRegistryOwnersAction>
 }
 
 impl FromNative<UpdateContractRegistryOwnersAction>
-    for protos::payload::UpdateContractRegistryOwnersAction
+    for protos::sabre_payload::UpdateContractRegistryOwnersAction
 {
     fn from_native(
         update_contract_registry_action: UpdateContractRegistryOwnersAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::UpdateContractRegistryOwnersAction::new();
+        let mut proto = protos::sabre_payload::UpdateContractRegistryOwnersAction::new();
         proto.set_name(update_contract_registry_action.name().to_string());
         proto.set_owners(RepeatedField::from_vec(
             update_contract_registry_action.owners().to_vec(),
@@ -849,7 +867,7 @@ impl FromBytes<UpdateContractRegistryOwnersAction> for UpdateContractRegistryOwn
     fn from_bytes(
         bytes: &[u8],
     ) -> Result<UpdateContractRegistryOwnersAction, ProtoConversionError> {
-        let proto: protos::payload::UpdateContractRegistryOwnersAction =
+        let proto: protos::sabre_payload::UpdateContractRegistryOwnersAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get UpdateContractRegistryOwnersAction from bytes".to_string(),
@@ -871,12 +889,12 @@ impl IntoBytes for UpdateContractRegistryOwnersAction {
     }
 }
 
-impl IntoProto<protos::payload::UpdateContractRegistryOwnersAction>
+impl IntoProto<protos::sabre_payload::UpdateContractRegistryOwnersAction>
     for UpdateContractRegistryOwnersAction
 {
 }
 impl IntoNative<UpdateContractRegistryOwnersAction>
-    for protos::payload::UpdateContractRegistryOwnersAction
+    for protos::sabre_payload::UpdateContractRegistryOwnersAction
 {
 }
 
@@ -943,9 +961,11 @@ impl CreateNamespaceRegistryAction {
     }
 }
 
-impl FromProto<protos::payload::CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {
+impl FromProto<protos::sabre_payload::CreateNamespaceRegistryAction>
+    for CreateNamespaceRegistryAction
+{
     fn from_proto(
-        proto: protos::payload::CreateNamespaceRegistryAction,
+        proto: protos::sabre_payload::CreateNamespaceRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(CreateNamespaceRegistryAction {
             namespace: proto.get_namespace().to_string(),
@@ -954,11 +974,13 @@ impl FromProto<protos::payload::CreateNamespaceRegistryAction> for CreateNamespa
     }
 }
 
-impl FromNative<CreateNamespaceRegistryAction> for protos::payload::CreateNamespaceRegistryAction {
+impl FromNative<CreateNamespaceRegistryAction>
+    for protos::sabre_payload::CreateNamespaceRegistryAction
+{
     fn from_native(
         create_namespace_registry_action: CreateNamespaceRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::CreateNamespaceRegistryAction::new();
+        let mut proto = protos::sabre_payload::CreateNamespaceRegistryAction::new();
         proto.set_namespace(create_namespace_registry_action.namespace().to_string());
         proto.set_owners(RepeatedField::from_vec(
             create_namespace_registry_action.owners().to_vec(),
@@ -969,7 +991,7 @@ impl FromNative<CreateNamespaceRegistryAction> for protos::payload::CreateNamesp
 
 impl FromBytes<CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<CreateNamespaceRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::CreateNamespaceRegistryAction =
+        let proto: protos::sabre_payload::CreateNamespaceRegistryAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateNamespaceRegistryAction from bytes".to_string(),
@@ -991,8 +1013,14 @@ impl IntoBytes for CreateNamespaceRegistryAction {
     }
 }
 
-impl IntoProto<protos::payload::CreateNamespaceRegistryAction> for CreateNamespaceRegistryAction {}
-impl IntoNative<CreateNamespaceRegistryAction> for protos::payload::CreateNamespaceRegistryAction {}
+impl IntoProto<protos::sabre_payload::CreateNamespaceRegistryAction>
+    for CreateNamespaceRegistryAction
+{
+}
+impl IntoNative<CreateNamespaceRegistryAction>
+    for protos::sabre_payload::CreateNamespaceRegistryAction
+{
+}
 
 /// Builder used to create a CreateNamespaceRegistryAction
 #[derive(Default, Clone)]
@@ -1051,9 +1079,11 @@ impl DeleteNamespaceRegistryAction {
         &self.namespace
     }
 }
-impl FromProto<protos::payload::DeleteNamespaceRegistryAction> for DeleteNamespaceRegistryAction {
+impl FromProto<protos::sabre_payload::DeleteNamespaceRegistryAction>
+    for DeleteNamespaceRegistryAction
+{
     fn from_proto(
-        proto: protos::payload::DeleteNamespaceRegistryAction,
+        proto: protos::sabre_payload::DeleteNamespaceRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(DeleteNamespaceRegistryAction {
             namespace: proto.get_namespace().to_string(),
@@ -1061,11 +1091,13 @@ impl FromProto<protos::payload::DeleteNamespaceRegistryAction> for DeleteNamespa
     }
 }
 
-impl FromNative<DeleteNamespaceRegistryAction> for protos::payload::DeleteNamespaceRegistryAction {
+impl FromNative<DeleteNamespaceRegistryAction>
+    for protos::sabre_payload::DeleteNamespaceRegistryAction
+{
     fn from_native(
         delete_namespace_registry_action: DeleteNamespaceRegistryAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::DeleteNamespaceRegistryAction::new();
+        let mut proto = protos::sabre_payload::DeleteNamespaceRegistryAction::new();
         proto.set_namespace(delete_namespace_registry_action.namespace().to_string());
         Ok(proto)
     }
@@ -1073,7 +1105,7 @@ impl FromNative<DeleteNamespaceRegistryAction> for protos::payload::DeleteNamesp
 
 impl FromBytes<DeleteNamespaceRegistryAction> for DeleteNamespaceRegistryAction {
     fn from_bytes(bytes: &[u8]) -> Result<DeleteNamespaceRegistryAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteNamespaceRegistryAction =
+        let proto: protos::sabre_payload::DeleteNamespaceRegistryAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteNamespaceRegistryAction from bytes".to_string(),
@@ -1095,8 +1127,14 @@ impl IntoBytes for DeleteNamespaceRegistryAction {
     }
 }
 
-impl IntoProto<protos::payload::DeleteNamespaceRegistryAction> for DeleteNamespaceRegistryAction {}
-impl IntoNative<DeleteNamespaceRegistryAction> for protos::payload::DeleteNamespaceRegistryAction {}
+impl IntoProto<protos::sabre_payload::DeleteNamespaceRegistryAction>
+    for DeleteNamespaceRegistryAction
+{
+}
+impl IntoNative<DeleteNamespaceRegistryAction>
+    for protos::sabre_payload::DeleteNamespaceRegistryAction
+{
+}
 
 /// Builder used to create a DeleteNamespaceRegistryAction
 #[derive(Default, Clone)]
@@ -1145,11 +1183,11 @@ impl UpdateNamespaceRegistryOwnersAction {
     }
 }
 
-impl FromProto<protos::payload::UpdateNamespaceRegistryOwnersAction>
+impl FromProto<protos::sabre_payload::UpdateNamespaceRegistryOwnersAction>
     for UpdateNamespaceRegistryOwnersAction
 {
     fn from_proto(
-        proto: protos::payload::UpdateNamespaceRegistryOwnersAction,
+        proto: protos::sabre_payload::UpdateNamespaceRegistryOwnersAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(UpdateNamespaceRegistryOwnersAction {
             namespace: proto.get_namespace().to_string(),
@@ -1159,12 +1197,12 @@ impl FromProto<protos::payload::UpdateNamespaceRegistryOwnersAction>
 }
 
 impl FromNative<UpdateNamespaceRegistryOwnersAction>
-    for protos::payload::UpdateNamespaceRegistryOwnersAction
+    for protos::sabre_payload::UpdateNamespaceRegistryOwnersAction
 {
     fn from_native(
         update_namespace_registry_action: UpdateNamespaceRegistryOwnersAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::UpdateNamespaceRegistryOwnersAction::new();
+        let mut proto = protos::sabre_payload::UpdateNamespaceRegistryOwnersAction::new();
         proto.set_namespace(update_namespace_registry_action.namespace().to_string());
         proto.set_owners(RepeatedField::from_vec(
             update_namespace_registry_action.owners().to_vec(),
@@ -1177,7 +1215,7 @@ impl FromBytes<UpdateNamespaceRegistryOwnersAction> for UpdateNamespaceRegistryO
     fn from_bytes(
         bytes: &[u8],
     ) -> Result<UpdateNamespaceRegistryOwnersAction, ProtoConversionError> {
-        let proto: protos::payload::UpdateNamespaceRegistryOwnersAction =
+        let proto: protos::sabre_payload::UpdateNamespaceRegistryOwnersAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get UpdateNamespaceRegistryOwnersAction from bytes".to_string(),
@@ -1199,12 +1237,12 @@ impl IntoBytes for UpdateNamespaceRegistryOwnersAction {
     }
 }
 
-impl IntoProto<protos::payload::UpdateNamespaceRegistryOwnersAction>
+impl IntoProto<protos::sabre_payload::UpdateNamespaceRegistryOwnersAction>
     for UpdateNamespaceRegistryOwnersAction
 {
 }
 impl IntoNative<UpdateNamespaceRegistryOwnersAction>
-    for protos::payload::UpdateNamespaceRegistryOwnersAction
+    for protos::sabre_payload::UpdateNamespaceRegistryOwnersAction
 {
 }
 
@@ -1287,11 +1325,11 @@ impl CreateNamespaceRegistryPermissionAction {
     }
 }
 
-impl FromProto<protos::payload::CreateNamespaceRegistryPermissionAction>
+impl FromProto<protos::sabre_payload::CreateNamespaceRegistryPermissionAction>
     for CreateNamespaceRegistryPermissionAction
 {
     fn from_proto(
-        proto: protos::payload::CreateNamespaceRegistryPermissionAction,
+        proto: protos::sabre_payload::CreateNamespaceRegistryPermissionAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(CreateNamespaceRegistryPermissionAction {
             namespace: proto.get_namespace().to_string(),
@@ -1303,12 +1341,12 @@ impl FromProto<protos::payload::CreateNamespaceRegistryPermissionAction>
 }
 
 impl FromNative<CreateNamespaceRegistryPermissionAction>
-    for protos::payload::CreateNamespaceRegistryPermissionAction
+    for protos::sabre_payload::CreateNamespaceRegistryPermissionAction
 {
     fn from_native(
         create_namespace_permission_action: CreateNamespaceRegistryPermissionAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::CreateNamespaceRegistryPermissionAction::new();
+        let mut proto = protos::sabre_payload::CreateNamespaceRegistryPermissionAction::new();
         proto.set_namespace(create_namespace_permission_action.namespace().to_string());
         proto.set_contract_name(
             create_namespace_permission_action
@@ -1327,7 +1365,7 @@ impl FromBytes<CreateNamespaceRegistryPermissionAction>
     fn from_bytes(
         bytes: &[u8],
     ) -> Result<CreateNamespaceRegistryPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::CreateNamespaceRegistryPermissionAction =
+        let proto: protos::sabre_payload::CreateNamespaceRegistryPermissionAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get CreateNamespaceRegistryPermissionAction from bytes".to_string(),
@@ -1349,12 +1387,12 @@ impl IntoBytes for CreateNamespaceRegistryPermissionAction {
     }
 }
 
-impl IntoProto<protos::payload::CreateNamespaceRegistryPermissionAction>
+impl IntoProto<protos::sabre_payload::CreateNamespaceRegistryPermissionAction>
     for CreateNamespaceRegistryPermissionAction
 {
 }
 impl IntoNative<CreateNamespaceRegistryPermissionAction>
-    for protos::payload::CreateNamespaceRegistryPermissionAction
+    for protos::sabre_payload::CreateNamespaceRegistryPermissionAction
 {
 }
 
@@ -1441,11 +1479,11 @@ impl DeleteNamespaceRegistryPermissionAction {
     }
 }
 
-impl FromProto<protos::payload::DeleteNamespaceRegistryPermissionAction>
+impl FromProto<protos::sabre_payload::DeleteNamespaceRegistryPermissionAction>
     for DeleteNamespaceRegistryPermissionAction
 {
     fn from_proto(
-        proto: protos::payload::DeleteNamespaceRegistryPermissionAction,
+        proto: protos::sabre_payload::DeleteNamespaceRegistryPermissionAction,
     ) -> Result<Self, ProtoConversionError> {
         Ok(DeleteNamespaceRegistryPermissionAction {
             namespace: proto.get_namespace().to_string(),
@@ -1455,12 +1493,12 @@ impl FromProto<protos::payload::DeleteNamespaceRegistryPermissionAction>
 }
 
 impl FromNative<DeleteNamespaceRegistryPermissionAction>
-    for protos::payload::DeleteNamespaceRegistryPermissionAction
+    for protos::sabre_payload::DeleteNamespaceRegistryPermissionAction
 {
     fn from_native(
         delete_namespace_permission_action: DeleteNamespaceRegistryPermissionAction,
     ) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::DeleteNamespaceRegistryPermissionAction::new();
+        let mut proto = protos::sabre_payload::DeleteNamespaceRegistryPermissionAction::new();
         proto.set_namespace(delete_namespace_permission_action.namespace().to_string());
         proto.set_contract_name(
             delete_namespace_permission_action
@@ -1477,7 +1515,7 @@ impl FromBytes<DeleteNamespaceRegistryPermissionAction>
     fn from_bytes(
         bytes: &[u8],
     ) -> Result<DeleteNamespaceRegistryPermissionAction, ProtoConversionError> {
-        let proto: protos::payload::DeleteNamespaceRegistryPermissionAction =
+        let proto: protos::sabre_payload::DeleteNamespaceRegistryPermissionAction =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get DeleteNamespaceRegistryPermissionAction from bytes".to_string(),
@@ -1499,12 +1537,12 @@ impl IntoBytes for DeleteNamespaceRegistryPermissionAction {
     }
 }
 
-impl IntoProto<protos::payload::DeleteNamespaceRegistryPermissionAction>
+impl IntoProto<protos::sabre_payload::DeleteNamespaceRegistryPermissionAction>
     for DeleteNamespaceRegistryPermissionAction
 {
 }
 impl IntoNative<DeleteNamespaceRegistryPermissionAction>
-    for protos::payload::DeleteNamespaceRegistryPermissionAction
+    for protos::sabre_payload::DeleteNamespaceRegistryPermissionAction
 {
 }
 
@@ -1569,67 +1607,69 @@ impl SabrePayload {
     }
 }
 
-impl FromProto<protos::payload::SabrePayload> for SabrePayload {
-    fn from_proto(proto: protos::payload::SabrePayload) -> Result<Self, ProtoConversionError> {
+impl FromProto<protos::sabre_payload::SabrePayload> for SabrePayload {
+    fn from_proto(
+        proto: protos::sabre_payload::SabrePayload,
+    ) -> Result<Self, ProtoConversionError> {
         let action = match proto.get_action() {
-            protos::payload::SabrePayload_Action::CREATE_CONTRACT => {
+            protos::sabre_payload::SabrePayload_Action::CREATE_CONTRACT => {
                 CreateContractAction::from_proto(proto.get_create_contract().clone())?.into()
             }
-            protos::payload::SabrePayload_Action::DELETE_CONTRACT => {
+            protos::sabre_payload::SabrePayload_Action::DELETE_CONTRACT => {
                 DeleteContractAction::from_proto(proto.get_delete_contract().clone())?.into()
             }
-            protos::payload::SabrePayload_Action::EXECUTE_CONTRACT => {
+            protos::sabre_payload::SabrePayload_Action::EXECUTE_CONTRACT => {
                 ExecuteContractAction::from_proto(proto.get_execute_contract().clone())?.into()
             }
-            protos::payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY => {
+            protos::sabre_payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY => {
                 CreateContractRegistryAction::from_proto(
                     proto.get_create_contract_registry().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY => {
+            protos::sabre_payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY => {
                 DeleteContractRegistryAction::from_proto(
                     proto.get_delete_contract_registry().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
+            protos::sabre_payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS => {
                 UpdateContractRegistryOwnersAction::from_proto(
                     proto.get_update_contract_registry_owners().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY => {
+            protos::sabre_payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY => {
                 CreateNamespaceRegistryAction::from_proto(
                     proto.get_create_namespace_registry().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY => {
+            protos::sabre_payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY => {
                 DeleteNamespaceRegistryAction::from_proto(
                     proto.get_delete_namespace_registry().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
+            protos::sabre_payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS => {
                 UpdateNamespaceRegistryOwnersAction::from_proto(
                     proto.get_update_namespace_registry_owners().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
+            protos::sabre_payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION => {
                 CreateNamespaceRegistryPermissionAction::from_proto(
                     proto.get_create_namespace_registry_permission().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
+            protos::sabre_payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION => {
                 DeleteNamespaceRegistryPermissionAction::from_proto(
                     proto.get_delete_namespace_registry_permission().clone(),
                 )?
                 .into()
             }
-            protos::payload::SabrePayload_Action::ACTION_UNSET => {
+            protos::sabre_payload::SabrePayload_Action::ACTION_UNSET => {
                 return Err(ProtoConversionError::InvalidTypeError(
                     "Cannot convert SabrePayload_Action with type unset.".to_string(),
                 ));
@@ -1640,60 +1680,68 @@ impl FromProto<protos::payload::SabrePayload> for SabrePayload {
     }
 }
 
-impl FromNative<SabrePayload> for protos::payload::SabrePayload {
+impl FromNative<SabrePayload> for protos::sabre_payload::SabrePayload {
     fn from_native(native: SabrePayload) -> Result<Self, ProtoConversionError> {
-        let mut proto = protos::payload::SabrePayload::new();
+        let mut proto = protos::sabre_payload::SabrePayload::new();
 
         match native.action() {
             Action::CreateContract(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::CREATE_CONTRACT);
+                proto.set_action(protos::sabre_payload::SabrePayload_Action::CREATE_CONTRACT);
                 proto.set_create_contract(payload.clone().into_proto()?);
             }
             Action::DeleteContract(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::DELETE_CONTRACT);
+                proto.set_action(protos::sabre_payload::SabrePayload_Action::DELETE_CONTRACT);
                 proto.set_delete_contract(payload.clone().into_proto()?);
             }
             Action::ExecuteContract(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::EXECUTE_CONTRACT);
+                proto.set_action(protos::sabre_payload::SabrePayload_Action::EXECUTE_CONTRACT);
                 proto.set_execute_contract(payload.clone().into_proto()?);
             }
             Action::CreateContractRegistry(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY);
+                proto.set_action(
+                    protos::sabre_payload::SabrePayload_Action::CREATE_CONTRACT_REGISTRY,
+                );
                 proto.set_create_contract_registry(payload.clone().into_proto()?);
             }
             Action::DeleteContractRegistry(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY);
+                proto.set_action(
+                    protos::sabre_payload::SabrePayload_Action::DELETE_CONTRACT_REGISTRY,
+                );
                 proto.set_delete_contract_registry(payload.clone().into_proto()?);
             }
             Action::UpdateContractRegistryOwners(payload) => {
                 proto.set_action(
-                    protos::payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS,
+                    protos::sabre_payload::SabrePayload_Action::UPDATE_CONTRACT_REGISTRY_OWNERS,
                 );
                 proto.set_update_contract_registry_owners(payload.clone().into_proto()?);
             }
             Action::CreateNamespaceRegistry(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY);
+                proto.set_action(
+                    protos::sabre_payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY,
+                );
                 proto.set_create_namespace_registry(payload.clone().into_proto()?);
             }
             Action::DeleteNamespaceRegistry(payload) => {
-                proto.set_action(protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY);
+                proto.set_action(
+                    protos::sabre_payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY,
+                );
                 proto.set_delete_namespace_registry(payload.clone().into_proto()?);
             }
             Action::UpdateNamespaceRegistryOwners(payload) => {
                 proto.set_action(
-                    protos::payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS,
+                    protos::sabre_payload::SabrePayload_Action::UPDATE_NAMESPACE_REGISTRY_OWNERS,
                 );
                 proto.set_update_namespace_registry_owners(payload.clone().into_proto()?);
             }
             Action::CreateNamespaceRegistryPermission(payload) => {
                 proto.set_action(
-                    protos::payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION,
+                    protos::sabre_payload::SabrePayload_Action::CREATE_NAMESPACE_REGISTRY_PERMISSION,
                 );
                 proto.set_create_namespace_registry_permission(payload.clone().into_proto()?);
             }
             Action::DeleteNamespaceRegistryPermission(payload) => {
                 proto.set_action(
-                    protos::payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION,
+                    protos::sabre_payload::SabrePayload_Action::DELETE_NAMESPACE_REGISTRY_PERMISSION,
                 );
                 proto.set_delete_namespace_registry_permission(payload.clone().into_proto()?);
             }
@@ -1705,7 +1753,7 @@ impl FromNative<SabrePayload> for protos::payload::SabrePayload {
 
 impl FromBytes<SabrePayload> for SabrePayload {
     fn from_bytes(bytes: &[u8]) -> Result<SabrePayload, ProtoConversionError> {
-        let proto: protos::payload::SabrePayload =
+        let proto: protos::sabre_payload::SabrePayload =
             Message::parse_from_bytes(bytes).map_err(|_| {
                 ProtoConversionError::SerializationError(
                     "Unable to get SabrePayload from bytes".to_string(),
@@ -1727,8 +1775,8 @@ impl IntoBytes for SabrePayload {
     }
 }
 
-impl IntoProto<protos::payload::SabrePayload> for SabrePayload {}
-impl IntoNative<SabrePayload> for protos::payload::SabrePayload {}
+impl IntoProto<protos::sabre_payload::SabrePayload> for SabrePayload {}
+impl IntoNative<SabrePayload> for protos::sabre_payload::SabrePayload {}
 
 #[derive(Debug)]
 pub enum SabrePayloadBuildError {
