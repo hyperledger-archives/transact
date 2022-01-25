@@ -13,18 +13,17 @@
 // limitations under the License.
 use protobuf::Message;
 
-use sabre_sdk::protocol::state::{
+use crate::handler::{ApplyError, TransactionContext};
+use crate::protocol::sabre::state::{
     Contract, ContractList, ContractListBuilder, ContractRegistry, ContractRegistryList,
     ContractRegistryListBuilder, NamespaceRegistry, NamespaceRegistryList,
     NamespaceRegistryListBuilder,
 };
-use sabre_sdk::protocol::ADMINISTRATORS_SETTING_ADDRESS;
-use sabre_sdk::protos::{FromBytes, IntoBytes};
-use sawtooth_sdk::messages::setting::Setting;
-use sawtooth_sdk::processor::handler::ApplyError;
-use sawtooth_sdk::processor::handler::TransactionContext;
+use crate::protocol::sabre::ADMINISTRATORS_SETTING_ADDRESS;
+use crate::protos::sabre_payload::Setting;
+use crate::protos::{FromBytes, IntoBytes};
 
-use crate::addressing::{
+use super::addressing::{
     make_contract_address, make_contract_registry_address, make_namespace_registry_address,
 };
 

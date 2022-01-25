@@ -23,9 +23,9 @@ mod settings;
 
 pub use self::allow_all::AllowAllAdminPermission;
 pub use self::settings::SettingsAdminPermission;
-use sawtooth_sdk::processor::handler::ApplyError;
 
-use crate::state::SabreState;
+use crate::families::sabre::state::SabreState;
+use crate::handler::ApplyError;
 
 /// Used to verify if a signer is an admin
 pub trait AdminPermission: Send {

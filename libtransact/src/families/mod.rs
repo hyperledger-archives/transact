@@ -14,6 +14,8 @@
 
 #[cfg(feature = "family-command")]
 pub mod command;
+#[cfg(feature = "family-sabre")]
+pub mod sabre;
 #[cfg(feature = "family-smallbank")]
 pub mod smallbank;
 #[cfg(feature = "family-xo")]

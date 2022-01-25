@@ -14,36 +14,26 @@
 
 //! Provides a Sawtooth Transaction Handler for executing Sabre transactions.
 
-use sabre_sdk::protocol::state::{
-    ContractBuilder, ContractRegistry, ContractRegistryBuilder, NamespaceRegistry,
-    NamespaceRegistryBuilder, PermissionBuilder, VersionBuilder,
-};
-use sawtooth_sdk::messages::processor::TpProcessRequest;
-use sawtooth_sdk::processor::handler::ApplyError;
-use sawtooth_sdk::processor::handler::TransactionContext;
-use sawtooth_sdk::processor::handler::TransactionHandler;
 use sha2::{Digest, Sha512};
 
-use crate::admin::AdminPermission;
-use crate::payload::SabreRequestPayload;
-use crate::state::SabreState;
-use crate::wasm_executor::wasm_module::WasmModule;
-use sabre_sdk::protocol::payload::{
+use crate::handler::{ApplyError, TransactionContext, TransactionHandler};
+use crate::protocol::sabre::payload::{
     Action, CreateContractAction, CreateContractRegistryAction, CreateNamespaceRegistryAction,
     CreateNamespaceRegistryPermissionAction, DeleteContractAction, DeleteContractRegistryAction,
     DeleteNamespaceRegistryAction, DeleteNamespaceRegistryPermissionAction, ExecuteContractAction,
     UpdateContractRegistryOwnersAction, UpdateNamespaceRegistryOwnersAction,
 };
-use sabre_sdk::protocol::SABRE_PROTOCOL_VERSION;
+use crate::protocol::sabre::state::{
+    ContractBuilder, ContractRegistry, ContractRegistryBuilder, NamespaceRegistry,
+    NamespaceRegistryBuilder, PermissionBuilder, VersionBuilder,
+};
+use crate::protocol::sabre::SABRE_PROTOCOL_VERSION;
+use crate::protocol::transaction::TransactionPair;
 
-/// The namespace registry prefix for global state (00ec00)
-const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";
-
-/// The contract registry prefix for global state (00ec01)
-const CONTRACT_REGISTRY_PREFIX: &str = "00ec01";
-
-/// The contract prefix for global state (00ec02)
-const CONTRACT_PREFIX: &str = "00ec02";
+use super::admin::AdminPermission;
+use super::payload::SabreRequestPayload;
+use super::state::SabreState;
+use super::wasm_executor::wasm_module::WasmModule;
 
 /// Handles Sabre Transactions
 ///
@@ -57,7 +47,6 @@ const CONTRACT_PREFIX: &str = "00ec02";
 pub struct SabreTransactionHandler {
     family_name: String,
     family_versions: Vec<String>,
-    namespaces: Vec<String>,
     admin_permissions: Box<dyn AdminPermission>,
 }
 
@@ -67,35 +56,26 @@ impl SabreTransactionHandler {
         SabreTransactionHandler {
             family_name: "sabre".into(),
             family_versions: vec!["0.5".into(), "0.6".into(), SABRE_PROTOCOL_VERSION.into()],
-            namespaces: vec![
-                NAMESPACE_REGISTRY_PREFIX.into(),
-                CONTRACT_REGISTRY_PREFIX.into(),
-                CONTRACT_PREFIX.into(),
-            ],
             admin_permissions,
         }
     }
 }
 
 impl TransactionHandler for SabreTransactionHandler {
-    fn family_name(&self) -> String {
-        self.family_name.clone()
+    fn family_name(&self) -> &str {
+        &self.family_name
     }
 
-    fn family_versions(&self) -> Vec<String> {
-        self.family_versions.clone()
-    }
-
-    fn namespaces(&self) -> Vec<String> {
-        self.namespaces.clone()
+    fn family_versions(&self) -> &[String] {
+        &self.family_versions
     }
 
     fn apply(
         &self,
-        request: &TpProcessRequest,
+        transaction_pair: &TransactionPair,
         context: &mut dyn TransactionContext,
     ) -> Result<(), ApplyError> {
-        let payload = SabreRequestPayload::new(request.get_payload());
+        let payload = SabreRequestPayload::new(transaction_pair.transaction().payload());
 
         let payload = match payload {
             Err(e) => return Err(e),
@@ -110,33 +90,33 @@ impl TransactionHandler for SabreTransactionHandler {
             }
         };
 
-        let signer = request.get_header().get_signer_public_key();
+        let signer = transaction_pair.header().signer_public_key();
         let mut state = SabreState::new(context);
 
         info!(
             "{} {:?} {:?}",
             payload.get_action(),
-            request.get_header().get_inputs(),
-            request.get_header().get_outputs()
+            transaction_pair.header().inputs(),
+            transaction_pair.header().outputs()
         );
 
         match payload.get_action() {
             Action::CreateContract(create_contract_payload) => {
-                create_contract(create_contract_payload, signer, &mut state)
+                create_contract(create_contract_payload, &hex::encode(signer), &mut state)
             }
             Action::DeleteContract(delete_contract_payload) => {
-                delete_contract(delete_contract_payload, signer, &mut state)
+                delete_contract(delete_contract_payload, &hex::encode(signer), &mut state)
             }
             Action::ExecuteContract(execute_contract_payload) => execute_contract(
                 execute_contract_payload,
-                signer,
-                request.get_signature(),
+                &hex::encode(signer),
+                transaction_pair.transaction().header_signature(),
                 &mut state,
             ),
             Action::CreateContractRegistry(create_contract_registry_payload) => {
                 create_contract_registry(
                     create_contract_registry_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -144,7 +124,7 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::DeleteContractRegistry(delete_contract_registry_payload) => {
                 delete_contract_registry(
                     delete_contract_registry_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -152,7 +132,7 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::UpdateContractRegistryOwners(update_contract_registry_owners_payload) => {
                 update_contract_registry_owners(
                     update_contract_registry_owners_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -160,7 +140,7 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::CreateNamespaceRegistry(create_namespace_registry_payload) => {
                 create_namespace_registry(
                     create_namespace_registry_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -168,7 +148,7 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::DeleteNamespaceRegistry(delete_namespace_registry_payload) => {
                 delete_namespace_registry(
                     delete_namespace_registry_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -176,7 +156,7 @@ impl TransactionHandler for SabreTransactionHandler {
             Action::UpdateNamespaceRegistryOwners(update_namespace_registry_owners_payload) => {
                 update_namespace_registry_owners(
                     update_namespace_registry_owners_payload,
-                    signer,
+                    &hex::encode(signer),
                     &mut state,
                     &*self.admin_permissions,
                 )
@@ -185,7 +165,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 create_namespace_registry_permission_payload,
             ) => create_namespace_registry_permission(
                 create_namespace_registry_permission_payload,
-                signer,
+                &hex::encode(signer),
                 &mut state,
                 &*self.admin_permissions,
             ),
@@ -193,7 +173,7 @@ impl TransactionHandler for SabreTransactionHandler {
                 delete_namespace_registry_permission_payload,
             ) => delete_namespace_registry_permission(
                 delete_namespace_registry_permission_payload,
-                signer,
+                &hex::encode(signer),
                 &mut state,
                 &*self.admin_permissions,
             ),

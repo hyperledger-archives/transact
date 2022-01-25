@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use sawtooth_sdk::processor::handler::ApplyError;
 use sha2::{Digest, Sha512};
+
+use crate::handler::ApplyError;
 
 /// The namespace registry prefix for global state (00ec00)
 const NAMESPACE_REGISTRY_PREFIX: &str = "00ec00";

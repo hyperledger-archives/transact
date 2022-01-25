@@ -11,9 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-use sabre_sdk::protocol::payload::{Action, SabrePayload};
-use sabre_sdk::protos::FromBytes;
-use sawtooth_sdk::processor::handler::ApplyError;
+use crate::handler::ApplyError;
+use crate::protocol::sabre::payload::{Action, SabrePayload};
+use crate::protos::FromBytes;
 
 pub struct SabreRequestPayload {
     action: Action,

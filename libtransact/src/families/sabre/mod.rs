@@ -12,9 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[macro_use]
-extern crate log;
-
 mod addressing;
 pub mod admin;
 pub mod handler;
@@ -22,4 +19,4 @@ mod payload;
 mod state;
 mod wasm_executor;
 
-pub use sabre_sdk::protocol::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};
+pub use crate::protocol::sabre::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};

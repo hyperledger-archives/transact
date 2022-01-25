@@ -15,12 +15,11 @@
 //! An implementations of `AdminPermission` that checks Sawtooth Settings and returns true if the
 //! signer is listed as an admin.
 
-use sabre_sdk::protocol::ADMINISTRATORS_SETTING_KEY;
-use sawtooth_sdk::processor::handler::ApplyError;
+use crate::families::sabre::state::SabreState;
+use crate::handler::ApplyError;
+use crate::protocol::sabre::ADMINISTRATORS_SETTING_KEY;
 
 use super::AdminPermission;
-
-use crate::state::SabreState;
 
 #[derive(Default)]
 pub struct SettingsAdminPermission;

@@ -19,13 +19,14 @@ use std::string::FromUtf8Error;
 use std::time::Instant;
 
 use log::{max_level, LevelFilter};
-use sawtooth_sdk::processor::handler::{ContextError, TransactionContext};
 use wasmi::memory_units::Pages;
 use wasmi::{
     Error, Externals, FuncInstance, FuncRef, HostError, MemoryDescriptor, MemoryInstance,
     MemoryRef, ModuleImportResolver, RuntimeArgs, RuntimeValue, Signature, Trap, TrapKind,
     ValueType,
 };
+
+use crate::handler::{ContextError, TransactionContext};
 
 // External function indices
 
@@ -435,7 +436,7 @@ impl<'a> WasmExternals<'a> {
             event_type, attributes, data
         );
 
-        match self.context.add_event(event_type, attributes, &data) {
+        match self.context.add_event(event_type, attributes, data) {
             Ok(()) => Ok(Some(RuntimeValue::I32(0))),
             Err(err) => {
                 error!("Add event Error: {}", err);

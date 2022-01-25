@@ -14,9 +14,8 @@
 
 //! An implementations of `AdminPermission` that always returns true
 
-use sawtooth_sdk::processor::handler::ApplyError;
-
-use crate::state::SabreState;
+use crate::families::sabre::state::SabreState;
+use crate::handler::ApplyError;
 
 use super::AdminPermission;
 
