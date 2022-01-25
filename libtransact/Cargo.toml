@@ -86,6 +86,7 @@ stable = [
     "family-command",
     "family-command-transaction-builder",
     "family-command-workload",
+    "family-sabre",
     "family-smallbank",
     "postgres",
     "protocol-sabre",
@@ -140,6 +141,7 @@ execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
 family-command-transaction-builder = ["cylinder", "family-command", "protocol-transaction-builder"]
 family-command-workload = ["family-command", "protocol-sabre", "workload"]
+family-sabre = ["handler"]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
     "family-smallbank",
