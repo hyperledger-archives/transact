@@ -866,6 +866,7 @@ impl BatchStatusChecker {
                                         }
                                     }
                                 }
+                                thread::sleep(Duration::from_millis(250));
                             }
                             Err(TryRecvError::Disconnected) => {
                                 error!("Channel has disconnected");
