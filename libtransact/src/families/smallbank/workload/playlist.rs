@@ -32,7 +32,7 @@ use yaml_rust::Yaml;
 use yaml_rust::YamlEmitter;
 use yaml_rust::YamlLoader;
 
-use crate::protocol::sabre::ExecuteContractActionBuilder;
+use crate::protocol::sabre::payload::ExecuteContractActionBuilder;
 use crate::protos::smallbank;
 use crate::protos::smallbank::SmallbankTransactionPayload;
 use crate::protos::smallbank::SmallbankTransactionPayload_PayloadType as SBPayloadType;

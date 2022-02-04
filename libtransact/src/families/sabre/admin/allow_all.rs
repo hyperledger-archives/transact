@@ -1,4 +1,4 @@
-// Copyright 2018-2021 Cargill Incorporated
+// Copyright 2021 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "family-command")]
-pub mod command;
-#[cfg(feature = "family-sabre")]
-pub mod sabre;
-#[cfg(feature = "family-smallbank")]
-pub mod smallbank;
-#[cfg(feature = "family-xo")]
-pub mod xo;
+//! An implementations of `AdminPermission` that always returns true
+
+use crate::families::sabre::state::SabreState;
+use crate::handler::ApplyError;
+
+use super::AdminPermission;
+
+#[derive(Default)]
+pub struct AllowAllAdminPermission;
+
+impl AdminPermission for AllowAllAdminPermission {
+    fn is_admin(&self, _signer: &str, _state: &mut SabreState) -> Result<bool, ApplyError> {
+        Ok(true)
+    }
+}

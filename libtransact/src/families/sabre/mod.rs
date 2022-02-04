@@ -1,4 +1,4 @@
-// Copyright 2018-2021 Cargill Incorporated
+// Copyright 2019 Cargill Incorporated
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "family-command")]
-pub mod command;
-#[cfg(feature = "family-sabre")]
-pub mod sabre;
-#[cfg(feature = "family-smallbank")]
-pub mod smallbank;
-#[cfg(feature = "family-xo")]
-pub mod xo;
+mod addressing;
+pub mod admin;
+pub mod handler;
+mod payload;
+mod state;
+mod wasm_executor;
+
+pub use crate::protocol::sabre::{ADMINISTRATORS_SETTING_ADDRESS, ADMINISTRATORS_SETTING_KEY};

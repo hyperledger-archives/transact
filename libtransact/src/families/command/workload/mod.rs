@@ -25,7 +25,7 @@ use crate::error::InvalidStateError;
 use crate::protocol::{
     batch::{BatchBuilder, BatchPair},
     command::{Command, CommandPayload},
-    sabre::ExecuteContractActionBuilder,
+    sabre::payload::ExecuteContractActionBuilder,
     transaction::TransactionPair,
 };
 use crate::protos::IntoBytes;

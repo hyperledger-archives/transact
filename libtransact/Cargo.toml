@@ -53,7 +53,9 @@ serde_yaml = { version = "0.8", optional = true }
 sha2 = "0.10"
 tar = { version = "0.4", optional = true }
 uuid = { version = "0.8", optional = true, features = ["v4"] }
+wasmi = { version = "0.9", optional = true }
 yaml-rust =  { version = "0.4", optional = true }
+
 
 [dev-dependencies]
 rusty-fork = "0.3"
@@ -86,6 +88,7 @@ stable = [
     "family-command",
     "family-command-transaction-builder",
     "family-command-workload",
+    "family-sabre",
     "family-smallbank",
     "postgres",
     "protocol-sabre",
@@ -140,6 +143,7 @@ execution = ["context", "handler", "log", "protocol-transaction", "scheduler"]
 family-command = ["handler"]
 family-command-transaction-builder = ["cylinder", "family-command", "protocol-transaction-builder"]
 family-command-workload = ["family-command", "protocol-sabre", "workload"]
+family-sabre = ["handler", "wasmi"]
 family-smallbank = ["handler"]
 family-smallbank-workload = [
     "family-smallbank",

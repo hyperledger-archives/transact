@@ -29,7 +29,7 @@ use protobuf::Message;
 use crate::error::InvalidStateError;
 use crate::protocol::{
     batch::{BatchBuilder, BatchPair},
-    sabre::ExecuteContractActionBuilder,
+    sabre::payload::ExecuteContractActionBuilder,
     transaction::TransactionPair,
 };
 use crate::protos::smallbank::{
