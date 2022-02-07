@@ -99,9 +99,13 @@ impl SqlMerkleState<SqliteBackend> {
     /// After calling this method, no data associated with the tree name will remain in the
     /// database.
     pub fn delete_tree(self) -> Result<(), InternalError> {
-        let store = SqlMerkleRadixStore::new(&self.backend);
+        let store = self.new_store();
         store.delete_tree(self.tree_id)?;
         Ok(())
+    }
+
+    fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
+        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
@@ -115,11 +119,7 @@ impl Write for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -137,11 +137,7 @@ impl Write for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -161,11 +157,7 @@ impl Read for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         if !overlay
             .has_root()
@@ -192,7 +184,7 @@ impl Prune for SqlMerkleState<SqliteBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, SqlMerkleRadixStore::new(&self.backend));
+        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
 
         overlay
             .prune(&state_ids)
@@ -351,11 +343,9 @@ impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = SqlMerkleRadixStore::new(&self.backend).list_entries(
-            self.tree_id,
-            state_id,
-            subtree,
-        )?;
+        let leaves = self
+            .new_store()
+            .list_entries(self.tree_id, state_id, subtree)?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }
