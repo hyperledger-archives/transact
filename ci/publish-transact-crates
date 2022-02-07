@@ -47,7 +47,9 @@ ENV PATH=$PATH:/root/.cargo/bin
 
 WORKDIR /project/transact/libtransact
 
-CMD cargo login $CARGO_CRED \
+CMD echo "Publishing version $REPO_VERSION" \
+ && cargo login $CARGO_CRED \
+ && sed -i -e "0,/version.*$/ s/version.*$/version\ =\ \"$REPO_VERSION\"/" Cargo.toml \
  && rm -f Cargo.lock \
  && cargo clean \
  && cargo test \

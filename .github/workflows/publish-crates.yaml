@@ -1,0 +1,55 @@
+name: Publish Crates
+
+on:
+  push:
+    tags:
+      - '*'
+
+env:
+  slack-channel: 'alerts'
+
+jobs:
+
+  test_transact:
+    if: >-
+      github.repository_owner == 'hyperledger'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Install Just
+        run: curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | sudo bash -s -- --to /usr/local/bin
+
+      - name: Run tests
+        run: just ci-test
+
+  publish_to_crates:
+    needs: test_transact
+    if: >-
+      github.repository_owner == 'hyperledger'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+        with:
+          fetch-depth: 0
+
+      - name: Display envvars
+        run: env
+
+      - name: Publish release to crates
+        run: |
+          git fetch --tags --force
+          CARGO_TOKEN=${{ secrets.CARGO_TOKEN }} ./ci/publish-crates
+      - name: Notify Slack of Failure
+        if: failure()
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          fields: repo,message,author,job
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
