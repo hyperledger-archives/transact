@@ -110,6 +110,7 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
+    "state-merkle-sql-caching",
     "state-merkle-sql-in-transaction",
     "state-trait",
     "state-trait-committer",
@@ -170,6 +171,7 @@ scheduler = ["context", "log", "protocol-batch"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec", "log"]
 state-merkle-sql = ["diesel", "diesel_migrations"]
+state-merkle-sql-caching = []
 state-merkle-sql-in-transaction = [
     "state-trait",
     "state-trait-committer",
