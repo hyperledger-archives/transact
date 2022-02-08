@@ -83,6 +83,11 @@ pub struct SqlMerkleStateBuilder<B: Backend> {
     backend: Option<B>,
     tree_name: Option<String>,
     create_tree: bool,
+    #[cfg(feature = "state-merkle-sql-caching")]
+    min_cached_data_size: Option<usize>,
+
+    #[cfg(feature = "state-merkle-sql-caching")]
+    cache_size: Option<u16>,
 }
 
 impl<B: Backend> SqlMerkleStateBuilder<B> {
@@ -92,6 +97,12 @@ impl<B: Backend> SqlMerkleStateBuilder<B> {
             backend: None,
             tree_name: None,
             create_tree: false,
+
+            #[cfg(feature = "state-merkle-sql-caching")]
+            min_cached_data_size: None,
+
+            #[cfg(feature = "state-merkle-sql-caching")]
+            cache_size: None,
         }
     }
 
@@ -110,6 +121,22 @@ impl<B: Backend> SqlMerkleStateBuilder<B> {
     /// Create the specified tree if it does not exist
     pub fn create_tree_if_necessary(mut self) -> Self {
         self.create_tree = true;
+        self
+    }
+
+    /// Sets the minimum size of data in the cache
+    ///
+    /// Any data values smaller than this limit won't be cached in memory.
+    #[cfg(feature = "state-merkle-sql-caching")]
+    pub fn with_min_cached_data_size(mut self, size: usize) -> Self {
+        self.min_cached_data_size = Some(size);
+        self
+    }
+
+    /// Sets the size of the cache
+    #[cfg(feature = "state-merkle-sql-caching")]
+    pub fn with_cache_size(mut self, size: u16) -> Self {
+        self.cache_size = Some(size);
         self
     }
 }
