@@ -88,6 +88,12 @@ impl SqlMerkleState<backend::SqliteBackend> {
         Ok(())
     }
 
+    #[cfg(feature = "state-merkle-sql-caching")]
+    fn new_store(&self) -> SqlMerkleRadixStore<backend::SqliteBackend> {
+        SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
+    }
+
+    #[cfg(not(feature = "state-merkle-sql-caching"))]
     fn new_store(&self) -> SqlMerkleRadixStore<backend::SqliteBackend> {
         SqlMerkleRadixStore::new(&self.backend)
     }
