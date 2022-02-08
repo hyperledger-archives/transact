@@ -50,6 +50,8 @@
 //! Available if the feature "state-merkle-sql" is enabled.
 
 pub mod backend;
+#[cfg(feature = "state-merkle-sql-caching")]
+mod cache;
 mod error;
 pub mod migration;
 #[cfg(feature = "postgres")]
