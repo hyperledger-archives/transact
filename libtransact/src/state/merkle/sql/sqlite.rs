@@ -79,6 +79,14 @@ where
         .tree_name
         .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
+    #[cfg(feature = "state-merkle-sql-caching")]
+    let cache = {
+        super::cache::DataCache::new(
+            builder.min_cached_data_size.unwrap_or(100 * 1024), // 100KB
+            builder.cache_size.unwrap_or(512),
+        )
+    };
+
     let store = SqlMerkleRadixStore::new(&backend);
 
     let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
@@ -90,7 +98,12 @@ where
         })?
     };
 
-    Ok(SqlMerkleState { backend, tree_id })
+    Ok(SqlMerkleState {
+        backend,
+        tree_id,
+        #[cfg(feature = "state-merkle-sql-caching")]
+        cache,
+    })
 }
 
 impl SqlMerkleState<SqliteBackend> {

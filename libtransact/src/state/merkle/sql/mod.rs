@@ -148,6 +148,8 @@ impl<B: Backend> SqlMerkleStateBuilder<B> {
 pub struct SqlMerkleState<B: Backend> {
     backend: B,
     tree_id: i64,
+    #[cfg(feature = "state-merkle-sql-caching")]
+    cache: cache::DataCache,
 }
 
 impl<B: Backend> SqlMerkleState<B> {
