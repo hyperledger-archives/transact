@@ -230,8 +230,8 @@ impl FromProto<protos::key_value_state::StateEntry> for StateEntry {
             normalized_key: proto.get_normalized_key().to_string(),
             state_entry_values: proto
                 .get_state_entry_values()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(StateEntryValue::from_proto)
                 .collect::<Result<Vec<StateEntryValue>, ProtoConversionError>>()?,
         })
@@ -245,8 +245,8 @@ impl FromNative<StateEntry> for protos::key_value_state::StateEntry {
         proto.set_state_entry_values(RepeatedField::from_vec(
             state_entry
                 .state_entry_values()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(StateEntryValue::into_proto)
                 .collect::<Result<
                     Vec<protos::key_value_state::StateEntryValue>,
@@ -359,8 +359,7 @@ impl StateEntryList {
 
     pub fn contains(&self, normalized_key: String) -> bool {
         self.entries()
-            .to_vec()
-            .into_iter()
+            .iter()
             .any(|e| e.normalized_key() == normalized_key)
     }
 }
@@ -372,8 +371,8 @@ impl FromProto<protos::key_value_state::StateEntryList> for StateEntryList {
         Ok(StateEntryList {
             entries: proto
                 .get_entries()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(StateEntry::from_proto)
                 .collect::<Result<Vec<StateEntry>, ProtoConversionError>>()?,
         })
@@ -386,8 +385,8 @@ impl FromNative<StateEntryList> for protos::key_value_state::StateEntryList {
         proto.set_entries(RepeatedField::from_vec(
             state_entry_list
                 .entries()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(StateEntry::into_proto)
                 .collect::<Result<Vec<protos::key_value_state::StateEntry>, ProtoConversionError>>(
                 )?,
