@@ -64,8 +64,8 @@ impl FromProto<merkle::ChangeLogEntry> for ChangeLogEntry {
             additions: change_log_entry.get_additions().to_vec(),
             successors: change_log_entry
                 .get_successors()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(Successor::from_proto)
                 .collect::<Result<Vec<Successor>, ProtoConversionError>>()?,
         })

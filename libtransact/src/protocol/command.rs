@@ -42,8 +42,8 @@ impl FromProto<protos::command::CommandPayload> for CommandPayload {
         Ok(CommandPayload {
             commands: payload
                 .get_commands()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(Command::from_proto)
                 .collect::<Result<Vec<Command>, ProtoConversionError>>()?,
         })
@@ -56,8 +56,8 @@ impl FromNative<CommandPayload> for protos::command::CommandPayload {
         proto_payload.set_commands(RepeatedField::from_vec(
             payload
                 .commands()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(Command::into_proto)
                 .collect::<Result<Vec<protos::command::Command>, ProtoConversionError>>()?,
         ));
@@ -305,8 +305,8 @@ impl FromProto<protos::command::SetState> for SetState {
         Ok(SetState {
             state_writes: set_state
                 .get_state_writes()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(BytesEntry::from_proto)
                 .collect::<Result<Vec<BytesEntry>, ProtoConversionError>>()?,
         })
@@ -320,8 +320,8 @@ impl FromNative<SetState> for protos::command::SetState {
         proto_set_state.set_state_writes(RepeatedField::from_vec(
             set_state
                 .state_writes()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(BytesEntry::into_proto)
                 .collect::<Result<Vec<protos::command::BytesEntry>, ProtoConversionError>>()?,
         ));
@@ -514,8 +514,8 @@ impl FromProto<protos::command::AddEvent> for AddEvent {
             event_type: add_event.get_event_type().to_string(),
             attributes: add_event
                 .get_attributes()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(BytesEntry::from_proto)
                 .collect::<Result<Vec<BytesEntry>, ProtoConversionError>>()?,
             data: add_event.get_data().to_vec(),
@@ -531,8 +531,8 @@ impl FromNative<AddEvent> for protos::command::AddEvent {
         proto_add_event.set_attributes(RepeatedField::from_vec(
             add_event
                 .attributes()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(BytesEntry::into_proto)
                 .collect::<Result<Vec<protos::command::BytesEntry>, ProtoConversionError>>()?,
         ));
