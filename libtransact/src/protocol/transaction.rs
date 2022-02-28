@@ -490,7 +490,7 @@ impl TransactionBuilder {
         let batcher_public_key = self
             .batcher_public_key
             .unwrap_or_else(|| signer_public_key.clone());
-        let dependencies = self.dependencies.unwrap_or_else(Vec::new);
+        let dependencies = self.dependencies.unwrap_or_default();
         let family_name = self.family_name.ok_or_else(|| {
             TransactionBuildError::MissingField("'family_name' field is required".to_string())
         })?;
