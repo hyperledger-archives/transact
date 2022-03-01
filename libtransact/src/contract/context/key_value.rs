@@ -247,9 +247,9 @@ where
                 if list.contains(nkey.to_string()) {
                     let filtered = list
                         .entries()
-                        .to_vec()
-                        .into_iter()
+                        .iter()
                         .filter(|e| e.normalized_key() != nkey)
+                        .cloned()
                         .collect::<Vec<StateEntry>>();
                     if filtered.is_empty() {
                         delete_lists.push(addr.to_string());
