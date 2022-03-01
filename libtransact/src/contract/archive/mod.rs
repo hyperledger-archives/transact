@@ -278,7 +278,7 @@ fn validate_scar_file_name(name: &str) -> Result<(), Error> {
 // the name of the scar file. This includes swapping any underscores which appear in the contract
 // name with dashes, as underscores are not allowed in scar file names.
 fn validate_metadata(file_name: &str, contract_name: &str) -> Result<(), Error> {
-    if file_name != contract_name.replace("_", "-") {
+    if file_name != contract_name.replace('_', "-") {
         return Err(Error::new(&format!(
             "scar file name `{}` does not match contract name in manifest `{}`",
             file_name, contract_name,

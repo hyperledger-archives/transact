@@ -410,8 +410,8 @@ impl FromProto<protos::events::Event> for Event {
             event_type: event.get_event_type().to_string(),
             attributes: event
                 .get_attributes()
-                .to_vec()
-                .into_iter()
+                .iter()
+                .cloned()
                 .map(|attr| (attr.get_key().to_string(), attr.get_value().to_string()))
                 .collect(),
             data: event.get_data().to_vec(),

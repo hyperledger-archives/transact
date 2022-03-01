@@ -156,7 +156,7 @@ impl ContextManager {
             } else if let Some(v) = self
                 .database
                 .get(context.state_id(), &[key.to_string()])?
-                .get(&key.to_string())
+                .get(key)
             {
                 key_values.push((key.to_string(), v.clone()));
             }
