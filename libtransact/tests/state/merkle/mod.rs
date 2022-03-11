@@ -1111,6 +1111,64 @@ where
     assert_read_value_at_address(&merkle_state, &parent_root, "ab0000", Some("0001"));
 }
 
+/// This test creates a merkle trie with multiple entries and then loops producing successors.
+/// After N iterations, it verifies that the unchanged values still exist in the trie.
+fn test_merkle_trie_prune_deep_successor_tree<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>
+        + Prune<StateId = String, Key = String, Value = Vec<u8>>,
+{
+    let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "0001".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0a01".to_string(),
+        value: "0002".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0100".to_string(),
+        value: "0003".as_bytes().to_vec(),
+    });
+
+    let mut parent = merkle_state
+        .commit(&initial_state_root, &updates)
+        .expect("Update failed to work");
+
+    assert_read_value_at_address(&merkle_state, &parent, "ab0000", Some("0001"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+
+    for i in 0..16 {
+        let old_parent = parent.clone();
+        parent = merkle_state
+            .commit(
+                &parent,
+                &[StateChange::Set {
+                    key: "ffffff".to_string(),
+                    value: format!("prune-{}", i).as_bytes().to_vec(),
+                }],
+            )
+            .expect("Loop update failed");
+        assert_read_value_at_address(&merkle_state, &parent, "ab0000", Some("0001"));
+        assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
+        assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+
+        merkle_state
+            .prune(vec![old_parent])
+            .expect("Loop prune failed");
+    }
+
+    assert_read_value_at_address(&merkle_state, &parent, "ffffff", Some("prune-15"));
+    // insure that the old values are still in the tree
+    assert_read_value_at_address(&merkle_state, &parent, "ab0000", Some("0001"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+}
+
 /// Test iteration over leaves.
 fn test_leaf_iteration<M>(initial_state_root: String, merkle_state: M)
 where
