@@ -1287,6 +1287,7 @@ fn test_produce_same_state<L, R>(
     assert_eq!(merkle_left_root_del, merkle_right_root_del);
 }
 
+#[track_caller]
 fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_value: &str) {
     let value = merkle_db.get_value(address);
     match value {
@@ -1299,6 +1300,7 @@ fn assert_value_at_address(merkle_db: &MerkleRadixTree, address: &str, expected_
     }
 }
 
+#[track_caller]
 fn assert_read_value_at_address<R>(
     merkle_read: &R,
     root_hash: &str,
@@ -1321,6 +1323,7 @@ fn assert_read_value_at_address<R>(
     }
 }
 
+#[track_caller]
 fn expect_change_log(db: &dyn Database, root_hash: &[u8]) -> ChangeLogEntry {
     let reader = db.get_reader().unwrap();
     protobuf::Message::parse_from_bytes(
@@ -1332,6 +1335,7 @@ fn expect_change_log(db: &dyn Database, root_hash: &[u8]) -> ChangeLogEntry {
     .expect("The change log entry to have bytes")
 }
 
+#[track_caller]
 fn assert_has_successors(change_log: &ChangeLogEntry, successor_roots: &[&[u8]]) {
     assert_eq!(successor_roots.len(), change_log.successors.len());
     for successor_root in successor_roots {
