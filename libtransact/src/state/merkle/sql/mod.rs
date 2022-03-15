@@ -50,6 +50,8 @@
 //! Available if the feature "state-merkle-sql" is enabled.
 
 pub mod backend;
+#[cfg(feature = "state-merkle-sql-caching")]
+mod cache;
 mod error;
 pub mod migration;
 #[cfg(feature = "postgres")]
@@ -81,6 +83,11 @@ pub struct SqlMerkleStateBuilder<B: Backend + Clone> {
     backend: Option<B>,
     tree_name: Option<String>,
     create_tree: bool,
+    #[cfg(feature = "state-merkle-sql-caching")]
+    min_cached_data_size: Option<usize>,
+
+    #[cfg(feature = "state-merkle-sql-caching")]
+    cache_size: Option<u16>,
 }
 
 impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
@@ -90,6 +97,12 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
             backend: None,
             tree_name: None,
             create_tree: false,
+
+            #[cfg(feature = "state-merkle-sql-caching")]
+            min_cached_data_size: None,
+
+            #[cfg(feature = "state-merkle-sql-caching")]
+            cache_size: None,
         }
     }
 
@@ -110,6 +123,22 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
         self.create_tree = true;
         self
     }
+
+    /// Sets the minimum size of data in the cache
+    ///
+    /// Any data values smaller than this limit won't be cached in memory.
+    #[cfg(feature = "state-merkle-sql-caching")]
+    pub fn with_min_cached_data_size(mut self, size: usize) -> Self {
+        self.min_cached_data_size = Some(size);
+        self
+    }
+
+    /// Sets the size of the cache
+    #[cfg(feature = "state-merkle-sql-caching")]
+    pub fn with_cache_size(mut self, size: u16) -> Self {
+        self.cache_size = Some(size);
+        self
+    }
 }
 
 /// SqlMerkleState provides a merkle-radix implementation over a SQL database.
@@ -120,6 +149,8 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
 pub struct SqlMerkleState<B: Backend + Clone> {
     backend: B,
     tree_id: i64,
+    #[cfg(feature = "state-merkle-sql-caching")]
+    cache: cache::DataCache,
 }
 
 impl<B: Backend + Clone> SqlMerkleState<B> {

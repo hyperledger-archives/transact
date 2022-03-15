@@ -93,7 +93,13 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         let conn = self.backend.connection()?;
 
         let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_leaves(tree_id, state_root_hash, keys)
+        operations.get_leaves(
+            tree_id,
+            state_root_hash,
+            keys,
+            #[cfg(feature = "state-merkle-sql-caching")]
+            self.cache,
+        )
     }
 
     fn list_entries(

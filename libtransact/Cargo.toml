@@ -40,6 +40,7 @@ lazy_static = { version = "1.4.0", optional = true }
 libc = ">=0.2.35"
 lmdb-zero = { version = ">=0.4.1", optional = true }
 log = { version = "0.4", optional = true, features = ["std"] }
+lru = { version = "0.7", optional = true }
 protobuf = "2.23"
 rand = { version = "0.8", optional = true }
 reqwest = { version = "0.11", features = ["blocking", "json"], optional = true}
@@ -112,7 +113,8 @@ experimental = [
     "contract-context-key-value",
     "family-smallbank-workload",
     "family-xo",
-    "key-value-state"
+    "key-value-state",
+    "state-merkle-sql-caching",
 ]
 
 # stable features in support of wasm
@@ -168,6 +170,7 @@ scheduler = ["context", "log", "protocol-batch"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec", "log"]
 state-merkle-sql = ["diesel", "diesel_migrations"]
+state-merkle-sql-caching = [ "lru" ]
 # This feature must be enabled to run tests using a postgres db it is not
 # enabled by default, due to its requirement of an external postgres db
 # instance.

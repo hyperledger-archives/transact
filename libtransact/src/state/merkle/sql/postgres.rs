@@ -51,6 +51,14 @@ impl SqlMerkleStateBuilder<backend::PostgresBackend> {
             .tree_name
             .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
+        #[cfg(feature = "state-merkle-sql-caching")]
+        let cache = {
+            super::cache::DataCache::new(
+                self.min_cached_data_size.unwrap_or(100 * 1024), // 100KB
+                self.cache_size.unwrap_or(512),
+            )
+        };
+
         let store = SqlMerkleRadixStore::new(&backend);
 
         let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
@@ -62,7 +70,12 @@ impl SqlMerkleStateBuilder<backend::PostgresBackend> {
             })?
         };
 
-        Ok(SqlMerkleState { backend, tree_id })
+        Ok(SqlMerkleState {
+            backend,
+            tree_id,
+            #[cfg(feature = "state-merkle-sql-caching")]
+            cache,
+        })
     }
 }
 
@@ -72,9 +85,19 @@ impl SqlMerkleState<backend::PostgresBackend> {
     /// After calling this method, no data associated with the tree name will remain in the
     /// database.
     pub fn delete_tree(self) -> Result<(), InternalError> {
-        let store = SqlMerkleRadixStore::new(&self.backend);
+        let store = self.new_store();
         store.delete_tree(self.tree_id)?;
         Ok(())
+    }
+
+    #[cfg(feature = "state-merkle-sql-caching")]
+    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend> {
+        SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
+    }
+
+    #[cfg(not(feature = "state-merkle-sql-caching"))]
+    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend> {
+        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
@@ -88,11 +111,7 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -110,11 +129,7 @@ impl Write for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -130,7 +145,7 @@ impl Prune for SqlMerkleState<backend::PostgresBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, SqlMerkleRadixStore::new(&self.backend));
+        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
 
         overlay
             .prune(&state_ids)
@@ -148,11 +163,7 @@ impl Read for SqlMerkleState<backend::PostgresBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         if !overlay
             .has_root()
@@ -189,11 +200,9 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::PostgresBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = SqlMerkleRadixStore::new(&self.backend).list_entries(
-            self.tree_id,
-            state_id,
-            subtree,
-        )?;
+        let leaves = self
+            .new_store()
+            .list_entries(self.tree_id, state_id, subtree)?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }

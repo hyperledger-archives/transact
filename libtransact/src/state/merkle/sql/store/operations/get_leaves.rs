@@ -17,11 +17,13 @@
 
 use diesel::prelude::*;
 use diesel::sql_query;
-use diesel::sql_types::{BigInt, Binary, Nullable, Text};
+use diesel::sql_types::{BigInt, Binary, Bool, Nullable, Text};
 #[cfg(feature = "postgres")]
 use diesel::{pg::types::sql_types::Array, sql_types::SmallInt};
 
 use crate::error::InternalError;
+#[cfg(feature = "state-merkle-sql-caching")]
+use crate::state::merkle::sql::cache::DataCache;
 
 use super::MerkleRadixOperations;
 
@@ -31,6 +33,7 @@ pub trait MerkleRadixGetLeavesOperation {
         tree_id: i64,
         state_root_hash: &str,
         addresses: Vec<&str>,
+        #[cfg(feature = "state-merkle-sql-caching")] data_cache: Option<&DataCache>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError>;
 }
 
@@ -41,10 +44,19 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, SqliteConne
         tree_id: i64,
         state_root_hash: &str,
         addresses: Vec<&str>,
+        #[cfg(feature = "state-merkle-sql-caching")] data_cache: Option<&DataCache>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
         self.conn.transaction(|| {
             let mut results = vec![];
             for address in addresses {
+                #[cfg(feature = "state-merkle-sql-caching")]
+                let cached_data: Option<(String, Vec<u8>)> = data_cache
+                    .map(|cache| cache.peek_last_known_data_for_address(address))
+                    .transpose()?
+                    .flatten();
+                #[cfg(not(feature = "state-merkle-sql-caching"))]
+                let cached_data: Option<(String, Vec<u8>)> = None;
+
                 let address_bytes =
                     hex::decode(address).map_err(|e| InternalError::from_source(Box::new(e)))?;
                 let values = sql_query(
@@ -67,7 +79,16 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, SqliteConne
                         )
                         AND c.tree_id = ?
                     )
-                    SELECT l.data
+                    SELECT
+                        t.hash,
+                        CASE t.hash
+                            WHEN ? THEN NULL
+                            ELSE l.data
+                        END as data,
+                        CASE t.hash
+                            WHEN ? THEN 1
+                            ELSE 0
+                        END as cached
                     FROM tree_path t, merkle_radix_leaf l
                     WHERE t.tree_id = ? AND t.leaf_id = l.id
                     "#,
@@ -79,12 +100,51 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, SqliteConne
                         .map_err(|err| InternalError::from_source(Box::new(err)))?,
                 )
                 .bind::<BigInt, _>(tree_id)
+                .bind::<Nullable<Text>, _>(cached_data.as_ref().map(|(hash, _)| hash))
+                .bind::<Nullable<Text>, _>(cached_data.as_ref().map(|(hash, _)| hash))
                 .bind::<BigInt, _>(tree_id)
                 .load::<LeafData>(self.conn)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-                if let Some(LeafData { data: Some(data) }) = values.into_iter().next() {
-                    results.push((address.to_string(), data))
+                #[cfg(feature = "state-merkle-sql-caching")]
+                match (values.into_iter().next(), data_cache, cached_data) {
+                    (
+                        Some(LeafData {
+                            hash,
+                            data: Some(data),
+                            ..
+                        }),
+                        Some(cache),
+                        _,
+                    ) => {
+                        if cache.cacheable(&data) {
+                            cache.insert(address.to_string(), hash, data.clone())?;
+                        }
+                        results.push((address.to_string(), data));
+                    }
+                    (
+                        Some(LeafData {
+                            data: Some(data), ..
+                        }),
+                        None,
+                        _,
+                    ) => {
+                        results.push((address.to_string(), data));
+                    }
+                    (Some(LeafData { hash, cached, .. }), Some(cache), Some((_, data)))
+                        if cached =>
+                    {
+                        cache.touch_entry(&hash)?;
+                        results.push((address.to_string(), data));
+                    }
+                    _ => (),
+                }
+                #[cfg(not(feature = "state-merkle-sql-caching"))]
+                if let Some(LeafData {
+                    data: Some(data), ..
+                }) = values.into_iter().next()
+                {
+                    results.push((address.to_string(), data));
                 }
             }
 
@@ -100,10 +160,19 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, PgConnectio
         tree_id: i64,
         state_root_hash: &str,
         addresses: Vec<&str>,
+        #[cfg(feature = "state-merkle-sql-caching")] data_cache: Option<&DataCache>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
         self.conn.transaction(|| {
             let mut results = vec![];
             for addr in addresses {
+                #[cfg(feature = "state-merkle-sql-caching")]
+                let cached_data: Option<(String, Vec<u8>)> = data_cache
+                    .map(|cache| cache.peek_last_known_data_for_address(addr))
+                    .transpose()?
+                    .flatten();
+                #[cfg(not(feature = "state-merkle-sql-caching"))]
+                let cached_data: Option<(String, Vec<u8>)> = None;
+
                 // both the indexes in the array and the depth in the SQL statement are set to start at 1,
                 // as the SQL arrays are 1-indexed.
                 let address_branches: Vec<i16> = hex::decode(addr)
@@ -129,7 +198,13 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, PgConnectio
                         WHERE c.hash = p.children[$3[p.depth]]
                         AND c.tree_id = $2
                     )
-                    SELECT l.data
+                    SELECT
+                        t.hash,
+                        CASE t.hash
+                            WHEN $4 THEN NULL
+                            ELSE l.data
+                        END as data,
+                        t.hash = $4 as cached
                     FROM tree_path t, merkle_radix_leaf l
                     WHERE t.tree_id = $2 AND t.leaf_id = l.id
                     "#,
@@ -137,11 +212,49 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, PgConnectio
                 .bind::<Text, _>(state_root_hash)
                 .bind::<BigInt, _>(tree_id)
                 .bind::<Array<SmallInt>, _>(&address_branches)
+                .bind::<Nullable<Text>, _>(cached_data.as_ref().map(|(hash, _)| hash))
                 .load::<LeafData>(self.conn)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
 
-                if let Some(LeafData { data: Some(data) }) = values.into_iter().next() {
-                    results.push((addr.to_string(), data))
+                #[cfg(feature = "state-merkle-sql-caching")]
+                match (values.into_iter().next(), data_cache, cached_data) {
+                    (
+                        Some(LeafData {
+                            hash,
+                            data: Some(data),
+                            ..
+                        }),
+                        Some(cache),
+                        _,
+                    ) => {
+                        if cache.cacheable(&data) {
+                            cache.insert(addr.to_string(), hash, data.clone())?;
+                        }
+                        results.push((addr.to_string(), data));
+                    }
+                    (
+                        Some(LeafData {
+                            data: Some(data), ..
+                        }),
+                        None,
+                        _,
+                    ) => {
+                        results.push((addr.to_string(), data));
+                    }
+                    (Some(LeafData { hash, cached, .. }), Some(cache), Some((_, data)))
+                        if cached =>
+                    {
+                        cache.touch_entry(&hash)?;
+                        results.push((addr.to_string(), data));
+                    }
+                    _ => (),
+                }
+                #[cfg(not(feature = "state-merkle-sql-caching"))]
+                if let Some(LeafData {
+                    data: Some(data), ..
+                }) = values.into_iter().next()
+                {
+                    results.push((addr.to_string(), data));
                 }
             }
 
@@ -150,11 +263,21 @@ impl<'a> MerkleRadixGetLeavesOperation for MerkleRadixOperations<'a, PgConnectio
     }
 }
 
-#[derive(QueryableByName)]
+#[derive(Debug, QueryableByName)]
 struct LeafData {
+    #[column_name = "hash"]
+    #[sql_type = "Text"]
+    #[cfg_attr(not(feature = "state-merkle-sql-caching"), allow(dead_code))]
+    pub hash: String,
+
     #[column_name = "data"]
     #[sql_type = "Nullable<Binary>"]
     pub data: Option<Vec<u8>>,
+
+    #[column_name = "cached"]
+    #[sql_type = "Bool"]
+    #[cfg_attr(not(feature = "state-merkle-sql-caching"), allow(dead_code))]
+    pub cached: bool,
 }
 
 #[cfg(test)]
@@ -186,11 +309,18 @@ mod tests {
     #[test]
     fn sqlite_get_entries_empty_tree() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
+        #[cfg(feature = "state-merkle-sql-caching")]
+        let cache = DataCache::new(10, 16);
 
         migration::sqlite::run_migrations(&conn)?;
 
-        let entries =
-            MerkleRadixOperations::new(&conn).get_leaves(1, "state-root", vec!["aabbcc"])?;
+        let entries = MerkleRadixOperations::new(&conn).get_leaves(
+            1,
+            "state-root",
+            vec!["aabbcc"],
+            #[cfg(feature = "state-merkle-sql-caching")]
+            Some(&cache),
+        )?;
 
         assert!(entries.is_empty());
 
@@ -203,9 +333,16 @@ mod tests {
     fn postgres_get_entries_empty_tree() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
+            #[cfg(feature = "state-merkle-sql-caching")]
+            let cache = DataCache::new(10, 16);
 
-            let entries =
-                MerkleRadixOperations::new(&conn).get_leaves(1, "state-root", vec!["aabbcc"])?;
+            let entries = MerkleRadixOperations::new(&conn).get_leaves(
+                1,
+                "state-root",
+                vec!["aabbcc"],
+                #[cfg(feature = "state-merkle-sql-caching")]
+                Some(&cache),
+            )?;
 
             assert!(entries.is_empty());
 
@@ -219,6 +356,8 @@ mod tests {
     #[test]
     fn sqlite_get_entries_single_entry() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
+        #[cfg(feature = "state-merkle-sql-caching")]
+        let cache = DataCache::new(10, 16);
 
         migration::sqlite::run_migrations(&conn)?;
 
@@ -262,8 +401,13 @@ mod tests {
             ])
             .execute(&conn)?;
 
-        let entries =
-            MerkleRadixOperations::new(&conn).get_leaves(1, "root-hash", vec!["000000"])?;
+        let entries = MerkleRadixOperations::new(&conn).get_leaves(
+            1,
+            "root-hash",
+            vec!["000000"],
+            #[cfg(feature = "state-merkle-sql-caching")]
+            Some(&cache),
+        )?;
 
         assert_eq!(entries, vec![("000000".to_string(), b"hello".to_vec(),),]);
 
@@ -277,6 +421,8 @@ mod tests {
     fn postgres_get_entries_single_entry() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
+            #[cfg(feature = "state-merkle-sql-caching")]
+            let cache = DataCache::new(10, 16);
 
             let leaf_id = 1;
             insert_into(merkle_radix_leaf::table)
@@ -317,10 +463,304 @@ mod tests {
                 ])
                 .execute(&conn)?;
 
-            let entries =
-                MerkleRadixOperations::new(&conn).get_leaves(1, "root-hash", vec!["000000"])?;
+            let entries = MerkleRadixOperations::new(&conn).get_leaves(
+                1,
+                "root-hash",
+                vec!["000000"],
+                #[cfg(feature = "state-merkle-sql-caching")]
+                Some(&cache),
+            )?;
 
             assert_eq!(entries, vec![("000000".to_string(), b"hello".to_vec(),),]);
+
+            Ok(())
+        })
+    }
+
+    /// Test that a single leaf, with intermediate nodes will return the correct entry address and
+    /// the bytes, where the bytes have been cached.
+    ///
+    /// Note, in this test, in order to verify that the cache has been hit, we set a different
+    /// value than what is set in the database.
+    #[cfg(all(feature = "sqlite", feature = "state-merkle-sql-caching"))]
+    #[test]
+    fn sqlite_get_entries_single_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = SqliteConnection::establish(":memory:")?;
+        let cache = DataCache::new(10, 16);
+        cache.insert(
+            "000000".into(),
+            "000000-hash".into(),
+            b"cached data!".to_vec(),
+        )?;
+
+        migration::sqlite::run_migrations(&conn)?;
+
+        insert_into(merkle_radix_leaf::table)
+            .values(NewMerkleRadixLeaf {
+                id: Some(1),
+                tree_id: 1,
+                address: "000000",
+                data: b"not cached",
+            })
+            .execute(&conn)?;
+
+        let inserted_id = select(last_insert_rowid).get_result::<i64>(&conn)?;
+
+        insert_into(sqlite_merkle_radix_tree_node::table)
+            .values(vec![
+                sqlite::MerkleRadixTreeNode {
+                    hash: "000000-hash".into(),
+                    tree_id: 1,
+                    leaf_id: Some(inserted_id),
+                    children: sqlite::Children(vec![]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "0000-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("000000-hash".to_string())]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "00-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("0000-hash".to_string())]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "root-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("00-hash".to_string())]),
+                },
+            ])
+            .execute(&conn)?;
+
+        let entries = MerkleRadixOperations::new(&conn).get_leaves(
+            1,
+            "root-hash",
+            vec!["000000"],
+            Some(&cache),
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("000000".to_string(), b"cached data!".to_vec(),),]
+        );
+
+        Ok(())
+    }
+
+    /// Test that a single leaf, with intermediate nodes will return the correct entry address and
+    /// the bytes, where the bytes have been cached.
+    ///
+    /// Note, in this test, in order to verify that the cache has been hit, we set a different
+    /// value than what is set in the database.
+    #[cfg(all(
+        feature = "state-merkle-sql-postgres-tests",
+        feature = "state-merkle-sql-caching"
+    ))]
+    #[test]
+    fn postgres_get_entries_single_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let conn = PgConnection::establish(&url)?;
+            let cache = DataCache::new(10, 16);
+            cache.insert(
+                "000000".into(),
+                "000000-hash".into(),
+                b"cached data!".to_vec(),
+            )?;
+
+            let leaf_id = 1;
+            insert_into(merkle_radix_leaf::table)
+                .values(NewMerkleRadixLeaf {
+                    id: Some(leaf_id),
+                    tree_id: 1,
+                    address: "000000",
+                    data: b"not cached",
+                })
+                .execute(&conn)?;
+
+            insert_into(postgres_merkle_radix_tree_node::table)
+                .values(vec![
+                    postgres::MerkleRadixTreeNode {
+                        hash: "000000-hash".into(),
+                        tree_id: 1,
+                        leaf_id: Some(leaf_id),
+                        children: vec![],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "0000-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("000000-hash".to_string())],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "00-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("0000-hash".to_string())],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "root-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("00-hash".to_string())],
+                    },
+                ])
+                .execute(&conn)?;
+
+            let entries = MerkleRadixOperations::new(&conn).get_leaves(
+                1,
+                "root-hash",
+                vec!["000000"],
+                Some(&cache),
+            )?;
+
+            assert_eq!(
+                entries,
+                vec![("000000".to_string(), b"cached data!".to_vec(),),]
+            );
+
+            Ok(())
+        })
+    }
+
+    /// Test that a single leaf, with intermediate nodes will return the correct entry address and
+    /// the bytes, and the value is large enough to be written to the cache.
+    #[cfg(all(feature = "sqlite", feature = "state-merkle-sql-caching"))]
+    #[test]
+    fn sqlite_get_entries_single_large_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
+        let conn = SqliteConnection::establish(":memory:")?;
+        let cache = DataCache::new(10, 16);
+
+        migration::sqlite::run_migrations(&conn)?;
+
+        let leaf_id = 1;
+        insert_into(merkle_radix_leaf::table)
+            .values(NewMerkleRadixLeaf {
+                id: Some(leaf_id),
+                tree_id: 1,
+                address: "000000",
+                data: b"large enough to cache",
+            })
+            .execute(&conn)?;
+
+        insert_into(sqlite_merkle_radix_tree_node::table)
+            .values(vec![
+                sqlite::MerkleRadixTreeNode {
+                    hash: "000000-hash".into(),
+                    tree_id: 1,
+                    leaf_id: Some(leaf_id),
+                    children: sqlite::Children(vec![]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "0000-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("000000-hash".to_string())]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "00-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("0000-hash".to_string())]),
+                },
+                sqlite::MerkleRadixTreeNode {
+                    hash: "root-hash".into(),
+                    tree_id: 1,
+                    leaf_id: None,
+                    children: sqlite::Children(vec![Some("00-hash".to_string())]),
+                },
+            ])
+            .execute(&conn)?;
+
+        let entries = MerkleRadixOperations::new(&conn).get_leaves(
+            1,
+            "root-hash",
+            vec!["000000"],
+            Some(&cache),
+        )?;
+
+        assert_eq!(
+            entries,
+            vec![("000000".to_string(), b"large enough to cache".to_vec(),),]
+        );
+
+        assert_eq!(
+            Some(("000000-hash".to_string(), b"large enough to cache".to_vec())),
+            cache.peek_last_known_data_for_address("000000")?
+        );
+
+        Ok(())
+    }
+
+    /// Test that a single leaf, with intermediate nodes will return the correct entry address and
+    /// the bytes, and the value is large enough to be written to the cache.
+    #[cfg(all(
+        feature = "state-merkle-sql-postgres-tests",
+        feature = "state-merkle-sql-caching"
+    ))]
+    #[test]
+    fn postgres_get_entries_single_large_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
+        run_postgres_test(|url| {
+            let conn = PgConnection::establish(&url)?;
+            let cache = DataCache::new(10, 16);
+
+            let leaf_id = 1;
+            insert_into(merkle_radix_leaf::table)
+                .values(NewMerkleRadixLeaf {
+                    id: Some(leaf_id),
+                    tree_id: 1,
+                    address: "000000",
+                    data: b"large enough to cache",
+                })
+                .execute(&conn)?;
+
+            insert_into(postgres_merkle_radix_tree_node::table)
+                .values(vec![
+                    postgres::MerkleRadixTreeNode {
+                        hash: "000000-hash".into(),
+                        tree_id: 1,
+                        leaf_id: Some(leaf_id),
+                        children: vec![],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "0000-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("000000-hash".to_string())],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "00-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("0000-hash".to_string())],
+                    },
+                    postgres::MerkleRadixTreeNode {
+                        hash: "root-hash".into(),
+                        tree_id: 1,
+                        leaf_id: None,
+                        children: vec![Some("00-hash".to_string())],
+                    },
+                ])
+                .execute(&conn)?;
+
+            let entries = MerkleRadixOperations::new(&conn).get_leaves(
+                1,
+                "root-hash",
+                vec!["000000"],
+                Some(&cache),
+            )?;
+
+            assert_eq!(
+                entries,
+                vec![("000000".to_string(), b"large enough to cache".to_vec(),),]
+            );
+
+            assert_eq!(
+                Some(("000000-hash".to_string(), b"large enough to cache".to_vec())),
+                cache.peek_last_known_data_for_address("000000")?
+            );
 
             Ok(())
         })
