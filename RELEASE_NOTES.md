@@ -1,5 +1,31 @@
 # Release Notes
 
+## Changes in Transact 0.4.4
+
+### Highlights
+
+* When using `SqlMerkleState`, large state values are cached. This cache
+  mitigates issues when used with large state values and Postgres, where the
+  frequent return of large data (for example, when smart contracts are in play)
+  causes a cloud instance to throttle bandwidth.
+
+### libtransact
+
+* Add caching to `SqlMerkleState` for large state values.  This cache is
+  configurable via the `SqlMerkleStateBuilder`.
+* Add experimental "version 2" State traits.  These traits provide a more
+  flexible division of State operations and include stronger type guarantees
+  with certain parameters.
+* Add experimental `InTransaction-` variants of the SQLite and Postgres
+  `Backend` implementations.  These back-ends allow for commits to state to
+  occur within a broader transaction such that many tables, including the merkle
+  state tables, can be updated atomically.
+
+## CLI
+
+* Add a 0.25 second sleep to the end of the loop in the `BatchStatusChecker`
+  thread to lower command workload CPU usage.
+
 ## Changes in Transact 0.4.3
 
 * Alter column type for `merkle_radix_leaf.address` in SQLite. This fixes a bug
