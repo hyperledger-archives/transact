@@ -226,7 +226,8 @@ where
         change_additions
     } else {
         // we have one successor, based on our criteria, so we can safely unwrap
-        let (_successor_state_root, deletions) = successors.into_iter().next().unwrap();
+        let (_successor_state_root, mut deletions) = successors.into_iter().next().unwrap();
+        deletions.push(state_root.into());
         deletions
     };
 
