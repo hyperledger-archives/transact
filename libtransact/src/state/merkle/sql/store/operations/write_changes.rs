@@ -128,10 +128,20 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
                 .execute(self.conn)?;
 
             // Update the change log
-            let change_log_additions = update
+            let additions = update
                 .node_changes
                 .iter()
-                .map(|(hash, _, _)| NewMerkleRadixChangeLogAddition {
+                .map(|(hash, _, _)| hash.as_ref())
+                .collect::<Vec<_>>();
+            let deletions = update
+                .deletions
+                .iter()
+                .map(|s| s.as_ref())
+                .collect::<Vec<_>>();
+
+            let change_log_additions = additions
+                .iter()
+                .map(|hash| NewMerkleRadixChangeLogAddition {
                     state_root,
                     tree_id,
                     parent_state_root: Some(parent_state_root),
@@ -143,8 +153,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
                 .values(change_log_additions)
                 .execute(self.conn)?;
 
-            let change_log_deletions = update
-                .deletions
+            let change_log_deletions = deletions
                 .iter()
                 .map(|hash| NewMerkleRadixChangeLogDeletion {
                     state_root: parent_state_root,

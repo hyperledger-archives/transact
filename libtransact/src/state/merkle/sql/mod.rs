@@ -230,7 +230,7 @@ where
             match state_change {
                 StateChange::Set { key, value } => {
                     let mut set_path_map = self
-                        .get_path(key, false)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     {
                         let node = set_path_map
@@ -245,7 +245,7 @@ where
                 }
                 StateChange::Delete { key } => {
                     let del_path_map = self
-                        .get_path(key, true)
+                        .get_path(key)
                         .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
                     path_map.extend(del_path_map);
                     delete_items.push(key);
@@ -326,8 +326,6 @@ where
             batch.push((key_hash_hex.clone(), node, path));
         }
 
-        deletions.insert(self.state_root_hash.to_string());
-
         Ok((
             key_hash_hex,
             TreeUpdate {
@@ -337,11 +335,7 @@ where
         ))
     }
 
-    fn get_path(
-        &self,
-        address: &str,
-        strict: bool,
-    ) -> Result<HashMap<String, Node>, InternalError> {
+    fn get_path(&self, address: &str) -> Result<HashMap<String, Node>, InternalError> {
         // Build up the address along the path, starting with the empty address for the root, and
         // finishing with the complete address.
         let addresses_along_path = (0..address.len())
@@ -353,21 +347,14 @@ where
             .inner
             .get_path(self.tree_id, self.state_root_hash, address)?
             .into_iter()
-            .map(|(_, node)| node);
-
-        let path_map = if strict {
-            addresses_along_path
-                .zip(node_path_iter)
-                .collect::<HashMap<_, _>>()
-        } else {
+            .map(|(_, node)| node)
             // include empty nodes after the queried path, to cover cases where the branch doesn't
             // exist.
-            addresses_along_path
-                .zip(node_path_iter.chain(std::iter::repeat_with(Node::default)))
-                .collect::<HashMap<_, _>>()
-        };
+            .chain(std::iter::repeat(Node::default()));
 
-        Ok(path_map)
+        Ok(addresses_along_path
+            .zip(node_path_iter)
+            .collect::<HashMap<_, _>>())
     }
 }
 
