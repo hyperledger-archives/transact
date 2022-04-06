@@ -1,17 +1,24 @@
-FROM ubuntu:bionic
+FROM ubuntu:focal
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
 RUN apt-get update && \
-    apt-get install -y \
+    apt-get install -y -q --no-install-recommends \
+    build-essential \
+    ca-certificates \
     curl \
     unzip \
-    gcc \
     libpq-dev \
     libssl-dev \
     pkg-config \
     protobuf-compiler \
     libzmq3-dev \
     libsqlite3-dev \
-    sqlite3
+    sqlite3 \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
 
 
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init && \
