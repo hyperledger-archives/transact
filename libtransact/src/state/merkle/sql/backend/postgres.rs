@@ -23,7 +23,7 @@ use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
 
 use crate::error::{InternalError, InvalidStateError};
 
-use super::{Backend, Connection};
+use super::{Backend, Connection, Execute};
 
 /// A connection to a Postgres database.
 ///
@@ -58,6 +58,21 @@ impl Backend for PostgresBackend {
             .get()
             .map(PostgresConnection)
             .map_err(|err| InternalError::from_source(Box::new(err)))
+    }
+}
+
+impl Execute for PostgresBackend {
+    fn execute<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        let conn = self
+            .connection_pool
+            .get()
+            .map(PostgresConnection)
+            .map_err(|err| InternalError::from_source(Box::new(err)))?;
+
+        f(&conn)
     }
 }
 
