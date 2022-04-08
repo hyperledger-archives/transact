@@ -17,7 +17,7 @@
 
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-use crate::state::merkle::sql::backend::{self, Connection};
+use crate::state::merkle::sql::backend::{self, Connection, WriteExclusiveExecute};
 
 use super::operations::delete_tree::MerkleRadixDeleteTreeOperation as _;
 use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
