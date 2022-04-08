@@ -20,7 +20,7 @@
 embed_migrations!("./src/state/merkle/sql/migration/postgres/migrations");
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::backend::{Backend, Connection, PostgresBackend};
+use crate::state::merkle::sql::backend::{Connection, Execute, PostgresBackend};
 
 use super::MigrationManager;
 
@@ -41,6 +41,6 @@ pub fn run_migrations(conn: &diesel::pg::PgConnection) -> Result<(), InternalErr
 
 impl MigrationManager for PostgresBackend {
     fn run_migrations(&self) -> Result<(), InternalError> {
-        run_migrations(self.connection()?.as_inner())
+        self.execute(|conn| run_migrations(conn.as_inner()))
     }
 }
