@@ -52,3 +52,37 @@ pub trait Backend: Sync + Send {
     /// Acquire a database connection.
     fn connection(&self) -> Result<Self::Connection, InternalError>;
 }
+
+pub trait Execute: Backend {
+    fn execute<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
+}
+
+pub trait WriteExclusiveExecute: Backend {
+    /// Execute write operations against the database.
+    ///
+    /// This function will execute the provided closure with an exclusive write connection.  Via
+    /// this function, only a single writer is allowed at a time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    fn execute_write<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
+
+    /// Execute read operation against the database.
+    ///
+    /// This function will execute the provided closure with an read connection.  Via
+    /// this function, multiple readers are allowed, unless there is a write in progress.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
+}
