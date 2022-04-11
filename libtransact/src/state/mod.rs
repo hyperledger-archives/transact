@@ -76,7 +76,7 @@ impl StateChange {
 /// ordered set of changes to be applied onto the given `StateId`.
 ///
 /// Implementations are expected to be thread-safe.
-pub trait Write: Sync + Send {
+pub trait Write {
     /// A reference to a checkpoint in state. It could be a merkle hash for
     /// a merkle database.
     type StateId;
@@ -125,7 +125,7 @@ pub trait Write: Sync + Send {
 ///
 /// Removing `StateIds` and the associated state makes it so the state storage
 /// system does not grow unbounded.
-pub trait Prune: Sync + Send {
+pub trait Prune {
     /// A reference to a checkpoint in state. It could be a merkle hash for
     /// a merkle database.
     type StateId;
