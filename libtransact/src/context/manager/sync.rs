@@ -26,7 +26,7 @@ use crate::context::error::ContextManagerError;
 use crate::context::{manager, ContextId, ContextLifecycle};
 use crate::error::InternalError;
 use crate::protocol::receipt::{Event, TransactionReceipt};
-use crate::state::Read;
+use crate::state::SyncRead;
 
 /// A thread-safe ContextManager.
 #[derive(Clone)]
@@ -38,7 +38,9 @@ impl ContextManager {
     /// Constructs a new Context Manager around a given state Read.
     ///
     /// The Read defines the state on which the context built.
-    pub fn new(database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>) -> Self {
+    pub fn new(
+        database: Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>>,
+    ) -> Self {
         ContextManager {
             internal_manager: Arc::new(Mutex::new(manager::ContextManager::new(database))),
         }

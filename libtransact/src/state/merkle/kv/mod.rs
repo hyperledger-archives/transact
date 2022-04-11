@@ -28,7 +28,7 @@ use crate::database::error::DatabaseError;
 use crate::database::{Database, DatabaseReader, DatabaseWriter};
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
-use crate::state::{Prune, Read, StateChange, Write};
+use crate::state::{Prune, Read, StateChange, SyncRead, Write};
 
 use super::node::Node;
 use super::{MerkleRadixLeafReadError, MerkleRadixLeafReader};
@@ -123,8 +123,10 @@ impl Read for MerkleState {
             Ok(result)
         })
     }
+}
 
-    fn clone_box(&self) -> Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>> {
+impl SyncRead for MerkleState {
+    fn clone_box(&self) -> Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(Clone::clone(self))
     }
 }

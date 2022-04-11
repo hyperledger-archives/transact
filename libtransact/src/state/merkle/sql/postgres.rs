@@ -20,7 +20,7 @@ use std::collections::HashMap;
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{
-    Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, Write,
+    Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, SyncRead, Write,
 };
 
 use super::backend;
@@ -176,10 +176,12 @@ impl Read for SqlMerkleState<backend::PostgresBackend> {
             .get_entries(keys)
             .map_err(|e| StateReadError::StorageError(Box::new(e)))
     }
+}
 
+impl SyncRead for SqlMerkleState<backend::PostgresBackend> {
     fn clone_box(
         &self,
-    ) -> Box<dyn Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>> {
+    ) -> Box<dyn SyncRead<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>> {
         Box::new(self.clone())
     }
 }

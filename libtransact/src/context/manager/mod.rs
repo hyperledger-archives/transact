@@ -26,13 +26,13 @@ pub use crate::context::error::ContextManagerError;
 use crate::context::{Context, ContextId, ContextLifecycle};
 use crate::error::InternalError;
 use crate::protocol::receipt::{Event, StateChange, TransactionReceipt, TransactionReceiptBuilder};
-use crate::state::Read;
+use crate::state::SyncRead;
 
 #[derive(Clone)]
 pub struct ContextManager {
     contexts: HashMap<ContextId, Context>,
     context_refs: RefMap<ContextId>,
-    database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>,
+    database: Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>>,
 }
 
 impl ContextLifecycle for ContextManager {
@@ -92,7 +92,9 @@ impl ContextLifecycle for ContextManager {
 }
 
 impl ContextManager {
-    pub fn new(database: Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>>) -> Self {
+    pub fn new(
+        database: Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>>,
+    ) -> Self {
         ContextManager {
             contexts: HashMap::new(),
             context_refs: RefMap::new(),

@@ -156,7 +156,7 @@ pub trait Prune: Sync + Send {
 /// It provides the ability to read values from an underlying storage
 ///
 /// Implementations are expected to be thread-safe.
-pub trait Read: Send + Send {
+pub trait Read {
     /// A reference to a checkpoint in state. It could be a merkle hash for
     /// a merkle database.
     type StateId;
@@ -180,14 +180,16 @@ pub trait Read: Send + Send {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError>;
-
-    fn clone_box(
-        &self,
-    ) -> Box<dyn Read<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>>;
 }
 
-impl<S, K, V> Clone for Box<dyn Read<StateId = S, Key = K, Value = V>> {
-    fn clone(&self) -> Box<dyn Read<StateId = S, Key = K, Value = V>> {
+pub trait SyncRead: Read + Sync + Send {
+    fn clone_box(
+        &self,
+    ) -> Box<dyn SyncRead<StateId = Self::StateId, Key = Self::Key, Value = Self::Value>>;
+}
+
+impl<S, K, V> Clone for Box<dyn SyncRead<StateId = S, Key = K, Value = V>> {
+    fn clone(&self) -> Self {
         self.clone_box()
     }
 }

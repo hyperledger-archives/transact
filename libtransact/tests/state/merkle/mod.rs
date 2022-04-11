@@ -34,7 +34,7 @@ use transact::{
     protos::merkle::ChangeLogEntry,
     state::{
         merkle::{MerkleRadixLeafReader, MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
-        Prune, Read, StateChange, StateReadError, Write,
+        Prune, Read, StateChange, StateReadError, SyncRead, Write,
     },
 };
 
@@ -154,7 +154,7 @@ where
 /// 4. In each thread, validate that you can still read the original value
 fn test_merkle_trie_multithread_read<M>(initial_state_root: String, merkle_state: M)
 where
-    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+    M: SyncRead<StateId = String, Key = String, Value = Vec<u8>>
         + Write<StateId = String, Key = String, Value = Vec<u8>>
         + Clone
         + 'static,

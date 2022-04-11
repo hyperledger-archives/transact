@@ -18,7 +18,7 @@
 //! Provides a simple, in-memory implementation of backed by `std::collections::HashMap`.
 
 use super::error::{StateReadError, StateWriteError};
-use super::{Read, StateChange, Write};
+use super::{Read, StateChange, SyncRead, Write};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -133,8 +133,10 @@ impl Read for HashMapState {
             .filter_map(|k| state.get(&k).cloned().map(|v| (k, v)))
             .collect())
     }
+}
 
-    fn clone_box(&self) -> Box<dyn Read<StateId = String, Key = String, Value = Vec<u8>>> {
+impl SyncRead for HashMapState {
+    fn clone_box(&self) -> Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(Clone::clone(self))
     }
 }
