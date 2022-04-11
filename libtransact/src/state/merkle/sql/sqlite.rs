@@ -23,7 +23,9 @@ use crate::state::{
     Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, SyncRead, Write,
 };
 
-use super::backend;
+use super::backend::{
+    Backend, Connection, InTransactionSqliteBackend, SqliteBackend, WriteExclusiveExecute,
+};
 use super::encode_and_hash;
 use super::{
     store::{MerkleRadixStore, SqlMerkleRadixStore},
@@ -31,7 +33,7 @@ use super::{
     SqlMerkleStateBuilder,
 };
 
-impl SqlMerkleStateBuilder<backend::SqliteBackend> {
+impl SqlMerkleStateBuilder<SqliteBackend> {
     /// Construct the final SqlMerkleState instance
     ///
     /// # Errors
@@ -40,44 +42,70 @@ impl SqlMerkleStateBuilder<backend::SqliteBackend> {
     /// * If a Backend has not been provided
     /// * If a tree name has not been provided
     /// * If an internal error occurs while trying to create or lookup the tree
-    pub fn build(self) -> Result<SqlMerkleState<backend::SqliteBackend>, SqlMerkleStateBuildError> {
-        let backend = self
-            .backend
-            .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
-
-        let tree_name = self
-            .tree_name
-            .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
-
-        #[cfg(feature = "state-merkle-sql-caching")]
-        let cache = {
-            super::cache::DataCache::new(
-                self.min_cached_data_size.unwrap_or(100 * 1024), // 100KB
-                self.cache_size.unwrap_or(512),
-            )
-        };
-
-        let store = SqlMerkleRadixStore::new(&backend);
-
-        let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
-        let tree_id: i64 = if self.create_tree {
-            store.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
-        } else {
-            store.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
-                InvalidStateError::with_message("must provide the name of an existing tree".into())
-            })?
-        };
-
-        Ok(SqlMerkleState {
-            backend,
-            tree_id,
-            #[cfg(feature = "state-merkle-sql-caching")]
-            cache,
-        })
+    pub fn build(self) -> Result<SqlMerkleState<SqliteBackend>, SqlMerkleStateBuildError> {
+        do_build(self)
     }
 }
 
-impl SqlMerkleState<backend::SqliteBackend> {
+impl<'a> SqlMerkleStateBuilder<InTransactionSqliteBackend<'a>> {
+    /// Construct the final SqlMerkleState instance
+    ///
+    /// # Errors
+    ///
+    /// An error may be returned under the following circumstances:
+    /// * If a Backend has not been provided
+    /// * If a tree name has not been provided
+    /// * If an internal error occurs while trying to create or lookup the tree
+    pub fn build(
+        self,
+    ) -> Result<SqlMerkleState<InTransactionSqliteBackend<'a>>, SqlMerkleStateBuildError> {
+        do_build(self)
+    }
+}
+
+fn do_build<B>(
+    builder: SqlMerkleStateBuilder<B>,
+) -> Result<SqlMerkleState<B>, SqlMerkleStateBuildError>
+where
+    B: Backend + WriteExclusiveExecute,
+    <B as Backend>::Connection: Connection<ConnectionType = diesel::SqliteConnection>,
+{
+    let backend = builder
+        .backend
+        .ok_or_else(|| InvalidStateError::with_message("must provide a backend".into()))?;
+
+    let tree_name = builder
+        .tree_name
+        .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
+
+    #[cfg(feature = "state-merkle-sql-caching")]
+    let cache = {
+        super::cache::DataCache::new(
+            builder.min_cached_data_size.unwrap_or(100 * 1024), // 100KB
+            builder.cache_size.unwrap_or(512),
+        )
+    };
+
+    let store = SqlMerkleRadixStore::new(&backend);
+
+    let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
+    let tree_id: i64 = if builder.create_tree {
+        store.get_or_create_tree(&tree_name, &hex::encode(&initial_state_root_hash))?
+    } else {
+        store.get_tree_id_by_name(&tree_name)?.ok_or_else(|| {
+            InvalidStateError::with_message("must provide the name of an existing tree".into())
+        })?
+    };
+
+    Ok(SqlMerkleState {
+        backend,
+        tree_id,
+        #[cfg(feature = "state-merkle-sql-caching")]
+        cache,
+    })
+}
+
+impl SqlMerkleState<SqliteBackend> {
     /// Deletes the complete tree
     ///
     /// After calling this method, no data associated with the tree name will remain in the
@@ -89,17 +117,43 @@ impl SqlMerkleState<backend::SqliteBackend> {
     }
 
     #[cfg(feature = "state-merkle-sql-caching")]
-    fn new_store(&self) -> SqlMerkleRadixStore<backend::SqliteBackend, diesel::SqliteConnection> {
+    fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
     }
 
     #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(&self) -> SqlMerkleRadixStore<backend::SqliteBackend, diesel::SqliteConnection> {
+    fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
         SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
-impl Write for SqlMerkleState<backend::SqliteBackend> {
+impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
+    /// Deletes the complete tree
+    ///
+    /// After calling this method, no data associated with the tree name will remain in the
+    /// database.
+    pub fn delete_tree(self) -> Result<(), InternalError> {
+        let store = self.new_store();
+        store.delete_tree(self.tree_id)?;
+        Ok(())
+    }
+
+    #[cfg(feature = "state-merkle-sql-caching")]
+    fn new_store(
+        &self,
+    ) -> SqlMerkleRadixStore<InTransactionSqliteBackend<'a>, diesel::SqliteConnection> {
+        SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
+    }
+
+    #[cfg(not(feature = "state-merkle-sql-caching"))]
+    fn new_store(
+        &self,
+    ) -> SqlMerkleRadixStore<InTransactionSqliteBackend<'a>, diesel::SqliteConnection> {
+        SqlMerkleRadixStore::new(&self.backend)
+    }
+}
+
+impl Write for SqlMerkleState<SqliteBackend> {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -137,7 +191,45 @@ impl Write for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
-impl Read for SqlMerkleState<backend::SqliteBackend> {
+impl<'a> Write for SqlMerkleState<InTransactionSqliteBackend<'a>> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn commit(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange],
+    ) -> Result<Self::StateId, StateWriteError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        let (next_state_id, tree_update) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        overlay
+            .write_updates(&next_state_id, tree_update)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        Ok(next_state_id)
+    }
+
+    fn compute_state_id(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[StateChange],
+    ) -> Result<Self::StateId, StateWriteError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        let (next_state_id, _) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
+
+        Ok(next_state_id)
+    }
+}
+
+impl Read for SqlMerkleState<SqliteBackend> {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -162,13 +254,52 @@ impl Read for SqlMerkleState<backend::SqliteBackend> {
     }
 }
 
-impl SyncRead for SqlMerkleState<backend::SqliteBackend> {
+impl<'a> Read for SqlMerkleState<InTransactionSqliteBackend<'a>> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn get(
+        &self,
+        state_id: &Self::StateId,
+        keys: &[Self::Key],
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        if !overlay
+            .has_root()
+            .map_err(|e| StateReadError::StorageError(Box::new(e)))?
+        {
+            return Err(StateReadError::InvalidStateId(state_id.into()));
+        }
+
+        overlay
+            .get_entries(keys)
+            .map_err(|e| StateReadError::StorageError(Box::new(e)))
+    }
+}
+
+impl SyncRead for SqlMerkleState<SqliteBackend> {
     fn clone_box(&self) -> Box<dyn SyncRead<StateId = String, Key = String, Value = Vec<u8>>> {
         Box::new(self.clone())
     }
 }
 
-impl Prune for SqlMerkleState<backend::SqliteBackend> {
+impl Prune for SqlMerkleState<SqliteBackend> {
+    type StateId = String;
+    type Key = String;
+    type Value = Vec<u8>;
+
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
+        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
+
+        overlay
+            .prune(&state_ids)
+            .map_err(|e| StatePruneError::StorageError(Box::new(e)))
+    }
+}
+
+impl<'a> Prune for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type StateId = String;
     type Key = String;
     type Value = Vec<u8>;
@@ -185,7 +316,28 @@ impl Prune for SqlMerkleState<backend::SqliteBackend> {
 type IterResult<T> = Result<T, MerkleRadixLeafReadError>;
 type LeafIter<T> = Box<dyn Iterator<Item = IterResult<T>>>;
 
-impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
+impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
+    /// Returns an iterator over the leaves of a merkle radix tree.
+    /// By providing an optional address prefix, the caller can limit the iteration
+    /// over the leaves in a specific subtree.
+    fn leaves(
+        &self,
+        state_id: &Self::StateId,
+        subtree: Option<&str>,
+    ) -> IterResult<LeafIter<(Self::Key, Self::Value)>> {
+        if &self.initial_state_root_hash()? == state_id {
+            return Ok(Box::new(std::iter::empty()));
+        }
+
+        let leaves = self
+            .new_store()
+            .list_entries(self.tree_id, state_id, subtree)?;
+
+        Ok(Box::new(leaves.into_iter().map(Ok)))
+    }
+}
+
+impl<'a> MerkleRadixLeafReader for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     /// Returns an iterator over the leaves of a merkle radix tree.
     /// By providing an optional address prefix, the caller can limit the iteration
     /// over the leaves in a specific subtree.
@@ -210,7 +362,7 @@ impl MerkleRadixLeafReader for SqlMerkleState<backend::SqliteBackend> {
 mod test {
     use super::*;
 
-    use crate::state::merkle::sql::backend::SqliteBackendBuilder;
+    use crate::state::merkle::sql::backend::{self, SqliteBackendBuilder};
     use crate::state::merkle::sql::migration::MigrationManager;
 
     /// This test creates multiple trees in the same backend/db instance and verifies that values
@@ -346,6 +498,43 @@ mod test {
             .expect("A value should have been listed")?;
 
         assert_eq!(("012345".to_string(), b"state_value".to_vec()), entry);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        let new_root = backend.execute_write(|conn| {
+            let in_txn_backend: backend::InTransactionSqliteBackend = conn.as_inner().into();
+
+            let tree = SqlMerkleStateBuilder::new()
+                .with_backend(in_txn_backend)
+                .with_tree("test-1")
+                .create_tree_if_necessary()
+                .build()
+                .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+            let initial_state_root_hash = tree.initial_state_root_hash()?;
+
+            let state_change_set = StateChange::Set {
+                key: "012345".to_string(),
+                value: "state_value".as_bytes().to_vec(),
+            };
+
+            tree.commit(&initial_state_root_hash, &[state_change_set])
+                .map_err(|e| InternalError::from_source(Box::new(e)))
+        })?;
+
+        let tree = SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .build()?;
+
+        assert_read_value_at_address(&tree, &new_root, "012345", Some("state_value"));
 
         Ok(())
     }
