@@ -45,7 +45,7 @@ pub trait Connection {
 /// A database backend.
 ///
 /// A Backend provides a light-weight abstraction over database connections.
-pub trait Backend: Sync + Send {
+pub trait Backend {
     /// The database connection.
     type Connection: Connection;
 
