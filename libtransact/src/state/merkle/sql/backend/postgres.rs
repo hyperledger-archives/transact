@@ -84,6 +84,65 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend
     }
 }
 
+/// A borrowed Postgres connection.
+///
+/// Available if the features "state-merkle-sql-in-transaction" "postgres" are enabled.
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+pub struct BorrowedPostgresConnection<'a>(&'a diesel::pg::PgConnection);
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Connection for BorrowedPostgresConnection<'a> {
+    type ConnectionType = diesel::pg::PgConnection;
+
+    fn as_inner(&self) -> &Self::ConnectionType {
+        self.0
+    }
+}
+
+/// A Postgres Backend that wraps a borrowed connection.
+///
+/// This backend is neither `Sync` nor `Send`.
+///
+/// Available if the features "state-merkle-sql-in-transaction" "postgres" are enabled.
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+pub struct InTransactionPostgresBackend<'a> {
+    connection: &'a diesel::pg::PgConnection,
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> InTransactionPostgresBackend<'a> {
+    /// Wrap a reference to a [`diesel::pg::PgConnection`].
+    pub fn new(connection: &'a diesel::pg::PgConnection) -> Self {
+        Self { connection }
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Backend for InTransactionPostgresBackend<'a> {
+    type Connection = BorrowedPostgresConnection<'a>;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError> {
+        Ok(BorrowedPostgresConnection(self.connection))
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Execute for InTransactionPostgresBackend<'a> {
+    fn execute<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        f(&BorrowedPostgresConnection(self.connection))
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> From<&'a diesel::pg::PgConnection> for InTransactionPostgresBackend<'a> {
+    fn from(conn: &'a diesel::pg::PgConnection) -> Self {
+        Self::new(conn)
+    }
+}
+
 /// A Builder for the PostgresBackend.
 ///
 /// Available if the feature "postgres" is enabled.
