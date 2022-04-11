@@ -50,6 +50,10 @@ pub trait Backend: Sync + Send {
     type Connection: Connection;
 
     /// Acquire a database connection.
+    ///
+    /// This method is soft-deprecated, as it is no longer used internally, and has been superseded
+    /// by use with the execute trait.  It may be strongly deprecated in a future release, to be
+    /// removed in a follow-up release.
     fn connection(&self) -> Result<Self::Connection, InternalError>;
 }
 
