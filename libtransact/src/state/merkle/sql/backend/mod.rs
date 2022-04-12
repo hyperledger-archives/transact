@@ -29,7 +29,9 @@ use crate::error::InternalError;
 #[cfg(feature = "state-merkle-sql-postgres-tests")]
 pub use postgres::test::run_postgres_test;
 #[cfg(feature = "postgres")]
-pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
+pub use postgres::{
+    InTransactionPostgresBackend, PostgresBackend, PostgresBackendBuilder, PostgresConnection,
+};
 #[cfg(feature = "sqlite")]
 pub use sqlite::{
     InTransactionSqliteBackend, JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection,
