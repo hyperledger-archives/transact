@@ -15,6 +15,8 @@
  * -----------------------------------------------------------------------------
  */
 
+use diesel::SqliteConnection;
+
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
 use crate::state::merkle::sql::backend::{self, Connection, WriteExclusiveExecute};
@@ -32,7 +34,7 @@ use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
-impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::SqliteBackend> {
+impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::SqliteBackend, SqliteConnection> {
     fn get_or_create_tree(
         &self,
         tree_name: &str,

@@ -17,6 +17,8 @@
 
 use std::collections::HashMap;
 
+use diesel::pg::PgConnection;
+
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{
@@ -91,12 +93,12 @@ impl SqlMerkleState<backend::PostgresBackend> {
     }
 
     #[cfg(feature = "state-merkle-sql-caching")]
-    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend> {
+    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend, PgConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
     }
 
     #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend> {
+    fn new_store(&self) -> SqlMerkleRadixStore<backend::PostgresBackend, PgConnection> {
         SqlMerkleRadixStore::new(&self.backend)
     }
 }
