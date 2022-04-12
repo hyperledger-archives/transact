@@ -126,6 +126,81 @@ impl From<Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>> for Sq
     }
 }
 
+/// A borrowed SQLite connection.
+///
+/// Available if the features "state-merkle-sql-in-transaction" and "sqlite" are enabled.
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+pub struct BorrowedSqliteConnection<'a>(&'a sqlite::SqliteConnection);
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Connection for BorrowedSqliteConnection<'a> {
+    type ConnectionType = sqlite::SqliteConnection;
+
+    fn as_inner(&self) -> &Self::ConnectionType {
+        self.0
+    }
+}
+
+/// A SQLite Backend that wraps a borrowed connection.
+///
+/// This backend is neither `Sync` nor `Send`.
+///
+/// Available if the features "state-merkle-sql-in-transaction" and "sqlite" are enabled.
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+pub struct InTransactionSqliteBackend<'a> {
+    connection: &'a sqlite::SqliteConnection,
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> InTransactionSqliteBackend<'a> {
+    /// Wrap a reference to a [`diesel::SqliteConnection`].
+    pub fn new(connection: &'a sqlite::SqliteConnection) -> Self {
+        Self { connection }
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Backend for InTransactionSqliteBackend<'a> {
+    type Connection = BorrowedSqliteConnection<'a>;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError> {
+        Ok(BorrowedSqliteConnection(self.connection))
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> WriteExclusiveExecute for InTransactionSqliteBackend<'a> {
+    fn execute_write<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        f(&BorrowedSqliteConnection(self.connection))
+    }
+
+    fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        f(&BorrowedSqliteConnection(self.connection))
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> Clone for InTransactionSqliteBackend<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            connection: self.connection,
+        }
+    }
+}
+
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+impl<'a> From<&'a sqlite::SqliteConnection> for InTransactionSqliteBackend<'a> {
+    fn from(connection: &'a sqlite::SqliteConnection) -> Self {
+        Self::new(connection)
+    }
+}
+
 /// The default size
 pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 
