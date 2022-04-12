@@ -126,6 +126,73 @@ impl From<Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>> for Sq
     }
 }
 
+/// A borrowed SQLite connection.
+///
+/// Available if the feature "sqlite" is enabled.
+pub struct BorrowedSqliteConnection<'a>(&'a sqlite::SqliteConnection);
+
+impl<'a> Connection for BorrowedSqliteConnection<'a> {
+    type ConnectionType = sqlite::SqliteConnection;
+
+    fn as_inner(&self) -> &Self::ConnectionType {
+        self.0
+    }
+}
+
+/// A SQLite Backend that wraps a borrowed connection.
+///
+/// This backend is neither `Sync` nor `Send`.
+///
+/// Available if the feature "sqlite" is enabled.
+pub struct InTransactionSqliteBackend<'a> {
+    connection: &'a sqlite::SqliteConnection,
+}
+
+impl<'a> InTransactionSqliteBackend<'a> {
+    /// Wrap a reference to a [`diesel::SqliteConnection`].
+    pub fn new(connection: &'a sqlite::SqliteConnection) -> Self {
+        Self { connection }
+    }
+}
+
+impl<'a> Backend for InTransactionSqliteBackend<'a> {
+    type Connection = BorrowedSqliteConnection<'a>;
+
+    fn connection(&self) -> Result<Self::Connection, InternalError> {
+        Ok(BorrowedSqliteConnection(self.connection))
+    }
+}
+
+impl<'a> WriteExclusiveExecute for InTransactionSqliteBackend<'a> {
+    fn execute_write<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        f(&BorrowedSqliteConnection(self.connection))
+    }
+
+    fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>,
+    {
+        f(&BorrowedSqliteConnection(self.connection))
+    }
+}
+
+impl<'a> Clone for InTransactionSqliteBackend<'a> {
+    fn clone(&self) -> Self {
+        Self {
+            connection: self.connection,
+        }
+    }
+}
+
+impl<'a> From<&'a sqlite::SqliteConnection> for InTransactionSqliteBackend<'a> {
+    fn from(connection: &'a sqlite::SqliteConnection) -> Self {
+        Self::new(connection)
+    }
+}
+
 /// The default size
 pub const DEFAULT_MMAP_SIZE: i64 = 100 * 1024 * 1024;
 

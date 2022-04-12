@@ -31,7 +31,10 @@ pub use postgres::test::run_postgres_test;
 #[cfg(feature = "postgres")]
 pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
 #[cfg(feature = "sqlite")]
-pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
+pub use sqlite::{
+    InTransactionSqliteBackend, JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection,
+    Synchronous,
+};
 
 /// A database connection.
 pub trait Connection {
