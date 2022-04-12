@@ -29,7 +29,10 @@ mod sqlite;
 use std::collections::HashSet;
 
 use crate::error::InternalError;
-use crate::state::merkle::{node::Node, sql::backend::Backend};
+use crate::state::merkle::{
+    node::Node,
+    sql::backend::{Backend, Connection},
+};
 
 // (Hash, packed bytes, path address)
 type NodeChanges = Vec<(String, Node, String)>;
@@ -231,13 +234,21 @@ pub trait MerkleRadixStore {
 }
 
 /// A MerkleRadixStore backed by a SQL back-end.
-pub struct SqlMerkleRadixStore<'b, B: Backend> {
+pub struct SqlMerkleRadixStore<'b, B: Backend, C> {
     pub backend: &'b B,
+    _conn: std::marker::PhantomData<C>,
 }
 
-impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
+impl<'b, B: Backend, C> SqlMerkleRadixStore<'b, B, C>
+where
+    B: Backend,
+    <B as Backend>::Connection: Connection<ConnectionType = C>,
+{
     /// Constructs a new store for a given back-end.
     pub fn new(backend: &'b B) -> Self {
-        Self { backend }
+        Self {
+            backend,
+            _conn: std::marker::PhantomData,
+        }
     }
 }

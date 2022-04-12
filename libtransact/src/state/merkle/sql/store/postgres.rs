@@ -15,9 +15,11 @@
  * -----------------------------------------------------------------------------
  */
 
+use diesel::pg::PgConnection;
+
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-use crate::state::merkle::sql::backend::{self, Connection, Execute};
+use crate::state::merkle::sql::backend::{Connection, Execute, PostgresBackend};
 
 use super::operations::delete_tree::MerkleRadixDeleteTreeOperation as _;
 use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
@@ -32,7 +34,7 @@ use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
-impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> {
+impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, PostgresBackend, PgConnection> {
     fn get_or_create_tree(
         &self,
         tree_name: &str,
