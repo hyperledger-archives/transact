@@ -26,12 +26,16 @@ pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
 pub mod merkle;
+#[cfg(feature = "state-trait-reader")]
+mod reader;
 #[cfg(feature = "state-trait")]
 mod state_trait;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;
 
+#[cfg(feature = "state-trait-reader")]
+pub use reader::{Reader, ValueIter, ValueIterResult};
 #[cfg(feature = "state-trait")]
 pub use error::StateError;
 #[cfg(feature = "state-trait")]

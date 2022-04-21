@@ -111,6 +111,7 @@ experimental = [
     "family-xo",
     "key-value-state",
     "state-trait",
+    "state-trait-reader",
 ]
 
 # stable features in support of wasm
@@ -170,6 +171,7 @@ state-merkle-sql = ["diesel", "diesel_migrations"]
 # instance.
 state-merkle-sql-postgres-tests = ["postgres", "lazy_static"]
 state-trait = []
+state-trait-reader = ["state-trait"]
 workload = []
 workload-batch-gen = ["workload"]
 workload-runner = [
