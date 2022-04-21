@@ -24,6 +24,8 @@
 
 #[cfg(feature = "state-trait-committer")]
 mod committer;
+#[cfg(feature = "state-trait-dry-run-committer")]
+mod dry_run_committer;
 pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
@@ -38,10 +40,12 @@ use std::collections::HashMap;
 
 #[cfg(feature = "state-trait-committer")]
 pub use committer::Committer;
-#[cfg(feature = "state-trait-reader")]
-pub use reader::{Reader, ValueIter, ValueIterResult};
+#[cfg(feature = "state-trait-dry-run-committer")]
+pub use dry_run_committer::DryRunCommitter;
 #[cfg(feature = "state-trait")]
 pub use error::StateError;
+#[cfg(feature = "state-trait-reader")]
+pub use reader::{Reader, ValueIter, ValueIterResult};
 #[cfg(feature = "state-trait")]
 pub use state_trait::State;
 

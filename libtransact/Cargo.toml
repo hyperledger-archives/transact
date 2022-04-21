@@ -117,6 +117,7 @@ experimental = [
     "state-merkle-sql-caching",
     "state-trait",
     "state-trait-committer",
+    "state-trait-dry-run-committer",
     "state-trait-reader",
 ]
 
@@ -180,6 +181,7 @@ state-merkle-sql-caching = [ "lru" ]
 state-merkle-sql-postgres-tests = ["postgres", "lazy_static"]
 state-trait = []
 state-trait-committer = ["state-trait"]
+state-trait-dry-run-committer= ["state-trait"]
 state-trait-reader = ["state-trait"]
 workload = []
 workload-batch-gen = ["workload"]
