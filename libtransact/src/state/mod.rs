@@ -30,6 +30,8 @@ pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
 pub mod merkle;
+#[cfg(feature = "state-trait-pruner")]
+mod pruner;
 #[cfg(feature = "state-trait-reader")]
 mod reader;
 #[cfg(feature = "state-trait")]
@@ -44,6 +46,8 @@ pub use committer::Committer;
 pub use dry_run_committer::DryRunCommitter;
 #[cfg(feature = "state-trait")]
 pub use error::StateError;
+#[cfg(feature = "state-trait-pruner")]
+pub use pruner::Pruner;
 #[cfg(feature = "state-trait-reader")]
 pub use reader::{Reader, ValueIter, ValueIterResult};
 #[cfg(feature = "state-trait")]
