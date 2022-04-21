@@ -37,9 +37,9 @@ mod reader;
 #[cfg(feature = "state-trait")]
 mod state_trait;
 
-pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;
 
+pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 #[cfg(feature = "state-trait-committer")]
 pub use committer::Committer;
 #[cfg(feature = "state-trait-dry-run-committer")]
