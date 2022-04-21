@@ -26,9 +26,14 @@ pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
 pub mod merkle;
+#[cfg(feature = "state-trait")]
+mod state_trait;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
 use std::collections::HashMap;
+
+#[cfg(feature = "state-trait")]
+pub use state_trait::State;
 
 /// A change to be applied to state, in terms of keys and values.
 ///
