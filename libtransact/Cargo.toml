@@ -115,6 +115,11 @@ experimental = [
     "family-xo",
     "key-value-state",
     "state-merkle-sql-caching",
+    "state-trait",
+    "state-trait-committer",
+    "state-trait-dry-run-committer",
+    "state-trait-pruner",
+    "state-trait-reader",
 ]
 
 # stable features in support of wasm
@@ -175,6 +180,11 @@ state-merkle-sql-caching = [ "lru" ]
 # enabled by default, due to its requirement of an external postgres db
 # instance.
 state-merkle-sql-postgres-tests = ["postgres", "lazy_static"]
+state-trait = []
+state-trait-committer = ["state-trait"]
+state-trait-dry-run-committer= ["state-trait"]
+state-trait-pruner = ["state-trait"]
+state-trait-reader = ["state-trait"]
 workload = []
 workload-batch-gen = ["workload"]
 workload-runner = [
