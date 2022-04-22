@@ -18,6 +18,8 @@
 
 mod change_log;
 mod error;
+#[cfg(feature = "state-trait")]
+mod state_trait_impls;
 
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet, VecDeque};
