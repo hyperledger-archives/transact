@@ -31,7 +31,10 @@ use std::collections::HashSet;
 use crate::error::InternalError;
 #[cfg(feature = "state-merkle-sql-caching")]
 use crate::state::merkle::sql::cache::DataCache;
-use crate::state::merkle::{node::Node, sql::backend::Backend};
+use crate::state::merkle::{
+    node::Node,
+    sql::backend::{Backend, Connection},
+};
 
 // (Hash, packed bytes, path address)
 type NodeChanges = Vec<(String, Node, String)>;
@@ -233,17 +236,23 @@ pub trait MerkleRadixStore {
 }
 
 /// A MerkleRadixStore backed by a SQL back-end.
-pub struct SqlMerkleRadixStore<'b, B: Backend> {
+pub struct SqlMerkleRadixStore<'b, B: Backend, C> {
     pub backend: &'b B,
+    _conn: std::marker::PhantomData<C>,
     #[cfg(feature = "state-merkle-sql-caching")]
     pub cache: Option<&'b DataCache>,
 }
 
-impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
+impl<'b, B: Backend, C> SqlMerkleRadixStore<'b, B, C>
+where
+    B: Backend,
+    <B as Backend>::Connection: Connection<ConnectionType = C>,
+{
     /// Constructs a new store for a given back-end.
     pub fn new(backend: &'b B) -> Self {
         Self {
             backend,
+            _conn: std::marker::PhantomData,
             #[cfg(feature = "state-merkle-sql-caching")]
             cache: None,
         }
@@ -253,6 +262,7 @@ impl<'b, B: Backend> SqlMerkleRadixStore<'b, B> {
     pub(crate) fn new_with_cache(backend: &'b B, cache: &'b DataCache) -> Self {
         Self {
             backend,
+            _conn: std::marker::PhantomData,
             cache: Some(cache),
         }
     }

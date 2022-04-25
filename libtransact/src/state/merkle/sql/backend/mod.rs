@@ -28,8 +28,12 @@ use crate::error::InternalError;
 
 #[cfg(feature = "state-merkle-sql-postgres-tests")]
 pub use postgres::test::run_postgres_test;
+#[cfg(all(feature = "postgres", feature = "state-merkle-sql-in-transaction"))]
+pub use postgres::InTransactionPostgresBackend;
 #[cfg(feature = "postgres")]
 pub use postgres::{PostgresBackend, PostgresBackendBuilder, PostgresConnection};
+#[cfg(all(feature = "sqlite", feature = "state-merkle-sql-in-transaction"))]
+pub use sqlite::InTransactionSqliteBackend;
 #[cfg(feature = "sqlite")]
 pub use sqlite::{JournalMode, SqliteBackend, SqliteBackendBuilder, SqliteConnection, Synchronous};
 
@@ -45,10 +49,48 @@ pub trait Connection {
 /// A database backend.
 ///
 /// A Backend provides a light-weight abstraction over database connections.
-pub trait Backend: Sync + Send {
+pub trait Backend {
     /// The database connection.
     type Connection: Connection;
 
     /// Acquire a database connection.
+    ///
+    /// This method is soft-deprecated, as it is no longer used internally, and has been superseded
+    /// by use with the execute trait.  It may be strongly deprecated in a future release, to be
+    /// removed in a follow-up release.
     fn connection(&self) -> Result<Self::Connection, InternalError>;
+}
+
+pub trait Execute: Backend {
+    fn execute<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
+}
+
+pub trait WriteExclusiveExecute: Backend {
+    /// Execute write operations against the database.
+    ///
+    /// This function will execute the provided closure with an exclusive write connection.  Via
+    /// this function, only a single writer is allowed at a time.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    fn execute_write<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
+
+    /// Execute read operation against the database.
+    ///
+    /// This function will execute the provided closure with an read connection.  Via
+    /// this function, multiple readers are allowed, unless there is a write in progress.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`InternalError`] if the lock is poisoned or the connection cannot be required.
+    /// Any [`InternalError`] results from the provided closure will be returned as well.
+    fn execute_read<F, T>(&self, f: F) -> Result<T, InternalError>
+    where
+        F: Fn(&Self::Connection) -> Result<T, InternalError>;
 }

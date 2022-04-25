@@ -20,7 +20,7 @@
 embed_migrations!("./src/state/merkle/sql/migration/sqlite/migrations");
 
 use crate::error::InternalError;
-use crate::state::merkle::sql::backend::{Backend, Connection, SqliteBackend};
+use crate::state::merkle::sql::backend::{Connection, SqliteBackend, WriteExclusiveExecute};
 
 use super::MigrationManager;
 
@@ -40,6 +40,6 @@ pub fn run_migrations(conn: &diesel::sqlite::SqliteConnection) -> Result<(), Int
 
 impl MigrationManager for SqliteBackend {
     fn run_migrations(&self) -> Result<(), InternalError> {
-        run_migrations(self.connection()?.as_inner())
+        self.execute_write(|conn| run_migrations(conn.as_inner()))
     }
 }

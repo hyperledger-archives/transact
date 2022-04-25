@@ -15,9 +15,11 @@
  * -----------------------------------------------------------------------------
  */
 
+use diesel::SqliteConnection;
+
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-use crate::state::merkle::sql::backend::{self, Connection};
+use crate::state::merkle::sql::backend::{Backend, Connection, WriteExclusiveExecute};
 
 use super::operations::delete_tree::MerkleRadixDeleteTreeOperation as _;
 use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
@@ -32,7 +34,11 @@ use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
-impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::SqliteBackend> {
+impl<'b, B> MerkleRadixStore for SqlMerkleRadixStore<'b, B, SqliteConnection>
+where
+    B: Backend + WriteExclusiveExecute,
+    <B as Backend>::Connection: Connection<ConnectionType = SqliteConnection>,
+{
     fn get_or_create_tree(
         &self,
         tree_name: &str,
