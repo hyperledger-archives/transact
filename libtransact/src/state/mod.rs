@@ -22,13 +22,36 @@
 //! `Write`, `Read`, and `Prune`.  These provide commit, read access,
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
+#[cfg(feature = "state-trait-committer")]
+mod committer;
+#[cfg(feature = "state-trait-dry-run-committer")]
+mod dry_run_committer;
 pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
 pub mod merkle;
+#[cfg(feature = "state-trait-pruner")]
+mod pruner;
+#[cfg(feature = "state-trait-reader")]
+mod reader;
+#[cfg(feature = "state-trait")]
+mod state_trait;
+
+use std::collections::HashMap;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
-use std::collections::HashMap;
+#[cfg(feature = "state-trait-committer")]
+pub use committer::Committer;
+#[cfg(feature = "state-trait-dry-run-committer")]
+pub use dry_run_committer::DryRunCommitter;
+#[cfg(feature = "state-trait")]
+pub use error::StateError;
+#[cfg(feature = "state-trait-pruner")]
+pub use pruner::Pruner;
+#[cfg(feature = "state-trait-reader")]
+pub use reader::{Reader, ValueIter, ValueIterResult};
+#[cfg(feature = "state-trait")]
+pub use state_trait::State;
 
 /// A change to be applied to state, in terms of keys and values.
 ///
