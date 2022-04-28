@@ -49,6 +49,23 @@ pub trait Connection {
 /// A database backend.
 ///
 /// A Backend provides a light-weight abstraction over database connections.
+#[cfg(feature = "state-merkle-sql-in-transaction")]
+pub trait Backend {
+    /// The database connection.
+    type Connection: Connection;
+
+    /// Acquire a database connection.
+    ///
+    /// This method is soft-deprecated, as it is no longer used internally, and has been superseded
+    /// by use with the execute trait.  It may be strongly deprecated in a future release, to be
+    /// removed in a follow-up release.
+    fn connection(&self) -> Result<Self::Connection, InternalError>;
+}
+
+/// A database backend.
+///
+/// A Backend provides a light-weight abstraction over database connections.
+#[cfg(not(feature = "state-merkle-sql-in-transaction"))]
 pub trait Backend {
     /// The database connection.
     type Connection: Connection;
