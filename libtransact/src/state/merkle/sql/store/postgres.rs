@@ -15,9 +15,11 @@
  * -----------------------------------------------------------------------------
  */
 
+use diesel::pg::PgConnection;
+
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
-use crate::state::merkle::sql::backend::{self, Backend, Connection};
+use crate::state::merkle::sql::backend::{Backend, Connection, Execute};
 
 use super::operations::delete_tree::MerkleRadixDeleteTreeOperation as _;
 use super::operations::get_leaves::MerkleRadixGetLeavesOperation as _;
@@ -32,44 +34,51 @@ use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
 
-impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> {
+impl<'b, B> MerkleRadixStore for SqlMerkleRadixStore<'b, B, PgConnection>
+where
+    B: Backend + Execute,
+    <B as Backend>::Connection: Connection<ConnectionType = PgConnection>,
+{
     fn get_or_create_tree(
         &self,
         tree_name: &str,
         initial_state_root_hash: &str,
     ) -> Result<i64, InternalError> {
-        let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_or_create_tree(tree_name, initial_state_root_hash)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.get_or_create_tree(tree_name, initial_state_root_hash)
+        })
     }
 
     fn get_tree_id_by_name(&self, tree_name: &str) -> Result<Option<i64>, InternalError> {
-        let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_tree_id_by_name(tree_name)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.get_tree_id_by_name(tree_name)
+        })
     }
 
     fn delete_tree(&self, tree_id: i64) -> Result<(), InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.delete_tree(tree_id)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.delete_tree(tree_id)
+        })
     }
 
     fn list_trees(
         &self,
     ) -> Result<Box<dyn ExactSizeIterator<Item = Result<String, InternalError>>>, InternalError>
     {
-        let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.list_trees()
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.list_trees()
+        })
     }
 
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.has_root(tree_id, state_root_hash)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.has_root(tree_id, state_root_hash)
+        })
     }
 
     fn get_path(
@@ -78,10 +87,10 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         state_root_hash: &str,
         address: &str,
     ) -> Result<Vec<(String, Node)>, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_path(tree_id, state_root_hash, address)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.get_path(tree_id, state_root_hash, address)
+        })
     }
 
     fn get_entries(
@@ -90,10 +99,15 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         state_root_hash: &str,
         keys: Vec<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.get_leaves(tree_id, state_root_hash, keys)
+        let read_keys = keys.into_iter().map(String::from).collect::<Vec<_>>();
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.get_leaves(
+                tree_id,
+                state_root_hash,
+                read_keys.iter().map(String::as_str).collect(),
+            )
+        })
     }
 
     fn list_entries(
@@ -102,10 +116,10 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         state_root_hash: &str,
         prefix: Option<&str>,
     ) -> Result<Vec<(String, Vec<u8>)>, InternalError> {
-        let conn = self.backend.connection()?;
-
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.list_leaves(tree_id, state_root_hash, prefix)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.list_leaves(tree_id, state_root_hash, prefix)
+        })
     }
 
     fn write_changes(
@@ -115,22 +129,23 @@ impl<'b> MerkleRadixStore for SqlMerkleRadixStore<'b, backend::PostgresBackend> 
         parent_state_root_hash: &str,
         tree_update: TreeUpdate,
     ) -> Result<(), InternalError> {
-        let conn = self.backend.connection()?;
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
 
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-
-        operations.write_changes(
-            tree_id,
-            state_root_hash,
-            parent_state_root_hash,
-            &tree_update,
-        )?;
-        Ok(())
+            operations.write_changes(
+                tree_id,
+                state_root_hash,
+                parent_state_root_hash,
+                &tree_update,
+            )?;
+            Ok(())
+        })
     }
 
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
-        let conn = self.backend.connection()?;
-        let operations = MerkleRadixOperations::new(conn.as_inner());
-        operations.prune_entries(tree_id, state_root)
+        self.backend.execute(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.prune_entries(tree_id, state_root)
+        })
     }
 }

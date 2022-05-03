@@ -77,13 +77,13 @@ const TOKEN_SIZE: usize = 2;
 
 /// Builds a new SqlMerkleState with a specific backend.
 #[derive(Default)]
-pub struct SqlMerkleStateBuilder<B: Backend + Clone> {
+pub struct SqlMerkleStateBuilder<B: Backend> {
     backend: Option<B>,
     tree_name: Option<String>,
     create_tree: bool,
 }
 
-impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
+impl<B: Backend> SqlMerkleStateBuilder<B> {
     /// Constructs a new builder
     pub fn new() -> Self {
         Self {
@@ -116,13 +116,12 @@ impl<B: Backend + Clone> SqlMerkleStateBuilder<B> {
 ///
 /// Databases are implemented using a Backend to provide connections. Note that the database must
 /// have the correct set of tables applied via migrations before this struct may be usable.
-#[derive(Clone)]
-pub struct SqlMerkleState<B: Backend + Clone> {
+pub struct SqlMerkleState<B: Backend> {
     backend: B,
     tree_id: i64,
 }
 
-impl<B: Backend + Clone> SqlMerkleState<B> {
+impl<B: Backend> SqlMerkleState<B> {
     /// Returns the initial state root.
     ///
     /// This value is the state root that applies to a empty merkle radix tree.
@@ -130,6 +129,20 @@ impl<B: Backend + Clone> SqlMerkleState<B> {
         let (hash, _) = encode_and_hash(Node::default())?;
 
         Ok(hex::encode(&hash))
+    }
+}
+
+impl<B> Clone for SqlMerkleState<B>
+where
+    B: Backend + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            backend: self.backend.clone(),
+            tree_id: self.tree_id,
+            #[cfg(feature = "state-merkle-sql-caching")]
+            cache: self.cache.clone(),
+        }
     }
 }
 
