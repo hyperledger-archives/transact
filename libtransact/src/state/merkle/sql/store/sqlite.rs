@@ -106,7 +106,6 @@ where
                 tree_id,
                 state_root_hash,
                 read_keys.iter().map(String::as_str).collect(),
-                #[cfg(feature = "state-merkle-sql-caching")]
                 self.cache,
             )
         })
