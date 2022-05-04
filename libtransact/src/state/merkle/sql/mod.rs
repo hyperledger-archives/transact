@@ -83,9 +83,12 @@ pub struct SqlMerkleStateBuilder<B: Backend> {
     backend: Option<B>,
     tree_name: Option<String>,
     create_tree: bool,
+
+    // Minimum size of a cacheable state entry in bytes
     #[cfg(feature = "state-merkle-sql-caching")]
     min_cached_data_size: Option<usize>,
 
+    // Maximum number of items in the cache
     #[cfg(feature = "state-merkle-sql-caching")]
     cache_size: Option<u16>,
 }
