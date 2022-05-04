@@ -33,9 +33,7 @@ use super::{
     SqlMerkleStateBuilder,
 };
 
-#[cfg(feature = "state-merkle-sql-caching")]
 const DEFAULT_MIN_CACHED_DATA_SIZE: usize = 100 * 1024; // 100KB
-#[cfg(feature = "state-merkle-sql-caching")]
 const DEFAULT_CACHE_SIZE: u16 = 512; // number of entries in cache
 
 impl SqlMerkleStateBuilder<SqliteBackend> {
@@ -84,7 +82,6 @@ where
         .tree_name
         .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     let cache = {
         super::cache::DataCache::new(
             builder
@@ -108,7 +105,6 @@ where
     Ok(SqlMerkleState {
         backend,
         tree_id,
-        #[cfg(feature = "state-merkle-sql-caching")]
         cache,
     })
 }
@@ -124,14 +120,8 @@ impl SqlMerkleState<SqliteBackend> {
         Ok(())
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
-    }
-
-    #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
-        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
@@ -230,18 +220,10 @@ impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
         Ok(())
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     fn new_store(
         &self,
     ) -> SqlMerkleRadixStore<InTransactionSqliteBackend<'a>, diesel::SqliteConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
-    }
-
-    #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(
-        &self,
-    ) -> SqlMerkleRadixStore<InTransactionSqliteBackend<'a>, diesel::SqliteConnection> {
-        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
