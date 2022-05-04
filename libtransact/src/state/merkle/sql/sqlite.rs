@@ -363,7 +363,12 @@ impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
 mod test {
     use super::*;
 
-    use crate::state::merkle::sql::backend::{self, SqliteBackendBuilder};
+    #[cfg(all(
+        feature = "state-merkle-sql-in-transaction",
+        feature = "state-trait-committer"
+    ))]
+    use crate::state::merkle::sql::backend;
+    use crate::state::merkle::sql::backend::SqliteBackendBuilder;
     use crate::state::merkle::sql::migration::MigrationManager;
     #[cfg(all(
         feature = "state-merkle-sql-in-transaction",
