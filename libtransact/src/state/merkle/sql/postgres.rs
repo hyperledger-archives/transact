@@ -35,6 +35,11 @@ use super::{
     SqlMerkleStateBuilder,
 };
 
+#[cfg(feature = "state-merkle-sql-caching")]
+const DEFAULT_MIN_CACHED_DATA_SIZE: usize = 100 * 1024; // 100KB
+#[cfg(feature = "state-merkle-sql-caching")]
+const DEFAULT_CACHE_SIZE: u16 = 512; // number of entries in cache
+
 impl SqlMerkleStateBuilder<PostgresBackend> {
     /// Construct the final SqlMerkleState instance
     ///
@@ -84,8 +89,10 @@ where
     #[cfg(feature = "state-merkle-sql-caching")]
     let cache = {
         super::cache::DataCache::new(
-            builder.min_cached_data_size.unwrap_or(100 * 1024), // 100KB
-            builder.cache_size.unwrap_or(512),
+            builder
+                .min_cached_data_size
+                .unwrap_or(DEFAULT_MIN_CACHED_DATA_SIZE),
+            builder.cache_size.unwrap_or(DEFAULT_CACHE_SIZE),
         )
     };
 
