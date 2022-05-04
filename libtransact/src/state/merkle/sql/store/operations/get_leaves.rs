@@ -304,13 +304,18 @@ mod tests {
     use crate::state::merkle::sql::store::operations::last_insert_rowid;
     use crate::state::merkle::sql::store::schema::merkle_radix_leaf;
 
+    #[cfg(feature = "state-merkle-sql-caching")]
+    const MIN_CACHED_DATA_SIZE: usize = 10; // 10 bytes
+    #[cfg(feature = "state-merkle-sql-caching")]
+    const CACHE_SIZE: u16 = 16; // number of entries in cache
+
     /// Test that the get entries on a non-existent root returns a empty entries.
     #[cfg(feature = "sqlite")]
     #[test]
     fn sqlite_get_entries_empty_tree() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
         #[cfg(feature = "state-merkle-sql-caching")]
-        let cache = DataCache::new(10, 16);
+        let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
         migration::sqlite::run_migrations(&conn)?;
 
@@ -334,7 +339,7 @@ mod tests {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
             #[cfg(feature = "state-merkle-sql-caching")]
-            let cache = DataCache::new(10, 16);
+            let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
             let entries = MerkleRadixOperations::new(&conn).get_leaves(
                 1,
@@ -357,7 +362,7 @@ mod tests {
     fn sqlite_get_entries_single_entry() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
         #[cfg(feature = "state-merkle-sql-caching")]
-        let cache = DataCache::new(10, 16);
+        let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
         migration::sqlite::run_migrations(&conn)?;
 
@@ -422,7 +427,7 @@ mod tests {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
             #[cfg(feature = "state-merkle-sql-caching")]
-            let cache = DataCache::new(10, 16);
+            let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
             let leaf_id = 1;
             insert_into(merkle_radix_leaf::table)
@@ -486,7 +491,7 @@ mod tests {
     #[test]
     fn sqlite_get_entries_single_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
-        let cache = DataCache::new(10, 16);
+        let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
         cache.insert(
             "000000".into(),
             "000000-hash".into(),
@@ -563,7 +568,7 @@ mod tests {
     fn postgres_get_entries_single_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
-            let cache = DataCache::new(10, 16);
+            let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
             cache.insert(
                 "000000".into(),
                 "000000-hash".into(),
@@ -631,7 +636,7 @@ mod tests {
     #[test]
     fn sqlite_get_entries_single_large_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
         let conn = SqliteConnection::establish(":memory:")?;
-        let cache = DataCache::new(10, 16);
+        let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
         migration::sqlite::run_migrations(&conn)?;
 
@@ -704,7 +709,7 @@ mod tests {
     fn postgres_get_entries_single_large_entry_cached() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|url| {
             let conn = PgConnection::establish(&url)?;
-            let cache = DataCache::new(10, 16);
+            let cache = DataCache::new(MIN_CACHED_DATA_SIZE, CACHE_SIZE);
 
             let leaf_id = 1;
             insert_into(merkle_radix_leaf::table)
