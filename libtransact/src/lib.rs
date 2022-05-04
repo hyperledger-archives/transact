@@ -154,7 +154,7 @@ compile_error!("Incompatible features enabled: 'sabre-compat' and 'log'");
 #[cfg(feature = "log")]
 #[macro_use]
 extern crate log;
-#[cfg(feature = "sabre-compat")]
+#[cfg(all(feature = "sabre-compat", feature = "family-smallbank"))]
 #[macro_use]
 extern crate sabre_sdk;
 #[cfg(feature = "serde_derive")]
