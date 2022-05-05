@@ -29,7 +29,6 @@ mod sqlite;
 use std::collections::HashSet;
 
 use crate::error::InternalError;
-#[cfg(feature = "state-merkle-sql-caching")]
 use crate::state::merkle::sql::cache::DataCache;
 use crate::state::merkle::{
     node::Node,
@@ -239,7 +238,6 @@ pub trait MerkleRadixStore {
 pub struct SqlMerkleRadixStore<'b, B: Backend, C> {
     pub backend: &'b B,
     _conn: std::marker::PhantomData<C>,
-    #[cfg(feature = "state-merkle-sql-caching")]
     pub cache: Option<&'b DataCache>,
 }
 
@@ -253,12 +251,10 @@ where
         Self {
             backend,
             _conn: std::marker::PhantomData,
-            #[cfg(feature = "state-merkle-sql-caching")]
             cache: None,
         }
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     pub(crate) fn new_with_cache(backend: &'b B, cache: &'b DataCache) -> Self {
         Self {
             backend,

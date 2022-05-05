@@ -35,9 +35,7 @@ use super::{
     SqlMerkleStateBuilder,
 };
 
-#[cfg(feature = "state-merkle-sql-caching")]
 const DEFAULT_MIN_CACHED_DATA_SIZE: usize = 100 * 1024; // 100KB
-#[cfg(feature = "state-merkle-sql-caching")]
 const DEFAULT_CACHE_SIZE: u16 = 512; // number of entries in cache
 
 impl SqlMerkleStateBuilder<PostgresBackend> {
@@ -86,7 +84,6 @@ where
         .tree_name
         .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     let cache = {
         super::cache::DataCache::new(
             builder
@@ -110,7 +107,6 @@ where
     Ok(SqlMerkleState {
         backend,
         tree_id,
-        #[cfg(feature = "state-merkle-sql-caching")]
         cache,
     })
 }
@@ -126,14 +122,8 @@ impl SqlMerkleState<PostgresBackend> {
         Ok(())
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     fn new_store(&self) -> SqlMerkleRadixStore<PostgresBackend, PgConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
-    }
-
-    #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(&self) -> SqlMerkleRadixStore<PostgresBackend, PgConnection> {
-        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
@@ -256,18 +246,10 @@ impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
         Ok(())
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     fn new_store(
         &self,
     ) -> SqlMerkleRadixStore<InTransactionPostgresBackend<'a>, diesel::pg::PgConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
-    }
-
-    #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(
-        &self,
-    ) -> SqlMerkleRadixStore<InTransactionPostgresBackend<'a>, diesel::pg::PgConnection> {
-        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
