@@ -17,6 +17,8 @@
 
 use std::collections::HashMap;
 
+use diesel::pg::PgConnection;
+
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
 use crate::state::{
@@ -32,6 +34,9 @@ use super::{
     MerkleRadixOverlay, MerkleRadixPruner, SqlMerkleState, SqlMerkleStateBuildError,
     SqlMerkleStateBuilder,
 };
+
+const DEFAULT_MIN_CACHED_DATA_SIZE: usize = 100 * 1024; // 100KB
+const DEFAULT_CACHE_SIZE: u16 = 512; // number of entries in cache
 
 impl SqlMerkleStateBuilder<PostgresBackend> {
     /// Construct the final SqlMerkleState instance
@@ -79,6 +84,15 @@ where
         .tree_name
         .ok_or_else(|| InvalidStateError::with_message("must provide a tree name".into()))?;
 
+    let cache = {
+        super::cache::DataCache::new(
+            builder
+                .min_cached_data_size
+                .unwrap_or(DEFAULT_MIN_CACHED_DATA_SIZE),
+            builder.cache_size.unwrap_or(DEFAULT_CACHE_SIZE),
+        )
+    };
+
     let store = SqlMerkleRadixStore::new(&backend);
 
     let (initial_state_root_hash, _) = encode_and_hash(Node::default())?;
@@ -90,7 +104,11 @@ where
         })?
     };
 
-    Ok(SqlMerkleState { backend, tree_id })
+    Ok(SqlMerkleState {
+        backend,
+        tree_id,
+        cache,
+    })
 }
 
 impl SqlMerkleState<PostgresBackend> {
@@ -99,9 +117,13 @@ impl SqlMerkleState<PostgresBackend> {
     /// After calling this method, no data associated with the tree name will remain in the
     /// database.
     pub fn delete_tree(self) -> Result<(), InternalError> {
-        let store = SqlMerkleRadixStore::new(&self.backend);
+        let store = self.new_store();
         store.delete_tree(self.tree_id)?;
         Ok(())
+    }
+
+    fn new_store(&self) -> SqlMerkleRadixStore<PostgresBackend, PgConnection> {
+        SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
     }
 }
 
@@ -115,11 +137,7 @@ impl Write for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -137,11 +155,7 @@ impl Write for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -157,7 +171,7 @@ impl Prune for SqlMerkleState<PostgresBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, SqlMerkleRadixStore::new(&self.backend));
+        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
 
         overlay
             .prune(&state_ids)
@@ -175,11 +189,7 @@ impl Read for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(
-            self.tree_id,
-            &*state_id,
-            SqlMerkleRadixStore::new(&self.backend),
-        );
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         if !overlay
             .has_root()
@@ -216,11 +226,9 @@ impl MerkleRadixLeafReader for SqlMerkleState<PostgresBackend> {
             return Ok(Box::new(std::iter::empty()));
         }
 
-        let leaves = SqlMerkleRadixStore::new(&self.backend).list_entries(
-            self.tree_id,
-            state_id,
-            subtree,
-        )?;
+        let leaves = self
+            .new_store()
+            .list_entries(self.tree_id, state_id, subtree)?;
 
         Ok(Box::new(leaves.into_iter().map(Ok)))
     }
@@ -238,18 +246,10 @@ impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
         Ok(())
     }
 
-    #[cfg(feature = "state-merkle-sql-caching")]
     fn new_store(
         &self,
     ) -> SqlMerkleRadixStore<InTransactionPostgresBackend<'a>, diesel::pg::PgConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
-    }
-
-    #[cfg(not(feature = "state-merkle-sql-caching"))]
-    fn new_store(
-        &self,
-    ) -> SqlMerkleRadixStore<InTransactionPostgresBackend<'a>, diesel::pg::PgConnection> {
-        SqlMerkleRadixStore::new(&self.backend)
     }
 }
 
