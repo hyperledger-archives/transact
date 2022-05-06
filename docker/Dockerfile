@@ -25,6 +25,7 @@ ENV PATH=$PATH:/root/.cargo/bin
 RUN curl https://sh.rustup.rs -sSf > /usr/bin/rustup-init \
  && chmod +x /usr/bin/rustup-init \
  && rustup-init -y \
+ && rustup target add wasm32-unknown-unknown \
 # Install protoc
  && TARGET_ARCH=$(dpkg --print-architecture) \
  && if [[ $TARGET_ARCH == "arm64" ]]; then \
