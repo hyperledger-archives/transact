@@ -28,8 +28,10 @@
 pub trait State {
     /// A reference to a checkpoint in state. It could be a merkle hash for a merkle database.
     type StateId;
+
     /// The Key that is being stored in state.
     type Key;
+
     /// The Value that is being stored in state.
     type Value;
 }
