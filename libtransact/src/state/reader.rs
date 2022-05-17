@@ -27,7 +27,7 @@ pub type ValueIter<T> = Box<dyn Iterator<Item = ValueIterResult<T>>>;
 /// This trait provides similar behaviour to the [`Read`](super::Read) trait, without the
 /// explicit requirements about thread safety.
 ///
-/// Available with the feature `"state-trait-reader"` enabled.
+/// Available with the feature `"state-trait"` enabled.
 pub trait Reader: State {
     /// The filter used for the iterating over state values.
     type Filter: ?Sized;
