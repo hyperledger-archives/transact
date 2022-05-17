@@ -18,7 +18,7 @@
 
 mod change_log;
 mod error;
-#[cfg(feature = "state-trait")]
+#[cfg(feature = "state-in-transaction")]
 mod state_trait_impls;
 
 use std::cmp::Reverse;
