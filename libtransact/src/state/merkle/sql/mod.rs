@@ -66,7 +66,7 @@ use sha2::{Digest, Sha512};
 
 use crate::error::InternalError;
 use crate::state::error::StateWriteError;
-#[cfg(feature = "state-trait")]
+#[cfg(feature = "state-in-transaction")]
 use crate::state::State;
 use crate::state::StateChange;
 
@@ -173,7 +173,7 @@ where
     }
 }
 
-#[cfg(feature = "state-trait")]
+#[cfg(feature = "state-in-transaction")]
 impl<B: Backend> State for SqlMerkleState<B> {
     type StateId = String;
     type Key = String;

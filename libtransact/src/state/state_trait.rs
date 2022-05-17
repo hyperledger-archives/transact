@@ -24,7 +24,7 @@
 /// For example, a `State` defined over a merkle database would prove the root merkle hash as its
 /// state ID.
 ///
-/// Available with the feature `"state-trait"` enabled.
+/// Available with the feature `"state-in-transaction"` enabled.
 pub trait State {
     /// A reference to a checkpoint in state. It could be a merkle hash for a merkle database.
     type StateId;
