@@ -22,17 +22,17 @@
 //! `Write`, `Read`, and `Prune`.  These provide commit, read access,
 //! and a way to purge old state, respectively, to an underlying storage mechanism.
 
-#[cfg(feature = "state-trait-committer")]
+#[cfg(feature = "state-trait")]
 mod committer;
-#[cfg(feature = "state-trait-dry-run-committer")]
+#[cfg(feature = "state-trait")]
 mod dry_run_committer;
 pub mod error;
 pub mod hashmap;
 #[cfg(feature = "state-merkle")]
 pub mod merkle;
-#[cfg(feature = "state-trait-pruner")]
+#[cfg(feature = "state-trait")]
 mod pruner;
-#[cfg(feature = "state-trait-reader")]
+#[cfg(feature = "state-trait")]
 mod reader;
 #[cfg(feature = "state-trait")]
 mod state_trait;
@@ -40,15 +40,15 @@ mod state_trait;
 use std::collections::HashMap;
 
 pub use crate::state::error::{StatePruneError, StateReadError, StateWriteError};
-#[cfg(feature = "state-trait-committer")]
+#[cfg(feature = "state-trait")]
 pub use committer::Committer;
-#[cfg(feature = "state-trait-dry-run-committer")]
+#[cfg(feature = "state-trait")]
 pub use dry_run_committer::DryRunCommitter;
 #[cfg(feature = "state-trait")]
 pub use error::StateError;
-#[cfg(feature = "state-trait-pruner")]
+#[cfg(feature = "state-trait")]
 pub use pruner::Pruner;
-#[cfg(feature = "state-trait-reader")]
+#[cfg(feature = "state-trait")]
 pub use reader::{Reader, ValueIter, ValueIterResult};
 #[cfg(feature = "state-trait")]
 pub use state_trait::State;
