@@ -15,13 +15,9 @@
  * -----------------------------------------------------------------------------
  */
 
-#[cfg(feature = "state-trait")]
 mod committer;
-#[cfg(feature = "state-trait")]
 mod dry_run_committer;
-#[cfg(feature = "state-trait")]
 mod pruner;
-#[cfg(feature = "state-trait")]
 mod reader;
 
 use super::MerkleState;
