@@ -91,6 +91,7 @@ stable = [
     "postgres",
     "protocol-sabre",
     "sqlite",
+    "state-in-transaction",
     "state-merkle-sql",
     "workload",
     "workload-batch-gen",
@@ -111,7 +112,6 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
-    "state-in-transaction",
     "state-merkle-sql-in-transaction",
 ]
 
