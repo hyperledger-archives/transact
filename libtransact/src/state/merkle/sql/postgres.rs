@@ -238,6 +238,89 @@ impl MerkleRadixLeafReader for SqlMerkleState<PostgresBackend> {
     }
 }
 
+#[cfg(feature = "state-trait")]
+impl Reader for SqlMerkleState<PostgresBackend> {
+    type Filter = str;
+
+    fn get(
+        &self,
+        state_id: &Self::StateId,
+        keys: &[Self::Key],
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        if !overlay.has_root()? {
+            return Err(InvalidStateError::with_message(state_id.into()).into());
+        }
+
+        Ok(overlay.get_entries(keys)?)
+    }
+
+    fn filter_iter(
+        &self,
+        state_id: &Self::StateId,
+        filter: Option<&Self::Filter>,
+    ) -> ValueIterResult<ValueIter<(Self::Key, Self::Value)>> {
+        if &self.initial_state_root_hash()? == state_id {
+            return Ok(Box::new(std::iter::empty()));
+        }
+
+        let leaves = self
+            .new_store()
+            .list_entries(self.tree_id, state_id, filter)?;
+
+        Ok(Box::new(leaves.into_iter().map(Ok)))
+    }
+}
+#[cfg(feature = "state-trait")]
+impl Committer for SqlMerkleState<PostgresBackend> {
+    type StateChange = StateChange;
+
+    fn commit(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[Self::StateChange],
+    ) -> Result<Self::StateId, StateError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        let (next_state_id, tree_update) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        overlay.write_updates(&next_state_id, tree_update)?;
+
+        Ok(next_state_id)
+    }
+}
+
+#[cfg(feature = "state-trait")]
+impl DryRunCommitter for SqlMerkleState<PostgresBackend> {
+    type StateChange = StateChange;
+
+    fn dry_run_commit(
+        &self,
+        state_id: &Self::StateId,
+        state_changes: &[Self::StateChange],
+    ) -> Result<Self::StateId, StateError> {
+        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+
+        let (next_state_id, _) = overlay
+            .generate_updates(state_changes)
+            .map_err(|e| InternalError::from_source(Box::new(e)))?;
+
+        Ok(next_state_id)
+    }
+}
+
+#[cfg(feature = "state-trait")]
+impl Pruner for SqlMerkleState<PostgresBackend> {
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
+        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
+
+        overlay.prune(&state_ids).map_err(StateError::from)
+    }
+}
+
 #[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
     /// Deletes the complete tree
@@ -370,9 +453,8 @@ mod test {
                 value: "state_value".as_bytes().to_vec(),
             };
 
-            let new_root = tree_1
-                .commit(&initial_state_root_hash, &[state_change_set])
-                .unwrap();
+            let new_root =
+                Write::commit(&tree_1, &initial_state_root_hash, &[state_change_set]).unwrap();
             assert_read_value_at_address(&tree_1, &new_root, "1234", Some("state_value"));
 
             let tree_2 = SqlMerkleStateBuilder::new()
@@ -381,7 +463,7 @@ mod test {
                 .create_tree_if_necessary()
                 .build()?;
 
-            assert!(tree_2.get(&new_root, &["1234".to_string()]).is_err());
+            assert!(Read::get(&tree_2, &new_root, &["1234".to_string()]).is_err());
 
             Ok(())
         })
@@ -422,7 +504,7 @@ mod test {
                 value: "state_value".as_bytes().to_vec(),
             };
 
-            let new_root = state.commit(&initial_state_root_hash, &[state_change_set])?;
+            let new_root = Write::commit(&state, &initial_state_root_hash, &[state_change_set])?;
 
             assert_read_value_at_address(&state, &new_root, "1234", Some("state_value"));
             drop(state);
@@ -470,9 +552,8 @@ mod test {
                 value: "state_value".as_bytes().to_vec(),
             };
 
-            let new_root = tree_1
-                .commit(&initial_state_root_hash, &[state_change_set])
-                .unwrap();
+            let new_root =
+                Write::commit(&tree_1, &initial_state_root_hash, &[state_change_set]).unwrap();
             assert_read_value_at_address(&tree_1, &new_root, "012345", Some("state_value"));
 
             let entry = tree_1
