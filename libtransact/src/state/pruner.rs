@@ -21,8 +21,6 @@ use super::{State, StateError};
 ///
 /// Removing `StateIds` and the associated state makes it so the state storage system does not grow
 /// unbounded.
-///
-/// Available with the feature `"state-in-transaction"` enabled.
 pub trait Pruner: State {
     /// Prune keys from state for a given set of state IDs.
     ///

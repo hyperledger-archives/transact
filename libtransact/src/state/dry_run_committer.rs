@@ -18,8 +18,6 @@
 use super::{State, StateError};
 
 /// Predicts future state checkpoints.
-///
-/// Available with the feature `"state-in-transaction"` enabled.
 pub trait DryRunCommitter: State {
     /// Defines the type of change to use for the prediction.
     type StateChange;
