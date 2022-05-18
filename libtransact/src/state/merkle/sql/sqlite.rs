@@ -228,13 +228,6 @@ impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
 }
 
 #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
-impl<'a> crate::state::State for SqlMerkleState<InTransactionSqliteBackend<'a>> {
-    type StateId = String;
-    type Key = String;
-    type Value = Vec<u8>;
-}
-
-#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Reader for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type Filter = str;
 
