@@ -21,6 +21,10 @@ use diesel::pg::PgConnection;
 
 use crate::error::{InternalError, InvalidStateError};
 use crate::state::merkle::{node::Node, MerkleRadixLeafReadError, MerkleRadixLeafReader};
+#[cfg(feature = "state-trait")]
+use crate::state::{
+    Committer, DryRunCommitter, Pruner, Reader, StateError, ValueIter, ValueIterResult,
+};
 use crate::state::{
     Prune, Read, StateChange, StatePruneError, StateReadError, StateWriteError, Write,
 };
@@ -254,14 +258,14 @@ impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
 }
 
 #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
-impl<'a> crate::state::Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
+impl<'a> Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type Filter = str;
 
     fn get(
         &self,
         state_id: &Self::StateId,
         keys: &[Self::Key],
-    ) -> Result<HashMap<Self::Key, Self::Value>, crate::state::StateError> {
+    ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
         let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         if !overlay.has_root()? {
@@ -275,7 +279,7 @@ impl<'a> crate::state::Reader for SqlMerkleState<InTransactionPostgresBackend<'a
         &self,
         state_id: &Self::StateId,
         filter: Option<&Self::Filter>,
-    ) -> crate::state::ValueIterResult<crate::state::ValueIter<(Self::Key, Self::Value)>> {
+    ) -> ValueIterResult<ValueIter<(Self::Key, Self::Value)>> {
         if &self.initial_state_root_hash()? == state_id {
             return Ok(Box::new(std::iter::empty()));
         }
@@ -289,14 +293,14 @@ impl<'a> crate::state::Reader for SqlMerkleState<InTransactionPostgresBackend<'a
 }
 
 #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
-impl<'a> crate::state::Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
+impl<'a> Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
     fn commit(
         &self,
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
-    ) -> Result<Self::StateId, crate::state::StateError> {
+    ) -> Result<Self::StateId, StateError> {
         let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
@@ -310,14 +314,14 @@ impl<'a> crate::state::Committer for SqlMerkleState<InTransactionPostgresBackend
 }
 
 #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
-impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
+impl<'a> DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
     fn dry_run_commit(
         &self,
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
-    ) -> Result<Self::StateId, crate::state::StateError> {
+    ) -> Result<Self::StateId, StateError> {
         let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
 
         let (next_state_id, _) = overlay
@@ -329,16 +333,11 @@ impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionPostgresB
 }
 
 #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
-impl<'a> crate::state::Pruner for SqlMerkleState<InTransactionPostgresBackend<'a>> {
-    fn prune(
-        &self,
-        state_ids: Vec<Self::StateId>,
-    ) -> Result<Vec<Self::Key>, crate::state::StateError> {
+impl<'a> Pruner for SqlMerkleState<InTransactionPostgresBackend<'a>> {
+    fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
 
-        overlay
-            .prune(&state_ids)
-            .map_err(crate::state::StateError::from)
+        overlay.prune(&state_ids).map_err(StateError::from)
     }
 }
 
