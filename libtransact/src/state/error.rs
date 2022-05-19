@@ -18,7 +18,6 @@
 use std::error::Error;
 use std::fmt;
 
-#[cfg(feature = "state-trait")]
 use crate::error::{InternalError, InvalidStateError};
 
 /// An error that may occur on state writes.
@@ -107,14 +106,12 @@ impl Error for StatePruneError {
     }
 }
 
-#[cfg(feature = "state-trait")]
 #[derive(Debug)]
 pub enum StateError {
     Internal(InternalError),
     InvalidState(InvalidStateError),
 }
 
-#[cfg(feature = "state-trait")]
 impl fmt::Display for StateError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
@@ -124,7 +121,6 @@ impl fmt::Display for StateError {
     }
 }
 
-#[cfg(feature = "state-trait")]
 impl Error for StateError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match self {
@@ -134,14 +130,12 @@ impl Error for StateError {
     }
 }
 
-#[cfg(feature = "state-trait")]
 impl From<InternalError> for StateError {
     fn from(err: InternalError) -> Self {
         Self::Internal(err)
     }
 }
 
-#[cfg(feature = "state-trait")]
 impl From<InvalidStateError> for StateError {
     fn from(err: InvalidStateError) -> Self {
         Self::InvalidState(err)

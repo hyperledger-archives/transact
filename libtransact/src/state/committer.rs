@@ -24,8 +24,6 @@ use super::{State, StateError};
 ///
 /// All operations are made using `StateChange` instances. These are the ordered set of changes to
 /// be applied onto the given `StateId`.
-///
-/// Available with the feature `"state-trait"` enabled.
 pub trait Committer: State {
     /// Defines the type of change to apply
     type StateChange;

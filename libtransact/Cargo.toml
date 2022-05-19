@@ -115,7 +115,6 @@ experimental = [
     "family-xo",
     "key-value-state",
     "state-merkle-sql-in-transaction",
-    "state-trait",
 ]
 
 # stable features in support of wasm
@@ -171,14 +170,11 @@ scheduler = ["context", "log", "protocol-batch"]
 sqlite = ["diesel/sqlite", "serde", "serde_derive", "serde_json"]
 state-merkle = ["cbor-codec", "log"]
 state-merkle-sql = ["diesel", "diesel_migrations", "lru"]
-state-merkle-sql-in-transaction = [
-    "state-trait",
-]
+state-merkle-sql-in-transaction = []
 # This feature must be enabled to run tests using a postgres db it is not
 # enabled by default, due to its requirement of an external postgres db
 # instance.
 state-merkle-sql-postgres-tests = ["postgres", "lazy_static"]
-state-trait = []
 workload = []
 workload-batch-gen = ["workload"]
 workload-runner = [
