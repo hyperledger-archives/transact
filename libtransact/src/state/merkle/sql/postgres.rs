@@ -260,10 +260,7 @@ impl<'a> crate::state::State for SqlMerkleState<InTransactionPostgresBackend<'a>
     type Value = Vec<u8>;
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-reader"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type Filter = str;
 
@@ -298,10 +295,7 @@ impl<'a> crate::state::Reader for SqlMerkleState<InTransactionPostgresBackend<'a
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-committer"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
@@ -322,10 +316,7 @@ impl<'a> crate::state::Committer for SqlMerkleState<InTransactionPostgresBackend
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-dry-run-committer"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
@@ -344,10 +335,7 @@ impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionPostgresB
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-pruner"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Pruner for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     fn prune(
         &self,
@@ -367,10 +355,7 @@ mod test {
     use super::*;
 
     use crate::state::merkle::sql::backend::{run_postgres_test, Execute, PostgresBackendBuilder};
-    #[cfg(all(
-        feature = "state-merkle-sql-in-transaction",
-        feature = "state-trait-committer"
-    ))]
+    #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
     use crate::state::Committer;
 
     /// This test creates multiple trees in the same backend/db instance and verifies that values
@@ -509,10 +494,7 @@ mod test {
         })
     }
 
-    #[cfg(all(
-        feature = "state-merkle-sql-in-transaction",
-        feature = "state-trait-committer"
-    ))]
+    #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
     #[test]
     fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|db_url| {

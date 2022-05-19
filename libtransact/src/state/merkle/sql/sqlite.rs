@@ -234,10 +234,7 @@ impl<'a> crate::state::State for SqlMerkleState<InTransactionSqliteBackend<'a>> 
     type Value = Vec<u8>;
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-reader"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Reader for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type Filter = str;
 
@@ -272,10 +269,7 @@ impl<'a> crate::state::Reader for SqlMerkleState<InTransactionSqliteBackend<'a>>
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-committer"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Committer for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type StateChange = StateChange;
 
@@ -296,10 +290,7 @@ impl<'a> crate::state::Committer for SqlMerkleState<InTransactionSqliteBackend<'
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-dry-run-committer"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type StateChange = StateChange;
 
@@ -318,10 +309,7 @@ impl<'a> crate::state::DryRunCommitter for SqlMerkleState<InTransactionSqliteBac
     }
 }
 
-#[cfg(all(
-    feature = "state-merkle-sql-in-transaction",
-    feature = "state-trait-pruner"
-))]
+#[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
 impl<'a> crate::state::Pruner for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     fn prune(
         &self,
@@ -363,12 +351,11 @@ impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
 mod test {
     use super::*;
 
-    use crate::state::merkle::sql::backend::{self, SqliteBackendBuilder};
+    #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
+    use crate::state::merkle::sql::backend;
+    use crate::state::merkle::sql::backend::SqliteBackendBuilder;
     use crate::state::merkle::sql::migration::MigrationManager;
-    #[cfg(all(
-        feature = "state-merkle-sql-in-transaction",
-        feature = "state-trait-committer"
-    ))]
+    #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
     use crate::state::Committer;
 
     /// This test creates multiple trees in the same backend/db instance and verifies that values
@@ -508,10 +495,7 @@ mod test {
         Ok(())
     }
 
-    #[cfg(all(
-        feature = "state-merkle-sql-in-transaction",
-        feature = "state-trait-committer"
-    ))]
+    #[cfg(all(feature = "state-merkle-sql-in-transaction", feature = "state-trait"))]
     #[test]
     fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
         let backend = SqliteBackendBuilder::new().with_memory_database().build()?;

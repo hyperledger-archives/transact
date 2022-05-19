@@ -21,7 +21,7 @@
 /// IDs, which define a checkpoint in the state. Keys that exist under one state ID are not
 /// required to be available under another.  How this is handled is left up to the implementation.
 ///
-/// For example, a `State` defined over a merkle database would proved the root merkle hash as its
+/// For example, a `State` defined over a merkle database would prove the root merkle hash as its
 /// state ID.
 ///
 /// Available with the feature `"state-trait"` enabled.
