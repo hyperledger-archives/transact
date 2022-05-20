@@ -86,7 +86,7 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend
 
 /// A borrowed Postgres connection.
 ///
-/// Available if the features "state-merkle-sql-in-transaction" "postgres" are enabled.
+/// Available if the features "state-merkle-sql-in-transaction" and "postgres" are enabled.
 #[cfg(feature = "state-merkle-sql-in-transaction")]
 pub struct BorrowedPostgresConnection<'a>(&'a diesel::pg::PgConnection);
 
@@ -103,7 +103,7 @@ impl<'a> Connection for BorrowedPostgresConnection<'a> {
 ///
 /// This backend is neither `Sync` nor `Send`.
 ///
-/// Available if the features "state-merkle-sql-in-transaction" "postgres" are enabled.
+/// Available if the features "state-merkle-sql-in-transaction" and "postgres" are enabled.
 #[cfg(feature = "state-merkle-sql-in-transaction")]
 pub struct InTransactionPostgresBackend<'a> {
     connection: &'a diesel::pg::PgConnection,
