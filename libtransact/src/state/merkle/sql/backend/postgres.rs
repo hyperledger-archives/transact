@@ -86,11 +86,9 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend
 
 /// A borrowed Postgres connection.
 ///
-/// Available if the features "state-merkle-sql-in-transaction" and "postgres" are enabled.
-#[cfg(feature = "state-merkle-sql-in-transaction")]
+/// Available if the feature "postgres" is enabled.
 pub struct BorrowedPostgresConnection<'a>(&'a diesel::pg::PgConnection);
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> Connection for BorrowedPostgresConnection<'a> {
     type ConnectionType = diesel::pg::PgConnection;
 
@@ -103,13 +101,11 @@ impl<'a> Connection for BorrowedPostgresConnection<'a> {
 ///
 /// This backend is neither `Sync` nor `Send`.
 ///
-/// Available if the features "state-merkle-sql-in-transaction" and "postgres" are enabled.
-#[cfg(feature = "state-merkle-sql-in-transaction")]
+/// Available if the feature "postgres" is enabled.
 pub struct InTransactionPostgresBackend<'a> {
     connection: &'a diesel::pg::PgConnection,
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> InTransactionPostgresBackend<'a> {
     /// Wrap a reference to a [`diesel::pg::PgConnection`].
     pub fn new(connection: &'a diesel::pg::PgConnection) -> Self {
@@ -117,7 +113,6 @@ impl<'a> InTransactionPostgresBackend<'a> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> Backend for InTransactionPostgresBackend<'a> {
     type Connection = BorrowedPostgresConnection<'a>;
 
@@ -126,7 +121,6 @@ impl<'a> Backend for InTransactionPostgresBackend<'a> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> Execute for InTransactionPostgresBackend<'a> {
     fn execute<F, T>(&self, f: F) -> Result<T, InternalError>
     where
@@ -136,7 +130,6 @@ impl<'a> Execute for InTransactionPostgresBackend<'a> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> From<&'a diesel::pg::PgConnection> for InTransactionPostgresBackend<'a> {
     fn from(conn: &'a diesel::pg::PgConnection) -> Self {
         Self::new(conn)

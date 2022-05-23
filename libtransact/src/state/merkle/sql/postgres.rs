@@ -26,7 +26,6 @@ use crate::state::{
     StatePruneError, StateReadError, StateWriteError, ValueIter, ValueIterResult, Write,
 };
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 use super::backend::InTransactionPostgresBackend;
 use super::backend::{Backend, Connection, Execute, PostgresBackend};
 use super::encode_and_hash;
@@ -53,7 +52,6 @@ impl SqlMerkleStateBuilder<PostgresBackend> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> SqlMerkleStateBuilder<InTransactionPostgresBackend<'a>> {
     /// Construct the final SqlMerkleState instance
     ///
@@ -314,7 +312,6 @@ impl Pruner for SqlMerkleState<PostgresBackend> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
     /// Deletes the complete tree
     ///
@@ -333,7 +330,6 @@ impl<'a> SqlMerkleState<InTransactionPostgresBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type Filter = str;
 
@@ -368,7 +364,6 @@ impl<'a> Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
@@ -389,7 +384,6 @@ impl<'a> Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     type StateChange = StateChange;
 
@@ -408,7 +402,6 @@ impl<'a> DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Pruner for SqlMerkleState<InTransactionPostgresBackend<'a>> {
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
@@ -423,7 +416,6 @@ mod test {
     use super::*;
 
     use crate::state::merkle::sql::backend::{run_postgres_test, Execute, PostgresBackendBuilder};
-    #[cfg(all(feature = "state-merkle-sql-in-transaction"))]
     use crate::state::Committer;
 
     /// This test creates multiple trees in the same backend/db instance and verifies that values
@@ -560,7 +552,6 @@ mod test {
         })
     }
 
-    #[cfg(all(feature = "state-merkle-sql-in-transaction"))]
     #[test]
     fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
         run_postgres_test(|db_url| {

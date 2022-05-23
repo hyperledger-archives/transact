@@ -24,7 +24,6 @@ use crate::state::{
     StatePruneError, StateReadError, StateWriteError, ValueIter, ValueIterResult, Write,
 };
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 use super::backend::InTransactionSqliteBackend;
 use super::backend::{Backend, Connection, SqliteBackend, WriteExclusiveExecute};
 use super::encode_and_hash;
@@ -51,7 +50,6 @@ impl SqlMerkleStateBuilder<SqliteBackend> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> SqlMerkleStateBuilder<InTransactionSqliteBackend<'a>> {
     /// Construct the final SqlMerkleState instance
     ///
@@ -289,7 +287,6 @@ impl Pruner for SqlMerkleState<SqliteBackend> {
     }
 }
 
-#[cfg(feature = "state-merkle-sql-in-transaction")]
 impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
     /// Deletes the complete tree
     ///
@@ -308,7 +305,6 @@ impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Reader for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type Filter = str;
 
@@ -343,7 +339,6 @@ impl<'a> Reader for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Committer for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type StateChange = StateChange;
 
@@ -364,7 +359,6 @@ impl<'a> Committer for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> DryRunCommitter for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     type StateChange = StateChange;
 
@@ -383,7 +377,6 @@ impl<'a> DryRunCommitter for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     }
 }
 
-#[cfg(all(feature = "state-merkle-sql-in-transaction"))]
 impl<'a> Pruner for SqlMerkleState<InTransactionSqliteBackend<'a>> {
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StateError> {
         let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
@@ -420,11 +413,9 @@ impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
 mod test {
     use super::*;
 
-    #[cfg(all(feature = "state-merkle-sql-in-transaction"))]
     use crate::state::merkle::sql::backend;
     use crate::state::merkle::sql::backend::SqliteBackendBuilder;
     use crate::state::merkle::sql::migration::MigrationManager;
-    #[cfg(all(feature = "state-merkle-sql-in-transaction"))]
     use crate::state::Committer;
 
     /// This test creates multiple trees in the same backend/db instance and verifies that values
@@ -562,7 +553,6 @@ mod test {
         Ok(())
     }
 
-    #[cfg(all(feature = "state-merkle-sql-in-transaction"))]
     #[test]
     fn test_in_transaction() -> Result<(), Box<dyn std::error::Error>> {
         let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
