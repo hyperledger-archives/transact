@@ -340,6 +340,8 @@ where
             batch.push((key_hash_hex.clone(), node, path));
         }
 
+        deletions.insert(self.state_root_hash.to_string());
+
         Ok((
             key_hash_hex,
             TreeUpdate {
