@@ -17,8 +17,8 @@
 
 use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 
-#[derive(Insertable, Queryable, QueryableByName, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Hash, PartialEq, Eq, Insertable, Queryable, QueryableByName, Identifiable)]
+#[cfg_attr(test, derive(Debug))]
 #[table_name = "postgres_merkle_radix_tree_node"]
 #[primary_key(hash, tree_id)]
 pub struct MerkleRadixTreeNode {
