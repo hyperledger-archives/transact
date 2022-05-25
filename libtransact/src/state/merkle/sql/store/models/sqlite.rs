@@ -36,6 +36,7 @@ pub struct MerkleRadixTreeNode {
     pub tree_id: i64,
     pub leaf_id: Option<i64>,
     pub children: Children,
+    pub reference: i64,
 }
 
 #[derive(AsExpression, Debug, FromSqlRow, Deserialize, Serialize)]

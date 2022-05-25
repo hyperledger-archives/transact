@@ -26,4 +26,5 @@ pub struct MerkleRadixTreeNode {
     pub tree_id: i64,
     pub leaf_id: Option<i64>,
     pub children: Vec<Option<String>>,
+    pub reference: i64,
 }
