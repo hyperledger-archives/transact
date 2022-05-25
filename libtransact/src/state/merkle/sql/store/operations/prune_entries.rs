@@ -88,7 +88,8 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteCo
                     sqlite_merkle_radix_tree_node::table.filter(
                         sqlite_merkle_radix_tree_node::tree_id
                             .eq(tree_id)
-                            .and(sqlite_merkle_radix_tree_node::hash.eq(&hash)),
+                            .and(sqlite_merkle_radix_tree_node::hash.eq(&hash))
+                            .and(sqlite_merkle_radix_tree_node::reference.gt(0)),
                     ),
                 )
                 .execute(self.conn)

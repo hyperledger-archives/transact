@@ -88,7 +88,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                 -- This is the initial node
                 SELECT hash, tree_id, leaf_id, children, 0 as depth
                 FROM merkle_radix_tree_node
-                WHERE hash = ? AND tree_id = ?
+                WHERE hash = ? AND tree_id = ? AND reference > 0
 
                 UNION ALL
 
@@ -99,7 +99,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, SqliteConnect
                   p.children,
                   '$[' || json_extract(?, '$[' || p.depth || ']') || ']'
                 )
-                AND c.tree_id = ?
+                AND c.tree_id = ? AND reference > 0
             )
             SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
@@ -163,7 +163,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
                 -- This is the initial node
                 SELECT hash, tree_id, leaf_id, children, 1 as depth
                 FROM merkle_radix_tree_node
-                WHERE hash = $1 AND tree_id = $2
+                WHERE hash = $1 AND tree_id = $2 AND reference > 0
 
                 UNION ALL
 
@@ -171,7 +171,7 @@ impl<'a> MerkleRadixGetPathOperation for MerkleRadixOperations<'a, PgConnection>
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p
                 WHERE c.hash = p.children[$3[p.depth]]
-                AND c.tree_id = $2
+                AND c.tree_id = $2 AND reference > 0
             )
             SELECT t.hash, t.children, l.data, t.depth FROM tree_path t
             LEFT OUTER JOIN merkle_radix_leaf l ON t.leaf_id = l.id
