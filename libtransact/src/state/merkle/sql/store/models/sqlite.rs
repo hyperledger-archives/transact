@@ -39,6 +39,32 @@ pub struct MerkleRadixTreeNode {
     pub reference: i64,
 }
 
+impl MerkleRadixTreeNode {
+    pub fn new<S: Into<String>>(hash: S, tree_id: i64) -> Self {
+        Self::inner_new(hash.into(), tree_id)
+    }
+
+    fn inner_new(hash: String, tree_id: i64) -> Self {
+        Self {
+            hash,
+            tree_id,
+            leaf_id: None,
+            children: Children(vec![None; 256]),
+            reference: 1,
+        }
+    }
+
+    pub fn with_children(mut self, children: Vec<Option<String>>) -> Self {
+        self.children = Children(children);
+        self
+    }
+
+    pub fn with_leaf_id(mut self, leaf_id: Option<i64>) -> Self {
+        self.leaf_id = leaf_id;
+        self
+    }
+}
+
 #[derive(AsExpression, Debug, FromSqlRow, Deserialize, Serialize)]
 #[cfg_attr(test, derive(PartialEq))]
 #[sql_type = "diesel::sql_types::Text"]

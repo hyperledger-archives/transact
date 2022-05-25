@@ -79,12 +79,7 @@ mod tests {
 
         // insert the root only into the tree:
         insert_into(sqlite_merkle_radix_tree_node::table)
-            .values(sqlite::MerkleRadixTreeNode {
-                hash: "initial-state-root".into(),
-                tree_id: 1,
-                leaf_id: None,
-                children: sqlite::Children(vec![]),
-            })
+            .values(sqlite::MerkleRadixTreeNode::new("initial-state-root", 1))
             .execute(&conn)?;
 
         assert!(MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);
@@ -104,12 +99,7 @@ mod tests {
 
             // insert the root only into the tree:
             insert_into(postgres_merkle_radix_tree_node::table)
-                .values(postgres::MerkleRadixTreeNode {
-                    hash: "initial-state-root".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: vec![],
-                })
+                .values(postgres::MerkleRadixTreeNode::new("initial-state-root", 1))
                 .execute(&conn)?;
 
             assert!(MerkleRadixOperations::new(&conn).has_root(1, "initial-state-root")?);

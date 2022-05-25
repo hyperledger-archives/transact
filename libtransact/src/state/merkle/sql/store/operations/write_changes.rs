@@ -362,12 +362,7 @@ mod tests {
         assert_eq!(nodes.len(), 1);
         assert_eq!(
             nodes[0],
-            sqlite::MerkleRadixTreeNode {
-                hash: "initial-state-root".into(),
-                tree_id: 1,
-                leaf_id: None,
-                children: sqlite::Children(vec![None; 256]),
-            }
+            sqlite::MerkleRadixTreeNode::new("initial-state-root", 1),
         );
 
         Ok(())
@@ -413,12 +408,7 @@ mod tests {
             assert_eq!(nodes.len(), 1);
             assert_eq!(
                 nodes[0],
-                postgres::MerkleRadixTreeNode {
-                    hash: "initial-state-root".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: vec![None; 256],
-                }
+                postgres::MerkleRadixTreeNode::new("initial-state-root", 1)
             );
 
             Ok(())
@@ -488,30 +478,14 @@ mod tests {
         assert_eq!(
             nodes,
             vec![
-                sqlite::MerkleRadixTreeNode {
-                    hash: "state-root".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(10, "first-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "first-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(1, "second-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "second-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(255, "leaf-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "leaf-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: Some(leaves[0].id),
-                    children: sqlite::Children(vec![None; 256])
-                },
+                sqlite::MerkleRadixTreeNode::new("state-root", 1)
+                    .with_children(single_db_child(10, "first-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("first-node-hash", 1)
+                    .with_children(single_db_child(1, "second-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("second-node-hash", 1)
+                    .with_children(single_db_child(255, "leaf-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("leaf-node-hash", 1)
+                    .with_leaf_id(Some(leaves[0].id)),
             ]
         );
 
@@ -580,40 +554,19 @@ mod tests {
             assert_eq!(
                 nodes,
                 vec![
-                    postgres::MerkleRadixTreeNode {
-                        hash: "state-root".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(10, "first-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "first-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(1, "second-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "second-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(255, "leaf-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "leaf-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: Some(leaves[0].id),
-                        children: vec![None; 256]
-                    },
+                    postgres::MerkleRadixTreeNode::new("state-root", 1)
+                        .with_children(single_db_child(10, "first-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("first-node-hash", 1)
+                        .with_children(single_db_child(1, "second-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("second-node-hash", 1)
+                        .with_children(single_db_child(255, "leaf-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("leaf-node-hash", 1)
+                        .with_leaf_id(Some(leaves[0].id)),
                 ]
             );
 
             Ok(())
         })
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn single_sqlite_child(pos: usize, hash: &str) -> sqlite::Children {
-        sqlite::Children(single_db_child(pos, hash))
     }
 
     fn single_db_child(pos: usize, hash: &str) -> Vec<Option<String>> {
