@@ -58,7 +58,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, SqliteConn
                 -- This is the initial node
                 SELECT hash, tree_id, leaf_id, children, 0 as depth
                 FROM merkle_radix_tree_node
-                WHERE hash = ? AND tree_id = ?
+                WHERE hash = ? AND tree_id = ? AND reference > 0
 
                 UNION ALL
 
@@ -66,7 +66,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, SqliteConn
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p, json_each(p.children)
                 WHERE c.hash = json_each.value
-                AND c.tree_id = ?
+                AND c.tree_id = ? AND reference > 0
             )
             SELECT l.address, l.data
             FROM tree_path t, merkle_radix_leaf l
@@ -104,7 +104,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, PgConnecti
                 -- This is the initial node
                 SELECT hash, tree_id, leaf_id, children, 0 as depth
                 FROM merkle_radix_tree_node
-                WHERE hash = $2 AND tree_id = $1
+                WHERE hash = $2 AND tree_id = $1 AND reference > 0
 
                 UNION ALL
 
@@ -112,7 +112,7 @@ impl<'a> MerkleRadixListLeavesOperation for MerkleRadixOperations<'a, PgConnecti
                 SELECT c.hash, c.tree_id, c.leaf_id, c.children, p.depth + 1
                 FROM merkle_radix_tree_node c, tree_path p
                 WHERE c.hash = ANY(p.children)
-                AND c.tree_id = $1
+                AND c.tree_id = $1 AND reference > 0
             )
             SELECT l.address, l.data
             FROM tree_path t, merkle_radix_leaf l

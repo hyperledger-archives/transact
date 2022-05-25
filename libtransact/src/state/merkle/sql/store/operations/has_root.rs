@@ -35,7 +35,9 @@ pub trait MerkleRadixHasRootOperation {
 impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         select(exists(
-            sqlite_merkle_radix_tree_node::table.find((state_root_hash, tree_id)),
+            sqlite_merkle_radix_tree_node::table
+                .find((state_root_hash, tree_id))
+                .filter(sqlite_merkle_radix_tree_node::reference.gt(0)),
         ))
         .get_result::<bool>(self.conn)
         .map_err(|e| InternalError::from_source(Box::new(e)))
@@ -46,7 +48,9 @@ impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, SqliteConnect
 impl<'a> MerkleRadixHasRootOperation for MerkleRadixOperations<'a, PgConnection> {
     fn has_root(&self, tree_id: i64, state_root_hash: &str) -> Result<bool, InternalError> {
         select(exists(
-            postgres_merkle_radix_tree_node::table.find((state_root_hash, tree_id)),
+            postgres_merkle_radix_tree_node::table
+                .find((state_root_hash, tree_id))
+                .filter(postgres_merkle_radix_tree_node::reference.gt(0)),
         ))
         .get_result::<bool>(self.conn)
         .map_err(|e| InternalError::from_source(Box::new(e)))
