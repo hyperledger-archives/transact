@@ -26,6 +26,8 @@ pub(super) mod list_trees;
 pub(super) mod prune_entries;
 pub(super) mod write_changes;
 
+mod prepared_stmt;
+
 #[cfg(feature = "sqlite")]
 no_arg_sql_function!(
     last_insert_rowid,
