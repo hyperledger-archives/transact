@@ -93,6 +93,7 @@ stable = [
     "sqlite",
     "state-in-transaction",
     "state-merkle-sql",
+    "state-merkle-sql-in-transaction",
     "workload",
     "workload-batch-gen",
     "workload-runner"
@@ -112,7 +113,6 @@ experimental = [
     "family-smallbank-workload",
     "family-xo",
     "key-value-state",
-    "state-merkle-sql-in-transaction",
 ]
 
 # stable features in support of wasm
