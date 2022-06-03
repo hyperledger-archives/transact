@@ -28,6 +28,7 @@ table! {
         tree_id -> Int8,
         address -> VarChar,
         data -> Blob,
+        pruned_at -> Nullable<Int8>,
     }
 }
 
@@ -40,6 +41,7 @@ table! {
         leaf_id -> Nullable<Int8>,
         // JSON children
         children -> Text,
+        reference -> Int8,
     }
 }
 
@@ -51,6 +53,7 @@ table! {
         tree_id -> Int8,
         leaf_id -> Nullable<Int8>,
         children -> Array<Nullable<VarChar>>,
+        reference -> Int8,
     }
 }
 
@@ -61,6 +64,7 @@ table! {
         state_root -> VarChar,
         parent_state_root -> Nullable<VarChar>,
         addition -> VarChar,
+        pruned_at -> Nullable<Int8>,
     }
 }
 
@@ -71,6 +75,7 @@ table! {
         successor_state_root -> VarChar,
         state_root -> VarChar,
         deletion -> VarChar,
+        pruned_at -> Nullable<Int8>,
     }
 }
 

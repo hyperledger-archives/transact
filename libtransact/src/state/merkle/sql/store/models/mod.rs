@@ -47,6 +47,7 @@ pub struct MerkleRadixLeaf {
     pub tree_id: i64,
     pub address: String,
     pub data: Vec<u8>,
+    pub pruned_at: Option<i64>,
 }
 
 #[derive(Insertable)]
@@ -67,6 +68,7 @@ pub struct NewMerkleRadixChangeLogAddition<'a> {
     pub state_root: &'a str,
     pub parent_state_root: Option<&'a str>,
     pub addition: &'a str,
+    pub pruned_at: Option<i64>,
 }
 
 #[derive(Queryable, QueryableByName, Identifiable)]
@@ -79,6 +81,7 @@ pub struct MerkleRadixChangeLogAddition {
     pub state_root: String,
     pub parent_state_root: Option<String>,
     pub addition: String,
+    pub pruned_at: Option<i64>,
 }
 
 #[derive(Insertable)]
@@ -89,6 +92,7 @@ pub struct NewMerkleRadixChangeLogDeletion<'a> {
     pub successor_state_root: &'a str,
     pub state_root: &'a str,
     pub deletion: &'a str,
+    pub pruned_at: Option<i64>,
 }
 
 #[derive(Queryable, QueryableByName, Identifiable)]
@@ -101,4 +105,5 @@ pub struct MerkleRadixChangeLogDeletion {
     pub successor_state_root: String,
     pub state_root: String,
     pub deletion: String,
+    pub pruned_at: Option<i64>,
 }
