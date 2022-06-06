@@ -126,18 +126,27 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
             for node in node_models {
                 prepare_stmt(
                     r#"
-                    INSERT INTO merkle_radix_tree_node
-                        (hash, tree_id, leaf_id, children, reference)
-                        VALUES (?, ?, ?, ?, ?)
-                    ON CONFLICT (hash, tree_id)
-                        DO UPDATE SET reference = reference + ?
+                    INSERT OR REPLACE INTO merkle_radix_tree_node
+                    WITH tree_nodes as (
+                        SELECT hash, tree_id, leaf_id, children, reference
+                        FROM merkle_radix_tree_node
+                        WHERE hash = ? AND tree_id = ?
+
+                        UNION ALL
+
+                        SELECT ? AS hash, ? AS tree_id, ? AS leaf_id, ? AS children, ? AS reference
+                    )
+                    SELECT hash, tree_id, leaf_id, children, SUM(reference)
+                    FROM tree_nodes
+                    GROUP BY hash, tree_id
                     "#,
                 )
-                .bind::<Text, _>(node.hash)
+                .bind::<Text, _>(&node.hash)
+                .bind::<BigInt, _>(node.tree_id)
+                .bind::<Text, _>(&node.hash)
                 .bind::<BigInt, _>(node.tree_id)
                 .bind::<Nullable<BigInt>, _>(node.leaf_id)
                 .bind::<Text, _>(node.children)
-                .bind::<BigInt, _>(node.reference)
                 .bind::<BigInt, _>(node.reference)
                 .execute(self.conn)
                 .map_err(|err| InternalError::from_source(Box::new(err)))?;
