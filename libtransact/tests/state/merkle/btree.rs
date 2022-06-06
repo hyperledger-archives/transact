@@ -121,6 +121,12 @@ fn merkle_trie_prune_successor_duplicate_leaves() {
 }
 
 #[test]
+fn merkle_trie_prune_deep_successor_tree() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_deep_successor_tree(orig_root, state);
+}
+
+#[test]
 fn leaf_iteration() {
     let (state, orig_root) = new_btree_state_and_root();
     test_leaf_iteration(orig_root, state);

@@ -167,30 +167,13 @@ mod tests {
 
         insert_into(sqlite_merkle_radix_tree_node::table)
             .values(vec![
-                sqlite::MerkleRadixTreeNode {
-                    hash: "000000-hash".into(),
-                    tree_id: 2,
-                    leaf_id: Some(inserted_id),
-                    children: sqlite::Children(vec![]),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "0000-hash".into(),
-                    tree_id: 2,
-                    leaf_id: None,
-                    children: sqlite::Children(vec![Some("000000-hash".to_string())]),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "00-hash".into(),
-                    tree_id: 2,
-                    leaf_id: None,
-                    children: sqlite::Children(vec![Some("0000-hash".to_string())]),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "root-hash".into(),
-                    tree_id: 2,
-                    leaf_id: None,
-                    children: sqlite::Children(vec![Some("00-hash".to_string())]),
-                },
+                sqlite::MerkleRadixTreeNode::new("000000-hash", 2).with_leaf_id(Some(inserted_id)),
+                sqlite::MerkleRadixTreeNode::new("0000-hash", 2)
+                    .with_children(vec![Some("000000-hash".to_string())]),
+                sqlite::MerkleRadixTreeNode::new("00-hash", 2)
+                    .with_children(vec![Some("0000-hash".to_string())]),
+                sqlite::MerkleRadixTreeNode::new("root-hash", 2)
+                    .with_children(vec![Some("00-hash".to_string())]),
             ])
             .execute(&conn)?;
 
@@ -250,30 +233,13 @@ mod tests {
 
             insert_into(postgres_merkle_radix_tree_node::table)
                 .values(vec![
-                    postgres::MerkleRadixTreeNode {
-                        hash: "000000-hash".into(),
-                        tree_id: 2,
-                        leaf_id: Some(1),
-                        children: vec![],
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "0000-hash".into(),
-                        tree_id: 2,
-                        leaf_id: None,
-                        children: vec![Some("000000-hash".to_string())],
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "00-hash".into(),
-                        tree_id: 2,
-                        leaf_id: None,
-                        children: vec![Some("0000-hash".to_string())],
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "root-hash".into(),
-                        tree_id: 2,
-                        leaf_id: None,
-                        children: vec![Some("00-hash".to_string())],
-                    },
+                    postgres::MerkleRadixTreeNode::new("000000-hash", 2).with_leaf_id(Some(1)),
+                    postgres::MerkleRadixTreeNode::new("0000-hash", 2)
+                        .with_children(vec![Some("000000-hash".to_string())]),
+                    postgres::MerkleRadixTreeNode::new("00-hash", 2)
+                        .with_children(vec![Some("0000-hash".to_string())]),
+                    postgres::MerkleRadixTreeNode::new("root-hash", 2)
+                        .with_children(vec![Some("00-hash".to_string())]),
                 ])
                 .execute(&conn)?;
 

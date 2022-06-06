@@ -17,8 +17,8 @@
 
 use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
 
-#[derive(Insertable, Queryable, QueryableByName, Identifiable)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Hash, PartialEq, Eq, Insertable, Queryable, QueryableByName, Identifiable)]
+#[cfg_attr(test, derive(Debug))]
 #[table_name = "postgres_merkle_radix_tree_node"]
 #[primary_key(hash, tree_id)]
 pub struct MerkleRadixTreeNode {
@@ -26,4 +26,31 @@ pub struct MerkleRadixTreeNode {
     pub tree_id: i64,
     pub leaf_id: Option<i64>,
     pub children: Vec<Option<String>>,
+    pub reference: i64,
+}
+
+impl MerkleRadixTreeNode {
+    pub fn new<S: Into<String>>(hash: S, tree_id: i64) -> Self {
+        Self::inner_new(hash.into(), tree_id)
+    }
+
+    fn inner_new(hash: String, tree_id: i64) -> Self {
+        Self {
+            hash,
+            tree_id,
+            leaf_id: None,
+            children: vec![None; 256],
+            reference: 1,
+        }
+    }
+
+    pub fn with_children(mut self, children: Vec<Option<String>>) -> Self {
+        self.children = children;
+        self
+    }
+
+    pub fn with_leaf_id(mut self, leaf_id: Option<i64>) -> Self {
+        self.leaf_id = leaf_id;
+        self
+    }
 }

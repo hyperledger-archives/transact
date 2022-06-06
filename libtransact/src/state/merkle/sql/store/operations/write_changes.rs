@@ -17,10 +17,10 @@
 
 use std::collections::HashMap;
 
-#[cfg(feature = "sqlite")]
-use diesel::dsl::insert_or_ignore_into;
 use diesel::dsl::{insert_into, max};
 use diesel::prelude::*;
+#[cfg(feature = "sqlite")]
+use diesel::sql_types::{BigInt, Nullable, Text};
 
 use crate::error::InternalError;
 use crate::state::merkle::node::Node;
@@ -31,15 +31,12 @@ use crate::state::merkle::sql::store::models::{postgres, MerkleRadixLeaf};
 use crate::state::merkle::sql::store::models::{
     NewMerkleRadixChangeLogAddition, NewMerkleRadixChangeLogDeletion, NewMerkleRadixLeaf,
 };
-#[cfg(feature = "postgres")]
-use crate::state::merkle::sql::store::schema::postgres_merkle_radix_tree_node;
-#[cfg(feature = "sqlite")]
-use crate::state::merkle::sql::store::schema::sqlite_merkle_radix_tree_node;
 use crate::state::merkle::sql::store::schema::{
     merkle_radix_change_log_addition, merkle_radix_change_log_deletion, merkle_radix_leaf,
 };
 use crate::state::merkle::sql::store::TreeUpdate;
 
+use super::prepared_stmt::prepare_stmt;
 use super::MerkleRadixOperations;
 
 struct InsertableNode<'a> {
@@ -114,18 +111,46 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
             let node_models = nodes
                 .iter()
                 .map::<Result<sqlite::MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
-                    Ok(sqlite::MerkleRadixTreeNode {
-                        hash: insertable_node.hash.to_string(),
-                        tree_id,
-                        leaf_id: leaf_ids.get(insertable_node.address).copied(),
-                        children: node_to_sqlite_children(insertable_node.node)?,
-                    })
+                    Ok(
+                        sqlite::MerkleRadixTreeNode::new(insertable_node.hash, tree_id)
+                            .with_leaf_id(leaf_ids.get(insertable_node.address).copied())
+                            .with_children(node_to_children(insertable_node.node)?),
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            insert_or_ignore_into(sqlite_merkle_radix_tree_node::table)
-                .values(node_models)
-                .execute(self.conn)?;
+            let node_models = dedup_sqlite(node_models);
+
+            // As diesel 1.4.x doesn't currently support the on_conflict function for the Sqlite
+            // DB, we manually have to perform the upsert on each row.
+            for node in node_models {
+                prepare_stmt(
+                    r#"
+                    INSERT OR REPLACE INTO merkle_radix_tree_node
+                    WITH tree_nodes as (
+                        SELECT hash, tree_id, leaf_id, children, reference
+                        FROM merkle_radix_tree_node
+                        WHERE hash = ? AND tree_id = ?
+
+                        UNION ALL
+
+                        SELECT ? AS hash, ? AS tree_id, ? AS leaf_id, ? AS children, ? AS reference
+                    )
+                    SELECT hash, tree_id, leaf_id, children, SUM(reference)
+                    FROM tree_nodes
+                    GROUP BY hash, tree_id
+                    "#,
+                )
+                .bind::<Text, _>(&node.hash)
+                .bind::<BigInt, _>(node.tree_id)
+                .bind::<Text, _>(&node.hash)
+                .bind::<BigInt, _>(node.tree_id)
+                .bind::<Nullable<BigInt>, _>(node.leaf_id)
+                .bind::<Text, _>(node.children)
+                .bind::<BigInt, _>(node.reference)
+                .execute(self.conn)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            }
 
             // Update the change log
             let additions = update
@@ -146,6 +171,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
                     tree_id,
                     parent_state_root: Some(parent_state_root),
                     addition: hash,
+                    pruned_at: None,
                 })
                 .collect::<Vec<_>>();
 
@@ -160,6 +186,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
                     tree_id,
                     successor_state_root: state_root,
                     deletion: hash,
+                    pruned_at: None,
                 })
                 .collect::<Vec<_>>();
 
@@ -170,18 +197,6 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, SqliteCo
             Ok(())
         })
     }
-}
-
-#[cfg(feature = "sqlite")]
-fn node_to_sqlite_children(node: &Node) -> Result<sqlite::Children, InternalError> {
-    let mut children = vec![None; 256];
-    for (location, hash) in node.children.iter() {
-        let pos = u8::from_str_radix(location, 16)
-            .map_err(|err| InternalError::from_source(Box::new(err)))?;
-
-        children[pos as usize] = Some(hash.to_string());
-    }
-    Ok(sqlite::Children(children))
 }
 
 #[cfg(feature = "postgres")]
@@ -230,19 +245,37 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
             let node_models: Vec<postgres::MerkleRadixTreeNode> = nodes
                 .iter()
                 .map::<Result<postgres::MerkleRadixTreeNode, InternalError>, _>(|insertable_node| {
-                    Ok(postgres::MerkleRadixTreeNode {
-                        hash: insertable_node.hash.to_string(),
-                        tree_id,
-                        leaf_id: leaf_ids.get(insertable_node.address).copied(),
-                        children: node_to_postgres_children(insertable_node.node)?,
-                    })
+                    Ok(
+                        postgres::MerkleRadixTreeNode::new(insertable_node.hash, tree_id)
+                            .with_leaf_id(leaf_ids.get(insertable_node.address).copied())
+                            .with_children(node_to_children(insertable_node.node)?),
+                    )
                 })
                 .collect::<Result<Vec<_>, _>>()?;
 
-            insert_into(postgres_merkle_radix_tree_node::table)
-                .values(&node_models)
-                .on_conflict_do_nothing()
-                .execute(self.conn)?;
+            let node_models = dedup_postgres(node_models);
+
+            for node in node_models {
+                prepare_stmt(
+                    r#"
+                    INSERT INTO merkle_radix_tree_node
+                        (hash, tree_id, leaf_id, children, reference)
+                        VALUES ($1, $2, $3, $4, $5)
+                    ON CONFLICT (hash, tree_id)
+                        DO UPDATE
+                        SET reference = EXCLUDED.reference + $5
+                    "#,
+                )
+                .bind::<diesel::sql_types::VarChar, _>(node.hash)
+                .bind::<BigInt, _>(node.tree_id)
+                .bind::<Nullable<BigInt>, _>(node.leaf_id)
+                .bind::<diesel::sql_types::Array<Nullable<diesel::sql_types::VarChar>>, _>(
+                    node.children,
+                )
+                .bind::<BigInt, _>(node.reference)
+                .execute(self.conn)
+                .map_err(|err| InternalError::from_source(Box::new(err)))?;
+            }
 
             // Update the change log
             let additions = update
@@ -263,6 +296,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
                     tree_id,
                     parent_state_root: Some(parent_state_root),
                     addition: hash,
+                    pruned_at: None,
                 })
                 .collect::<Vec<_>>();
 
@@ -277,6 +311,7 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
                     tree_id,
                     successor_state_root: state_root,
                     deletion: hash,
+                    pruned_at: None,
                 })
                 .collect::<Vec<_>>();
 
@@ -290,7 +325,40 @@ impl<'a> MerkleRadixWriteChangesOperation for MerkleRadixOperations<'a, PgConnec
 }
 
 #[cfg(feature = "postgres")]
-fn node_to_postgres_children(node: &Node) -> Result<Vec<Option<String>>, InternalError> {
+fn dedup_postgres(nodes: Vec<postgres::MerkleRadixTreeNode>) -> Vec<postgres::MerkleRadixTreeNode> {
+    let mut deduped_nodes: Vec<postgres::MerkleRadixTreeNode> = vec![];
+    let mut node_map = HashMap::new();
+    for node in nodes.into_iter() {
+        if let Some(index) = node_map.get(&node.hash) {
+            let node: &mut postgres::MerkleRadixTreeNode = &mut deduped_nodes[*index];
+            node.reference += 1;
+        } else {
+            node_map.insert(node.hash.clone(), deduped_nodes.len());
+            deduped_nodes.push(node);
+        }
+    }
+
+    deduped_nodes
+}
+
+#[cfg(feature = "sqlite")]
+fn dedup_sqlite(nodes: Vec<sqlite::MerkleRadixTreeNode>) -> Vec<sqlite::MerkleRadixTreeNode> {
+    let mut deduped_nodes: Vec<sqlite::MerkleRadixTreeNode> = vec![];
+    let mut node_map = HashMap::new();
+    for node in nodes.into_iter() {
+        if let Some(index) = node_map.get(&node.hash) {
+            let node: &mut sqlite::MerkleRadixTreeNode = &mut deduped_nodes[*index];
+            node.reference += 1;
+        } else {
+            node_map.insert(node.hash.clone(), deduped_nodes.len());
+            deduped_nodes.push(node);
+        }
+    }
+
+    deduped_nodes
+}
+
+fn node_to_children(node: &Node) -> Result<Vec<Option<String>>, InternalError> {
     let mut children = vec![None; 256];
     for (location, hash) in node.children.iter() {
         let pos = u8::from_str_radix(location, 16)
@@ -315,11 +383,15 @@ mod tests {
 
     use diesel::dsl::count;
 
-    #[cfg(feature = "state-merkle-sql-postgres-tests")]
-    use crate::state::merkle::sql::backend::postgres::test::run_postgres_test;
     #[cfg(feature = "sqlite")]
     use crate::state::merkle::sql::migration;
     use crate::state::merkle::sql::store::models::MerkleRadixLeaf;
+    #[cfg(feature = "sqlite")]
+    use crate::state::merkle::sql::store::schema::sqlite_merkle_radix_tree_node;
+    #[cfg(feature = "state-merkle-sql-postgres-tests")]
+    use crate::state::merkle::sql::{
+        backend::postgres::test::run_postgres_test, store::schema::postgres_merkle_radix_tree_node,
+    };
 
     /// This test inserts a single node (that of the initial state root) and verifies that it is
     /// correctly inserted into the node table.
@@ -362,12 +434,7 @@ mod tests {
         assert_eq!(nodes.len(), 1);
         assert_eq!(
             nodes[0],
-            sqlite::MerkleRadixTreeNode {
-                hash: "initial-state-root".into(),
-                tree_id: 1,
-                leaf_id: None,
-                children: sqlite::Children(vec![None; 256]),
-            }
+            sqlite::MerkleRadixTreeNode::new("initial-state-root", 1),
         );
 
         Ok(())
@@ -413,12 +480,7 @@ mod tests {
             assert_eq!(nodes.len(), 1);
             assert_eq!(
                 nodes[0],
-                postgres::MerkleRadixTreeNode {
-                    hash: "initial-state-root".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: vec![None; 256],
-                }
+                postgres::MerkleRadixTreeNode::new("initial-state-root", 1)
             );
 
             Ok(())
@@ -488,30 +550,14 @@ mod tests {
         assert_eq!(
             nodes,
             vec![
-                sqlite::MerkleRadixTreeNode {
-                    hash: "state-root".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(10, "first-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "first-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(1, "second-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "second-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: None,
-                    children: single_sqlite_child(255, "leaf-node-hash"),
-                },
-                sqlite::MerkleRadixTreeNode {
-                    hash: "leaf-node-hash".into(),
-                    tree_id: 1,
-                    leaf_id: Some(leaves[0].id),
-                    children: sqlite::Children(vec![None; 256])
-                },
+                sqlite::MerkleRadixTreeNode::new("state-root", 1)
+                    .with_children(single_db_child(10, "first-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("first-node-hash", 1)
+                    .with_children(single_db_child(1, "second-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("second-node-hash", 1)
+                    .with_children(single_db_child(255, "leaf-node-hash")),
+                sqlite::MerkleRadixTreeNode::new("leaf-node-hash", 1)
+                    .with_leaf_id(Some(leaves[0].id)),
             ]
         );
 
@@ -580,40 +626,19 @@ mod tests {
             assert_eq!(
                 nodes,
                 vec![
-                    postgres::MerkleRadixTreeNode {
-                        hash: "state-root".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(10, "first-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "first-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(1, "second-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "second-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: None,
-                        children: single_db_child(255, "leaf-node-hash"),
-                    },
-                    postgres::MerkleRadixTreeNode {
-                        hash: "leaf-node-hash".into(),
-                        tree_id: 1,
-                        leaf_id: Some(leaves[0].id),
-                        children: vec![None; 256]
-                    },
+                    postgres::MerkleRadixTreeNode::new("state-root", 1)
+                        .with_children(single_db_child(10, "first-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("first-node-hash", 1)
+                        .with_children(single_db_child(1, "second-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("second-node-hash", 1)
+                        .with_children(single_db_child(255, "leaf-node-hash")),
+                    postgres::MerkleRadixTreeNode::new("leaf-node-hash", 1)
+                        .with_leaf_id(Some(leaves[0].id)),
                 ]
             );
 
             Ok(())
         })
-    }
-
-    #[cfg(feature = "sqlite")]
-    fn single_sqlite_child(pos: usize, hash: &str) -> sqlite::Children {
-        sqlite::Children(single_db_child(pos, hash))
     }
 
     fn single_db_child(pos: usize, hash: &str) -> Vec<Option<String>> {

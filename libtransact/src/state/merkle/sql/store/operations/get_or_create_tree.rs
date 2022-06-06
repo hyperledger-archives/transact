@@ -70,12 +70,10 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, Sqlit
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
             insert_into(sqlite_merkle_radix_tree_node::table)
-                .values(sqlite::MerkleRadixTreeNode {
-                    hash: initial_state_root.to_string(),
+                .values(sqlite::MerkleRadixTreeNode::new(
+                    initial_state_root,
                     tree_id,
-                    leaf_id: None,
-                    children: sqlite::Children(vec![None; 256]),
-                })
+                ))
                 .execute(self.conn)?;
 
             Ok(tree_id)
@@ -108,12 +106,10 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, PgCon
                 .map_err(|e| InternalError::from_source(Box::new(e)))?;
 
             insert_into(postgres_merkle_radix_tree_node::table)
-                .values(postgres::MerkleRadixTreeNode {
-                    hash: initial_state_root.to_string(),
+                .values(postgres::MerkleRadixTreeNode::new(
+                    initial_state_root,
                     tree_id,
-                    leaf_id: None,
-                    children: vec![None; 256],
-                })
+                ))
                 .execute(self.conn)?;
 
             Ok(tree_id)
@@ -146,15 +142,7 @@ mod test {
             .get_results::<sqlite::MerkleRadixTreeNode>(&conn)?;
 
         assert_eq!(nodes.len(), 1);
-        assert_eq!(
-            nodes[0],
-            sqlite::MerkleRadixTreeNode {
-                hash: "test-root".into(),
-                tree_id: 2,
-                leaf_id: None,
-                children: sqlite::Children(vec![None; 256]),
-            }
-        );
+        assert_eq!(nodes[0], sqlite::MerkleRadixTreeNode::new("test-root", 2),);
 
         let id = operations.get_or_create_tree("default", "test-root")?;
         assert_eq!(1, id);
@@ -177,15 +165,7 @@ mod test {
                 .get_results::<postgres::MerkleRadixTreeNode>(&conn)?;
 
             assert_eq!(nodes.len(), 1);
-            assert_eq!(
-                nodes[0],
-                postgres::MerkleRadixTreeNode {
-                    hash: "test_root".into(),
-                    tree_id: 2,
-                    leaf_id: None,
-                    children: vec![None; 256],
-                }
-            );
+            assert_eq!(nodes[0], postgres::MerkleRadixTreeNode::new("test_root", 2),);
 
             let id = operations.get_or_create_tree("default", "test_root")?;
             assert_eq!(1, id);
