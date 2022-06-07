@@ -81,6 +81,14 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteCo
             .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(SQLITE_NOW_MILLIS)))
             .execute(self.conn)?;
 
+            // Remove the parent relationship on its successors
+            update(
+                merkle_radix_change_log_addition::table
+                    .filter(merkle_radix_change_log_addition::parent_state_root.eq(state_root)),
+            )
+            .set(merkle_radix_change_log_addition::parent_state_root.eq(NULL_PARENT))
+            .execute(self.conn)?;
+
             let mut deleted_values = vec![];
             for hash in deletion_candidates.into_iter() {
                 update(
