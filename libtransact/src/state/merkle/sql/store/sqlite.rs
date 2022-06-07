@@ -30,6 +30,7 @@ use super::operations::has_root::MerkleRadixHasRootOperation as _;
 use super::operations::list_leaves::MerkleRadixListLeavesOperation as _;
 use super::operations::list_trees::MerkleRadixListTreesOperation as _;
 use super::operations::prune_entries::MerkleRadixPruneEntriesOperation as _;
+use super::operations::remove_pruned_entries::MerkleRadixRemovePrunedEntriesOperation as _;
 use super::operations::write_changes::MerkleRadixWriteChangesOperation as _;
 use super::operations::MerkleRadixOperations;
 use super::{MerkleRadixStore, SqlMerkleRadixStore, TreeUpdate};
@@ -148,6 +149,13 @@ where
         self.backend.execute_write(|conn| {
             let operations = MerkleRadixOperations::new(conn.as_inner());
             operations.prune_entries(tree_id, state_root)
+        })
+    }
+
+    fn remove_pruned_entries(&self, tree_id: i64) -> Result<u64, InternalError> {
+        self.backend.execute_write(|conn| {
+            let operations = MerkleRadixOperations::new(conn.as_inner());
+            operations.remove_pruned_entries(tree_id)
         })
     }
 }

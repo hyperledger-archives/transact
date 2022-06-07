@@ -232,6 +232,21 @@ pub trait MerkleRadixStore {
     ///
     /// Returns an [`InternalError`] if there is an issue with the underlying storage.
     fn prune(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
+
+    /// Removes pruned entries in a given tree.
+    ///
+    /// The SQL-backed merkle tree implementation prunes entries by marking them as pruned, either
+    /// through a `pruned_at` column or a reference count of `0`.  This function deletes the
+    /// records that match those criteria.
+    ///
+    /// # Parameters
+    ///
+    /// * `tree_id`: the ID of the tree from which entries are removed
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`InternalError`] if there is an issue with the underlying storage.
+    fn remove_pruned_entries(&self, tree_id: i64) -> Result<u64, InternalError>;
 }
 
 /// A MerkleRadixStore backed by a SQL back-end.
