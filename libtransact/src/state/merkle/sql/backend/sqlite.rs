@@ -126,6 +126,12 @@ impl From<Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>>> for Sq
     }
 }
 
+impl From<SqliteBackend> for Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>> {
+    fn from(backend: SqliteBackend) -> Self {
+        backend.connection_pool
+    }
+}
+
 /// A borrowed SQLite connection.
 ///
 /// Available if the feature "sqlite" is enabled.

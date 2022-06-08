@@ -84,6 +84,12 @@ impl From<Pool<ConnectionManager<diesel::pg::PgConnection>>> for PostgresBackend
     }
 }
 
+impl From<PostgresBackend> for Pool<ConnectionManager<diesel::pg::PgConnection>> {
+    fn from(backend: PostgresBackend) -> Self {
+        backend.connection_pool
+    }
+}
+
 /// A borrowed Postgres connection.
 ///
 /// Available if the feature "postgres" is enabled.
