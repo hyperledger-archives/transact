@@ -38,7 +38,7 @@ pub trait MerkleRadixDeleteTreeOperation {
 #[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixDeleteTreeOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn delete_tree(&self, tree_id: i64) -> Result<(), InternalError> {
-        self.conn.immediate_transaction(|| {
+        self.conn.transaction(|| {
             delete(
                 merkle_radix_change_log_addition::table
                     .filter(merkle_radix_change_log_addition::tree_id.eq(tree_id)),
