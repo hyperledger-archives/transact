@@ -50,7 +50,7 @@ impl<'a> MerkleRadixGetOrCreateTreeOperation for MerkleRadixOperations<'a, Sqlit
         tree_name: &str,
         initial_state_root: &str,
     ) -> Result<i64, InternalError> {
-        self.conn.immediate_transaction::<_, InternalError, _>(|| {
+        self.conn.transaction::<_, InternalError, _>(|| {
             if let Some(tree_id) = merkle_radix_tree::table
                 .filter(merkle_radix_tree::name.eq(tree_name))
                 .select(merkle_radix_tree::id)
