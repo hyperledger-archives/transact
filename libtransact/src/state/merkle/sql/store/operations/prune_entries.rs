@@ -46,7 +46,7 @@ const SQLITE_NOW_MILLIS: &str = "strftime('%s') * 1000";
 #[cfg(feature = "sqlite")]
 impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
-        self.conn.immediate_transaction(|| {
+        self.conn.transaction(|| {
             let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
 
             // Remove the change logs for this root
