@@ -124,6 +124,16 @@ impl SqlMerkleState<SqliteBackend> {
         Ok(())
     }
 
+    /// Removes all entries that have been marked as pruned.
+    ///
+    /// After calling this method, any records that have been marked as pruned will have been
+    /// deleted from the database.
+    pub fn remove_pruned_entries(&self) -> Result<(), InternalError> {
+        let store = self.new_store();
+        store.remove_pruned_entries(self.tree_id)?;
+        Ok(())
+    }
+
     fn new_store(&self) -> SqlMerkleRadixStore<SqliteBackend, diesel::SqliteConnection> {
         SqlMerkleRadixStore::new_with_cache(&self.backend, &self.cache)
     }
@@ -438,6 +448,15 @@ impl MerkleRadixLeafReader for SqlMerkleState<SqliteBackend> {
 mod test {
     use super::*;
 
+    use std::sync::{Arc, RwLock};
+
+    use diesel::{
+        dsl::sql_query,
+        prelude::*,
+        r2d2::{ConnectionManager, Pool},
+        sqlite,
+    };
+
     #[cfg(all(
         feature = "state-merkle-sql-in-transaction",
         feature = "state-in-transaction"
@@ -623,6 +642,88 @@ mod test {
             .build()?;
 
         assert_read_value_at_address(&tree, &new_root, "012345", Some("state_value"));
+
+        Ok(())
+    }
+
+    /// Test that pruned entries are successfully removed
+    /// 1. Create a merkle tree
+    /// 2. Commit a single value
+    /// 3. Commit a value and delete the previous value
+    /// 4. Prune the first state root
+    /// 5. Verify that the records still exist
+    /// 6. Remove the pruned values
+    /// 7. Verify that the records no longer exist
+    #[test]
+    fn test_remove_pruned_entries() -> Result<(), Box<dyn std::error::Error>> {
+        let backend = SqliteBackendBuilder::new().with_memory_database().build()?;
+
+        backend.run_migrations()?;
+
+        let tree = SqlMerkleStateBuilder::new()
+            .with_backend(backend.clone())
+            .with_tree("test-1")
+            .create_tree_if_necessary()
+            .build()?;
+
+        let initial_state_root_hash = tree.initial_state_root_hash()?;
+
+        let state_change_set = StateChange::Set {
+            key: "012345".to_string(),
+            value: "state_value".as_bytes().to_vec(),
+        };
+
+        let first_root = Write::commit(&tree, &initial_state_root_hash, &[state_change_set])?;
+        assert_read_value_at_address(&tree, &first_root, "012345", Some("state_value"));
+
+        let new_state_changes = [
+            StateChange::Set {
+                key: "ab0000".to_string(),
+                value: "second_value".as_bytes().to_vec(),
+            },
+            StateChange::Delete {
+                key: "012345".to_string(),
+            },
+        ];
+
+        let second_root = Write::commit(&tree, &first_root, &new_state_changes)?;
+        assert_read_value_at_address(&tree, &second_root, "ab0000", Some("second_value"));
+        assert_read_value_at_address(&tree, &second_root, "012345", None);
+
+        Prune::prune(&tree, vec![first_root])?;
+
+        #[derive(Debug, QueryableByName)]
+        struct Entries {
+            #[column_name = "entries"]
+            #[sql_type = "diesel::sql_types::BigInt"]
+            pub entries: i64,
+        }
+
+        let pool: Arc<RwLock<Pool<ConnectionManager<sqlite::SqliteConnection>>>> = backend.into();
+
+        {
+            let conn = pool.read().unwrap().get()?;
+
+            let count: Entries =
+                sql_query("SELECT count(id) as entries FROM merkle_radix_leaf WHERE address = ?")
+                    .bind::<diesel::sql_types::Text, _>("012345")
+                    .get_result(&*conn)?;
+
+            assert_eq!(count.entries, 1);
+        }
+
+        tree.remove_pruned_entries()?;
+
+        {
+            let conn = pool.read().unwrap().get()?;
+
+            let count: Entries =
+                sql_query("SELECT count(id) as entries FROM merkle_radix_leaf WHERE address = ?")
+                    .bind::<diesel::sql_types::Text, _>("012345")
+                    .get_result(&*conn)?;
+
+            assert_eq!(count.entries, 0);
+        }
 
         Ok(())
     }

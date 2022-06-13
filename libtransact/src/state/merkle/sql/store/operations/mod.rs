@@ -24,6 +24,7 @@ pub(super) mod has_root;
 pub(super) mod list_leaves;
 pub(super) mod list_trees;
 pub(super) mod prune_entries;
+pub(super) mod remove_pruned_entries;
 pub(super) mod write_changes;
 
 mod prepared_stmt;
