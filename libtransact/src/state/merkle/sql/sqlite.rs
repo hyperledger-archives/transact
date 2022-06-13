@@ -308,6 +308,16 @@ impl<'a> SqlMerkleState<InTransactionSqliteBackend<'a>> {
         Ok(())
     }
 
+    /// Removes all entries that have been marked as pruned.
+    ///
+    /// After calling this method, any records that have been marked as pruned will have been
+    /// deleted from the database.
+    pub fn remove_pruned_entries(&self) -> Result<(), InternalError> {
+        let store = self.new_store();
+        store.remove_pruned_entries(self.tree_id)?;
+        Ok(())
+    }
+
     fn new_store(
         &self,
     ) -> SqlMerkleRadixStore<InTransactionSqliteBackend<'a>, diesel::SqliteConnection> {
