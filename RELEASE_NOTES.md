@@ -1,5 +1,26 @@
 # Release Notes
 
+## Changes in Transact 0.4.5
+
+### Highlights
+
+* Use of `SqlMerkleState` in an existing transaction is now stable.
+* State pruning has now be fixed for `SqlMerkleState`.
+
+### libtransact
+
+* Stabilize "version 2" state traits under the feature `"state-in-transaction"`.
+* Stabilize `InTransaction-` variants of the Postgres and SQLite `Backend`
+  implementations behind the feature `"state-merkle-sql-in-transaction"`.
+* Remove the use of `immediate_transaction` in SQLite merkle state operations.
+* Fix state pruning in `SqlMerkleState` by implemented reference counting of the
+  `merkle_radix_tree_node` entries.  As it is easy to produce duplicate nodes,
+  the reference tracks the number of duplicate entries.  As state is pruned, the
+  reference count is reduced. At `0`, the record is considered complete pruned.
+  The change log tables are also marked as pruned, via a timestamp.
+* Add `remove_pruned_entries` to `SqlMerkleState` to clean up all records that
+  have been marked as pruned.
+
 ## Changes in Transact 0.4.4
 
 ### Highlights
