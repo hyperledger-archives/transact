@@ -113,6 +113,8 @@
 //! Hyperledger Transact provides optional support for smart contract engines implemented for
 //! Hyperledger Sawtooth through the `sawtooth-compat` feature.
 
+// This must be allowed until diesel is upgraded to 2.0
+#![allow(clippy::extra_unused_lifetimes)]
 #![cfg_attr(feature = "nightly", feature(test))]
 
 #[cfg(feature = "diesel")]
