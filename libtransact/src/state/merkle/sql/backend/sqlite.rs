@@ -461,7 +461,9 @@ impl SqliteCustomizer {
         let mut on_connect_sql = format!("PRAGMA mmap_size={};", mmap_size);
 
         if let Some(journal_mode) = journal_mode {
-            on_connect_sql += &format!("PRAGMA journal_mode={};", journal_mode);
+            on_connect_sql.push_str("PRAGMA journal_mode=");
+            on_connect_sql.push_str(&journal_mode.to_string());
+            on_connect_sql.push(';');
             if matches!(journal_mode, JournalMode::Wal) {
                 on_connect_sql += r#"
                     PRAGMA wal_checkpoint(truncate);
@@ -471,10 +473,13 @@ impl SqliteCustomizer {
         }
 
         if let Some(synchronous) = synchronous {
-            on_connect_sql += &format!("PRAGMA synchronous={};", synchronous);
+            on_connect_sql.push_str("PRAGMA synchronous=");
+            on_connect_sql.push_str(&synchronous.to_string());
+            on_connect_sql.push(';');
         }
 
         on_connect_sql += "PRAGMA foreign_keys = ON;";
+
         Self { on_connect_sql }
     }
 }
