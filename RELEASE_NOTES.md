@@ -1,5 +1,19 @@
 # Release Notes
 
+## Changes in Transact 0.4.6
+
+### libtransact
+
+* Fix state pruning issue where pruning intermediate state roots caused foreign
+  key violations.  This is corrected through relinking the parent and successor
+  roots after a root has been pruned. 
+
+### Build
+
+* Use 22.04 (Jammy Jellyfish as Docker base image)
+* Update protobuf compiler to 3.20.0
+* Select protoc based on target arch in scar builder Dockerfiles
+
 ## Changes in Transact 0.4.5
 
 ### Highlights
