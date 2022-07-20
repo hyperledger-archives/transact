@@ -23,6 +23,11 @@ crates := '\
     cli \
     '
 
+crates_wasm := '\
+    examples/sabre_command \
+    examples/sabre_smallbank \
+    '
+
 features := '\
     --features=experimental \
     --features=stable \
@@ -48,6 +53,17 @@ build:
     cmd="cargo build --tests --manifest-path=libtransact/Cargo.toml --features=experimental,state-merkle-sql-postgres-tests"
     echo "\033[1m$cmd\033[0m"
     RUSTFLAGS="-D warnings" $cmd
+    $cmd
+    for feature in $(echo {{features}})
+    do
+        for crate in $(echo {{crates_wasm}})
+        do
+            cmd="cargo build --tests --target wasm32-unknown-unknown --manifest-path=$crate/Cargo.toml $BUILD_MODE $feature"
+            echo "\033[1m$cmd\033[0m"
+            RUSTFLAGS="-D warnings" $cmd
+            $cmd
+        done
+    done
     echo "\n\033[92mBuild Success\033[0m\n"
 
 ci:
