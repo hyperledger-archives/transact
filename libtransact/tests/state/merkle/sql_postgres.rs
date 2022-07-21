@@ -24,6 +24,12 @@ use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
 use super::*;
 
+impl AutoCleanPrunedData for SqlMerkleState<PostgresBackend> {
+    fn remove_pruned_entries(&self) -> Result<(), transact::error::InternalError> {
+        SqlMerkleState::<PostgresBackend>::remove_pruned_entries(&self)
+    }
+}
+
 #[test]
 fn merkle_trie_empty_changes() -> Result<(), Box<dyn Error>> {
     run_postgres_test(|db_url| {
@@ -119,6 +125,15 @@ fn merkle_trie_prune_deep_successor_tree() -> Result<(), Box<dyn Error>> {
     run_postgres_test(|db_url| {
         let (state, orig_root) = new_sql_merkle_state_and_root(db_url)?;
         test_merkle_trie_prune_deep_successor_tree(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
+fn merkle_trie_prune_late_pruning() -> Result<(), Box<dyn Error>> {
+    run_postgres_test(|db_url| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_url)?;
+        test_merkle_trie_prune_late_pruning(orig_root, state);
         Ok(())
     })
 }

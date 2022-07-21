@@ -31,12 +31,17 @@ use sha2::{Digest, Sha512};
 
 use transact::{
     database::{error::DatabaseError, Database},
+    error::InternalError,
     protos::merkle::ChangeLogEntry,
     state::{
         merkle::{MerkleRadixLeafReader, MerkleRadixTree, MerkleState, CHANGE_LOG_INDEX},
         Prune, Read, StateChange, StateReadError, Write,
     },
 };
+
+pub trait AutoCleanPrunedData {
+    fn remove_pruned_entries(&self) -> Result<(), InternalError>;
+}
 
 /// 1. Compute the state root hash for an empty change list to the original root
 /// 2. Validate the computed root is the same as the original root
@@ -1117,7 +1122,8 @@ fn test_merkle_trie_prune_deep_successor_tree<M>(initial_state_root: String, mer
 where
     M: Read<StateId = String, Key = String, Value = Vec<u8>>
         + Write<StateId = String, Key = String, Value = Vec<u8>>
-        + Prune<StateId = String, Key = String, Value = Vec<u8>>,
+        + Prune<StateId = String, Key = String, Value = Vec<u8>>
+        + AutoCleanPrunedData,
 {
     let mut updates: Vec<StateChange> = Vec::with_capacity(3);
 
@@ -1171,6 +1177,10 @@ where
         merkle_state
             .prune(vec![old_parent])
             .expect("Loop prune failed");
+
+        merkle_state
+            .remove_pruned_entries()
+            .expect("Auto-cleanup failed");
     }
 
     assert_read_value_at_address(&merkle_state, &parent, "ffffff", Some("prune-ffffff"));
@@ -1178,6 +1188,102 @@ where
     assert_read_value_at_address(&merkle_state, &parent, "ab0000", None);
     assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
     assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+}
+
+/// This test creates a merkle trie with multiple entries and then loops producing successors.
+/// After N iterations, it verifies that the unchanged values still exist in the trie.
+///
+/// Following that, it walks back through the predecessors, prunes them, and removes the resulting
+/// pruned entries.  The expected state is validated to still exist.
+fn test_merkle_trie_prune_late_pruning<M>(initial_state_root: String, merkle_state: M)
+where
+    M: Read<StateId = String, Key = String, Value = Vec<u8>>
+        + Write<StateId = String, Key = String, Value = Vec<u8>>
+        + Prune<StateId = String, Key = String, Value = Vec<u8>>
+        + AutoCleanPrunedData,
+{
+    let mut roots = vec![initial_state_root.clone()];
+    let mut updates: Vec<StateChange> = Vec::with_capacity(3);
+
+    updates.push(StateChange::Set {
+        key: "ab0000".to_string(),
+        value: "0001".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0a01".to_string(),
+        value: "0002".as_bytes().to_vec(),
+    });
+    updates.push(StateChange::Set {
+        key: "ab0100".to_string(),
+        value: "0003".as_bytes().to_vec(),
+    });
+
+    let mut parent = merkle_state
+        .commit(&initial_state_root, &updates)
+        .expect("Update failed to work");
+
+    roots.push(parent.clone());
+
+    assert_read_value_at_address(&merkle_state, &parent, "ab0000", Some("0001"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
+    assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+
+    let state_changes = vec![
+        StateChange::Set {
+            key: "ffffff".to_string(),
+            value: b"prune-ffffff".to_vec(),
+        },
+        StateChange::Set {
+            key: "ab0001".to_string(),
+            value: b"0004".to_vec(),
+        },
+        StateChange::Delete {
+            key: "ab0000".to_string(),
+        },
+        StateChange::Set {
+            key: "ab0001".to_string(),
+            value: b"0004".to_vec(),
+        },
+    ];
+
+    for i in 0..state_changes.len() {
+        let new_parent = merkle_state
+            .commit(&parent, &state_changes[i..i + 1])
+            .expect("Loop update failed");
+        assert_read_value_at_address(&merkle_state, &new_parent, "ab0a01", Some("0002"));
+        assert_read_value_at_address(&merkle_state, &new_parent, "ab0100", Some("0003"));
+
+        match &state_changes[i] {
+            StateChange::Set { key, value } => assert_read_value_at_address(
+                &merkle_state,
+                &new_parent,
+                &key,
+                Some(&String::from_utf8(value.to_vec()).unwrap()),
+            ),
+            StateChange::Delete { key } => {
+                assert_read_value_at_address(&merkle_state, &new_parent, &key, None)
+            }
+        }
+
+        if new_parent != parent {
+            roots.push(new_parent.clone());
+            parent = new_parent
+        }
+    }
+
+    for root in roots.into_iter().rev().skip(1) {
+        merkle_state.prune(vec![root]).expect("Loop prune failed");
+
+        merkle_state
+            .remove_pruned_entries()
+            .expect("Auto-cleanup failed");
+
+        assert_read_value_at_address(&merkle_state, &parent, "ffffff", Some("prune-ffffff"));
+        // insure that the old values are still in the tree
+        assert_read_value_at_address(&merkle_state, &parent, "ab0000", None);
+        assert_read_value_at_address(&merkle_state, &parent, "ab0a01", Some("0002"));
+        assert_read_value_at_address(&merkle_state, &parent, "ab0100", Some("0003"));
+    }
 }
 
 /// Test iteration over leaves.
