@@ -28,6 +28,12 @@ use super::*;
 
 static GLOBAL_THREAD_COUNT: AtomicUsize = AtomicUsize::new(1);
 
+impl AutoCleanPrunedData for SqlMerkleState<SqliteBackend> {
+    fn remove_pruned_entries(&self) -> Result<(), transact::error::InternalError> {
+        SqlMerkleState::<SqliteBackend>::remove_pruned_entries(&self)
+    }
+}
+
 #[test]
 fn merkle_trie_empty_changes() -> Result<(), Box<dyn Error>> {
     run_test(|db_path| {
@@ -123,6 +129,15 @@ fn merkle_trie_prune_deep_successor_tree() -> Result<(), Box<dyn Error>> {
     run_test(|db_path| {
         let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
         test_merkle_trie_prune_deep_successor_tree(orig_root, state);
+        Ok(())
+    })
+}
+
+#[test]
+fn merkle_trie_prune_late_pruning() -> Result<(), Box<dyn Error>> {
+    run_test(|db_path| {
+        let (state, orig_root) = new_sql_merkle_state_and_root(db_path)?;
+        test_merkle_trie_prune_late_pruning(orig_root, state);
         Ok(())
     })
 }

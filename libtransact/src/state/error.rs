@@ -141,3 +141,30 @@ impl From<InvalidStateError> for StateError {
         Self::InvalidState(err)
     }
 }
+
+impl From<StateError> for StateWriteError {
+    fn from(err: StateError) -> Self {
+        match err {
+            StateError::Internal(err) => Self::StorageError(Box::new(err)),
+            StateError::InvalidState(err) => Self::InvalidStateId(err.to_string()),
+        }
+    }
+}
+
+impl From<StateError> for StateReadError {
+    fn from(err: StateError) -> Self {
+        match err {
+            StateError::Internal(err) => Self::StorageError(Box::new(err)),
+            StateError::InvalidState(err) => Self::InvalidStateId(err.to_string()),
+        }
+    }
+}
+
+impl From<StateError> for StatePruneError {
+    fn from(err: StateError) -> Self {
+        match err {
+            StateError::Internal(err) => Self::StorageError(Box::new(err)),
+            StateError::InvalidState(err) => Self::InvalidStateId(err.to_string()),
+        }
+    }
+}

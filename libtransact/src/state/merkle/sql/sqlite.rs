@@ -144,17 +144,7 @@ impl Write for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
-
-        let (next_state_id, tree_update) = overlay
-            .generate_updates(state_changes)
-            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
-
-        overlay
-            .write_updates(&next_state_id, tree_update)
-            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
-
-        Ok(next_state_id)
+        Committer::commit(self, state_id, state_changes).map_err(StateWriteError::from)
     }
 
     fn compute_state_id(
@@ -162,13 +152,8 @@ impl Write for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
-
-        let (next_state_id, _) = overlay
-            .generate_updates(state_changes)
-            .map_err(|e| StateWriteError::StorageError(Box::new(e)))?;
-
-        Ok(next_state_id)
+        DryRunCommitter::dry_run_commit(self, state_id, state_changes)
+            .map_err(StateWriteError::from)
     }
 }
 
@@ -182,18 +167,7 @@ impl Read for SqlMerkleState<SqliteBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
-
-        if !overlay
-            .has_root()
-            .map_err(|e| StateReadError::StorageError(Box::new(e)))?
-        {
-            return Err(StateReadError::InvalidStateId(state_id.into()));
-        }
-
-        overlay
-            .get_entries(keys)
-            .map_err(|e| StateReadError::StorageError(Box::new(e)))
+        Reader::get(self, state_id, keys).map_err(StateReadError::from)
     }
 
     fn clone_box(
@@ -209,11 +183,7 @@ impl Prune for SqlMerkleState<SqliteBackend> {
     type Value = Vec<u8>;
 
     fn prune(&self, state_ids: Vec<Self::StateId>) -> Result<Vec<Self::Key>, StatePruneError> {
-        let overlay = MerkleRadixPruner::new(self.tree_id, self.new_store());
-
-        overlay
-            .prune(&state_ids)
-            .map_err(|e| StatePruneError::StorageError(Box::new(e)))
+        Pruner::prune(self, state_ids).map_err(StatePruneError::from)
     }
 }
 
