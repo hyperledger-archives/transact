@@ -50,6 +50,10 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteCo
             let Candidates { deletions, .. } =
                 get_deletion_candidates(self.conn, tree_id, state_root)?;
 
+            if deletions.is_empty() {
+                return Ok(vec![]);
+            }
+
             update_changelogs(self.conn, tree_id, state_root, SQLITE_NOW_MILLIS)?;
 
             let mut deleted_values = vec![];
@@ -94,6 +98,10 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, PgConnec
         self.conn.transaction(|| {
             let Candidates { deletions, .. } =
                 get_deletion_candidates(self.conn, tree_id, state_root)?;
+
+            if deletions.is_empty() {
+                return Ok(vec![]);
+            }
 
             update_changelogs(self.conn, tree_id, state_root, POSTGRES_NOW_MILLIS)?;
 
