@@ -18,6 +18,12 @@ use transact::{database::btree::BTreeDatabase, state::merkle::INDEXES};
 
 use super::*;
 
+impl AutoCleanPrunedData for MerkleState {
+    fn remove_pruned_entries(&self) -> Result<(), transact::error::InternalError> {
+        Ok(())
+    }
+}
+
 fn new_btree_state_and_root() -> (MerkleState, String) {
     let btree_db = Box::new(BTreeDatabase::new(&INDEXES));
     let merkle_state = MerkleState::new(btree_db.clone());
@@ -124,6 +130,12 @@ fn merkle_trie_prune_successor_duplicate_leaves() {
 fn merkle_trie_prune_deep_successor_tree() {
     let (state, orig_root) = new_btree_state_and_root();
     test_merkle_trie_prune_deep_successor_tree(orig_root, state);
+}
+
+#[test]
+fn merkle_trie_prune_late_pruning() {
+    let (state, orig_root) = new_btree_state_and_root();
+    test_merkle_trie_prune_late_pruning(orig_root, state);
 }
 
 #[test]

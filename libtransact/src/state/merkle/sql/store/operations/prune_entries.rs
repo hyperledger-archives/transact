@@ -17,7 +17,7 @@
 
 use std::collections::HashMap;
 
-use diesel::dsl::{sql, update};
+use diesel::dsl::{not, sql, update};
 use diesel::prelude::*;
 
 use crate::error::InternalError;
@@ -34,8 +34,6 @@ use crate::state::merkle::sql::store::{models::sqlite, schema::sqlite_merkle_rad
 
 use super::MerkleRadixOperations;
 
-const NULL_PARENT: Option<String> = None;
-
 pub trait MerkleRadixPruneEntriesOperation {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError>;
 }
@@ -47,50 +45,28 @@ const SQLITE_NOW_MILLIS: &str = "strftime('%s') * 1000";
 impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, SqliteConnection> {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
         self.conn.transaction(|| {
-            let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
+            let Candidates {
+                deletions,
+                parent,
+                successor,
+            } = get_deletion_candidates(self.conn, tree_id, state_root)?;
 
-            // Remove the change logs for this root
-            // delete its additions entry
-            update(
-                merkle_radix_change_log_addition::table.filter(
-                    merkle_radix_change_log_addition::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_addition::state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_addition::pruned_at.eq(sql(SQLITE_NOW_MILLIS)))
-            .execute(self.conn)?;
-            // Unlink any successors it might have
-            update(
-                merkle_radix_change_log_deletion::table.filter(
-                    merkle_radix_change_log_deletion::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_deletion::state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(SQLITE_NOW_MILLIS)))
-            .execute(self.conn)?;
-            // Delete its successor entry
-            update(
-                merkle_radix_change_log_deletion::table.filter(
-                    merkle_radix_change_log_deletion::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_deletion::successor_state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(SQLITE_NOW_MILLIS)))
-            .execute(self.conn)?;
+            if deletions.is_empty() {
+                return Ok(vec![]);
+            }
 
-            // Remove the parent relationship on its successors
-            update(
-                merkle_radix_change_log_addition::table
-                    .filter(merkle_radix_change_log_addition::parent_state_root.eq(state_root)),
-            )
-            .set(merkle_radix_change_log_addition::parent_state_root.eq(NULL_PARENT))
-            .execute(self.conn)?;
+            update_changelogs(
+                self.conn,
+                tree_id,
+                state_root,
+                parent.as_deref(),
+                successor.as_deref(),
+                &deletions,
+                SQLITE_NOW_MILLIS,
+            )?;
 
             let mut deleted_values = vec![];
-            for hash in deletion_candidates.into_iter() {
+            for hash in deletions.into_iter() {
                 update(
                     sqlite_merkle_radix_tree_node::table.filter(
                         sqlite_merkle_radix_tree_node::tree_id
@@ -129,49 +105,28 @@ const POSTGRES_NOW_MILLIS: &str =
 impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, PgConnection> {
     fn prune_entries(&self, tree_id: i64, state_root: &str) -> Result<Vec<String>, InternalError> {
         self.conn.transaction(|| {
-            let deletion_candidates = get_deletion_candidates(self.conn, tree_id, state_root)?;
+            let Candidates {
+                deletions,
+                parent,
+                successor,
+            } = get_deletion_candidates(self.conn, tree_id, state_root)?;
 
-            // Remove the change logs for this root
-            // delete its additions entry
-            update(
-                merkle_radix_change_log_addition::table.filter(
-                    merkle_radix_change_log_addition::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_addition::state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_addition::pruned_at.eq(sql(POSTGRES_NOW_MILLIS)))
-            .execute(self.conn)?;
-            // Unlink any successors it might have
-            update(
-                merkle_radix_change_log_deletion::table.filter(
-                    merkle_radix_change_log_deletion::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_deletion::state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(POSTGRES_NOW_MILLIS)))
-            .execute(self.conn)?;
-            // Delete its successor entry
-            update(
-                merkle_radix_change_log_deletion::table.filter(
-                    merkle_radix_change_log_deletion::tree_id
-                        .eq(tree_id)
-                        .and(merkle_radix_change_log_deletion::successor_state_root.eq(state_root)),
-                ),
-            )
-            .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(POSTGRES_NOW_MILLIS)))
-            .execute(self.conn)?;
-            // Remove the parent relation ship on its successors
-            update(
-                merkle_radix_change_log_addition::table
-                    .filter(merkle_radix_change_log_addition::parent_state_root.eq(state_root)),
-            )
-            .set(merkle_radix_change_log_addition::parent_state_root.eq(NULL_PARENT))
-            .execute(self.conn)?;
+            if deletions.is_empty() {
+                return Ok(vec![]);
+            }
+
+            update_changelogs(
+                self.conn,
+                tree_id,
+                state_root,
+                parent.as_deref(),
+                successor.as_deref(),
+                &deletions,
+                POSTGRES_NOW_MILLIS,
+            )?;
 
             let mut deleted_values = vec![];
-            for hash in deletion_candidates.into_iter().rev() {
+            for hash in deletions.into_iter().rev() {
                 let node: postgres::MerkleRadixTreeNode = update(
                     postgres_merkle_radix_tree_node::table.filter(
                         postgres_merkle_radix_tree_node::tree_id
@@ -197,31 +152,44 @@ impl<'a> MerkleRadixPruneEntriesOperation for MerkleRadixOperations<'a, PgConnec
     }
 }
 
+#[derive(Default)]
+struct Candidates {
+    deletions: Vec<String>,
+    parent: Option<String>,
+    successor: Option<String>,
+}
+
 fn get_deletion_candidates<C>(
     conn: &C,
     tree_id: i64,
     state_root: &str,
-) -> Result<Vec<String>, InternalError>
+) -> Result<Candidates, InternalError>
 where
     C: diesel::Connection,
     i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
     String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
 {
-    let change_additions = merkle_radix_change_log_addition::table
+    let addition_changelog = merkle_radix_change_log_addition::table
         .filter(
             merkle_radix_change_log_addition::tree_id
                 .eq(tree_id)
                 .and(merkle_radix_change_log_addition::state_root.eq(state_root))
                 .and(merkle_radix_change_log_addition::pruned_at.is_null()),
         )
-        .get_results::<MerkleRadixChangeLogAddition>(conn)?
+        .get_results::<MerkleRadixChangeLogAddition>(conn)?;
+
+    if addition_changelog.is_empty() {
+        return Ok(Candidates::default());
+    }
+
+    let parent = addition_changelog
+        .get(0)
+        .and_then(|entry| entry.parent_state_root.clone());
+
+    let change_additions = addition_changelog
         .into_iter()
         .map(|addition| addition.addition)
         .collect::<Vec<_>>();
-
-    if change_additions.is_empty() {
-        return Ok(Vec::new());
-    }
 
     // Find all successors
     let successors = merkle_radix_change_log_deletion::table
@@ -243,19 +211,99 @@ where
 
     // Currently, don't clean up a parent with multiple successors
     if successors.len() > 1 {
-        return Ok(vec![]);
+        return Ok(Candidates::default());
     }
 
-    let deletion_candidates: Vec<String> = if successors.is_empty() {
+    let (deletions, successor) = if successors.is_empty() {
         // this root is the tip of the trie history
-        change_additions
+        (change_additions, None)
     } else {
         // we have one successor, based on our criteria, so we can safely unwrap
-        let (_successor_state_root, deletions) = successors.into_iter().next().unwrap();
-        deletions
+        let (successor_state_root, deletions) = successors.into_iter().next().unwrap();
+        (deletions, Some(successor_state_root))
     };
 
-    Ok(deletion_candidates)
+    Ok(Candidates {
+        deletions,
+        parent,
+        successor,
+    })
+}
+
+fn update_changelogs<C>(
+    conn: &C,
+    tree_id: i64,
+    state_root: &str,
+    parent: Option<&str>,
+    successor: Option<&str>,
+    deletions: &[String],
+    now_as_millis: &'static str,
+) -> Result<(), InternalError>
+where
+    C: diesel::Connection,
+    i64: diesel::deserialize::FromSql<diesel::sql_types::BigInt, C::Backend>,
+    String: diesel::deserialize::FromSql<diesel::sql_types::Text, C::Backend>,
+{
+    // delete the deletions for this root.
+    update(
+        merkle_radix_change_log_deletion::table.filter(
+            merkle_radix_change_log_deletion::tree_id
+                .eq(tree_id)
+                .and(merkle_radix_change_log_deletion::state_root.eq(state_root)),
+        ),
+    )
+    .set(merkle_radix_change_log_deletion::pruned_at.eq(sql(now_as_millis)))
+    .execute(conn)?;
+
+    // prune any addition that was included in the deletions
+    update(
+        merkle_radix_change_log_addition::table.filter(
+            merkle_radix_change_log_addition::tree_id
+                .eq(tree_id)
+                // .and(merkle_radix_change_log_addition::state_root.eq(state_root))
+                .and(merkle_radix_change_log_addition::addition.eq_any(deletions)),
+        ),
+    )
+    .set(merkle_radix_change_log_addition::pruned_at.eq(sql(now_as_millis)))
+    .execute(conn)?;
+
+    // If there is a successor, re-link the relationsships using the parent and the successor node
+    if let Some(successor) = successor {
+        // Re-link the parent's deletions to its successor, if any
+        update(
+            merkle_radix_change_log_deletion::table.filter(
+                merkle_radix_change_log_deletion::tree_id
+                    .eq(tree_id)
+                    .and(merkle_radix_change_log_deletion::successor_state_root.eq(state_root)),
+            ),
+        )
+        .set(merkle_radix_change_log_deletion::successor_state_root.eq(successor))
+        .execute(conn)?;
+
+        // Move the remainder of the additions by the pruned root to the successor root
+        update(
+            merkle_radix_change_log_addition::table.filter(
+                merkle_radix_change_log_addition::tree_id
+                    .eq(tree_id)
+                    .and(merkle_radix_change_log_addition::state_root.eq(state_root))
+                    .and(not(
+                        merkle_radix_change_log_addition::addition.eq_any(deletions)
+                    )),
+            ),
+        )
+        .set(merkle_radix_change_log_addition::state_root.eq(successor))
+        .execute(conn)?;
+    }
+
+    // Remove the parent relationship on its successors
+    update(
+        merkle_radix_change_log_addition::table
+            .filter(merkle_radix_change_log_addition::parent_state_root.eq(state_root)),
+    )
+    .set(merkle_radix_change_log_addition::parent_state_root.eq(parent))
+    .execute(conn)?;
+
+    Ok(())
 }
 
 #[cfg(feature = "sqlite")]
