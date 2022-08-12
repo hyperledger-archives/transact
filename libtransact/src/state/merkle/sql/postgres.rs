@@ -151,7 +151,7 @@ impl Write for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -169,7 +169,7 @@ impl Write for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[StateChange],
     ) -> Result<Self::StateId, StateWriteError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -203,7 +203,7 @@ impl Read for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateReadError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         if !overlay
             .has_root()
@@ -257,7 +257,7 @@ impl Reader for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         if !overlay.has_root()? {
             return Err(InvalidStateError::with_message(state_id.into()).into());
@@ -291,7 +291,7 @@ impl Committer for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -312,7 +312,7 @@ impl DryRunCommitter for SqlMerkleState<PostgresBackend> {
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)
@@ -372,7 +372,7 @@ impl<'a> Reader for SqlMerkleState<InTransactionPostgresBackend<'a>> {
         state_id: &Self::StateId,
         keys: &[Self::Key],
     ) -> Result<HashMap<Self::Key, Self::Value>, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         if !overlay.has_root()? {
             return Err(InvalidStateError::with_message(state_id.into()).into());
@@ -410,7 +410,7 @@ impl<'a> Committer for SqlMerkleState<InTransactionPostgresBackend<'a>> {
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, tree_update) = overlay
             .generate_updates(state_changes)
@@ -434,7 +434,7 @@ impl<'a> DryRunCommitter for SqlMerkleState<InTransactionPostgresBackend<'a>> {
         state_id: &Self::StateId,
         state_changes: &[Self::StateChange],
     ) -> Result<Self::StateId, StateError> {
-        let overlay = MerkleRadixOverlay::new(self.tree_id, &*state_id, self.new_store());
+        let overlay = MerkleRadixOverlay::new(self.tree_id, state_id, self.new_store());
 
         let (next_state_id, _) = overlay
             .generate_updates(state_changes)

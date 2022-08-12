@@ -125,7 +125,7 @@ pub fn process_smallbank_playlist(
                     .as_bytes()
                     .to_vec(),
             )
-            .build(&*signer)
+            .build(signer)
             .map_err(|err| {
                 PlaylistError::BuildError(format!("Unable to build transaction: {}", err))
             })?;
