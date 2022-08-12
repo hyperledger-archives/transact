@@ -22,7 +22,7 @@ use crate::protos::{
 };
 
 /// Native implementation for ValueType
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ValueType {
     Int64(i64),
     Int32(i32),
@@ -32,7 +32,7 @@ pub enum ValueType {
     Bytes(Vec<u8>),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StateEntryValue {
     key: String,
     value: ValueType,
@@ -206,7 +206,7 @@ impl StateEntryValueBuilder {
 }
 
 /// Native implementation for StateEntry
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct StateEntry {
     normalized_key: String,
     state_entry_values: Vec<StateEntryValue>,

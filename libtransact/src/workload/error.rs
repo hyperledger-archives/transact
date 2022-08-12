@@ -20,7 +20,7 @@
 use crate::error::{InternalError, InvalidStateError};
 
 #[cfg(feature = "workload-runner")]
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum WorkloadRunnerError {
     /// Error raised when failing to submit the batch
     SubmitError(String),

@@ -21,7 +21,7 @@ use protobuf::Message;
 
 use super::error::StateDatabaseError;
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Successor {
     pub successor: Vec<u8>,
     pub deletions: Vec<Vec<u8>>,

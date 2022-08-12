@@ -102,7 +102,7 @@ impl From<InvalidTransactionResult> for TransactionReceipt {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ExecutionTaskCompletionNotification {
     /// The transation was invalid.
     Invalid(ContextId, InvalidTransactionResult),

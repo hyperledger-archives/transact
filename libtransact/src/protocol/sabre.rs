@@ -42,7 +42,7 @@ pub const CONTRACT_REGISTRY_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 1];
 pub const CONTRACT_ADDRESS_PREFIX_BYTES: &[u8] = &[0, 236, 2];
 
 /// Native implementation for SabrePayload_Action
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     CreateContract(CreateContractAction),
     ExecuteContract(ExecuteContractAction),
@@ -111,7 +111,7 @@ impl std::fmt::Display for ActionBuildError {
 }
 
 /// Creates a contract and updates the associated contract registry
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct CreateContractAction {
     name: String,
     version: String,
@@ -255,7 +255,7 @@ impl CreateContractActionBuilder {
 }
 
 /// Executes the contract
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct ExecuteContractAction {
     name: String,
     version: String,
@@ -423,7 +423,7 @@ impl ExecuteContractActionBuilder {
 }
 
 /// Create a contract registry with no version
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct CreateContractRegistryAction {
     name: String,
     owners: Vec<String>,
@@ -513,7 +513,7 @@ impl CreateContractRegistryActionBuilder {
 }
 
 /// Creates a namespace registry with no permissions
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct CreateNamespaceRegistryAction {
     namespace: String,
     owners: Vec<String>,
@@ -603,7 +603,7 @@ impl CreateNamespaceRegistryActionBuilder {
 }
 
 /// Adds a permission entry into a namespace registry for the associated namespace
-#[derive(Default, Debug, Clone, PartialEq)]
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
 pub struct CreateNamespaceRegistryPermissionAction {
     namespace: String,
     contract_name: String,
@@ -739,7 +739,7 @@ impl CreateNamespaceRegistryPermissionActionBuilder {
 }
 
 /// Contains the sabre action that will be executed
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SabrePayload {
     action: Action,
 }
