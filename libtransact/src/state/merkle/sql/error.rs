@@ -41,8 +41,8 @@ impl fmt::Display for SqlMerkleStateBuildError {
 impl Error for SqlMerkleStateBuildError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         match *self {
-            SqlMerkleStateBuildError::InternalError(ref e) => Some(&*e),
-            SqlMerkleStateBuildError::InvalidStateError(ref e) => Some(&*e),
+            SqlMerkleStateBuildError::InternalError(ref e) => Some(e),
+            SqlMerkleStateBuildError::InvalidStateError(ref e) => Some(e),
         }
     }
 }
