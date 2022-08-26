@@ -44,12 +44,12 @@ use super::batch::BatchBuilder;
 #[cfg(feature = "protocol-transaction-builder")]
 static DEFAULT_NONCE_SIZE: usize = 32;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Clone, Eq)]
 pub enum HashMethod {
     Sha512,
 }
 
-#[derive(PartialEq, Clone)]
+#[derive(PartialEq, Clone, Eq)]
 pub struct TransactionHeader {
     batcher_public_key: Vec<u8>,
     dependencies: Vec<String>,
