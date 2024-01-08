@@ -1,13 +1,10 @@
 > ⚠️ 
-> 
-> The Hyperledger Transact codebase is now maintained as part of 
-> Hyperledger Sawtooth's lib repository which you can find here:
-> https://github.com/hyperledger/sawtooth-lib
 >
-> Please head over to the link above to: ask questions, report issues, 
-> submit contributions, etc.**
+> Transact is now maintained as part of the Splinter Community. The
+> Hyperledger Transact incarnation has been moved to ARCHIVED status.
 >
-> (Hyperledger Transact has moved to DORMANT status.](https://github.com/hyperledger/toc/issues/98)
+> More information about Transact can be found at its new home:
+> https://github.com/splintercommunity/transact
 
 ---
 
